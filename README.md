@@ -6,7 +6,7 @@ The Azure Functions CLI provides a local development experience for creating, de
 
 ## Installing
 
-**NOTE**: This package only currently works on Windows and must be installed globally, since the underlying Functions Host is not yet cross-platform. You can upvote this GitHub issue if you're interested in running on other platforms: [make the Azure Functions CLI cross platform](https://github.com/Azure/azure-webjobs-sdk-script/issues/509).
+**NOTE**: This package only currently works on Windows and must be installed globally, since the underlying Functions Host is not yet cross-platform. You can upvote this GitHub issue if you're interested in running on other platforms: [make the Azure Functions CLI cross platform](https://github.com/Azure/azure-functions-cli/issues/13).
 
 Make sure you're using a Node version 6.x LTS or later, as the Yeoman dependency requires this.
 
