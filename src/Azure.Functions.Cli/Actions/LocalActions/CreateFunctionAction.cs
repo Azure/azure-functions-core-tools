@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Colors.Net;
 using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -15,9 +16,30 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         private readonly ITemplatesManager _templatesManager;
 
+        public string Language { get; set; }
+        public string TemplateName { get; set; }
+        public string FunctionName { get; set; }
+
         public CreateFunctionAction(ITemplatesManager templatesManager)
         {
             _templatesManager = templatesManager;
+        }
+
+        public override ICommandLineParserResult ParseArgs(string[] args)
+        {
+            Parser
+                .Setup<string>('l', "language")
+                .WithDescription("The programming language used in the template. e.g: C#, F#, JavaScript, etc.")
+                .Callback(l => Language = l);
+            Parser
+                .Setup<string>('t', "template")
+                .WithDescription("The name of the template to create.")
+                .Callback(t => TemplateName = t);
+            Parser
+                .Setup<string>('n', "name")
+                .WithDescription("The name of the function")
+                .Callback(n => FunctionName = n);
+            return Parser.Parse(args);
         }
 
         public async override Task RunAsync()
@@ -25,20 +47,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var templates = await _templatesManager.Templates;
 
             ColoredConsole.Write("Select a language: ");
-            var language = DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Distinct());
+            var language = Language ?? DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Distinct());
             ColoredConsole.WriteLine(TitleColor(language));
 
             ColoredConsole.Write("Select a template: ");
-            var name = DisplaySelectionWizard(templates.Where(t => t.Metadata.Language == language).Select(t => t.Metadata.Name).Distinct());
+            var name = TemplateName ?? DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(language, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
             ColoredConsole.WriteLine(TitleColor(name));
 
-            var template = templates.First(t => t.Metadata.Name == name && t.Metadata.Language == language);
+            var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(language, StringComparison.OrdinalIgnoreCase));
 
-            ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
-            var functionName = Console.ReadLine();
-            functionName = string.IsNullOrEmpty(functionName) ? template.Metadata.DefaultFunctionName : functionName;
-
-            await _templatesManager.Deploy(functionName, template);
+            if (template == null)
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor($"Can't find template \"{name}\" in \"{language}\""));
+            }
+            else
+            {
+                ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
+                var functionName = FunctionName ?? Console.ReadLine();
+                functionName = string.IsNullOrEmpty(functionName) ? template.Metadata.DefaultFunctionName : functionName;
+                await _templatesManager.Deploy(functionName, template);
+            }
         }
 
         private static T DisplaySelectionWizard<T>(IEnumerable<T> options)
