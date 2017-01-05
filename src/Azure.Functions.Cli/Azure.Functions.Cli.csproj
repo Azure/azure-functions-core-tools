@@ -39,8 +39,8 @@
       <HintPath>..\..\packages\ARMClient.Authentication.0.0.5-alpha\lib\net45\ARMClient.Authentication.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="ARMClient.Library, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\ARMClient.Library.0.0.8-alpha\lib\net45\ARMClient.Library.dll</HintPath>
+    <Reference Include="ARMClient.Library, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\ARMClient.Library.0.0.10-alpha\lib\net45\ARMClient.Library.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Autofac, Version=4.2.1.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
@@ -420,6 +420,7 @@
     <Compile Include="Arm\Models\Site.cs" />
     <Compile Include="Arm\Models\StorageAccount.cs" />
     <Compile Include="Arm\Models\Subscription.cs" />
+    <Compile Include="Arm\ArmResourceNotFoundException.cs" />
     <Compile Include="Common\CliException.cs" />
     <Compile Include="Common\Constants.cs" />
     <Compile Include="Common\DiskBacked.cs" />

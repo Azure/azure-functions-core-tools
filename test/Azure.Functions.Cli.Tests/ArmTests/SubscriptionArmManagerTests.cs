@@ -2,6 +2,8 @@
 using FluentAssertions;
 using Azure.Functions.Cli.Arm;
 using Xunit;
+using NSubstitute;
+using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Tests.ArmTests
 {
@@ -12,8 +14,9 @@ namespace Azure.Functions.Cli.Tests.ArmTests
         {
             var client = AzureClientFactory.GetAzureClient();
             var authHelper = AzureClientFactory.GetAuthHelper();
+            var settings = Substitute.For<ISettings>();
 
-            var armManager = new ArmManager(authHelper, client);
+            var armManager = new ArmManager(authHelper, client, settings);
             var subscriptions = await armManager.GetSubscriptionsAsync();
 
             subscriptions.Should()

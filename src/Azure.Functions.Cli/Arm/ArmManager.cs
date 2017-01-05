@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -9,7 +8,7 @@ using ARMClient.Authentication;
 using ARMClient.Authentication.Contracts;
 using ARMClient.Library;
 using Azure.Functions.Cli.Arm.Models;
-using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Arm
 {
@@ -17,24 +16,34 @@ namespace Azure.Functions.Cli.Arm
     {
         private readonly IAzureClient _client;
         private readonly IAuthHelper _authHelper;
+        private readonly ISettings _settings;
 
-        public ArmManager(IAuthHelper authHelper, IAzureClient client)
+        public ArmManager(IAuthHelper authHelper, IAzureClient client, ISettings settings)
         {
             _authHelper = authHelper;
             _client = client;
+            _settings = settings;
+            SelectTenantAsync(_settings.CurrentSubscription);
         }
 
         public async Task<IEnumerable<Site>> GetFunctionAppsAsync()
         {
-            var subscriptions = await GetSubscriptionsAsync();
-            var temp = await subscriptions.Select(GetFunctionAppsAsync).IgnoreAndFilterFailures();
-            return temp.SelectMany(i => i);
+            var subscription = await GetCurrentSubscriptionAsync();
+            return await GetFunctionAppsAsync(subscription);
         }
 
         public async Task<Site> GetFunctionAppAsync(string name)
         {
             var functionApps = await GetFunctionAppsAsync();
-            return await LoadAsync(functionApps.FirstOrDefault(s => s.SiteName.Equals(name, StringComparison.OrdinalIgnoreCase)));
+            var functionApp = functionApps.FirstOrDefault(s => s.SiteName.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (functionApp == null)
+            {
+                throw new ArmResourceNotFoundException($"Can't find app with name \"{name}\" in current subscription.");
+            }
+            else
+            {
+                return await LoadAsync(functionApp);
+            }
         }
 
         public async Task<Site> CreateFunctionAppAsync(string subscriptionStr, string resourceGroupStr, string functionAppNameStr, string geoLocationStr)
@@ -140,16 +149,14 @@ namespace Azure.Functions.Cli.Arm
 
         public async Task<IEnumerable<StorageAccount>> GetStorageAccountsAsync()
         {
-            var subscriptions = await GetSubscriptionsAsync();
-            var temp = await subscriptions.Select(GetStorageAccountsAsync).IgnoreAndFilterFailures();
-            return temp.SelectMany(i => i);
+            var subscription = await GetCurrentSubscriptionAsync();
+            return await GetStorageAccountsAsync(subscription);
         }
 
         public async Task<IEnumerable<ArmWrapper<object>>> getAzureResourceAsync(string resourceName)
         {
-            var subscriptions = await GetSubscriptionsAsync();
-            var temp = await subscriptions.Select(s => GetResourcesByNameAsync(s, resourceName)).IgnoreAndFilterFailures();
-            return temp.SelectMany(i => i);
+            var subscription = await GetCurrentSubscriptionAsync();
+            return await GetResourcesByNameAsync(subscription, resourceName);
         }
 
         private async Task<IEnumerable<ArmWrapper<object>>> GetResourcesByNameAsync(Subscription subscription, string resourceName)

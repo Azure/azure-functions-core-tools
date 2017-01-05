@@ -1,5 +1,4 @@
-﻿using System.Threading.Tasks;
-using ARMClient.Library;
+﻿using ARMClient.Library;
 
 namespace Azure.Functions.Cli.Arm
 {

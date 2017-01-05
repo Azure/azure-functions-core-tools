@@ -55,6 +55,11 @@ namespace Azure.Functions.Cli
             builder.Register(c => new PersistentAuthHelper { AzureEnvironments = AzureEnvironments.Prod })
                 .As<IAuthHelper>();
 
+            builder.Register(_ => new PersistentSettings())
+                .As<ISettings>()
+                .SingleInstance()
+                .ExternallyOwned();
+
             builder.Register(c => new AzureClient(retryCount: 3, authHelper: c.Resolve<IAuthHelper>()))
                 .As<IAzureClient>();
 
@@ -66,11 +71,6 @@ namespace Azure.Functions.Cli
 
             builder.RegisterType<SecretsManager>()
                 .As<ISecretsManager>();
-
-            builder.Register(_ => new PersistentSettings())
-                .As<ISettings>()
-                .SingleInstance()
-                .ExternallyOwned();
 
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();

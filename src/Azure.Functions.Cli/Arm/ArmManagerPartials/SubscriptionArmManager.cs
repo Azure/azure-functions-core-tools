@@ -19,9 +19,15 @@ namespace Azure.Functions.Cli.Arm
             return subscriptions.Value.Select(s => new Subscription(s.SubscriptionId, s.DisplayName));
         }
 
-        public async Task<Subscription> GetSubscriptionAsync(string subscriptionId)
+        public async Task<Subscription> GetCurrentSubscriptionAsync()
         {
-            var subscriptionResponse = await _client.HttpInvoke(HttpMethod.Get, ArmUriTemplates.Subscription.Bind(new { subscriptionId = subscriptionId }));
+            if (string.IsNullOrEmpty(_settings.CurrentSubscription))
+            {
+                var subscriptions = await GetSubscriptionsAsync();
+                _settings.CurrentSubscription = subscriptions.First().SubscriptionId;
+            }
+
+            var subscriptionResponse = await _client.HttpInvoke(HttpMethod.Get, ArmUriTemplates.Subscription.Bind(new { subscriptionId = _settings.CurrentSubscription }));
             subscriptionResponse.EnsureSuccessStatusCode();
 
             var subscription = await subscriptionResponse.Content.ReadAsAsync<ArmSubscription>();

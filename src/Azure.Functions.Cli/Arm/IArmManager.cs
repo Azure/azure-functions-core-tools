@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Arm
         Task<TenantCacheInfo> GetCurrentTenantAsync();
         IEnumerable<TenantCacheInfo> GetTenants();
         Task<IEnumerable<Subscription>> GetSubscriptionsAsync();
-        Task<Subscription> GetSubscriptionAsync(string subscriptionId);
+        Task<Subscription> GetCurrentSubscriptionAsync();
         Task<Site> LoadSitePublishingCredentialsAsync(Site site);
         Task<IEnumerable<StorageAccount>> GetStorageAccountsAsync();
         Task<IEnumerable<StorageAccount>> GetStorageAccountsAsync(Subscription subscription);

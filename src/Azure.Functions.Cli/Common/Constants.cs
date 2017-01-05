@@ -7,6 +7,7 @@
         public const string StorageAccountArmType = "Microsoft.Storage/storageAccounts";
         public const string FunctionAppArmKind = "functionapp";
         public const string CliVersion = "1.0.0-beta.9";
+        public const string CliDebug = "CLI_DEBUG";
 
         public static class Errors
         {

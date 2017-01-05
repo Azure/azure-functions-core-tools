@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            var storageAccounts = await _armManager.GetStorageAccountsAsync(await _armManager.GetSubscriptionAsync(_settings.CurrentSubscription));
+            var storageAccounts = await _armManager.GetStorageAccountsAsync(await _armManager.GetCurrentSubscriptionAsync());
             if (storageAccounts.Any())
             {
                 ColoredConsole.WriteLine(TitleColor("Storage Accounts:"));

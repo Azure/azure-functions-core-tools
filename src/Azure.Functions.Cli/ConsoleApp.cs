@@ -4,13 +4,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 using Autofac;
-using Colors.Net;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli
 {
@@ -40,7 +40,14 @@ namespace Azure.Functions.Cli
                 }
                 catch (Exception ex)
                 {
-                    ColoredConsole.Error.WriteLine(ex.ToString());
+                    if (Environment.GetEnvironmentVariable(Constants.CliDebug) == "1")
+                    {
+                        ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
+                    }
+                    else
+                    {
+                        ColoredConsole.Error.WriteLine(ErrorColor(ex.Message));
+                    }
                 }
             }
         }

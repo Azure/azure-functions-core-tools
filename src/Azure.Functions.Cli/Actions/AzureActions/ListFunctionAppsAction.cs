@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public override async Task RunAsync()
         {
             var user = await _armManager.GetUserAsync();
-            var functionApps = await _armManager.GetFunctionAppsAsync(await _armManager.GetSubscriptionAsync(_settings.CurrentSubscription));
+            var functionApps = await _armManager.GetFunctionAppsAsync(await _armManager.GetCurrentSubscriptionAsync());
             if (functionApps.Any())
             {
                 ColoredConsole.WriteLine(TitleColor("Function Apps:"));
