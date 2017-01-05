@@ -12,8 +12,6 @@ using System.Web.Http.SelfHost;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script.WebHost;
-using Microsoft.Azure.WebJobs.Script.WebHost.Common;
-using Microsoft.Azure.WebJobs.Script.WebHost.Kudu;
 using Newtonsoft.Json.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -120,24 +118,24 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     await Task.Delay(500);
                 }
 
-                using (var client = new HttpClient() { BaseAddress = server })
-                {
-                    var functionsResponse = await client.GetAsync("admin/functions");
-                    var hostConfigResponse = await client.GetAsync("admin/functions/config");
-                    var functions = await functionsResponse.Content.ReadAsAsync<FunctionEnvelope[]>();
-                    var httpFunctions = functions.Where(f => f.Config?["bindings"]?.Any(b => b["type"].ToString() == "httpTrigger") == true);
-                    var hostConfig = await hostConfigResponse.Content.ReadAsAsync<JObject>();
-                    foreach (var function in httpFunctions)
-                    {
-                        var httpRoute = function.Config["bindings"]?.FirstOrDefault(b => b["type"].ToString() == "httpTrigger")?["route"]?.ToString();
-                        httpRoute = httpRoute ?? function.Name;
-                        var hostRoutePrefix = hostConfig?["http"]?["routePrefix"]?.ToString() ?? "api/";
-                        hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
-                            ? hostRoutePrefix
-                            : $"{hostRoutePrefix}/";
-                        ColoredConsole.WriteLine($"{TitleColor($"Http Function {function.Name}:")} {server.ToString()}{hostRoutePrefix}{httpRoute}");
-                    }
-                }
+                //using (var client = new HttpClient() { BaseAddress = server })
+                //{
+                //    var functionsResponse = await client.GetAsync("admin/functions");
+                //    var hostConfigResponse = await client.GetAsync("admin/functions/config");
+                //    var functions = await functionsResponse.Content.ReadAsAsync<FunctionEnvelope[]>();
+                //    var httpFunctions = functions.Where(f => f.Config?["bindings"]?.Any(b => b["type"].ToString() == "httpTrigger") == true);
+                //    var hostConfig = await hostConfigResponse.Content.ReadAsAsync<JObject>();
+                //    foreach (var function in httpFunctions)
+                //    {
+                //        var httpRoute = function.Config["bindings"]?.FirstOrDefault(b => b["type"].ToString() == "httpTrigger")?["route"]?.ToString();
+                //        httpRoute = httpRoute ?? function.Name;
+                //        var hostRoutePrefix = hostConfig?["http"]?["routePrefix"]?.ToString() ?? "api/";
+                //        hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
+                //            ? hostRoutePrefix
+                //            : $"{hostRoutePrefix}/";
+                //        ColoredConsole.WriteLine($"{TitleColor($"Http Function {function.Name}:")} {server.ToString()}{hostRoutePrefix}{httpRoute}");
+                //    }
+                //}
             }
             catch (Exception ex)
             {

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script.Description;
-using Microsoft.Azure.WebJobs.Script.WebHost.Kudu;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -15,6 +14,7 @@ using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -165,7 +165,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 invocation = invocation ?? string.Empty;
 
-                var adminInvocation = JsonConvert.SerializeObject(new FunctionInvocation { Input = invocation, WaitForCompletion = true });
+                var adminInvocation = JsonConvert.SerializeObject(new FunctionInvocation { Input = invocation });
 
                 var response = functionStatus.IsHttpFunction()
                     ? await client.PostAsync($"api/{FunctionName}", new StringContent(invocation, Encoding.UTF8, invocation.IsJson() ? "application/json" : "plain/text"))
