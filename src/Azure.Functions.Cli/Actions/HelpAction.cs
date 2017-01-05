@@ -9,6 +9,7 @@ using Fclp;
 using Microsoft.Azure.WebJobs.Script;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions
 {
@@ -57,13 +58,15 @@ namespace Azure.Functions.Cli.Actions
 
                 if (!string.IsNullOrEmpty(_context) && !Enum.TryParse(_context, true, out context))
                 {
-                    ColoredConsole.Error.WriteLine($"Error: unknown argument {_context}");
+                    ColoredConsole.Error.WriteLine(ErrorColor($"Error: unknown argument {_context}"));
+                    DisplayGeneralHelp();
                     return Task.CompletedTask;
                 }
 
                 if (!string.IsNullOrEmpty(_subContext) && !Enum.TryParse(_subContext, true, out subContext))
                 {
-                    ColoredConsole.Error.WriteLine($"Error: unknown argument {_subContext} in {context.ToLowerCaseString()} Context");
+                    ColoredConsole.Error.WriteLine(ErrorColor($"Error: unknown argument {_subContext} in {context.ToLowerCaseString()} Context"));
+                    DisplayContextHelp(context, Context.None);
                     return Task.CompletedTask;
                 }
 

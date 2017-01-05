@@ -19,6 +19,7 @@ namespace Azure.Functions.Cli
         private readonly IContainer _container;
         private readonly string[] _args;
         private readonly IEnumerable<TypeAttributePair> _actionAttributes;
+        private readonly string[] _helpArgs = new[] { "help", "h", "?", "version", "v" };
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
         public static void Run<T>(string[] args, IContainer container)
@@ -109,9 +110,7 @@ namespace Azure.Functions.Cli
             //ConsoleAppUtilities.ValidateVerbs(_verbTypes);
 #endif
             if (_args.Length == 0 ||
-                _args.Any(a => a.Equals("-v", StringComparison.OrdinalIgnoreCase) ||
-                               a.Equals("--version", StringComparison.OrdinalIgnoreCase) ||
-                               a.Equals("-version", StringComparison.OrdinalIgnoreCase)))
+                _helpArgs.Any(ha => _args[0].Replace("-", "").Equals(ha, StringComparison.OrdinalIgnoreCase)))
             {
                 return new HelpAction(_actionAttributes);
             }
