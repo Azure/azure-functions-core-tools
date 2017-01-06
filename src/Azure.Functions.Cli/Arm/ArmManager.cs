@@ -60,7 +60,7 @@ namespace Azure.Functions.Cli.Arm
             var functionApp = new Site(subscription.SubscriptionId, resourceGroup.ResourceGroupName, functionAppNameStr);
             var keys = await GetStorageAccountKeysAsync(storageAccount);
             var connectionString = $"DefaultEndpointsProtocol=https;AccountName={storageAccount.StorageAccountName};AccountKey={keys.First().Value}";
-            var armFunctionApp = await ArmHttpAsync<ArmWrapper<object>>(HttpMethod.Put, ArmUriTemplates.Site.Bind(functionApp),
+            await ArmHttpAsync<ArmWrapper<object>>(HttpMethod.Put, ArmUriTemplates.Site.Bind(functionApp),
                     new
                     {
                         properties = new

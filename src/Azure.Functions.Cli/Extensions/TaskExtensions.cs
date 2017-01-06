@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -8,22 +9,53 @@ namespace Azure.Functions.Cli.Extensions
     {
         public static void Ignore(this Task task)
         {
-            //Empty ignore functions for tasks.
+            task.ContinueWith(t =>
+            {
+                try
+                {
+                    t.Wait();
+                }
+                catch (Exception e)
+                {
+                    System.Diagnostics.Trace.TraceError($"SafeGuard Exception: {e.ToString()}");
+                }
+            }, TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted);
         }
 
         public static Task IgnoreFailure(this Task task)
         {
-            return Utilities.SafeGuardAsync(() => task);
+            return task.ContinueWith(t =>
+            {
+                try
+                {
+                    t.Wait();
+                }
+                catch (Exception e)
+                {
+                    System.Diagnostics.Trace.TraceError($"SafeGuard Exception: {e.ToString()}");
+                }
+            }, TaskContinuationOptions.ExecuteSynchronously);
         }
 
         public static Task<T> IgnoreFailure<T>(this Task<T> task)
         {
-            return Utilities.SafeGuardAsync<T>(() => task);
+            return task.ContinueWith(t =>
+            {
+                try
+                {
+                    return t.Result;
+                }
+                catch (Exception e)
+                {
+                    System.Diagnostics.Trace.TraceError($"SafeGuard<T> Exception: {e.ToString()}");
+                }
+                return default(T);
+            }, TaskContinuationOptions.ExecuteSynchronously);
         }
 
         public static async Task<IEnumerable<T>> IgnoreAndFilterFailures<T>(this IEnumerable<Task<T>> collection)
         {
-            return (await collection.Select(t => Utilities.SafeGuardAsync<T>(() => t)).WhenAll()).NotDefaults();
+            return (await collection.Select(t => TaskUtilities.SafeGuardAsync<T>(() => t)).WhenAll()).NotDefaults();
         }
 
         public static Task WhenAll(this IEnumerable<Task> collection)

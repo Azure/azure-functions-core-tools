@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.Helpers
 }}";
 
             var existingLaunchJson = await (FileSystemHelpers.FileExists(LaunchJsonPath)
-                ? Utilities.SafeGuardAsync(async () => JsonConvert.DeserializeObject<JObject>(await FileSystemHelpers.ReadAllTextFromFileAsync(LaunchJsonPath)))
+                ? TaskUtilities.SafeGuardAsync(async () => JsonConvert.DeserializeObject<JObject>(await FileSystemHelpers.ReadAllTextFromFileAsync(LaunchJsonPath)))
                 : Task.FromResult<JObject>(null));
 
             FileSystemHelpers.CreateDirectory(Path.GetDirectoryName(LaunchJsonPath));

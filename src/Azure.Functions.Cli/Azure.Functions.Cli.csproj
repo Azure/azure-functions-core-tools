@@ -34,6 +34,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)'!='Unix'">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="ARMClient.Authentication, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\ARMClient.Authentication.0.0.5-alpha\lib\net45\ARMClient.Authentication.dll</HintPath>
@@ -453,6 +456,7 @@
     <Compile Include="FunctionsLocalServer.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Helpers\DebuggerHelper.cs" />
+    <Compile Include="Helpers\PlatformHelper.cs" />
     <Compile Include="Helpers\SecurityHelpers.cs" />
     <Compile Include="Interfaces\IAction.cs" />
     <Compile Include="Interfaces\IFunctionsLocalServer.cs" />
@@ -475,7 +479,7 @@
       <SubType>Designer</SubType>
     </None>
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(OS)'!='Unix'">
     <COMReference Include="CERTENROLLLib">
       <Guid>{728AB348-217D-11DA-B2A4-000E7BBB2B09}</Guid>
       <VersionMajor>1</VersionMajor>
