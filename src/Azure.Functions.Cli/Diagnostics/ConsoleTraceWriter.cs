@@ -5,6 +5,7 @@ using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Host;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Microsoft.Azure.WebJobs.Script;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
@@ -32,7 +33,8 @@ namespace Azure.Functions.Cli.Diagnostics
             switch (traceEvent.Level)
             {
                 case TraceLevel.Error:
-                    return ErrorColor(traceEvent.Message);
+                    string errorMessage = traceEvent.Message + Environment.NewLine + Utility.FlattenException(traceEvent.Exception);
+                    return ErrorColor(errorMessage);
                 case TraceLevel.Warning:
                     return traceEvent.Message.Yellow();
                 case TraceLevel.Info:
