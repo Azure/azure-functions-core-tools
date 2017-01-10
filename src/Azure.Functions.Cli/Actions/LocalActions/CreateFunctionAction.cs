@@ -74,12 +74,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var current = 0;
             var next = current;
             var leftPos = Console.CursorLeft;
-            var topPos = Console.CursorTop;
+            var topPos = Console.CursorTop == Console.BufferHeight - 1 ? Console.CursorTop - 1 : Console.CursorTop;
             var optionsArray = options.ToArray();
 
             ColoredConsole.WriteLine();
             for (var i = 0; i < optionsArray.Length; i++)
             {
+                if (Console.CursorTop == Console.BufferHeight - 1)
+                {
+                    topPos -= 1;
+                }
+
                 if (i == current)
                 {
                     ColoredConsole.WriteLine(TitleColor(optionsArray[i].ToString()));
@@ -133,7 +138,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private static void ClearConsole(int topPos, int length)
         {
             Console.SetCursorPosition(0, topPos);
-            for (var i = 0; i < length * 2; i++)
+            for (var i = 0; i < Math.Min(length * 2, Console.BufferHeight - topPos - 1); i++)
             {
                 ColoredConsole.WriteLine(new string(' ', Console.BufferWidth - 1));
             }
