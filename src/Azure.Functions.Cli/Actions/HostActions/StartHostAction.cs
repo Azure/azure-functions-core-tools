@@ -27,6 +27,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         const int DefaultPort = 7071;
         const int DefaultNodeDebugPort = 5858;
         const TraceLevel DefaultDebugLevel = TraceLevel.Info;
+        const int DefaultTimeout = 20;
 
         public int Port { get; set; }
 
@@ -35,6 +36,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public TraceLevel ConsoleTraceLevel { get; set; }
 
         public string CorsOrigins { get; set; }
+
+        public int Timeout { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -61,6 +64,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"A comma separated list of CORS origins with no spaces. Example: https://functions.azure.com,https://functions-staging.azure.com")
                 .SetDefault(LocalhostConstants.AzureFunctionsCors)
                 .Callback(c => CorsOrigins = c);
+
+            Parser
+                .Setup<int>('t', "timeout")
+                .WithDescription($"Timeout for on the functions host to start in seconds. Default: {DefaultTimeout} seconds.")
+                .SetDefault(DefaultTimeout)
+                .Callback(t => Timeout = t);
 
             return Parser.Parse(args);
         }
@@ -92,8 +101,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 await httpServer.OpenAsync();
                 ColoredConsole.WriteLine($"Listening on {baseAddress}");
                 ColoredConsole.WriteLine("Hit CTRL-C to exit...");
-                await PostHostStartActions(baseAddress);
-                DisableCoreLogging(config);
+                await PostHostStartActions(config);
                 await Task.Delay(-1);
                 await httpServer.CloseAsync();
             }
@@ -109,33 +117,47 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private static async Task PostHostStartActions(Uri server)
+        private void DisplayHttpFunctionsInfo(HttpSelfHostConfiguration config)
+        {
+
+            WebScriptHostManager hostManager = config.DependencyResolver.GetService<WebScriptHostManager>();
+
+            if (hostManager != null)
+            {
+                foreach (var function in hostManager.Instance.Functions)
+                {
+                    var httpRoute = function.Metadata.Bindings.FirstOrDefault(b => b.Type == "httpTrigger")?.Raw["route"]?.ToString();
+                    httpRoute = httpRoute ?? function.Name;
+                    var hostRoutePrefix = hostManager.Instance.ScriptConfig.HttpRoutePrefix ?? "api/";
+                    hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
+                        ? hostRoutePrefix
+                        : $"{hostRoutePrefix}/";
+                    ColoredConsole.WriteLine($"{TitleColor($"Http Function {function.Name}:")} {config.BaseAddress.ToString()}{hostRoutePrefix}{httpRoute}");
+                }
+            }
+        }
+
+        private async Task PostHostStartActions(HttpSelfHostConfiguration config)
         {
             try
             {
-                while (!await server.IsServerRunningAsync())
+                var totalRetryTimes = Timeout * 2;
+                var retries = 0;
+                while (!await config.BaseAddress.IsServerRunningAsync())
                 {
-                    await Task.Delay(500);
+                    retries++;
+                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                    if (retries % 10 == 0)
+                    {
+                        ColoredConsole.WriteLine(WarningColor("The host is taking longer than expected to start."));
+                    }
+                    else if (retries == totalRetryTimes)
+                    {
+                        throw new TimeoutException("Host was unable to start in specified time.");
+                    }
                 }
-
-                //using (var client = new HttpClient() { BaseAddress = server })
-                //{
-                //    var functionsResponse = await client.GetAsync("admin/functions");
-                //    var hostConfigResponse = await client.GetAsync("admin/functions/config");
-                //    var functions = await functionsResponse.Content.ReadAsAsync<FunctionEnvelope[]>();
-                //    var httpFunctions = functions.Where(f => f.Config?["bindings"]?.Any(b => b["type"].ToString() == "httpTrigger") == true);
-                //    var hostConfig = await hostConfigResponse.Content.ReadAsAsync<JObject>();
-                //    foreach (var function in httpFunctions)
-                //    {
-                //        var httpRoute = function.Config["bindings"]?.FirstOrDefault(b => b["type"].ToString() == "httpTrigger")?["route"]?.ToString();
-                //        httpRoute = httpRoute ?? function.Name;
-                //        var hostRoutePrefix = hostConfig?["http"]?["routePrefix"]?.ToString() ?? "api/";
-                //        hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
-                //            ? hostRoutePrefix
-                //            : $"{hostRoutePrefix}/";
-                //        ColoredConsole.WriteLine($"{TitleColor($"Http Function {function.Name}:")} {server.ToString()}{hostRoutePrefix}{httpRoute}");
-                //    }
-                //}
+                DisableCoreLogging(config);
+                DisplayHttpFunctionsInfo(config);
             }
             catch (Exception ex)
             {
