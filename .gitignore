@@ -18,3 +18,4 @@ Publish
 
 *.ncrunchproject
 *.ncrunchsolution
+nCrunchTemp*
