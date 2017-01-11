@@ -1,13 +1,16 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using Autofac;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -69,7 +72,16 @@ namespace Azure.Functions.Cli
                     .Select(n =>
                     {
                         var property = action.GetType().GetProperty(n.Name);
-                        return $"{n.ParamName} {property.GetValue(action).ToString()}";
+                        if (property.PropertyType.IsGenericEnumerable())
+                        {
+                            var genericCollection = property.GetValue(action) as IEnumerable;
+                            var collection = genericCollection.Cast<object>().Select(o => o.ToString());
+                            return $"{n.ParamName} {string.Join(" ", collection)}";
+                        }
+                        else
+                        {
+                            return $"{n.ParamName} {property.GetValue(action).ToString()}";
+                        }
                     })
                     .Aggregate((a, b) => string.Join(" ", a, b));
 
@@ -113,9 +125,6 @@ namespace Azure.Functions.Cli
 
         internal IAction Parse()
         {
-#if DEBUG
-            //ConsoleAppUtilities.ValidateVerbs(_verbTypes);
-#endif
             if (_args.Length == 0 ||
                 _helpArgs.Any(ha => _args[0].Replace("-", "").Equals(ha, StringComparison.OrdinalIgnoreCase)))
             {

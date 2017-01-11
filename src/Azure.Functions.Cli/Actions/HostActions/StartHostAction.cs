@@ -17,6 +17,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using System.Collections.Generic;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -38,6 +39,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public string CorsOrigins { get; set; }
 
         public int Timeout { get; set; }
+
+        public bool UseHttps { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -70,6 +73,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"Timeout for on the functions host to start in seconds. Default: {DefaultTimeout} seconds.")
                 .SetDefault(DefaultTimeout)
                 .Callback(t => Timeout = t);
+
+            Parser
+                .Setup<bool>("useHttps")
+                .WithDescription("Bind to https://localhost:{port} rather than http://localhost:{port}. By default it creates and trusts a certificate.")
+                .SetDefault(false)
+                .Callback(s => UseHttps = s);
 
             return Parser.Parse(args);
         }
@@ -188,18 +197,28 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private Uri Setup()
         {
-            if (!SecurityHelpers.IsUrlAclConfigured("http", Port))
+            var protocol = UseHttps ? "https" : "http";
+            var actions = new List<InternalAction>();
+            if (!SecurityHelpers.IsUrlAclConfigured(protocol, Port))
+            {
+                actions.Add(InternalAction.SetupUrlAcl);
+            }
+
+            if (UseHttps && !SecurityHelpers.IsSSLConfigured(Port))
+            {
+                actions.Add(InternalAction.SetupSslCert);
+            }
+
+            if (actions.Any())
             {
                 string errors;
-                // TODONOW
-                if (!ConsoleApp.RelaunchSelfElevated(new InternalUseAction { Port = Port, Action = InternalAction.SetupUrlAcl }, out errors))
+                if (!ConsoleApp.RelaunchSelfElevated(new InternalUseAction { Port = Port, Actions = actions, Protocol = protocol}, out errors))
                 {
                     ColoredConsole.WriteLine("Error: " + errors);
                     Environment.Exit(ExitCodes.GeneralError);
                 }
             }
-
-            return new Uri($"http://localhost:{Port}");
+            return new Uri($"{protocol}://localhost:{Port}");
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")]
