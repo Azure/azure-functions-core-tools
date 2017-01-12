@@ -8,6 +8,7 @@ using Colors.Net;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.NativeMethods;
 using static Azure.Functions.Cli.Common.OutputTheme;

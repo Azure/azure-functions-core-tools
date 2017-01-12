@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Extensions
 {

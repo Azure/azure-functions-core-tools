@@ -78,7 +78,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.WebHost">
-      <HintPath>..\..\azure-webjobs-sdk-script2\src\WebJobs.Script.WebHost\bin\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
+      <HintPath>..\..\..\azure-webjobs-sdk-script\src\WebJobs.Script.WebHost\bin\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Data.Edm, Version=5.8.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.Data.Edm.5.8.1\lib\net40\Microsoft.Data.Edm.dll</HintPath>
