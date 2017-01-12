@@ -151,4 +151,4 @@ For questions on Azure Functions or the CLI, you can ask questions here:
 - [Azure Functions MSDN Forum](https://social.msdn.microsoft.com/Forums/azure/en-US/home?forum=AzureFunctions)
 - [Azure-Functions tag on StackOverflow](http://stackoverflow.com/questions/tagged/azure-functions)
 
-To file bugs, post an issue with the prefix "CLI:" in the [Azure Functions Script repo on GitHub](https://github.com/Azure/azure-webjobs-sdk-script/issues).
+File bugs at [Azure Functions CLI repo on GitHub](https://github.com/Azure/azure-functions-cli/issues).
