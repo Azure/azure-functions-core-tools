@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Fclp;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -22,7 +23,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (args.Length == 0)
             {
-                throw new ArgumentException("Must specify setting name.");
+                throw new CliArgumentsException("Must specify setting name.",
+                    new CliArgument { Name = nameof(Name), Description = "Name of app setting to be deleted." });
             }
             else
             {

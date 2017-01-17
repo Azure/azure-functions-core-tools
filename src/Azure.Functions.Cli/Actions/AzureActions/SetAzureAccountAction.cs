@@ -5,6 +5,7 @@ using Colors.Net;
 using Fclp;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -12,7 +13,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "set", Context = Context.Azure, SubContext = Context.Subscriptions, HelpText = "Set the active subscription")]
     class SetAzureAccountAction : BaseAzureAccountAction
     {
-        private string _subscription { get; set; }
+        private string Subscription { get; set; }
 
         public SetAzureAccountAction(IArmManager armManager, ISettings settings)
             : base(armManager, settings)
@@ -23,11 +24,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             if (args.Any())
             {
-                _subscription = args.First();
+                Subscription = args.First();
             }
             else
             {
-                throw new ArgumentException("Must specify subscription id.");
+                throw new CliArgumentsException("Must specify subscription id.",
+                    new CliArgument { Name = nameof(Subscription), Description = "Subscription Id" });
             }
 
             return base.ParseArgs(args);
@@ -39,14 +41,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var validSub = tenants
                 .Select(t => t.subscriptions)
                 .SelectMany(s => s)
-                .Any(s => s.subscriptionId.Equals(_subscription));
+                .Any(s => s.subscriptionId.Equals(Subscription));
             if (validSub)
             {
-                Settings.CurrentSubscription = _subscription;
+                Settings.CurrentSubscription = Subscription;
             }
             else
             {
-                ColoredConsole.Error.WriteLine($"Unable to find ${_subscription}");
+                ColoredConsole.Error.WriteLine($"Unable to find ${Subscription}");
             }
             await PrintAccountsAsync();
         }

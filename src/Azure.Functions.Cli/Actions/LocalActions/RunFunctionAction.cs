@@ -37,31 +37,33 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
+            Parser
+                .Setup<int>('t', "timeout")
+                .WithDescription("Time to wait until Functions Server is ready in Seconds")
+                .SetDefault(20)
+                .Callback(t => Timeout = t);
+            Parser
+                .Setup<string>('c', "content")
+                .WithDescription("In line content to use")
+                .Callback(c => Content = c);
+            Parser
+                .Setup<string>('f', "file")
+                .WithDescription("File name to use as content")
+                .Callback(f => FileName = f);
+            Parser
+                .Setup<bool>('d', "debug")
+                .WithDescription("Attach a debugger to the host process before running the function.")
+                .Callback(d => Debug = d);
+
             if (args.Any())
             {
                 FunctionName = args.First();
-                Parser
-                    .Setup<int>('t', "timeout")
-                    .WithDescription("Time to wait until Functions Server is ready in Seconds")
-                    .SetDefault(20)
-                    .Callback(t => Timeout = t);
-                Parser
-                    .Setup<string>('c', "content")
-                    .WithDescription("In line content to use")
-                    .Callback(c => Content = c);
-                Parser
-                    .Setup<string>('f', "file")
-                    .WithDescription("File name to use as content")
-                    .Callback(f => FileName = f);
-                Parser
-                    .Setup<bool>('d', "debug")
-                    .WithDescription("Attach a debugger to the host process before running the function.")
-                    .Callback(d => Debug = d);
                 return Parser.Parse(args);
             }
             else
             {
-                throw new ArgumentException("Must specify function to run");
+                throw new CliArgumentsException("Must specify function to run", Parser.Parse(args),
+                    new CliArgument { Name = nameof(FunctionName), Description = "Function name to run." });
             }
         }
 

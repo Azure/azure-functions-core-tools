@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.Helpers
             if (response.IsSuccessStatusCode)
             {
                 var status = await response.Content.ReadAsAsync<HostStatus>();
-                return status.WebHostSettings.NodeDebugPort;
+                return 5858;
             }
             else
             {

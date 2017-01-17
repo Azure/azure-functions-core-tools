@@ -15,6 +15,7 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
+
 namespace Azure.Functions.Cli
 {
     class ConsoleApp
@@ -126,12 +127,17 @@ namespace Azure.Functions.Cli
         internal IAction Parse()
         {
             if (_args.Length == 0 ||
-                _helpArgs.Any(ha => _args[0].Replace("-", "").Equals(ha, StringComparison.OrdinalIgnoreCase)))
+                (_args.Length == 1 && _helpArgs.Any(ha => _args[0].Replace("-", "").Equals(ha, StringComparison.OrdinalIgnoreCase)))
+               )
             {
-                return new HelpAction(_actionAttributes);
+                return new HelpAction(_actionAttributes, CreateAction);
             }
 
-            var argsStack = new Stack<string>(_args.Reverse());
+            var isHelp = _args.First().Equals("help", StringComparison.OrdinalIgnoreCase)
+                ? true
+                : false;
+
+            var argsStack = new Stack<string>((isHelp ? _args.Skip(1) : _args).Reverse());
             var contextStr = argsStack.Peek();
             var subContextStr = string.Empty;
             var context = Context.None;
@@ -156,9 +162,9 @@ namespace Azure.Functions.Cli
                 actionStr = argsStack.Pop();
             }
 
-            if (string.IsNullOrEmpty(actionStr))
+            if (string.IsNullOrEmpty(actionStr) || isHelp)
             {
-                return new HelpAction(_actionAttributes, contextStr, subContextStr);
+                return new HelpAction(_actionAttributes, CreateAction, contextStr, subContextStr);
             }
 
             var actionType = _actionAttributes
@@ -169,37 +175,37 @@ namespace Azure.Functions.Cli
 
             if (actionType == null)
             {
-                return new HelpAction(_actionAttributes, contextStr, subContextStr);
+                return new HelpAction(_actionAttributes, CreateAction, contextStr, subContextStr);
             }
 
-            var action = CreateAction(actionType);
+            var action = CreateAction(actionType.Type);
             var args = argsStack.ToArray();
             try
             {
                 var parseResult = action.ParseArgs(args);
                 if (parseResult.HasErrors)
                 {
-                    return new HelpAction(_actionAttributes, action, parseResult);
+                    return new HelpAction(_actionAttributes, CreateAction, action, parseResult);
                 }
                 else
                 {
                     return action;
                 }
             }
-            catch (ArgumentException ex)
+            catch (CliArgumentsException ex)
             {
                 ColoredConsole.Error.WriteLine(ex.Message);
                 return null;
             }
         }
 
-        internal IAction CreateAction(TypeAttributePair actionType)
+        internal IAction CreateAction(Type type)
         {
-            var ctor = actionType.Type.GetConstructors()?.SingleOrDefault();
+            var ctor = type.GetConstructors()?.SingleOrDefault();
             var args = ctor?.GetParameters()?.Select(p => _container.Resolve(p.ParameterType)).ToArray();
             return args == null || args.Length == 0
-                ? (IAction)Activator.CreateInstance(actionType.Type)
-                : (IAction)Activator.CreateInstance(actionType.Type, args);
+                ? (IAction)Activator.CreateInstance(type)
+                : (IAction)Activator.CreateInstance(type, args);
         }
     }
 }

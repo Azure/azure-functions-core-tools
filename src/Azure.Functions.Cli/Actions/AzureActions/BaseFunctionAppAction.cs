@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Azure.Functions.Cli.Common;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -16,7 +17,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                throw new ArgumentException("Must specify functionApp name.");
+                throw new CliArgumentsException("Must specify functionApp name.", 
+                    new CliArgument { Name = nameof(FunctionAppName), Description = "Function App Name" });
             }
 
             return base.ParseArgs(args);

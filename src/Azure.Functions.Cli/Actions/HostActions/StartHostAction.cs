@@ -21,7 +21,7 @@ using System.Collections.Generic;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
-    [Action(Name = "start", Context = Context.Host)]
+    [Action(Name = "start", Context = Context.Host, HelpText = "Launches the functions runtime host")]
     class StartHostAction : BaseAction, IDisposable
     {
         private FileSystemWatcher fsWatcher;
@@ -100,9 +100,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             config.Formatters.Clear();
             config.Formatters.Add(new JsonMediaTypeFormatter());
 
-            var settings = SelfHostWebHostSettingsFactory.Create(NodeDebugPort, ConsoleTraceLevel);
+            var settings = SelfHostWebHostSettingsFactory.Create(ConsoleTraceLevel);
 
-            Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={settings.NodeDebugPort}", EnvironmentVariableTarget.Process);
+            Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={NodeDebugPort}", EnvironmentVariableTarget.Process);
 
             WebApiConfig.Initialize(config, settings: settings);
             using (var httpServer = new HttpSelfHostServer(config))

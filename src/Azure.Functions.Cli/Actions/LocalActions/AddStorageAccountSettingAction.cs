@@ -6,6 +6,7 @@ using Fclp;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -33,7 +34,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                throw new ArgumentException("Must specify storage account name.");
+                throw new CliArgumentsException("Must specify storage account name.",
+                    new CliArgument { Name = nameof(StorageAccountName), Description = "Storage Account Name" });
             }
 
             return base.ParseArgs(args);

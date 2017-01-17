@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Azure.Functions.Cli.Common;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -16,7 +17,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                throw new ArgumentException("Must specify a username.");
+                throw new CliArgumentsException("Must specify a username.",
+                    new CliArgument { Name = nameof(UserName), Description = "Publishing userName to set or update." });
             }
 
             return base.ParseArgs(args);

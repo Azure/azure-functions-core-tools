@@ -10,6 +10,9 @@ using Microsoft.Azure.WebJobs.Script;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using System.Text;
+using Fclp.Internals;
+using Colors.Net.StringColorExtensions;
 
 namespace Azure.Functions.Cli.Actions
 {
@@ -20,11 +23,13 @@ namespace Azure.Functions.Cli.Actions
         private readonly IAction _action;
         private readonly ICommandLineParserResult _parseResult;
         private readonly IEnumerable<ActionType> _actionTypes;
+        private readonly Func<Type, IAction> _createAction;
 
-        public HelpAction(IEnumerable<TypeAttributePair> actions, string context = null, string subContext = null)
+        public HelpAction(IEnumerable<TypeAttributePair> actions, Func<Type, IAction> createAction, string context = null, string subContext = null)
         {
             _context = context;
             _subContext = subContext;
+            _createAction = createAction;
             _actionTypes = actions
                 .Where(a => a.Attribute.ShowInHelp)
                 .Select(a => a.Type)
@@ -42,7 +47,8 @@ namespace Azure.Functions.Cli.Actions
                 });
         }
 
-        public HelpAction(IEnumerable<TypeAttributePair> actions, IAction action, ICommandLineParserResult parseResult) : this(actions)
+        public HelpAction(IEnumerable<TypeAttributePair> actions, Func<Type, IAction> createAction, IAction action, ICommandLineParserResult parseResult)
+            : this(actions, createAction)
         {
             _action = action;
             _parseResult = parseResult;
@@ -88,7 +94,7 @@ namespace Azure.Functions.Cli.Actions
             if (subContext == Context.None)
             {
                 ColoredConsole
-                .WriteLine($"Usage: func {context.ToLowerCaseString()} [context] <action> [-/--options]")
+                .WriteLine($"{TitleColor("Usage:")} func {context.ToLowerCaseString()} [context] <action> [-/--options]")
                 .WriteLine();
                 var contexts = _actionTypes
                     .Where(a => a.Contexts.Contains(context))
@@ -102,7 +108,7 @@ namespace Azure.Functions.Cli.Actions
             else
             {
                 ColoredConsole
-                .WriteLine($"Usage: func {context.ToLowerCaseString()} {subContext.ToLowerCaseString()} <action> [-/--options]")
+                .WriteLine($"{TitleColor("Usage:")} func {context.ToLowerCaseString()} {subContext.ToLowerCaseString()} <action> [-/--options]")
                 .WriteLine();
             }
 
@@ -140,26 +146,113 @@ namespace Azure.Functions.Cli.Actions
             if (contexts.Any())
             {
                 var longestName = contexts.Select(c => c.ToLowerCaseString()).Max(n => n.Length);
-                ColoredConsole.WriteLine("Contexts:");
+                ColoredConsole.WriteLine(TitleColor("Contexts:"));
                 foreach (var context in contexts)
                 {
-                    ColoredConsole.WriteLine(string.Format($"{{0, {-longestName}}}  {{1}}", context.ToLowerCaseString(), GetDescriptionOfContext(context)));
+                    ColoredConsole.WriteLine(string.Format($"{{0, {-longestName}}}  {{1}}", context.ToLowerCaseString().Yellow(), GetDescriptionOfContext(context)));
                 }
                 ColoredConsole.WriteLine();
             }
         }
 
-        private static void DisplayActionsHelp(IEnumerable<ActionType> actions)
+        private void DisplayActionsHelp(IEnumerable<ActionType> actions)
         {
             if (actions.Any())
             {
-                ColoredConsole.WriteLine("Actions: ");
+                ColoredConsole.WriteLine(TitleColor("Actions: "));
                 var longestName = actions.Select(a => a.Names).SelectMany(n => n).Max(n => n.Length);
+                longestName += 2; // for coloring chars
                 foreach (var action in actions)
                 {
                     ColoredConsole.WriteLine(GetActionHelp(action, longestName));
+                    DisplaySwitches(action);
                 }
                 ColoredConsole.WriteLine();
+            }
+        }
+
+        private void DisplaySwitches(ActionType actionType)
+        {
+            var action = _createAction.Invoke(actionType.Type);
+            try
+            {
+                var options = action.ParseArgs(Array.Empty<string>());
+                if (options.UnMatchedOptions.Any())
+                {
+                    DisplayOptions(options.UnMatchedOptions);
+                    ColoredConsole.WriteLine();
+                }
+            }
+            catch(CliArgumentsException e)
+            {
+                if (e.Arguments.Any())
+                {
+                    DisplayPositionalArguments(e.Arguments);
+                }
+
+                if (e.ParseResults != null && e.ParseResults.UnMatchedOptions.Any())
+                {
+                    DisplayOptions(e.ParseResults.UnMatchedOptions);
+                }
+                ColoredConsole.WriteLine();
+            }
+            catch (Exception e)
+            {
+                ColoredConsole.WriteLine(ErrorColor(e.ToString()));
+            }
+        }
+
+        private void DisplayPositionalArguments(IEnumerable<CliArgument> arguments)
+        {
+            var longestName = arguments.Max(o => o.Name.Length);
+            longestName += 4; // 4 for coloring and <> characters
+            foreach (var argument in arguments)
+            {
+                var helpLine = string.Format($"    {{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
+                if (helpLine.Length < Console.BufferWidth)
+                {
+                    ColoredConsole.WriteLine(helpLine);
+                }
+                else
+                {
+                    while (helpLine.Length > Console.BufferWidth)
+                    {
+                        var segment = helpLine.Substring(0, Console.BufferWidth - 1);
+                        helpLine = helpLine.Substring(Console.BufferWidth);
+                    }
+                }
+            }
+        }
+
+        private static void DisplayOptions(IEnumerable<ICommandLineOption> options)
+        {
+            var longestName = options.Max(o => o.HasLongName ? o.LongName.Length : 0);
+            longestName += 9; // for coloring and --/- characters
+            foreach (var option in options)
+            {
+                var stringBuilder = new StringBuilder();
+                if (option.HasLongName)
+                {
+                    stringBuilder.Append($"--{option.LongName}");
+                }
+
+                if (option.HasShortName)
+                {
+                    stringBuilder.Append($" [-{option.ShortName}]");
+                }
+                var helpLine = string.Format($"    {{0, {-longestName}}} {{1}}", stringBuilder.ToString().DarkGray(), option.Description);
+                if (helpLine.Length < Console.BufferWidth)
+                {
+                    ColoredConsole.WriteLine(helpLine);
+                }
+                else
+                {
+                    while (helpLine.Length > Console.BufferWidth)
+                    {
+                        var segment = helpLine.Substring(0, Console.BufferWidth - 1);
+                        helpLine = helpLine.Substring(Console.BufferWidth);
+                    }
+                }
             }
         }
 
@@ -170,7 +263,7 @@ namespace Azure.Functions.Cli.Actions
                 ? action.Names.Distinct().Aggregate((a, b) => string.Join(", ", a, b))
                 : string.Empty;
             var description = action.Type.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
-            return string.Format($"{{0, {-formattingSpace}}}  {{1}} {(aliases.Any() ? "Aliases:" : "")} {{2}}", name, description, aliases);
+            return string.Format($"{{0, {-formattingSpace}}}  {{1}} {(aliases.Any() ? "Aliases:" : "")} {{2}}", name.Yellow(), description, aliases);
         }
 
         // http://stackoverflow.com/a/1799401

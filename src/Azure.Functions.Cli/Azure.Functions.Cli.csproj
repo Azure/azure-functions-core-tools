@@ -426,6 +426,7 @@
     <Compile Include="Arm\Models\StorageAccount.cs" />
     <Compile Include="Arm\Models\Subscription.cs" />
     <Compile Include="Arm\ArmResourceNotFoundException.cs" />
+    <Compile Include="Common\CliArgumentException.cs" />
     <Compile Include="Common\CliException.cs" />
     <Compile Include="Common\Constants.cs" />
     <Compile Include="Common\DiskBacked.cs" />
@@ -477,7 +478,6 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="npm\package.json" />
-    <None Include="npm\README.md" />
     <None Include="packages.config">
       <SubType>Designer</SubType>
     </None>
