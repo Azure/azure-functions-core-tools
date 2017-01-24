@@ -36,6 +36,8 @@ The CLI commands have the following basic structure:
 func [context] [context] <action> [-/--options]
 ```
 
+Output can be found at *%temp%\LogFiles*.
+
 ### Contexts
 
 ```
