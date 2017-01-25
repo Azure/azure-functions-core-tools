@@ -19,8 +19,7 @@ namespace Azure.Functions.Cli.Extensions
                     statusResponse.EnsureSuccessStatusCode();
                     var hostStatus = await statusResponse.Content.ReadAsAsync<HostStatus>();
 
-                    return rootResponse.StatusCode == HttpStatusCode.OK &&
-                        hostStatus.WebHostSettings != null;
+                    return rootResponse.StatusCode == HttpStatusCode.OK;
                 }
             }
             catch

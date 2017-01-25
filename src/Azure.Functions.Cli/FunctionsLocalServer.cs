@@ -1,16 +1,17 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Colors.Net;
-using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.NativeMethods;
+using Colors.Net;
+using Microsoft.Azure.WebJobs.Script.WebHost.Models;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli
@@ -81,13 +82,14 @@ namespace Azure.Functions.Cli
             }
             else
             {
+                var hostId = await GetHostId(Environment.CurrentDirectory);
                 using (var client = new HttpClient())
                 {
                     var response = await client.GetAsync(new Uri(server, "admin/host/status"));
                     response.EnsureSuccessStatusCode();
 
                     var hostStatus = await response.Content.ReadAsAsync<HostStatus>();
-                    if (!hostStatus.WebHostSettings.ScriptPath.Equals(Environment.CurrentDirectory, StringComparison.OrdinalIgnoreCase))
+                    if (!hostStatus.Id.Equals(hostId, StringComparison.OrdinalIgnoreCase))
                     {
                         return await DiscoverServer(iteration + 1);
                     }
@@ -97,6 +99,18 @@ namespace Azure.Functions.Cli
                     }
                 }
             }
+        }
+
+        private static async Task<string> GetHostId(string currentDirectory)
+        {
+            var hostJson = Path.Combine(currentDirectory, "host.json");
+            if (!File.Exists(hostJson))
+            {
+                return string.Empty;
+            }
+
+            var hostConfig = JsonConvert.DeserializeObject<JToken>(await FileSystemHelpers.ReadAllTextFromFileAsync(hostJson));
+            return hostConfig["id"]?.ToString() ?? string.Empty;
         }
 
         private bool NotRunningAlready()

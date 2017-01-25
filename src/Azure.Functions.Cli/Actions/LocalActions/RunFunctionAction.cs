@@ -4,17 +4,17 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Azure.Functions.Cli.Extensions;
-using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -90,7 +90,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
 
-                var functionStatus = await functionStatusResponse.Content.ReadAsAsync<FunctionStatus>();
+                var functionMetadata = ScriptHostHelpers.GetFunctionMetadata(FunctionName);
                 var hostStatus = await hostStatusResponse.Content.ReadAsAsync<HostStatus>();
                 Func<IEnumerable<string>, string, bool> printError = (errors, title) =>
                 {
@@ -119,15 +119,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (Debug)
                 {
-                    var scriptType = functionStatus.Metadata?.ScriptType;
-                    if (scriptType == null)
-                    {
-                        ColoredConsole
-                            .Error
-                            .WriteLine(ErrorColor("Unable to read function config"));
-                        return;
-                    }
-                    else if (scriptType != null && scriptType != ScriptType.CSharp && scriptType != ScriptType.Javascript)
+                    var scriptType = functionMetadata.ScriptType;
+                    if (scriptType != ScriptType.CSharp && scriptType != ScriptType.Javascript)
                     {
                         ColoredConsole
                             .Error
@@ -135,7 +128,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         return;
                     }
 
-                    if (scriptType == ScriptType.CSharp && !hostStatus.IsDebuggerAttached)
+                    if (scriptType == ScriptType.CSharp)
                     {
                         ColoredConsole
                             .WriteLine("Debugger launching...")
@@ -169,7 +162,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 var adminInvocation = JsonConvert.SerializeObject(new FunctionInvocation { Input = invocation });
 
-                var response = functionStatus.IsHttpFunction()
+                var response = functionMetadata.IsHttpFunction()
                     ? await client.PostAsync($"api/{FunctionName}", new StringContent(invocation, Encoding.UTF8, invocation.IsJson() ? "application/json" : "plain/text"))
                     : await client.PostAsync($"admin/functions/{FunctionName}", new StringContent(adminInvocation, Encoding.UTF8, "application/json"));
 

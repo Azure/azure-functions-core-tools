@@ -1,16 +1,14 @@
-﻿
-using System;
+﻿using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Extensions;
 using FluentAssertions;
-using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Newtonsoft.Json;
 using SuaveServerWrapper;
-using Azure.Functions.Cli.Extensions;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests
@@ -55,7 +53,7 @@ namespace Azure.Functions.Cli.Tests
                     {
                         response = new HttpResponseMessage
                         {
-                            Content = new StringContent(JsonConvert.SerializeObject(new HostStatus { WebHostSettings = new WebHostSettings() }), Encoding.UTF8, "application/json")
+                            Content = new StringContent(JsonConvert.SerializeObject(new HostStatus()), Encoding.UTF8, "application/json")
                         };
                     }
                     else
