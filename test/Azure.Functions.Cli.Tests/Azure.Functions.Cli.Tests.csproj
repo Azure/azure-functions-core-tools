@@ -137,8 +137,8 @@
       <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.1.0.0-beta2-10723\lib\net451\Microsoft.Azure.WebJobs.Script.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Azure.WebJobs.Script.Extensibility">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.Extensibility.1.0.0-beta2-10697\lib\net45\Microsoft.Azure.WebJobs.Script.Extensibility.dll</HintPath>
+    <Reference Include="Microsoft.Azure.WebJobs.Script.Extensibility, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.Extensibility.1.0.0-beta2-10723\lib\net45\Microsoft.Azure.WebJobs.Script.Extensibility.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.WebHost">
