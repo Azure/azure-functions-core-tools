@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.Actions
         {
             if (contexts.Any())
             {
-                var longestName = contexts.Select(c => c.ToLowerCaseString()).Max(n => n.Length);
+                var longestName = contexts.Select(c => c.ToLowerCaseString()).Max(n => n.Length) + 2;
                 ColoredConsole.WriteLine(TitleColor("Contexts:"));
                 foreach (var context in contexts)
                 {
