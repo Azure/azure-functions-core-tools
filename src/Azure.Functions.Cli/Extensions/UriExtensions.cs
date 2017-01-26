@@ -15,10 +15,6 @@ namespace Azure.Functions.Cli.Extensions
                 using (var client = new HttpClient())
                 {
                     var rootResponse = await client.GetAsync(server);
-                    var statusResponse = await client.GetAsync(new Uri(server, "admin/host/status"));
-                    statusResponse.EnsureSuccessStatusCode();
-                    var hostStatus = await statusResponse.Content.ReadAsAsync<HostStatus>();
-
                     return rootResponse.StatusCode == HttpStatusCode.OK;
                 }
             }

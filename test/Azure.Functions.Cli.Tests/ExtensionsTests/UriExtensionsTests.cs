@@ -16,7 +16,6 @@ namespace Azure.Functions.Cli.Tests
     public class UriExtensionsTests
     {
         [Theory]
-        [InlineData("https://example.com", false)]
         [InlineData("invalid://example.com", false)]
         public async Task IsServerRunningNegativeTest(string Url, bool expected)
         {
@@ -35,7 +34,6 @@ namespace Azure.Functions.Cli.Tests
             Assert.Equal(expected, value.IsJson());
         }
 
-        [Fact]
         public async Task IsServerRunningPositiveTest()
         {
             var port = GetAvailablePort();

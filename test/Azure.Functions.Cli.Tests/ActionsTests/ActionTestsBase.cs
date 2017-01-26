@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                 }
                 else if (Directory.Exists(path))
                 {
-                    Directory.Delete(path);
+                    Directory.Delete(path, recursive: true);
                 }
             }
             catch (Exception ex)
