@@ -16,7 +16,8 @@ namespace Azure.Functions.Cli.Common
                 ScriptPath = Path.Combine(Environment.CurrentDirectory),
                 LogPath = Path.Combine(Path.GetTempPath(), @"LogFiles\Application\Functions"),
                 SecretsPath = Path.Combine(Path.GetTempPath(), "secrets", "functions", "secrets"),
-                TraceWriter = new ConsoleTraceWriter(consoleTraceLevel)
+                TraceWriter = new ConsoleTraceWriter(consoleTraceLevel),
+                IsAuthDisabled = true
             };
         }
     }
