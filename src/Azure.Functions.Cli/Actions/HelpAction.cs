@@ -209,16 +209,16 @@ namespace Azure.Functions.Cli.Actions
             foreach (var argument in arguments)
             {
                 var helpLine = string.Format($"    {{0, {-longestName}}} {{1}}", $"<{argument.Name}>".DarkGray(), argument.Description);
-                if (helpLine.Length < Console.BufferWidth)
+                if (helpLine.Length < SafeConsole.BufferWidth)
                 {
                     ColoredConsole.WriteLine(helpLine);
                 }
                 else
                 {
-                    while (helpLine.Length > Console.BufferWidth)
+                    while (helpLine.Length > SafeConsole.BufferWidth)
                     {
-                        var segment = helpLine.Substring(0, Console.BufferWidth - 1);
-                        helpLine = helpLine.Substring(Console.BufferWidth);
+                        var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
+                        helpLine = helpLine.Substring(SafeConsole.BufferWidth);
                     }
                 }
             }
@@ -241,16 +241,16 @@ namespace Azure.Functions.Cli.Actions
                     stringBuilder.Append($" [-{option.ShortName}]");
                 }
                 var helpLine = string.Format($"    {{0, {-longestName}}} {{1}}", stringBuilder.ToString().DarkGray(), option.Description);
-                if (helpLine.Length < Console.BufferWidth)
+                if (helpLine.Length < SafeConsole.BufferWidth)
                 {
                     ColoredConsole.WriteLine(helpLine);
                 }
                 else
                 {
-                    while (helpLine.Length > Console.BufferWidth)
+                    while (helpLine.Length > SafeConsole.BufferWidth)
                     {
-                        var segment = helpLine.Substring(0, Console.BufferWidth - 1);
-                        helpLine = helpLine.Substring(Console.BufferWidth);
+                        var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
+                        helpLine = helpLine.Substring(SafeConsole.BufferWidth);
                     }
                 }
             }

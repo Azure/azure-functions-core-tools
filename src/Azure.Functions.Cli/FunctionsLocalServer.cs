@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.NativeMethods;
 using Colors.Net;
+using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -103,7 +104,7 @@ namespace Azure.Functions.Cli
 
         private static async Task<string> GetHostId(string currentDirectory)
         {
-            var hostJson = Path.Combine(currentDirectory, "host.json");
+            var hostJson = Path.Combine(currentDirectory, ScriptConstants.HostMetadataFileName);
             if (!File.Exists(hostJson))
             {
                 return string.Empty;
