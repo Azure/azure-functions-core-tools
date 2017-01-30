@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -10,6 +11,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Newtonsoft.Json;
@@ -25,7 +27,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly IFunctionsLocalServer _scriptServer;
 
         public string FunctionName { get; set; }
-        public int Timeout { get; set; }
+        public TimeSpan Timeout { get; set; } = System.Threading.Timeout.InfiniteTimeSpan;
         public string Content { get; set; }
         public string FileName { get; set; }
         public bool Debug { get; set; }
@@ -40,8 +42,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<int>('t', "timeout")
                 .WithDescription("Time to wait until Functions Server is ready in Seconds")
-                .SetDefault(20)
-                .Callback(t => Timeout = t);
+                .Callback(t => Timeout = TimeSpan.FromSeconds(t));
             Parser
                 .Setup<string>('c', "content")
                 .WithDescription("In line content to use")
@@ -57,7 +58,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (args.Any())
             {
-                FunctionName = args.First();
+                FunctionName = args
+                    .Select(n => Path.Combine(n, ScriptConstants.FunctionMetadataFileName))
+                    .Select(Path.GetFullPath)
+                    .Select(Path.GetDirectoryName)
+                    .Select(Path.GetFileName)
+                    .First();
+
                 return Parser.Parse(args);
             }
             else
@@ -69,7 +76,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
-            using (var client = await _scriptServer.ConnectAsync(TimeSpan.FromSeconds(Timeout)))
+            using (var client = await _scriptServer.ConnectAsync(Timeout))
             {
                 var hostStatusResponse = await client.GetAsync("admin/host/status");
                 var functionStatusResponse = await client.GetAsync($"admin/functions/{FunctionName}/status");

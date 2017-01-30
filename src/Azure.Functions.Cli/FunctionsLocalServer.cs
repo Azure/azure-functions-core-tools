@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli
         private async Task<Uri> DiscoverServer(int iteration = 0)
         {
             var server = new Uri($"http://localhost:{Port + iteration}");
-            if (!NotRunningAlready() || !await server.IsServerRunningAsync())
+            if (!await server.IsServerRunningAsync())
             {
                 // create the server
                 if (_settings.DisplayLaunchingRunServerWarning)
@@ -112,21 +112,6 @@ namespace Azure.Functions.Cli
 
             var hostConfig = JsonConvert.DeserializeObject<JToken>(await FileSystemHelpers.ReadAllTextFromFileAsync(hostJson));
             return hostConfig["id"]?.ToString() ?? string.Empty;
-        }
-
-        private bool NotRunningAlready()
-        {
-            if (PlatformHelper.IsMono)
-            {
-                //FIXME: tricky on Mono since the processes just show up as "mono"
-                // and GetProcessesByName can throw if there are any dead processes.
-                // For now, just assume we need to check properly.
-                return false;
-            }
-
-            var fileName = Path.GetFileNameWithoutExtension(_processManager.GetCurrentProcess().FileName);
-            var pid = _processManager.GetCurrentProcess().Id;
-            return !_processManager.GetProcessesByName(fileName).Any(p => p.Id != pid);
         }
     }
 }
