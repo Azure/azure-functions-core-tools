@@ -138,6 +138,11 @@ For consistency, the `func init` command can also be invoked via `func function 
 func functionapp init
 ```
 
+## Default Directories
+
+* `CurrentDirectory`: is the default directory the functions runtime looks for functions in.
+* `%TMP%\LogFiles\Application\Functions`: is the default directory for logs. It mirrors the logs directory on Azure as well.
+
 ## License
 
 This project is under the benevolent umbrella of the [.NET Foundation](http://www.dotnetfoundation.org/) and is licensed under [the MIT License](LICENSE.txt)
