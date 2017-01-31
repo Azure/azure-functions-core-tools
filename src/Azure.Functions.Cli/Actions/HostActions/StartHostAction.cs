@@ -22,11 +22,10 @@ using System.Collections.Generic;
 namespace Azure.Functions.Cli.Actions.HostActions
 {
     [Action(Name = "start", Context = Context.Host, HelpText = "Launches the functions runtime host")]
-    class StartHostAction : BaseAction, IDisposable
+    internal class StartHostAction : BaseAction, IDisposable
     {
         private FileSystemWatcher fsWatcher;
         const int DefaultPort = 7071;
-        const int DefaultNodeDebugPort = 5858;
         const TraceLevel DefaultDebugLevel = TraceLevel.Info;
         const int DefaultTimeout = 20;
 
@@ -52,8 +51,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<int>('n', "nodeDebugPort")
-                .WithDescription($"Port for node debugger to use. Default: {DefaultNodeDebugPort}")
-                .SetDefault(DefaultNodeDebugPort)
+                .WithDescription($"Port for node debugger to use. Default: value from launch.json or {DebuggerHelper.DefaultNodeDebugPort}")
+                .SetDefault(DebuggerHelper.GetNodeDebuggerPort())
                 .Callback(p => NodeDebugPort = p);
 
             Parser

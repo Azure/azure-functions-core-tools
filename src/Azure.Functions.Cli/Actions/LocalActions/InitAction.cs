@@ -6,6 +6,7 @@ using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
 using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -66,6 +67,25 @@ appsettings.json
                 {
                     ColoredConsole.WriteLine($"{pair.Key} already exists. Skipped!");
                 }
+            }
+
+            var setupNodeDebugResult = await DebuggerHelper.TrySetupNodeDebuggerAsync();
+
+            if (setupNodeDebugResult == NodeDebuggerStatus.Created)
+            {
+                ColoredConsole.WriteLine("Created launch.json");
+            }
+            else if (setupNodeDebugResult == NodeDebuggerStatus.Updated)
+            {
+                ColoredConsole.WriteLine("Added Azure Functions attach target to existing launch.json");
+            }
+            else if (setupNodeDebugResult == NodeDebuggerStatus.AlreadyCreated)
+            {
+                ColoredConsole.WriteLine("launch.json already configured. Skipped!");
+            }
+            else if (setupNodeDebugResult == NodeDebuggerStatus.Error)
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor("Unable to configure launch.json. Check the file for more info"));
             }
 
             try

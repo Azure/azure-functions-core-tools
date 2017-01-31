@@ -144,7 +144,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                     else if (scriptType == ScriptType.Javascript)
                     {
-                        var nodeDebugger = await DebuggerHelper.TryAttachNodeAsync(client);
+                        var nodeDebugger = await DebuggerHelper.TrySetupNodeDebuggerAsync();
                         if (nodeDebugger == NodeDebuggerStatus.Error)
                         {
                             ColoredConsole
@@ -152,7 +152,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                                 .WriteLine(ErrorColor("Unable to configure node debugger. Check your launch.json."));
                             return;
                         }
-                        else if (nodeDebugger == NodeDebuggerStatus.Created || nodeDebugger == NodeDebuggerStatus.AlreadyCreated)
+                        else
                         {
                             ColoredConsole
                             .Write("launch.json configured. Setup your break points, launch debugger (F5), and press any key to continue...");
