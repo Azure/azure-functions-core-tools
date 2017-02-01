@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             using (var client = new HttpClient())
             {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basicHeaderValue);
-                var response = await client.GetStreamAsync(new Uri($"{functionApp.ScmUri}/api/logstream/application"));
+                var response = await client.GetStreamAsync(new Uri($"https://{functionApp.ScmUri}/api/logstream/application"));
                 using (var reader = new StreamReader(response))
                 {
                     var buffer = new char[4096];

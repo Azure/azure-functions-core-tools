@@ -9,8 +9,5 @@ namespace Azure.Functions.Cli.Arm.Models
 
         [JsonProperty("publishingPassword")]
         public string PublishingPassword { get; set; }
-
-        [JsonProperty("scmUri")]
-        public string ScmUri { get; set; }
     }
 }
