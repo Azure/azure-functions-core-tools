@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Common
@@ -87,6 +90,32 @@ namespace Azure.Functions.Cli.Common
         public static void DeleteDirectorySafe(string path, bool ignoreErrors = true)
         {
             DeleteFileSystemInfo(Instance.DirectoryInfo.FromDirectoryName(path), ignoreErrors);
+        }
+
+        internal static IEnumerable<string> GetFiles(string directoryPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> excludedFiles = null)
+        {
+            foreach (var file in Instance.Directory.GetFiles(directoryPath, "*", SearchOption.TopDirectoryOnly))
+            {
+                var fileName = Path.GetFileName(file);
+                if (excludedFiles == null ||
+                    !excludedFiles.Any(f => f.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    yield return file;
+                }
+            }
+
+            foreach (var directory in Instance.Directory.GetDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly))
+            {
+                var directoryName = Path.GetFileName(directory);
+                if (excludedDirectories == null ||
+                    !excludedDirectories.Any(d => d.Equals(directoryName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles))
+                    {
+                        yield return file;
+                    }
+                }
+            }
         }
 
         private static void DeleteFileSystemInfo(FileSystemInfoBase fileSystemInfo, bool ignoreErrors)

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using ARMClient.Authentication.Contracts;
 using Azure.Functions.Cli.Arm.Models;
@@ -28,5 +29,6 @@ namespace Azure.Functions.Cli.Arm
         Task<IEnumerable<ArmWrapper<object>>> getAzureResourceAsync(string resourceName);
         Task<StorageAccount> GetStorageAccountsAsync(ArmWrapper<object> armWrapper);
         Task<Dictionary<string, string>> GetFunctionAppAppSettings(Site functionApp);
+        Task<AuthenticationHeaderValue> GetAuthenticationHeader(string id);
     }
 }

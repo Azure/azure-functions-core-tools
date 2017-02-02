@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using ARMClient.Authentication;
@@ -24,6 +25,12 @@ namespace Azure.Functions.Cli.Arm
             _client = client;
             _settings = settings;
             SelectTenantAsync(_settings.CurrentSubscription);
+        }
+
+        public async Task<AuthenticationHeaderValue> GetAuthenticationHeader(string id)
+        {
+            var token = await _authHelper.GetToken(id);
+            return new AuthenticationHeaderValue("Bearer", token.AccessToken);
         }
 
         public async Task<IEnumerable<Site>> GetFunctionAppsAsync()

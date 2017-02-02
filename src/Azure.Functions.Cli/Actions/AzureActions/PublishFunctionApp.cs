@@ -6,7 +6,9 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -14,19 +16,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "publish", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Publish all of the current directory content to azure function app.")]
     internal class PublishFunctionApp : BaseFunctionAppAction
     {
-        private IArmManager _armManager;
+        private readonly IArmManager _armManager;
+        private readonly ISettings _settings;
 
-        public PublishFunctionApp(IArmManager armManager)
+        public PublishFunctionApp(IArmManager armManager, ISettings settings)
         {
             _armManager = armManager;
+            _settings = settings;
         }
 
         public override async Task RunAsync()
         {
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
-
-            using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), functionApp.PublishingUserName, functionApp.PublishingPassword))
+            using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
             using (var request = new HttpRequestMessage())
             {
                 request.Method = HttpMethod.Put;
@@ -37,6 +40,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 ColoredConsole.WriteLine("Uploading archive...");
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
+                response = await client.PostAsync("api/functions/synctriggers", content: null);
+                response.EnsureSuccessStatusCode();
                 ColoredConsole.WriteLine("Upload completed successfully.");
             }
         }
@@ -46,7 +51,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var memoryStream = new MemoryStream();
             using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                foreach (var fileName in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                foreach (var fileName in FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".gitignore", "appsettings.json" }))
                 {
                     zip.AddFile(fileName, fileName, path);
                 }
@@ -57,17 +62,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return content;
         }
 
-        private HttpClient GetRemoteZipClient(Uri url, string userName, string password)
+        private async Task<HttpClient> GetRemoteZipClient(Uri url)
         {
-            var basicHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{userName}:{password}"));
-
             var client = new HttpClient
             {
                 BaseAddress = url,
                 MaxResponseContentBufferSize = 30 * 1024 * 1024
             };
 
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basicHeaderValue);
+            client.DefaultRequestHeaders.Authorization = await _armManager.GetAuthenticationHeader(_settings.CurrentSubscription);
             return client;
         }
     }
