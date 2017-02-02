@@ -534,7 +534,6 @@
     <Compile Include="Actions\AzureActions\BaseAzureAccountAction.cs" />
     <Compile Include="Actions\AzureActions\BaseFunctionAppAction.cs" />
     <Compile Include="Actions\AzureActions\BasePublishUserAction.cs" />
-    <Compile Include="Actions\AzureActions\CreateFunctionAppAction.cs" />
     <Compile Include="Actions\AzureActions\EnableGitRepoAction.cs" />
     <Compile Include="Actions\AzureActions\FetchAppSettingsAction.cs" />
     <Compile Include="Actions\AzureActions\GetPublishUsernameAction.cs" />
