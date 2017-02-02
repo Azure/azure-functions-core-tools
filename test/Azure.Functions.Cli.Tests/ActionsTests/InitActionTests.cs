@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             files.Should().Contain("host.json");
             files.Should().Contain("appsettings.json");
 
-            folders.Should().HaveCount(1);
+            folders.Should().HaveCount(2);
             folders.Should().Contain(".git");
         }
     }
