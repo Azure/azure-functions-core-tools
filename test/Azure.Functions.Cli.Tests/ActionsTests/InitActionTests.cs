@@ -24,7 +24,11 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             files.Should().Contain("host.json");
             files.Should().Contain("appsettings.json");
 
-            folders.Should().HaveCount(2);
+            var expectedFolders = 2;
+            folders
+                .Should()
+                .HaveCount(expectedFolders,
+                $"Expected to have {expectedFolders}, but got {folders.Count()}, which are {folders.Aggregate(string.Empty, (a, b) => string.Join(",", a, b))}");
             folders.Should().Contain(".git");
         }
     }
