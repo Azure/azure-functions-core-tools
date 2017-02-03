@@ -119,7 +119,7 @@ namespace Azure.Functions.Cli.Common
             {
                 if (IsEncrypted)
                 {
-                    return Values.ToDictionary(k => k.Key, v => Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                    return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
                 }
                 else
                 {

@@ -46,7 +46,12 @@ project.lock.json
 appsettings.json
 "},
             { ScriptConstants.HostMetadataFileName, $"{{\"id\":\"{ Guid.NewGuid().ToString("N") }\"}}" },
-            { SecretsManager.AppSettingsFileName, string.Empty }
+            { SecretsManager.AppSettingsFileName, @"{
+  ""IsEncrypted"": true,
+  ""Values"": {
+    ""AzureWebJobsStorage"": """"
+  }
+}"}
         };
 
         public override async Task RunAsync()
