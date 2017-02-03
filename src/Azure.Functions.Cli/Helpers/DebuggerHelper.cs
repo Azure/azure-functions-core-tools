@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.Helpers
         const int Retries = 20;
         public const int DefaultNodeDebugPort = 5858;
 
-        static readonly string LaunchJsonPath = Path.Combine(Environment.CurrentDirectory, ".vscode", "launch.json");
+        static string LaunchJsonPath => Path.Combine(Environment.CurrentDirectory, ".vscode", "launch.json");
         static readonly VsCodeLaunch DefaultLaunchJson = new VsCodeLaunch
         {
             Version = "0.2.0",

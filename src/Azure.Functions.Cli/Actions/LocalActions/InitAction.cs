@@ -7,6 +7,8 @@ using Microsoft.Azure.WebJobs.Script;
 using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Helpers;
+using Fclp;
+using System.Linq;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -17,6 +19,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     class InitAction : BaseAction
     {
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
+
+        public string FolderName { get; set; } = string.Empty;
 
         internal readonly Dictionary<string, string> fileToContentMap = new Dictionary<string, string>
         {
@@ -54,11 +58,27 @@ appsettings.json
 }"}
         };
 
+        public override ICommandLineParserResult ParseArgs(string[] args)
+        {
+            if (args.Any())
+            {
+                FolderName = args.First();
+            }
+            return base.ParseArgs(args);
+        }
+
         public override async Task RunAsync()
         {
             if (SourceControl != SourceControl.Git)
             {
                 throw new Exception("Only Git is supported right now for vsc");
+            }
+
+            if (!string.IsNullOrEmpty(FolderName))
+            {
+                var folderPath = Path.Combine(Environment.CurrentDirectory, FolderName);
+                FileSystemHelpers.EnsureDirectory(folderPath);
+                Environment.CurrentDirectory = folderPath;
             }
 
             foreach (var pair in fileToContentMap)

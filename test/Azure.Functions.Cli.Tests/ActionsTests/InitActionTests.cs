@@ -10,13 +10,28 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
     {
         public InitActionTests(ITestOutputHelper output) : base(output) { }
 
-        [Fact]
-        public void InitActionTest()
+        [Theory]
+        [InlineData(null)]
+        [InlineData(".")]
+        [InlineData("newFolder")]
+        [InlineData("..\\anotherNewFolder")]
+        public void InitActionTest(string folderName)
         {
+            var localWorkingDirectory = string.Empty;
             // Test
-            Program.Main(new[] { "init" });
-            var files = Directory.GetFiles(WorkingDirectory).Select(Path.GetFileName);
-            var folders = Directory.GetDirectories(WorkingDirectory).Select(Path.GetFileName);
+            if (string.IsNullOrEmpty(folderName))
+            {
+                Program.Main(new[] { "init" });
+                localWorkingDirectory = WorkingDirectory;
+            }
+            else
+            {
+                Program.Main(new[] { "init", folderName });
+                localWorkingDirectory = Path.Combine(WorkingDirectory, folderName);
+            }
+
+            var files = Directory.GetFiles(localWorkingDirectory).Select(Path.GetFileName);
+            var folders = Directory.GetDirectories(localWorkingDirectory).Select(Path.GetFileName);
 
             // Assert
             files.Should().HaveCount(3);

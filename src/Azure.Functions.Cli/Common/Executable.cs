@@ -34,7 +34,8 @@ namespace Azure.Functions.Cli.Common
                 UseShellExecute = _shareConsole,
                 RedirectStandardError = _streamOutput,
                 RedirectStandardInput = _streamOutput,
-                RedirectStandardOutput = _streamOutput
+                RedirectStandardOutput = _streamOutput,
+                WorkingDirectory = Environment.CurrentDirectory
             };
 
             Process process = null;
