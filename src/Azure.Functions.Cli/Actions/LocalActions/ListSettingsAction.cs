@@ -28,6 +28,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override Task RunAsync()
         {
+            ColoredConsole.WriteLine(TitleColor("App Settings:"));
             foreach (var pair in _secretsManager.GetSecrets())
             {
                 ColoredConsole
@@ -35,6 +36,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     .WriteLine($"      {TitleColor("Value")}: {(ShowValues ? pair.Value : "*****")}")
                     .WriteLine();
             }
+
+            ColoredConsole.WriteLine(TitleColor("App Settings:"));
+            foreach (var pair in _secretsManager.GetConnectionStrings())
+            {
+                ColoredConsole
+                    .WriteLine($"   -> {TitleColor("Name")}: {pair.Key}")
+                    .WriteLine($"      {TitleColor("Value")}: {(ShowValues ? pair.Value : "*****")}")
+                    .WriteLine();
+            }
+
             return Task.CompletedTask;
         }
     }

@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -27,6 +28,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
+            ColoredConsole.WriteLine(WarningColor("Publish the current directory contents to an Azure Function App. Locally deleted files are not removed from destination."));
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))

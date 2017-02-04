@@ -25,12 +25,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             if (functionApp != null)
             {
-                var secrets = await _armManager.GetFunctionAppAppSettings(functionApp);
-                foreach (var pair in secrets)
+                ColoredConsole.WriteLine(TitleColor("App Settings:"));
+                var appSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
+                foreach (var pair in appSettings)
                 {
                     ColoredConsole.WriteLine($"Loading {pair.Key} = *****");
                     _secretsManager.SetSecret(pair.Key, pair.Value);
                 }
+
+                ColoredConsole.WriteLine();
+
+                ColoredConsole.WriteLine(TitleColor("Connection Strings:"));
+                var connectionStrings = await _armManager.GetFunctionAppConnectionStrings(functionApp);
+                foreach (var connectionString in connectionStrings)
+                {
+                    ColoredConsole.WriteLine($"Loading {connectionString.Key} = *****");
+                    _secretsManager.SetConnectionString(connectionString.Key, connectionString.Value.Value);
+                }
+
             }
             else
             {

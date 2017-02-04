@@ -13,6 +13,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         private readonly ISecretsManager _secretsManager;
         public string Name { get; set; }
+        public bool IsConnectionString { get; set; }
 
         public DeleteSettingAction(ISecretsManager secretsManager)
         {
@@ -21,9 +22,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
+            Parser
+                .Setup<bool>("connectionString")
+                .SetDefault(false)
+                .Callback(f => IsConnectionString = f)
+                .WithDescription("Specifying this removes the value from the connection strings collection instead.");
+
             if (args.Length == 0)
             {
-                throw new CliArgumentsException("Must specify setting name.",
+                throw new CliArgumentsException("Must specify setting name.", Parser.Parse(args),
                     new CliArgument { Name = nameof(Name), Description = "Name of app setting to be deleted." });
             }
             else

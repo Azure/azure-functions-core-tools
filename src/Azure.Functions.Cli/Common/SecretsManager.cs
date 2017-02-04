@@ -19,10 +19,23 @@ namespace Azure.Functions.Cli.Common
             return appSettingsFile.GetValues();
         }
 
+        public IDictionary<string, string> GetConnectionStrings()
+        {
+            var appSettingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            return appSettingsFile.GetConnectionStrings();
+        }
+
         public void SetSecret(string name, string value)
         {
             var appSettingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
             appSettingsFile.SetSecret(name, value);
+            appSettingsFile.Commit();
+        }
+
+        public void SetConnectionString(string name, string value)
+        {
+            var appSettingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            appSettingsFile.SetConnectionString(name, value);
             appSettingsFile.Commit();
         }
 
@@ -32,11 +45,19 @@ namespace Azure.Functions.Cli.Common
             if (settingsFile.IsEncrypted)
             {
                 var values = settingsFile.GetValues();
+                var connectionStrings = settingsFile.GetConnectionStrings();
                 settingsFile.IsEncrypted = false;
+
                 foreach (var pair in values)
                 {
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
+
+                foreach(var pair in connectionStrings)
+                {
+                    settingsFile.SetConnectionString(pair.Key, pair.Value);
+                }
+
                 settingsFile.Commit();
             }
         }
@@ -47,12 +68,21 @@ namespace Azure.Functions.Cli.Common
             if (!settingsFile.IsEncrypted)
             {
                 var values = settingsFile.GetValues();
+                var connectionStrings = settingsFile.GetConnectionStrings();
                 settingsFile.IsEncrypted = true;
+
                 foreach (var pair in values)
                 {
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
+
+                foreach(var pair in connectionStrings)
+                {
+                    settingsFile.SetConnectionString(pair.Key, pair.Value);
+                }
+
                 settingsFile.Commit();
+
             }
         }
 
@@ -60,6 +90,13 @@ namespace Azure.Functions.Cli.Common
         {
             var settingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
             settingsFile.RemoveSetting(name);
+            settingsFile.Commit();
+        }
+
+        public void DeleteConnectionString(string name)
+        {
+            var settingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            settingsFile.RemoveConnectionString(name);
             settingsFile.Commit();
         }
 
@@ -79,16 +116,19 @@ namespace Azure.Functions.Cli.Common
                     var appSettings = JsonConvert.DeserializeObject<AppSettingsFile>(content);
                     IsEncrypted = appSettings.IsEncrypted;
                     Values = appSettings.Values;
+                    ConnectionStrings = appSettings.ConnectionStrings;
                 }
                 catch
                 {
                     Values = new Dictionary<string, string>();
+                    ConnectionStrings = new Dictionary<string, string>();
                     IsEncrypted = true;
                 }
             }
 
             public bool IsEncrypted { get; set; }
-            public Dictionary<string, string> Values { get; set; }
+            public Dictionary<string, string> Values { get; set; } = new Dictionary<string, string>();
+            public Dictionary<string, string> ConnectionStrings { get; set; } = new Dictionary<string, string>();
 
             public void SetSecret(string name, string value)
             {
@@ -102,11 +142,31 @@ namespace Azure.Functions.Cli.Common
                 };
             }
 
+            public void SetConnectionString(string name, string value)
+            {
+                if (IsEncrypted)
+                {
+                    ConnectionStrings[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), null, DataProtectionScope.CurrentUser));
+                }
+                else
+                {
+                    ConnectionStrings[name] = value;
+                };
+            }
+
             public void RemoveSetting(string name)
             {
                 if (Values.ContainsKey(name))
                 {
                     Values.Remove(name);
+                }
+            }
+
+            public void RemoveConnectionString(string name)
+            {
+                if (ConnectionStrings.ContainsKey(name))
+                {
+                    ConnectionStrings.Remove(name);
                 }
             }
 
@@ -124,6 +184,18 @@ namespace Azure.Functions.Cli.Common
                 else
                 {
                     return Values.ToDictionary(k => k.Key, v => v.Value);
+                }
+            }
+
+            public IDictionary<string, string> GetConnectionStrings()
+            {
+                if (IsEncrypted)
+                {
+                    return ConnectionStrings.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                }
+                else
+                {
+                    return ConnectionStrings.ToDictionary(k => k.Key, v => v.Value);
                 }
             }
         }

@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string Name { get; set; }
         public string Value { get; set; }
+        public bool IsConnectionString { get; set; }
 
         public AddSettingAction(ISecretsManager secretsManager)
         {
@@ -24,9 +25,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
+            Parser
+                .Setup<bool>("connectionString")
+                .SetDefault(false)
+                .Callback(f => IsConnectionString = f)
+                .WithDescription("Specifying this adds the name-value pair to connection strings collection instead.");
+
             if (args.Length == 0)
             {
-                throw new CliArgumentsException("Must specify setting name.",
+                throw new CliArgumentsException("Must specify setting name.", Parser.Parse(args),
                     new CliArgument { Name = nameof(Name), Description = "App setting name" },
                     new CliArgument { Name = nameof(Value), Description = "(Optional) App setting value. Omit for secure values."});
             }
@@ -45,7 +52,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 ColoredConsole.Write("Please enter the value: ");
                 Value = SecurityHelpers.ReadPassword();
             }
-            _secretsManager.SetSecret(Name, Value);
+            if (IsConnectionString)
+            {
+                _secretsManager.SetConnectionString(Name, Value);
+            }
+            else
+            {
+                _secretsManager.SetSecret(Name, Value);
+            }
             return Task.CompletedTask;
         }
     }

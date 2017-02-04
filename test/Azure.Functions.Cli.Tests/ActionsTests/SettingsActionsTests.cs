@@ -18,7 +18,8 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         public SettingsActionsTests(ITestOutputHelper output) : base(output) { }
 
         [Theory]
-        [InlineData("Name1", "Value1")]
+        [InlineData("Name1", "Value1", true)]
+        [InlineData("Name1", "Value1", false)]
         public void AddSettingsActionTest(string name, string value)
         {
             // Setup

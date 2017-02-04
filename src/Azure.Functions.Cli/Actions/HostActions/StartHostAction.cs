@@ -18,6 +18,7 @@ using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using System.Collections.Generic;
+using System.Configuration;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -178,13 +179,22 @@ namespace Azure.Functions.Cli.Actions.HostActions
             try
             {
                 var secretsManager = new SecretsManager();
-
-                foreach (var pair in secretsManager.GetSecrets())
+                var secrets = secretsManager.GetSecrets();
+                UpdateEnvironmentVariables(secrets);
+                UpdateAppSettings(secrets);
+                UpdateConnectionStrings(secretsManager.GetConnectionStrings());
+            }
+            catch (Exception e)
+            {
+                if (Environment.GetEnvironmentVariable(Constants.CliDebug) == "1")
                 {
-                    Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
+                    ColoredConsole.Error.WriteLine(WarningColor(e.ToString()));
+                }
+                else
+                {
+                    ColoredConsole.Error.WriteLine(WarningColor(e.Message));
                 }
             }
-            catch { }
 
             fsWatcher = new FileSystemWatcher(Environment.CurrentDirectory, SecretsManager.AppSettingsFileName);
             fsWatcher.Changed += (s, e) =>
@@ -192,6 +202,70 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 Environment.Exit(ExitCodes.Success);
             };
             fsWatcher.EnableRaisingEvents = true;
+        }
+
+        // https://msdn.microsoft.com/en-us/library/system.configuration.configurationmanager.appsettings(v=vs.110).aspx
+        private void UpdateConnectionStrings(IDictionary<string, string> connectionStrings)
+        {
+            try
+            {
+                var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+                var settings = configFile.ConnectionStrings.ConnectionStrings;
+                settings.Clear();
+                foreach (var pair in connectionStrings)
+                {
+                    if (settings[pair.Key] == null)
+                    {
+                        settings.Add(new ConnectionStringSettings(pair.Key, pair.Value));
+                    }
+                    else
+                    {
+                        settings[pair.Key].ConnectionString = pair.Value;
+                    }
+                }
+                configFile.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection(configFile.ConnectionStrings.SectionInformation.Name);
+            }
+            catch (ConfigurationErrorsException)
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor("Error updating ConfigurationManager.ConnectionStrings"));
+            }
+        }
+
+        private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
+        {
+            foreach (var pair in secrets)
+            {
+                Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
+            }
+        }
+
+        // https://msdn.microsoft.com/en-us/library/system.configuration.configurationmanager.appsettings(v=vs.110).aspx
+        private static void UpdateAppSettings(IDictionary<string, string> secrets)
+        {
+            try
+            {
+                var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+                var settings = configFile.AppSettings.Settings;
+                settings.Clear();
+                foreach (var pair in secrets)
+                {
+                    if (settings[pair.Key] == null)
+                    {
+                        settings.Add(pair.Key, pair.Value);
+                    }
+                    else
+                    {
+                        settings[pair.Key].Value = pair.Value;
+                    }
+                }
+                configFile.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
+            }
+            catch (ConfigurationErrorsException)
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor("Error updating ConfigurationManager.AppSettings"));
+            }
         }
 
         private Uri Setup()
