@@ -9,8 +9,8 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new Function from a template")]
-    [Action(Name = "new", Context = Context.Function, HelpText = "Create a new Function from a template")]
+    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new function from a template.")]
+    [Action(Name = "new", Context = Context.Function, HelpText = "Create a new function from a template.")]
     [Action(Name = "new")]
     internal class CreateFunctionAction : BaseAction
     {
@@ -29,15 +29,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             Parser
                 .Setup<string>('l', "language")
-                .WithDescription("The programming language used in the template. e.g: C#, F#, JavaScript, etc.")
+                .WithDescription("Template programming language, such as C#, F#, JavaScript, etc.")
                 .Callback(l => Language = l);
             Parser
                 .Setup<string>('t', "template")
-                .WithDescription("The name of the template to create.")
+                .WithDescription("Template name")
                 .Callback(t => TemplateName = t);
             Parser
                 .Setup<string>('n', "name")
-                .WithDescription("The name of the function")
+                .WithDescription("Function name")
                 .Callback(n => FunctionName = n);
             return Parser.Parse(args);
         }

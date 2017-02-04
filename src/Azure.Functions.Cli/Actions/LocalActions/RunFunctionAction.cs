@@ -41,11 +41,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             Parser
                 .Setup<int>('t', "timeout")
-                .WithDescription("Time to wait until Functions Server is ready in Seconds")
+                .WithDescription("Time (in seconds) to wait until local Functions host is ready")
                 .Callback(t => Timeout = TimeSpan.FromSeconds(t));
             Parser
                 .Setup<string>('c', "content")
-                .WithDescription("In line content to use")
+                .WithDescription("Inline content")
                 .Callback(c => Content = c);
             Parser
                 .Setup<string>('f', "file")
@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => FileName = f);
             Parser
                 .Setup<bool>('d', "debug")
-                .WithDescription("Attach a debugger to the host process before running the function.")
+                .WithDescription("Attach a debugger to the host process before running the function")
                 .Callback(d => Debug = d);
 
             if (args.Any())
@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 throw new CliArgumentsException("Must specify function to run", Parser.Parse(args),
-                    new CliArgument { Name = nameof(FunctionName), Description = "Function name to run." });
+                    new CliArgument { Name = nameof(FunctionName), Description = "Function to run" });
             }
         }
 
@@ -131,7 +131,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     {
                         ColoredConsole
                             .Error
-                            .WriteLine(ErrorColor($"Only C# and Javascript functions are supported for debugging at the moment."));
+                            .WriteLine(ErrorColor($"Only C# and Javascript functions are currently supported for debugging."));
                         return;
                     }
 

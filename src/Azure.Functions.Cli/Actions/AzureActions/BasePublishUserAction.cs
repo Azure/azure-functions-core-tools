@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else
             {
                 throw new CliArgumentsException("Must specify a username.",
-                    new CliArgument { Name = nameof(UserName), Description = "Publishing userName to set or update." });
+                    new CliArgument { Name = nameof(UserName), Description = "Publishing username to set or update" });
             }
 
             return base.ParseArgs(args);

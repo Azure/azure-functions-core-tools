@@ -6,28 +6,28 @@ namespace Azure.Functions.Cli
     {
         None,
 
-        [Description("For Azure login and working with Function Apps on Azure")]
+        [Description("Commands to log in to Azure and manage resources")]
         Azure,
 
-        [Description("For Azure account and subscriptions settings and actions")]
+        [Description("Commands to list and select Azure subscriptions")]
         Account,
 
-        [Description("For local function app settings and actions")]
+        [Description("Commands for working with a local function app")]
         FunctionApp,
 
-        [Description("For Azure Storage settings and actions")]
+        [Description("Commands to work with Azure Storage")]
         Storage,
 
-        [Description("For local Functions host settings and actions")]
+        [Description("Commands for running the Functions host locally")]
         Host,
 
-        [Description("For local function settings and actions")]
+        [Description("Commands for creating and running functions locally")]
         Function,
 
-        [Description("For Azure account and subscriptions settings and actions")]
+        [Description("Commands to list and select active Azure subscription")]
         Subscriptions,
 
-        [Description("For local settings for your Functions host")]
+        [Description("Commands for managing environment settings for the local Functions host")]
         Settings
     }
 
