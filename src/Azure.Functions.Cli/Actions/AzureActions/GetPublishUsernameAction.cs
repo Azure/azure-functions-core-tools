@@ -6,7 +6,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    [Action(Name = "get-publish-username", Context = Context.Azure, HelpText = "Get the source control publishing username for all Function Apps in Azure")]
+    [Action(Name = "get-publish-username", Context = Context.Azure, HelpText = "Get the source control publishing username for all Function Apps in Azure.")]
     class GetPublishUserNameAction : BaseAction
     {
         private readonly IArmManager _armManager;

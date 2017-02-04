@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else
             {
                 throw new CliArgumentsException("Must specify functionApp name.", 
-                    new CliArgument { Name = nameof(FunctionAppName), Description = "Function App Name" });
+                    new CliArgument { Name = nameof(FunctionAppName), Description = "Function App name" });
             }
 
             return base.ParseArgs(args);
