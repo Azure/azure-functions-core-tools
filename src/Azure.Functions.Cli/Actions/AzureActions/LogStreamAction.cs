@@ -10,7 +10,7 @@ using Azure.Functions.Cli.Arm;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp)]
+    [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Show interactive streaming logs for an Azure-hosted Function App")]
     class LogStreamAction : BaseFunctionAppAction
     {
         private readonly IArmManager _armManager;
