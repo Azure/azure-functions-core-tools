@@ -33,7 +33,12 @@ namespace Azure.Functions.Cli.Diagnostics
             switch (traceEvent.Level)
             {
                 case TraceLevel.Error:
-                    string errorMessage = traceEvent.Message + Environment.NewLine + Utility.FlattenException(traceEvent.Exception);
+                    string errorMessage = traceEvent.Message +
+                        Environment.NewLine +
+                        (traceEvent.Exception == null
+                        ? string.Empty
+                        : Utility.FlattenException(traceEvent.Exception));
+
                     return ErrorColor(errorMessage);
                 case TraceLevel.Warning:
                     return traceEvent.Message.Yellow();
