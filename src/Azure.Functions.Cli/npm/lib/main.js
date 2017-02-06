@@ -11,7 +11,7 @@ function main() {
     var bin = path.join(path.dirname(fs.realpathSync(__filename)), '../bin');
 
     if (!isWin) {
-        var funcProc = spawn("mono" + bin + '/func.exe', args.slice(2), { stdio : [process.stdin, process.stdout, process.stderr, 'pipe']});
+        var funcProc = spawn("mono " + bin + '/func.exe', args.slice(2), { stdio : [process.stdin, process.stdout, process.stderr, 'pipe']});
         funcProc.on('exit', function(code) {
             process.exit(code);
         });
