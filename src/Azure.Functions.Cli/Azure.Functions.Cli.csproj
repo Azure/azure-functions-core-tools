@@ -37,6 +37,9 @@
   <PropertyGroup Condition="'$(OS)'!='Unix'">
     <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="ARMClient.Authentication, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\ARMClient.Authentication.0.0.5-alpha\lib\net45\ARMClient.Authentication.dll</HintPath>
