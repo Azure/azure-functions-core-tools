@@ -1,24 +1,25 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Net.Http.Formatting;
 using System.ServiceModel;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Cors;
 using System.Web.Http.SelfHost;
-using Colors.Net;
-using Fclp;
-using Microsoft.Azure.WebJobs.Script.WebHost;
-using Newtonsoft.Json.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
+using Colors.Net;
+using Fclp;
+using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.WebHost;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using System.Collections.Generic;
-using System.Configuration;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -87,6 +88,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             Utilities.PrintLogo();
             ReadSecrets();
+            CheckHostJsonId();
             var baseAddress = Setup();
 
             var config = new HttpSelfHostConfiguration(baseAddress)
@@ -113,6 +115,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 await PostHostStartActions(config);
                 await Task.Delay(-1);
                 await httpServer.CloseAsync();
+            }
+        }
+
+        private void CheckHostJsonId()
+        {
+            if (FileSystemHelpers.FileExists(ScriptConstants.HostMetadataFileName))
+            {
+                var hostConfig = JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile(ScriptConstants.HostMetadataFileName));
+                if (hostConfig["id"] == null)
+                {
+                    hostConfig.Add("id", Guid.NewGuid().ToString("N"));
+                    FileSystemHelpers.WriteAllTextToFile(ScriptConstants.HostMetadataFileName, JsonConvert.SerializeObject(hostConfig, Formatting.Indented));
+                }
             }
         }
 
