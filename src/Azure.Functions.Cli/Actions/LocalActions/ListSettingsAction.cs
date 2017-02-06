@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     .WriteLine();
             }
 
-            ColoredConsole.WriteLine(TitleColor("App Settings:"));
+            ColoredConsole.WriteLine(TitleColor("Connection Strings:"));
             foreach (var pair in _secretsManager.GetConnectionStrings())
             {
                 ColoredConsole
