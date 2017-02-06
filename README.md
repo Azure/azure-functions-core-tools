@@ -92,7 +92,6 @@ func azure functionapp
 Usage: func azure functionapp <action> [-/--options]
 
 Actions:
-create              Create a new Function App in Azure with default settings
 enable-git-repo     Enable git repository on your Azure-hosted Function App
 fetch-app-settings  Retrieve App Settings from your Azure-hosted Function App and store locally. Alias: fetch
 list                List all Function Apps in the selected Azure subscription
