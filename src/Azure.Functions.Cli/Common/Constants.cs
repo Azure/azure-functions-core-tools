@@ -8,6 +8,7 @@
         public const string FunctionAppArmKind = "functionapp";
         public const string CliVersion = "1.0.0-beta.91";
         public const string CliDebug = "CLI_DEBUG";
+        public const string DefaultSqlProviderName = "System.Data.SqlClient";
 
         public static class Errors
         {
