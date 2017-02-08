@@ -148,9 +148,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (hostManager != null)
             {
-                foreach (var function in hostManager.Instance.Functions)
+                foreach (var function in hostManager.Instance.Functions.Where(f => f.Metadata.IsHttpFunction()))
                 {
-                    var httpRoute = function.Metadata.Bindings.FirstOrDefault(b => b.Type == "httpTrigger")?.Raw["route"]?.ToString();
+                    var httpRoute = function.Metadata.Bindings.FirstOrDefault(b => b.Type == "httpTrigger").Raw["route"]?.ToString();
                     httpRoute = httpRoute ?? function.Name;
                     var hostRoutePrefix = hostManager.Instance.ScriptConfig.HttpRoutePrefix ?? "api/";
                     hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
