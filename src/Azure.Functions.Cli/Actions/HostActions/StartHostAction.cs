@@ -125,6 +125,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var hostConfig = JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile(ScriptConstants.HostMetadataFileName));
                 if (hostConfig["id"] == null)
                 {
+                    ColoredConsole.Out
+                        .WriteLine(WarningColor($"No \"id\" property defined in {ScriptConstants.HostMetadataFileName}."))
+                        .WriteLine(WarningColor($"Updating {ScriptConstants.HostMetadataFileName} with a new \"id\""));
+
                     hostConfig.Add("id", Guid.NewGuid().ToString("N"));
                     FileSystemHelpers.WriteAllTextToFile(ScriptConstants.HostMetadataFileName, JsonConvert.SerializeObject(hostConfig, Formatting.Indented));
                 }
