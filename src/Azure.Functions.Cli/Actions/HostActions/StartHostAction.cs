@@ -43,6 +43,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool UseHttps { get; set; }
 
+        public bool IgnoreHostJsonNotFound { get; set; }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
@@ -81,14 +83,27 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .SetDefault(false)
                 .Callback(s => UseHttps = s);
 
+            Parser
+                .Setup<bool>("ignoreHostJsonNotFound")
+                .WithDescription($"Default is false. Ignores the check for {ScriptConstants.HostMetadataFileName} in current directory then up until it finds one.")
+                .SetDefault(false)
+                .Callback(f => IgnoreHostJsonNotFound = f);
+
             return Parser.Parse(args);
         }
 
         public override async Task RunAsync()
         {
             Utilities.PrintLogo();
+
+            var scriptPath = IgnoreHostJsonNotFound
+                ? Environment.CurrentDirectory
+                : ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+            var settings = SelfHostWebHostSettingsFactory.Create(ConsoleTraceLevel, scriptPath);
+
             ReadSecrets();
             CheckHostJsonId();
+
             var baseAddress = Setup();
 
             var config = new HttpSelfHostConfiguration(baseAddress)
@@ -102,11 +117,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             config.Formatters.Clear();
             config.Formatters.Add(new JsonMediaTypeFormatter());
 
-            var settings = SelfHostWebHostSettingsFactory.Create(ConsoleTraceLevel);
-
             Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={NodeDebugPort}", EnvironmentVariableTarget.Process);
 
             WebApiConfig.Initialize(config, settings: settings);
+
             using (var httpServer = new HttpSelfHostServer(config))
             {
                 await httpServer.OpenAsync();

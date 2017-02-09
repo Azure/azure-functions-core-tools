@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
@@ -28,6 +29,26 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 return function;
+            }
+        }
+
+        public static string GetFunctionAppRootDirectory(string startingDirectory)
+        {
+            var hostJson = Path.Combine(startingDirectory, ScriptConstants.HostMetadataFileName);
+            if (FileSystemHelpers.FileExists(hostJson))
+            {
+                return startingDirectory;
+            }
+
+            var parent = Path.GetDirectoryName(startingDirectory);
+
+            if (parent == null)
+            {
+                throw new CliException($"Unable to find function project root. Expecting to have {ScriptConstants.HostMetadataFileName} in function project root.");
+            }
+            else
+            {
+                return GetFunctionAppRootDirectory(parent);
             }
         }
     }
