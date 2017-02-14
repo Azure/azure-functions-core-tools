@@ -9,9 +9,9 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new function from a template.")]
     [Action(Name = "new", Context = Context.Function, HelpText = "Create a new function from a template.")]
-    [Action(Name = "new")]
+    [Action(Name = "new", HelpText = "Create a new function from a template.")]
+    [Action(Name = "create", Context = Context.Function, HelpText = "Create a new function from a template.")]
     internal class CreateFunctionAction : BaseAction
     {
         private readonly ITemplatesManager _templatesManager;

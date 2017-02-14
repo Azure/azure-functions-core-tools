@@ -13,7 +13,6 @@ using System.Linq;
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
     [Action(Name = "init", HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
-    [Action(Name = "create", HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
     [Action(Name = "init", Context = Context.FunctionApp, HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
     [Action(Name = "create", Context = Context.FunctionApp, HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
     class InitAction : BaseAction
