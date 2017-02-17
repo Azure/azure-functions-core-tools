@@ -65,7 +65,7 @@ function createFunction(f) {
             }
             else {
                 var values = {};
-                if (context.res && context.bindings.res === undefined) {
+                if (context.res) {
                     context.bindings.res = context.res;
                 }
                 for (var name in context.bindings) {
