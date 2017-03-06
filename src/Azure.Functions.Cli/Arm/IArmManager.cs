@@ -25,6 +25,7 @@ namespace Azure.Functions.Cli.Arm
         Task<Subscription> GetCurrentSubscriptionAsync();
         Task<Site> LoadSitePublishingCredentialsAsync(Site site);
         Task<IEnumerable<StorageAccount>> GetStorageAccountsAsync();
+        Task<StorageAccount> LoadAsync(StorageAccount storageAccount);
         Task<IEnumerable<StorageAccount>> GetStorageAccountsAsync(Subscription subscription);
         Task<IEnumerable<ArmWrapper<object>>> getAzureResourceAsync(string resourceName);
         Task<StorageAccount> GetStorageAccountsAsync(ArmWrapper<object> armWrapper);

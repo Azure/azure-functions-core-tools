@@ -54,6 +54,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
+                storageAccount = await _armManager.LoadAsync(storageAccount);
                 var name = $"{storageAccount.StorageAccountName}_STORAGE";
                 _secretsManager.SetSecret(name, storageAccount.GetConnectionString());
                 ColoredConsole
