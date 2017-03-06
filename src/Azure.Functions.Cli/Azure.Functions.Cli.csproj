@@ -71,13 +71,11 @@
       <HintPath>..\..\packages\FluentCommandLineParser.1.4.3\lib\net35\FluentCommandLineParser.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="FSharp.Compiler.Service, Version=8.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\FSharp.Compiler.Service.8.0.0\lib\net45\FSharp.Compiler.Service.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="FSharp.Compiler.Service, Version=9.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\FSharp.Compiler.Service.9.0.1\lib\net45\FSharp.Compiler.Service.dll</HintPath>
     </Reference>
-    <Reference Include="FSharp.Compiler.Service.MSBuild.v12, Version=8.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\FSharp.Compiler.Service.8.0.0\lib\net45\FSharp.Compiler.Service.MSBuild.v12.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="FSharp.Compiler.Service.MSBuild.v12, Version=9.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\FSharp.Compiler.Service.9.0.1\lib\net45\FSharp.Compiler.Service.MSBuild.v12.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Core, Version=4.4.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
@@ -188,12 +186,10 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Azure.ApiHub.Sdk, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.ApiHub.Sdk.0.7.0-alpha\lib\net45\Microsoft.Azure.ApiHub.Sdk.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.ApiHub.Sdk.0.7.2-alpha\lib\net45\Microsoft.Azure.ApiHub.Sdk.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Azure.Documents.Client, Version=1.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.DocumentDB.1.10.0\lib\net45\Microsoft.Azure.Documents.Client.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="Microsoft.Azure.Documents.Client, Version=1.11.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Microsoft.Azure.DocumentDB.1.11.4\lib\net45\Microsoft.Azure.Documents.Client.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.KeyVault.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.Azure.KeyVault.Core.1.0.0\lib\net40\Microsoft.Azure.KeyVault.Core.dll</HintPath>
@@ -204,64 +200,49 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Core.2.0.0-beta2-10504\lib\net45\Microsoft.Azure.WebJobs.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Core.2.0.0-beta2-10522\lib\net45\Microsoft.Azure.WebJobs.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.2.0.0-beta2-10392\lib\net45\Microsoft.Azure.WebJobs.Extensions.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.2.0.0-beta2-10403\lib\net45\Microsoft.Azure.WebJobs.Extensions.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions.ApiHub, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.ApiHub.1.0.0-beta2-10392\lib\net45\Microsoft.Azure.WebJobs.Extensions.ApiHub.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.ApiHub.1.0.0-beta2-10403\lib\net45\Microsoft.Azure.WebJobs.Extensions.ApiHub.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions.BotFramework, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.BotFramework.1.0.9-beta\lib\net452\Microsoft.Azure.WebJobs.Extensions.BotFramework.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.BotFramework.1.0.10-beta\lib\net452\Microsoft.Azure.WebJobs.Extensions.BotFramework.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions.DocumentDB, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.DocumentDB.1.0.0-beta2-10392\lib\net45\Microsoft.Azure.WebJobs.Extensions.DocumentDB.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.DocumentDB.1.0.0-beta2-10403\lib\net45\Microsoft.Azure.WebJobs.Extensions.DocumentDB.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions.MobileApps, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.MobileApps.1.0.0-beta2-10392\lib\net45\Microsoft.Azure.WebJobs.Extensions.MobileApps.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.MobileApps.1.0.0-beta2-10403\lib\net45\Microsoft.Azure.WebJobs.Extensions.MobileApps.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions.NotificationHubs, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.NotificationHubs.1.0.0-beta2-10392\lib\net45\Microsoft.Azure.WebJobs.Extensions.NotificationHubs.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.NotificationHubs.1.0.0-beta2-10403\lib\net45\Microsoft.Azure.WebJobs.Extensions.NotificationHubs.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions.SendGrid, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.SendGrid.2.0.0-beta2-10392\lib\net45\Microsoft.Azure.WebJobs.Extensions.SendGrid.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.SendGrid.2.0.0-beta2-10403\lib\net45\Microsoft.Azure.WebJobs.Extensions.SendGrid.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Extensions.Twilio, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.Twilio.1.0.0-beta2-10392\lib\net45\Microsoft.Azure.WebJobs.Extensions.Twilio.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Extensions.Twilio.1.0.0-beta2-10403\lib\net45\Microsoft.Azure.WebJobs.Extensions.Twilio.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Host, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.2.0.0-beta2-10504\lib\net45\Microsoft.Azure.WebJobs.Host.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.2.0.0-beta2-10522\lib\net45\Microsoft.Azure.WebJobs.Host.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Logging, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Logging.2.0.0-beta2-10504\lib\net45\Microsoft.Azure.WebJobs.Logging.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Logging.2.0.0-beta2-10522\lib\net45\Microsoft.Azure.WebJobs.Logging.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.1.0.0-beta2-10726\lib\net451\Microsoft.Azure.WebJobs.Script.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.1.0.0-beta2-10774\lib\net451\Microsoft.Azure.WebJobs.Script.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.Extensibility, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.Extensibility.1.0.0-beta2-10726\lib\net45\Microsoft.Azure.WebJobs.Script.Extensibility.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.Extensibility.1.0.0-beta2-10765\lib\net45\Microsoft.Azure.WebJobs.Script.Extensibility.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.WebHost, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.WebHost.1.0.0-beta2-10726\lib\net451\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.WebHost.1.0.0-beta2-10774\lib\net451\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.ServiceBus, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.ServiceBus.2.0.0-beta2-10504\lib\net45\Microsoft.Azure.WebJobs.ServiceBus.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.ServiceBus.2.0.0-beta2-10522\lib\net45\Microsoft.Azure.WebJobs.ServiceBus.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebSites.DataProtection, Version=0.1.6.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.Azure.WebSites.DataProtection.0.1.6-alpha45\lib\net46\Microsoft.Azure.WebSites.DataProtection.dll</HintPath>
@@ -340,32 +321,27 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.ServiceBus, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\WindowsAzure.ServiceBus.3.4.1\lib\net45-full\Microsoft.ServiceBus.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\WindowsAzure.ServiceBus.3.4.5\lib\net45-full\Microsoft.ServiceBus.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.ServiceBus.Messaging.EventProcessorHost, Version=0.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.ServiceBus.EventProcessorHost.2.2.6\lib\net45-full\Microsoft.ServiceBus.Messaging.EventProcessorHost.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.ServiceBus.EventProcessorHost.2.2.10\lib\net45-full\Microsoft.ServiceBus.Messaging.EventProcessorHost.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.Configuration, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.WindowsAzure.ConfigurationManager.3.2.3\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Mobile, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.Mobile.Client.3.0.3\lib\net45\Microsoft.WindowsAzure.Mobile.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="Microsoft.WindowsAzure.Mobile, Version=3.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Microsoft.Azure.Mobile.Client.3.1.0\lib\net45\Microsoft.WindowsAzure.Mobile.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Mobile.Ext, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.Mobile.Client.3.0.3\lib\net45\Microsoft.WindowsAzure.Mobile.Ext.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="Microsoft.WindowsAzure.Mobile.Ext, Version=3.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Microsoft.Azure.Mobile.Client.3.1.0\lib\net45\Microsoft.WindowsAzure.Mobile.Ext.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.Storage, Version=7.2.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\..\packages\WindowsAzure.Storage.7.2.1\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="NCrontab, Version=3.2.20120.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\ncrontab.3.2.0\lib\net45\NCrontab.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\ncrontab.3.3.0\lib\net35\NCrontab.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -708,9 +684,11 @@
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets'))" />
-    <Error Condition="!Exists('..\..\packages\Microsoft.Azure.DocumentDB.1.10.0\build\Microsoft.Azure.DocumentDB.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Azure.DocumentDB.1.10.0\build\Microsoft.Azure.DocumentDB.targets'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Azure.DocumentDB.1.11.4\build\Microsoft.Azure.DocumentDB.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Azure.DocumentDB.1.11.4\build\Microsoft.Azure.DocumentDB.targets'))" />
+    <Error Condition="!Exists('..\..\packages\StyleCop.MSBuild.4.7.54.0\build\StyleCop.MSBuild.Targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\StyleCop.MSBuild.4.7.54.0\build\StyleCop.MSBuild.Targets'))" />
   </Target>
-  <Import Project="..\..\packages\Microsoft.Azure.DocumentDB.1.10.0\build\Microsoft.Azure.DocumentDB.targets" Condition="Exists('..\..\packages\Microsoft.Azure.DocumentDB.1.10.0\build\Microsoft.Azure.DocumentDB.targets')" />
+  <Import Project="..\..\packages\Microsoft.Azure.DocumentDB.1.11.4\build\Microsoft.Azure.DocumentDB.targets" Condition="Exists('..\..\packages\Microsoft.Azure.DocumentDB.1.11.4\build\Microsoft.Azure.DocumentDB.targets')" />
+  <Import Project="..\..\packages\StyleCop.MSBuild.4.7.54.0\build\StyleCop.MSBuild.Targets" Condition="Exists('..\..\packages\StyleCop.MSBuild.4.7.54.0\build\StyleCop.MSBuild.Targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
