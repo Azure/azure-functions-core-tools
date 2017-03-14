@@ -285,10 +285,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var pair in secrets)
             {
-                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pair.Key)))
-                {
-                    Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
-                }
+                Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
             }
         }
         /// <summary>
