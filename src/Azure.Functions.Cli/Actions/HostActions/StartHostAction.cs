@@ -68,7 +68,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Parser
                 .Setup<string>("cors")
                 .WithDescription($"A comma separated list of CORS origins with no spaces. Example: https://functions.azure.com,https://functions-staging.azure.com")
-                .SetDefault(LocalhostConstants.AzureFunctionsCors)
+                .SetDefault(string.Empty)
                 .Callback(c => CorsOrigins = c);
 
             Parser
@@ -112,9 +112,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 TransferMode = TransferMode.Streamed
             };
 
-            var cors = new EnableCorsAttribute(CorsOrigins, "*", "*");
-            config.EnableCors(cors);
-            config.Formatters.Clear();
+            if (!string.IsNullOrEmpty(CorsOrigins))
+            {
+                var cors = new EnableCorsAttribute(CorsOrigins, "*", "*");
+                config.EnableCors(cors);
+            }
             config.Formatters.Add(new JsonMediaTypeFormatter());
 
             Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={NodeDebugPort}", EnvironmentVariableTarget.Process);
@@ -283,7 +285,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var pair in secrets)
             {
-                Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
+                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pair.Key)))
+                {
+                    Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
+                }
             }
         }
         /// <summary>

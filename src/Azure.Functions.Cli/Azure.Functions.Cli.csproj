@@ -583,7 +583,6 @@
     <Compile Include="Common\ExitCodes.cs" />
     <Compile Include="Common\FileSystemHelpers.cs" />
     <Compile Include="Common\FunctionNotFoundException.cs" />
-    <Compile Include="Common\LocalhostConstants.cs" />
     <Compile Include="Common\OutputTheme.cs" />
     <Compile Include="Common\PersistentSettings.cs" />
     <Compile Include="Common\ProcessInfo.cs" />
