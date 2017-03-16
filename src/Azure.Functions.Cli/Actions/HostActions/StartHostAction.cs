@@ -119,7 +119,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Always,
                 TransferMode = TransferMode.Streamed,
-                HostNameComparisonMode = HostNameComparisonMode.Exact
+                HostNameComparisonMode = HostNameComparisonMode.Exact,
+                MaxReceivedMessageSize = 102400 // 100MB
             };
 
             if (!string.IsNullOrEmpty(CorsOrigins))
