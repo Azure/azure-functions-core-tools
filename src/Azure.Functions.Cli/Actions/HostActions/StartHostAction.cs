@@ -109,7 +109,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var config = new HttpSelfHostConfiguration(baseAddress)
             {
                 IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Always,
-                TransferMode = TransferMode.Streamed
+                TransferMode = TransferMode.Streamed,
+                HostNameComparisonMode = HostNameComparisonMode.Exact
             };
 
             if (!string.IsNullOrEmpty(CorsOrigins))
@@ -327,9 +328,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             var protocol = UseHttps ? "https" : "http";
             var actions = new List<InternalAction>();
-            if (!SecurityHelpers.IsUrlAclConfigured(protocol, Port))
+            if (SecurityHelpers.IsUrlAclConfigured(protocol, Port))
             {
-                actions.Add(InternalAction.SetupUrlAcl);
+                actions.Add(InternalAction.RemoveUrlAcl);
             }
 
             if (UseHttps && !SecurityHelpers.IsSSLConfigured(Port))
@@ -340,7 +341,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             if (actions.Any())
             {
                 string errors;
-                if (!ConsoleApp.RelaunchSelfElevated(new InternalUseAction { Port = Port, Actions = actions, Protocol = protocol}, out errors))
+                if (!ConsoleApp.RelaunchSelfElevated(new InternalUseAction { Port = Port, Actions = actions, Protocol = protocol }, out errors))
                 {
                     ColoredConsole.WriteLine("Error: " + errors);
                     Environment.Exit(ExitCodes.GeneralError);

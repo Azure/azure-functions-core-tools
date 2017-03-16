@@ -57,6 +57,9 @@ namespace Azure.Functions.Cli.Actions
                     case InternalAction.SetupUrlAcl:
                         SetupUrlAcl();
                         break;
+                    case InternalAction.RemoveUrlAcl:
+                        RemoveUrlAcl();
+                        break;
                     case InternalAction.SetupSslCert:
                         SetupSslCert();
                         break;
@@ -68,6 +71,11 @@ namespace Azure.Functions.Cli.Actions
         private void SetupUrlAcl()
         {
             NetSH.CMD.Http.Add.UrlAcl($"{Protocol}://+:{Port}/", $"{Environment.UserDomainName}\\{Environment.UserName}", null);
+        }
+
+        private void RemoveUrlAcl()
+        {
+            NetSH.CMD.Http.Delete.UrlAcl($"{Protocol}://+:{Port}/");
         }
 
         private void SetupSslCert()
@@ -103,6 +111,7 @@ namespace Azure.Functions.Cli.Actions
     {
         None,
         SetupUrlAcl,
+        RemoveUrlAcl,
         SetupSslCert
     }
 }
