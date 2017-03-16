@@ -1,13 +1,13 @@
 ﻿using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using Colors.Net;
-using FluentAssertions;
-using NSubstitute;
-using Azure.Functions.Cli.Actions.LocalActions;
+using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using FluentAssertions;
+using NSubstitute;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -18,8 +18,8 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         public SettingsActionsTests(ITestOutputHelper output) : base(output) { }
 
         [Theory]
-        [InlineData("Name1", "Value1", true)]
-        [InlineData("Name1", "Value1", false)]
+        [InlineData("Name1", "Value1")]
+        [InlineData("Name1", "Value1")]
         public void AddSettingsActionTest(string name, string value)
         {
             // Setup
@@ -146,7 +146,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             ColoredConsole.Error = console;
 
             var armManager = Substitute.For<IArmManager>();
-            armManager.GetStorageAccountsAsync().Returns(new[] { new StorageAccount(currentSubscription, "resource", storageAccountName, "location") { StorageAccountKey = storageAccountKey } });
+            var storageAccount = new StorageAccount(currentSubscription, "resource", storageAccountName, "location") { StorageAccountKey = storageAccountKey };
+            armManager.GetStorageAccountsAsync().Returns(new[] {storageAccount});
+            armManager.LoadAsync(Arg.Any<StorageAccount>()).Returns(storageAccount);
 
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.SetSecret(Arg.Is(storageAccountName), Arg.Any<string>());

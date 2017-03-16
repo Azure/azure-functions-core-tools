@@ -544,7 +544,7 @@
     <Compile Include="Actions\HostActions\StopHostAction.cs" />
     <Compile Include="Actions\InternalUseAction.cs" />
     <Compile Include="Actions\LocalActions\AddSettingAction.cs" />
-    <Compile Include="Actions\LocalActions\AddStorageAccountSettingAction.cs" />
+    <Compile Include="Actions\AzureActions\AddStorageAccountSettingAction.cs" />
     <Compile Include="Actions\LocalActions\CreateFunctionAction.cs" />
     <Compile Include="Actions\LocalActions\DecryptSettingAction.cs" />
     <Compile Include="Actions\LocalActions\DeleteSettingAction.cs" />
@@ -591,6 +591,7 @@
     <Compile Include="Common\SecretsManager.cs" />
     <Compile Include="Common\SelfHostWebHostSettingsFactory.cs" />
     <Compile Include="Common\SourceControl.cs" />
+    <Compile Include="Common\StaticSettings.cs" />
     <Compile Include="Common\TaskUtilities.cs" />
     <Compile Include="Common\Template.cs" />
     <Compile Include="Common\TemplatesManager.cs" />

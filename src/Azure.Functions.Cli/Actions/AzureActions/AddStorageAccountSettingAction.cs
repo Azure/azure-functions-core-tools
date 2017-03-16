@@ -8,9 +8,9 @@ using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Common;
 
-namespace Azure.Functions.Cli.Actions.LocalActions
+namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    [Action(Name = "add-storage-account", Context = Context.Settings, HelpText = "Add a local app setting using the value from an Azure Storage account. Requires Azure login.")]
+    [Action(Name = "fetch-connection-string", Context = Context.Azure, SubContext = Context.Storage, HelpText = "Add a local app setting using the value from an Azure Storage account. Requires Azure login.")]
     internal class AddStorageAccountSettingAction : BaseAction
     {
         private readonly IArmManager _armManager;
@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var name = $"{storageAccount.StorageAccountName}_STORAGE";
                 _secretsManager.SetSecret(name, storageAccount.GetConnectionString());
                 ColoredConsole
-                    .WriteLine($"Secret saved locally in {ExampleColor(name)}")
+                    .WriteLine($"Secret saved locally in {SecretsManager.AppSettingsFileName} under name {ExampleColor(name)}.")
                     .WriteLine();
             }
         }
