@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Net.Http.Formatting;
 using System.ServiceModel;
 using System.Threading.Tasks;
@@ -44,6 +45,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public bool UseHttps { get; set; }
 
         public bool IgnoreHostJsonNotFound { get; set; }
+
+        public DebuggerType Debugger { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -88,6 +91,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"Default is false. Ignores the check for {ScriptConstants.HostMetadataFileName} in current directory then up until it finds one.")
                 .SetDefault(false)
                 .Callback(f => IgnoreHostJsonNotFound = f);
+
+            Parser
+                .Setup<DebuggerType>("debug")
+                .WithDescription("Default is None. Options are VSCode and VS")
+                .SetDefault(DebuggerType.None)
+                .Callback(d => Debugger = d);
 
             return Parser.Parse(args);
         }
@@ -203,10 +212,38 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 }
                 DisableCoreLogging(config);
                 DisplayHttpFunctionsInfo(config);
+                await SetupDebuggerAsync(config);
             }
             catch (Exception ex)
             {
                 ColoredConsole.Error.WriteLine(ErrorColor($"Unable to retrieve functions list: {ex.Message}"));
+            }
+        }
+
+        private async Task SetupDebuggerAsync(HttpSelfHostConfiguration config)
+        {
+            if (Debugger == DebuggerType.Vs)
+            {
+                using (var client = new HttpClient { BaseAddress = config.BaseAddress })
+                {
+                    await DebuggerHelper.AttachManagedAsync(client);
+                }
+            }
+            else if (Debugger == DebuggerType.VsCode)
+            {
+                var nodeDebugger = await DebuggerHelper.TrySetupNodeDebuggerAsync();
+                if (nodeDebugger == NodeDebuggerStatus.Error)
+                {
+                    ColoredConsole
+                        .Error
+                        .WriteLine(ErrorColor("Unable to configure node debugger. Check your launch.json."));
+                    return;
+                }
+                else
+                {
+                    ColoredConsole
+                        .WriteLine("launch.json for VSCode configured.");
+                }
             }
         }
 

@@ -20,6 +20,13 @@ namespace Azure.Functions.Cli.Helpers
         Error
     }
 
+    internal enum DebuggerType
+    {
+        None,
+        Vs,
+        VsCode
+    }
+
     internal static class DebuggerHelper
     {
         const int Retries = 20;
