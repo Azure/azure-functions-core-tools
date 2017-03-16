@@ -116,11 +116,12 @@ namespace Azure.Functions.Cli
 
                 // Since the process will be elevated, we won't be able to redirect stdout\stdin to
                 // our process if we are not elevated too, which is most probably the case.
-                // Therefore I use shell redirection >> to a temp file, then read the content after
+                // Therefore I use shell redirection > to a temp file, then read the content after
                 // the process exists.
                 var logFile = Path.GetTempFileName();
                 var exeName = Process.GetCurrentProcess().MainModule.FileName;
-                command = $"/c \"{exeName}\" {command} >> {logFile}";
+                // '2>&1' redirects stderr to stdout.
+                command = $"/c \"\"{exeName}\" {command} > \"{logFile}\" 2>&1\"";
 
 
                 var startInfo = new ProcessStartInfo("cmd")
