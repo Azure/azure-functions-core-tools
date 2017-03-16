@@ -65,7 +65,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch (Exception e)
             {
-                if (Environment.GetEnvironmentVariable(Constants.CliDebug) == "1")
+                if (StaticSettings.IsDebug)
                 {
                     ColoredConsole.Error.WriteLine(ErrorColor(e.ToString()));
                 }
@@ -107,7 +107,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch (Exception e)
             {
-                if (Environment.GetEnvironmentVariable(Constants.CliDebug) == "1")
+                if (StaticSettings.IsDebug)
                 {
                     ColoredConsole.Error.WriteLine(ErrorColor(e.ToString()));
                 }

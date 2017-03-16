@@ -48,7 +48,7 @@ namespace Azure.Functions.Cli
                 }
                 catch (Exception ex)
                 {
-                    if (Environment.GetEnvironmentVariable(Constants.CliDebug) == "1")
+                    if (StaticSettings.IsDebug)
                     {
                         // If CLI is in debug mode, display full call stack.
                         ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));

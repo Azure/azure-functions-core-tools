@@ -229,7 +229,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             catch (Exception e)
             {
-                if (Environment.GetEnvironmentVariable(Constants.CliDebug) == "1")
+                if (StaticSettings.IsDebug)
                 {
                     ColoredConsole.Error.WriteLine(WarningColor(e.ToString()));
                 }
