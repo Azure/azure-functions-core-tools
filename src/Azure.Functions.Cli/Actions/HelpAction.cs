@@ -226,8 +226,25 @@ namespace Azure.Functions.Cli.Actions
 
         private static void DisplayOptions(IEnumerable<ICommandLineOption> options)
         {
-            var longestName = options.Max(o => o.HasLongName ? o.LongName.Length : 0);
-            longestName += 9; // for coloring and --/- characters
+            var longestName = options.Max(o =>
+            {
+                const int coloringChars = 2;
+                const int longNameSwitches = 2;
+                const int shortNameSwitches = 3;
+                const int shortNameSpace = 1;
+                if (o.HasLongName && o.HasShortName)
+                {
+                    return o.LongName.Length + longNameSwitches + o.ShortName.Length + shortNameSwitches + shortNameSpace + coloringChars;
+                }
+                else if (o.HasLongName)
+                {
+                    return o.LongName.Length + longNameSwitches + coloringChars;
+                }
+                else
+                {
+                    return 0;
+                }
+            });
             foreach (var option in options)
             {
                 var stringBuilder = new StringBuilder();
@@ -240,17 +257,31 @@ namespace Azure.Functions.Cli.Actions
                 {
                     stringBuilder.Append($" [-{option.ShortName}]");
                 }
-                var helpLine = string.Format($"    {{0, {-longestName}}} {{1}}", stringBuilder.ToString().DarkGray(), option.Description);
-                if (helpLine.Length < SafeConsole.BufferWidth)
+                var helpSwitch = string.Format($"    {{0, {-longestName}}} ", stringBuilder.ToString().DarkGray());
+                var helpSwitchLength = helpSwitch.Length - 2; // helpSwitch contains 2 formatting characters.
+                var helpText = option.Description;
+                if (helpSwitchLength + helpText.Length < SafeConsole.BufferWidth || helpSwitchLength > SafeConsole.BufferWidth)
                 {
-                    ColoredConsole.WriteLine(helpLine);
+                    ColoredConsole.WriteLine($"{helpSwitch}{helpText}");
                 }
                 else
                 {
-                    while (helpLine.Length > SafeConsole.BufferWidth)
+                    ColoredConsole.Write(helpSwitch);
+                    var lineNumber = 1;
+                    while (helpText.Length + helpSwitchLength > SafeConsole.BufferWidth)
                     {
-                        var segment = helpLine.Substring(0, SafeConsole.BufferWidth - 1);
-                        helpLine = helpLine.Substring(SafeConsole.BufferWidth);
+                        var segment = helpText.Substring(0, SafeConsole.BufferWidth - helpSwitchLength - 1);
+                        helpText = helpText.Substring(SafeConsole.BufferWidth - helpSwitchLength - 1);
+                        if (lineNumber != 1)
+                        {
+                            segment = segment.PadLeft(helpSwitchLength + segment.Length);
+                        }
+                        ColoredConsole.WriteLine(segment);
+                        lineNumber++;
+                    }
+                    if (helpText.Length > 0)
+                    {
+                        ColoredConsole.WriteLine(helpText.PadLeft(helpSwitchLength + helpText.Length, ' '));
                     }
                 }
             }
