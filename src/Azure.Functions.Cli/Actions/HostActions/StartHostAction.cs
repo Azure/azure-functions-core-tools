@@ -15,6 +15,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
+using EdgeJs;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost;
@@ -214,11 +215,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 DisableCoreLogging(config);
                 DisplayHttpFunctionsInfo(config);
                 await SetupDebuggerAsync(config);
+                await DummyEdgeInit();
             }
             catch (Exception ex)
             {
                 ColoredConsole.Error.WriteLine(ErrorColor($"Unable to retrieve functions list: {ex.Message}"));
             }
+        }
+
+        private async Task DummyEdgeInit()
+        {
+            // Sample: https://github.com/tjanczuk/edge
+            var func = Edge.Func(@"return function (data, callback) {
+                callback(null, 'Node.js welcomes ' + data);
+            }");
+            await func("init");
         }
 
         private async Task SetupDebuggerAsync(HttpSelfHostConfiguration config)
