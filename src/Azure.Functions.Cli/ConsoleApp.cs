@@ -57,8 +57,6 @@ namespace Azure.Functions.Cli
                     {
                         ColoredConsole.Error.WriteLine(ErrorColor(ex.Message));
                     }
-                    ColoredConsole.Write("Press any to continue....");
-                    Console.ReadKey(true);
                 }
             }
         }
