@@ -150,7 +150,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (FileSystemHelpers.FileExists(ScriptConstants.HostMetadataFileName))
             {
-                var hostConfig = JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile(ScriptConstants.HostMetadataFileName));
+                var hostJsonContent = FileSystemHelpers.ReadAllTextFromFile(ScriptConstants.HostMetadataFileName);
+                var hostConfig = string.IsNullOrEmpty(hostJsonContent)
+                    ? new JObject()
+                    : JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile(ScriptConstants.HostMetadataFileName));
                 if (hostConfig["id"] == null)
                 {
                     ColoredConsole.Out
