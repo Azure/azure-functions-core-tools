@@ -541,7 +541,6 @@
     <Compile Include="Actions\BaseAction.cs" />
     <Compile Include="Actions\HelpAction.cs" />
     <Compile Include="Actions\HostActions\StartHostAction.cs" />
-    <Compile Include="Actions\HostActions\StopHostAction.cs" />
     <Compile Include="Actions\InternalUseAction.cs" />
     <Compile Include="Actions\LocalActions\AddSettingAction.cs" />
     <Compile Include="Actions\AzureActions\AddStorageAccountSettingAction.cs" />

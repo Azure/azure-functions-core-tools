@@ -31,7 +31,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("azure set-publish-password userName", typeof(SetPublishPasswordAction))]
         [InlineData("azure set-publish-username userName", typeof(SetPublishPasswordAction))]
         [InlineData("host start", typeof(StartHostAction))]
-        [InlineData("host stop", typeof(StopHostAction))]
         [InlineData("settings add settingName", typeof(AddSettingAction))]
         [InlineData("azure storage fetch-connection-string storageName", typeof(AddStorageAccountSettingAction))]
         [InlineData("new", typeof(CreateFunctionAction))]
