@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Arm
             _authHelper = authHelper;
             _client = client;
             _settings = settings;
-            SelectTenantAsync(_settings.CurrentSubscription);
+            Task.Run(async () => await SelectTenantAsync(_settings.CurrentSubscription)).Wait();
         }
 
         public async Task<AuthenticationHeaderValue> GetAuthenticationHeader(string id)
@@ -105,9 +105,21 @@ namespace Azure.Functions.Cli.Arm
             return _authHelper.DumpTokenCache();
         }
 
-        public Task SelectTenantAsync(string id)
+        public async Task SelectTenantAsync(string id)
         {
-            return _authHelper.GetToken(id);
+            TokenCacheInfo token = null;
+            try
+            {
+                token = await _authHelper.GetToken(id);
+            }
+            catch { }
+
+            if (token == null || token.ExpiresOn < DateTimeOffset.Now)
+            {
+                await _authHelper.AcquireTokens();
+            }
+
+            await _authHelper.GetToken(id);
         }
 
         public void Logout()
