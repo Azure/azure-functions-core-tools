@@ -22,7 +22,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             Parser
                 .Setup<bool>('a', "showValue")
-                .Callback(a => ShowValues = a);
+                .Callback(a => ShowValues = a)
+                .WithDescription("Specifying this shows decrypted settings."); 
             return Parser.Parse(args);
         }
 
