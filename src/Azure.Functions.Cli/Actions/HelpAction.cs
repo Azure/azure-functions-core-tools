@@ -120,7 +120,17 @@ namespace Azure.Functions.Cli.Actions
 
         private void DisplayActionHelp()
         {
-            ColoredConsole.WriteLine(_parseResult.ErrorText);
+            if (_parseResult.Errors.All(e => e.Option.HasLongName && !string.IsNullOrEmpty(e.Option.Description)))
+            {
+                foreach (var error in _parseResult.Errors)
+                {
+                    ColoredConsole.WriteLine($"Error parsing {error.Option.LongName}. {error.Option.Description}");
+                }
+            }
+            else
+            {
+                ColoredConsole.WriteLine(_parseResult.ErrorText);
+            }
         }
 
         private void DisplayGeneralHelp()
