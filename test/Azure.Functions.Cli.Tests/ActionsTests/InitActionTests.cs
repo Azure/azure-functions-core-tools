@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
     {
         public InitActionTests(ITestOutputHelper output) : base(output) { }
 
-        [Theory]
+        //[Theory]
         [InlineData(null)]
         [InlineData(".")]
         [InlineData("newFolder")]
