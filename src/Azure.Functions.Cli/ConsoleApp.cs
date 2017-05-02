@@ -57,6 +57,12 @@ namespace Azure.Functions.Cli
                     {
                         ColoredConsole.Error.WriteLine(ErrorColor(ex.Message));
                     }
+
+                    if (args.Any(a => a.Equals("--pause-on-error", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        ColoredConsole.Write("Press any to continue....");
+                        Console.ReadKey(true);
+                    }
                 }
             }
         }
