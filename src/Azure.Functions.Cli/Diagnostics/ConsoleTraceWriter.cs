@@ -6,6 +6,7 @@ using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Host;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Microsoft.Azure.WebJobs.Script;
+using System.Collections.Generic;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
@@ -24,11 +25,14 @@ namespace Azure.Functions.Cli.Diagnostics
         {
             if (Level >= traceEvent.Level)
             {
-                ColoredConsole.WriteLine(GetMessageString(traceEvent));
+                foreach (var line in GetMessageString(traceEvent))
+                {
+                    ColoredConsole.WriteLine($"[{traceEvent.Timestamp}] {line}");
+                }
             }
         }
 
-        private static RichString GetMessageString(TraceEvent traceEvent)
+        private static IEnumerable<RichString> GetMessageString(TraceEvent traceEvent)
         {
             switch (traceEvent.Level)
             {
@@ -39,15 +43,23 @@ namespace Azure.Functions.Cli.Diagnostics
                         ? string.Empty
                         : Utility.FlattenException(traceEvent.Exception));
 
-                    return ErrorColor(errorMessage);
+                    return SplitAndApply(errorMessage, ErrorColor);
                 case TraceLevel.Warning:
-                    return traceEvent.Message.Yellow();
+                    return SplitAndApply(traceEvent.Message, WarningColor);
                 case TraceLevel.Info:
-                    return AdditionalInfoColor(traceEvent.Message);
+                    return SplitAndApply(traceEvent.Message, AdditionalInfoColor);
                 case TraceLevel.Verbose:
-                    return VerboseColor(traceEvent.Message);
+                    return SplitAndApply(traceEvent.Message, VerboseColor);
                 default:
-                    return traceEvent.Message.White();
+                    return SplitAndApply(traceEvent.Message);
+            }
+        }
+
+        private static IEnumerable<RichString> SplitAndApply(string message, Func<string, RichString> Color = null)
+        {
+            foreach (var line in message.ToString().Split(new[] { Environment.NewLine }, StringSplitOptions.None))
+            {
+                yield return Color == null ? new RichString(line) : Color(line);
             }
         }
     }
