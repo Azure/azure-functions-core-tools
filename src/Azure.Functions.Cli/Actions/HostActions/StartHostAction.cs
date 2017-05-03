@@ -102,7 +102,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var settings = SelfHostWebHostSettingsFactory.Create(ConsoleTraceLevel, scriptPath);
 
             ReadSecrets();
-            CheckHostJsonId();
 
             var baseAddress = Setup();
 
@@ -133,26 +132,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 await PostHostStartActions(config);
                 await Task.Delay(-1);
                 await httpServer.CloseAsync();
-            }
-        }
-
-        private void CheckHostJsonId()
-        {
-            if (FileSystemHelpers.FileExists(ScriptConstants.HostMetadataFileName))
-            {
-                var hostJsonContent = FileSystemHelpers.ReadAllTextFromFile(ScriptConstants.HostMetadataFileName);
-                var hostConfig = string.IsNullOrEmpty(hostJsonContent)
-                    ? new JObject()
-                    : JsonConvert.DeserializeObject<JObject>(hostJsonContent);
-                if (hostConfig["id"] == null)
-                {
-                    ColoredConsole.Out
-                        .WriteLine(WarningColor($"No \"id\" property defined in {ScriptConstants.HostMetadataFileName}."))
-                        .WriteLine(WarningColor($"Updating {ScriptConstants.HostMetadataFileName} with a new \"id\""));
-
-                    hostConfig.Add("id", Guid.NewGuid().ToString("N"));
-                    FileSystemHelpers.WriteAllTextToFile(ScriptConstants.HostMetadataFileName, JsonConvert.SerializeObject(hostConfig, Formatting.Indented));
-                }
             }
         }
 

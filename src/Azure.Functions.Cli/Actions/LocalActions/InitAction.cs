@@ -49,7 +49,7 @@ project.lock.json
 appsettings.json
 local.settings.json
 "},
-            { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), $"{{\"id\":\"{ Guid.NewGuid().ToString("N") }\"}}" },
+            { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), "{ }" },
             { new Lazy<string>(() => SecretsManager.AppSettingsFileName), @"{
   ""IsEncrypted"": true,
   ""Values"": {
