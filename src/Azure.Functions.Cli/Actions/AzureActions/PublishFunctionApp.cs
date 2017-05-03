@@ -22,8 +22,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private readonly IArmManager _armManager;
         private readonly ISettings _settings;
 
-        public bool IgnoreHostJsonNotFound { get; set; }
-
         public PublishFunctionApp(IArmManager armManager, ISettings settings)
         {
             _armManager = armManager;
@@ -32,20 +30,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            Parser
-                .Setup<bool>("ignoreHostJsonNotFound")
-                .WithDescription($"Default is false. Ignores the check for {ScriptConstants.HostMetadataFileName} in current directory then up until it finds one.")
-                .SetDefault(false)
-                .Callback(f => IgnoreHostJsonNotFound = f);
-
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
-            var functionAppRoot = IgnoreHostJsonNotFound
-                ? Environment.CurrentDirectory
-                : ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+            var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
             ColoredConsole.WriteLine(WarningColor($"Publish {functionAppRoot} contents to an Azure Function App. Locally deleted files are not removed from destination."));
             ColoredConsole.WriteLine("Getting site publishing info...");
@@ -72,7 +62,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var memoryStream = new MemoryStream();
             using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                foreach (var fileName in FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".gitignore", "appsettings.json", "project.lock.json" }))
+                foreach (var fileName in FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" }))
                 {
                     zip.AddFile(fileName, fileName, path);
                 }

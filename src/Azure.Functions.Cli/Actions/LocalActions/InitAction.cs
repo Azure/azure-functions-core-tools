@@ -1,14 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading.Tasks;
-using Colors.Net;
-using Microsoft.Azure.WebJobs.Script;
-using Azure.Functions.Cli.Common;
-using static Azure.Functions.Cli.Common.OutputTheme;
-using Azure.Functions.Cli.Helpers;
-using Fclp;
 using System.Linq;
+using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
+using Colors.Net;
+using Fclp;
+using Microsoft.Azure.WebJobs.Script;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -21,9 +21,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string FolderName { get; set; } = string.Empty;
 
-        internal readonly Dictionary<string, string> fileToContentMap = new Dictionary<string, string>
+        internal readonly Dictionary<Lazy<string>, string> fileToContentMap = new Dictionary<Lazy<string>, string>
         {
-            { ".gitignore",  @"
+            { new Lazy<string>(() => ".gitignore"),  @"
 bin
 obj
 csx
@@ -47,9 +47,10 @@ project.lock.json
 /data
 .secrets
 appsettings.json
+local.settings.json
 "},
-            { ScriptConstants.HostMetadataFileName, $"{{\"id\":\"{ Guid.NewGuid().ToString("N") }\"}}" },
-            { SecretsManager.AppSettingsFileName, @"{
+            { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), $"{{\"id\":\"{ Guid.NewGuid().ToString("N") }\"}}" },
+            { new Lazy<string>(() => SecretsManager.AppSettingsFileName), @"{
   ""IsEncrypted"": true,
   ""Values"": {
     ""AzureWebJobsStorage"": """"
@@ -82,10 +83,10 @@ appsettings.json
 
             foreach (var pair in fileToContentMap)
             {
-                if (!FileSystemHelpers.FileExists(pair.Key))
+                if (!FileSystemHelpers.FileExists(pair.Key.Value))
                 {
                     ColoredConsole.WriteLine($"Writing {pair.Key}");
-                    await FileSystemHelpers.WriteAllTextToFileAsync(pair.Key, pair.Value);
+                    await FileSystemHelpers.WriteAllTextToFileAsync(pair.Key.Value, pair.Value);
                 }
                 else
                 {

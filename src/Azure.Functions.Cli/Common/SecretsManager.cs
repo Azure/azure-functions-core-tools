@@ -6,42 +6,89 @@ using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using static Azure.Functions.Cli.Common.OutputTheme;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
 {
     internal class SecretsManager : ISecretsManager
     {
-        public const string AppSettingsFileName = "appsettings.json";
+        private static bool warningPrinted = false;
+
+        public static string AppSettingsFilePath
+        {
+            get
+            {
+                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+                var newFilePath = Path.Combine(rootPath, "local.settings.json");
+                var oldFilePath = Path.Combine(rootPath, "appsettings.json");
+                if (!FileSystemHelpers.FileExists(oldFilePath))
+                {
+                    return newFilePath;
+                }
+                else if (FileSystemHelpers.FileExists(oldFilePath) && FileSystemHelpers.FileExists(newFilePath))
+                {
+                    if (!warningPrinted)
+                    {
+                        ColoredConsole.WriteLine(WarningColor("Warning: found both 'local.settings.json' and 'appsettings.json'. Ignoring 'appsettings.json'."));
+                        warningPrinted = true;
+                    }
+                    return newFilePath;
+                }
+                else if (FileSystemHelpers.FileExists(oldFilePath))
+                {
+                    if (!warningPrinted)
+                    {
+                        ColoredConsole.WriteLine(WarningColor($"Warning: The filename 'appsettings.json' is deprecated. Rename it to local.settings.json"));
+                        warningPrinted = true;
+                    }
+                    return oldFilePath;
+                }
+                else
+                {
+                    return newFilePath;
+                }
+            }
+        }
+
+        public static string AppSettingsFileName
+        {
+            get
+            {
+                return Path.GetFileName(AppSettingsFilePath);
+            }
+        }
 
         public IDictionary<string, string> GetSecrets()
         {
-            var appSettingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
             return appSettingsFile.GetValues();
         }
 
         public IDictionary<string, string> GetConnectionStrings()
         {
-            var appSettingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
             return appSettingsFile.GetConnectionStrings();
         }
 
         public void SetSecret(string name, string value)
         {
-            var appSettingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
             appSettingsFile.SetSecret(name, value);
             appSettingsFile.Commit();
         }
 
         public void SetConnectionString(string name, string value)
         {
-            var appSettingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
             appSettingsFile.SetConnectionString(name, value);
             appSettingsFile.Commit();
         }
 
         public void DecryptSettings()
         {
-            var settingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
             if (settingsFile.IsEncrypted)
             {
                 var values = settingsFile.GetValues();
@@ -64,7 +111,7 @@ namespace Azure.Functions.Cli.Common
 
         public void EncryptSettings()
         {
-            var settingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
             if (!settingsFile.IsEncrypted)
             {
                 var values = settingsFile.GetValues();
@@ -88,31 +135,28 @@ namespace Azure.Functions.Cli.Common
 
         public void DeleteSecret(string name)
         {
-            var settingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
             settingsFile.RemoveSetting(name);
             settingsFile.Commit();
         }
 
         public void DeleteConnectionString(string name)
         {
-            var settingsFile = new AppSettingsFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
             settingsFile.RemoveConnectionString(name);
             settingsFile.Commit();
         }
 
         private class AppSettingsFile
         {
-            [JsonIgnore]
             private readonly string _filePath;
-
-            public AppSettingsFile() { }
 
             public AppSettingsFile(string filePath)
             {
                 _filePath = filePath;
                 try
                 {
-                    var content = FileSystemHelpers.ReadAllTextFromFile(Path.Combine(Environment.CurrentDirectory, AppSettingsFileName));
+                    var content = FileSystemHelpers.ReadAllTextFromFile(_filePath);
                     var appSettings = JsonConvert.DeserializeObject<AppSettingsFile>(content);
                     IsEncrypted = appSettings.IsEncrypted;
                     Values = appSettings.Values;

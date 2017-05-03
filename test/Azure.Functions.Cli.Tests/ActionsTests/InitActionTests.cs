@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             files.Should().HaveCount(3);
             files.Should().Contain(".gitignore");
             files.Should().Contain("host.json");
-            files.Should().Contain("appsettings.json");
+            files.Should().Contain("local.settings.json");
 
             var expectedFolders = 2;
             folders

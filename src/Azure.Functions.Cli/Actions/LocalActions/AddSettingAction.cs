@@ -9,7 +9,7 @@ using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "add", Context = Context.Settings, HelpText = "Add new local app setting to appsettings.json.\n\t Settings are encrypted by default. If encrypted, they can only be decrypted on the current machine.")]
+    [Action(Name = "add", Context = Context.Settings, HelpText = "Add new local app setting to local.settings.json. Settings are encrypted by default. If encrypted, they can only be decrypted on the current machine.")]
     class AddSettingAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;

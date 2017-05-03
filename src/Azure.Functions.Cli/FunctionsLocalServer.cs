@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli
             }
             else
             {
-                var hostId = await GetHostId(Environment.CurrentDirectory);
+                var hostId = await GetHostId(ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory));
                 using (var client = new HttpClient())
                 {
                     var response = await client.GetAsync(new Uri(server, "admin/host/status"));

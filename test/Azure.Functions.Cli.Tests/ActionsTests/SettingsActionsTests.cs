@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             // Test
             Program.Main(new[] { "settings", "add", name, value });
 
-            var content = File.ReadAllText(Path.Combine(WorkingDirectory, "appsettings.json"));
+            var content = File.ReadAllText(Path.Combine(WorkingDirectory, "local.settings.json"));
 
             // Assert
             content.Should().Contain(name);
@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             // Test
             Program.Main(new[] { "settings", "remove", name });
-            var content = File.ReadAllText(Path.Combine(WorkingDirectory, "appsettings.json"));
+            var content = File.ReadAllText(Path.Combine(WorkingDirectory, "local.settings.json"));
 
             // Assert
             content.Should().NotContain(name);
@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             // Setup
             Program.Main(new[] { "init" });
             Program.Main(new[] { "settings", "add", name, value });
-            var settingsPath = Path.Combine(WorkingDirectory, "appsettings.json");
+            var settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
 
             var content = File.ReadAllText(settingsPath);
             content.Should().Contain(name);
@@ -113,6 +113,8 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [Fact]
         public async Task AddStorageAccountActionTest()
         {
+            Program.Main(new[] { "init" });
+
             const string storageAccountName = "StorageAccount1";
             var output = new StringBuilder();
             var action = SetupForStorageAccount(storageAccountName, output);
@@ -144,6 +146,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             console.Write(Arg.Do<object>(o => output.Append(o.ToString()))).Returns(console);
             ColoredConsole.Out = console;
             ColoredConsole.Error = console;
+
 
             var armManager = Substitute.For<IArmManager>();
             var storageAccount = new StorageAccount(currentSubscription, "resource", storageAccountName, "location") { StorageAccountKey = storageAccountKey };

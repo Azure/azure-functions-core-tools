@@ -45,8 +45,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool UseHttps { get; set; }
 
-        public bool IgnoreHostJsonNotFound { get; set; }
-
         public DebuggerType Debugger { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -88,12 +86,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(s => UseHttps = s);
 
             Parser
-                .Setup<bool>("ignoreHostJsonNotFound")
-                .WithDescription($"Default is false. Ignores the check for {ScriptConstants.HostMetadataFileName} in current directory then up until it finds one.")
-                .SetDefault(false)
-                .Callback(f => IgnoreHostJsonNotFound = f);
-
-            Parser
                 .Setup<DebuggerType>("debug")
                 .WithDescription("Default is None. Options are VSCode and VS")
                 .SetDefault(DebuggerType.None)
@@ -106,9 +98,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             Utilities.PrintLogo();
 
-            var scriptPath = IgnoreHostJsonNotFound
-                ? Environment.CurrentDirectory
-                : ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+            var scriptPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
             var settings = SelfHostWebHostSettingsFactory.Create(ConsoleTraceLevel, scriptPath);
 
             ReadSecrets();
@@ -263,12 +253,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
         }
 
         /// <summary>
-        /// This method reads the secrets from appsettings.json and sets them
+        /// This method reads the secrets from local.settings.json and sets them
         /// AppSettings are set in environment variables, ConfigurationManager.AppSettings
         /// ConnectionStrings are only set in ConfigurationManager.ConnectionStrings
         /// 
         /// It also sets up a FileSystemWatcher that kills the current running process
-        /// when appsettings.json is updated.
+        /// when local.settings.json is updated.
         /// </summary>
         private void ReadSecrets()
         {
@@ -292,7 +282,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 }
             }
 
-            fsWatcher = new FileSystemWatcher(Environment.CurrentDirectory, SecretsManager.AppSettingsFileName);
+            fsWatcher = new FileSystemWatcher(Path.GetDirectoryName(SecretsManager.AppSettingsFilePath), SecretsManager.AppSettingsFileName);
             fsWatcher.Changed += (s, e) =>
             {
                 Environment.Exit(ExitCodes.Success);
