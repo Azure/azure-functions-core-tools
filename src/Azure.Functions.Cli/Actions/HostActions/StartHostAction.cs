@@ -22,6 +22,9 @@ using Microsoft.Azure.WebJobs.Script.WebHost;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Microsoft.Azure.WebJobs.Host;
+using Microsoft.Azure.WebJobs.Host.Config;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -156,7 +159,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     var httpRoute = function.Metadata.Bindings.FirstOrDefault(b => b.Type == "httpTrigger").Raw["route"]?.ToString();
                     httpRoute = httpRoute ?? function.Name;
-                    var hostRoutePrefix = hostManager.Instance.ScriptConfig.HttpRoutePrefix ?? "api/";
+                    var extensions = hostManager.Instance.ScriptConfig.HostConfig.GetService<IExtensionRegistry>();
+                    var httpConfig = extensions.GetExtensions<IExtensionConfigProvider>().OfType<HttpExtensionConfiguration>().Single();
+                    var hostRoutePrefix = httpConfig.RoutePrefix ?? "api/";
                     hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
                         ? hostRoutePrefix
                         : $"{hostRoutePrefix}/";

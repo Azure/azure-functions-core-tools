@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Helpers
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
             var functionErrors = new Dictionary<string, Collection<string>>();
-            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ConsoleTraceWriter(TraceLevel.Info), functionErrors);
+            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ConsoleTraceWriter(TraceLevel.Info), null, functionErrors);
             var function = functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
             if (function == null)
             {

@@ -1,7 +1,7 @@
 {
-  "name": "azure-functions-cli",
-  "version": "1.0.0-beta.91",
-  "description": "Azure Functions Cli",
+  "name": "azure-functions-core-tools",
+  "version": "1.0.0-beta.95",
+  "description": "Azure Functions Core Tools",
   "scripts": { },
   "author": "Microsoft",
   "license": "MIT",

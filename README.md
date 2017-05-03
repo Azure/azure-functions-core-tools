@@ -4,18 +4,18 @@
 |---|---|
 |master|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/master?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/master)|
 
-# Azure Functions CLI
+# Azure Functions Core Tools
 
-The Azure Functions CLI provides a local development experience for creating, developing, testing, running, and debugging Azure Functions.
+The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
 
 ## Installing
 
-**NOTE**: This package only currently works on Windows, since the underlying Functions Host is not yet cross-platform. You can upvote this GitHub issue if you're interested in running on other platforms: [make the Azure Functions CLI cross platform](https://github.com/Azure/azure-functions-cli/issues/13).
+**NOTE**: This package only currently works on Windows, since the underlying Functions Host is not yet cross-platform. You can upvote this GitHub issue if you're interested in running on other platforms: [make the Azure Functions Core Tools cross platform](https://github.com/Azure/azure-functions-cli/issues/13).
 
 To install globally:
 
 ```
-npm i -g azure-functions-cli
+npm i -g azure-functions-core-tools
 ```
 
 ### Aliases
@@ -30,7 +30,7 @@ azure-functions
 
 ## Commands
 
-The CLI commands have the following basic structure:
+Commands have the following basic structure:
 
 ```
 func [context] [context] <action> [-/--options]
@@ -152,9 +152,9 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 ## Contact Us
 
-For questions on Azure Functions or the CLI, you can ask questions here:
+For questions on Azure Functions or the tools, you can ask questions here:
 
 - [Azure Functions MSDN Forum](https://social.msdn.microsoft.com/Forums/azure/en-US/home?forum=AzureFunctions)
 - [Azure-Functions tag on StackOverflow](http://stackoverflow.com/questions/tagged/azure-functions)
 
-File bugs at [Azure Functions CLI repo on GitHub](https://github.com/Azure/azure-functions-cli/issues).
+File bugs at [Azure Functions Core Tools repo on GitHub](https://github.com/Azure/azure-functions-cli/issues).
