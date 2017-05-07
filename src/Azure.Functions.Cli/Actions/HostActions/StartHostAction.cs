@@ -201,7 +201,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 DisableCoreLogging(config);
                 DisplayHttpFunctionsInfo(config);
                 await SetupDebuggerAsync(config);
-                await DummyEdgeInit();
+                if (PlatformHelper.IsWindows)
+                {
+                    await DummyEdgeInit();
+                }
             }
             catch (Exception ex)
             {
