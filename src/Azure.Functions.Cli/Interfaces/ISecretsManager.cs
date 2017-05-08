@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Interfaces
 {
@@ -12,5 +13,6 @@ namespace Azure.Functions.Cli.Interfaces
         void EncryptSettings();
         void DeleteSecret(string name);
         void DeleteConnectionString(string name);
+        HostStartSettings GetHostStartSettings();
     }
 }

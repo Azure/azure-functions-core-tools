@@ -140,6 +140,12 @@ namespace Azure.Functions.Cli.Common
             settingsFile.Commit();
         }
 
+        public HostStartSettings GetHostStartSettings()
+        {
+            var settingsFile = new AppSettingsFile(AppSettingsFilePath);
+            return settingsFile.Host ?? new HostStartSettings();
+        }
+
         public void DeleteConnectionString(string name)
         {
             var settingsFile = new AppSettingsFile(AppSettingsFilePath);
@@ -161,6 +167,7 @@ namespace Azure.Functions.Cli.Common
                     IsEncrypted = appSettings.IsEncrypted;
                     Values = appSettings.Values;
                     ConnectionStrings = appSettings.ConnectionStrings;
+                    Host = appSettings.Host;
                 }
                 catch
                 {
@@ -173,6 +180,9 @@ namespace Azure.Functions.Cli.Common
             public bool IsEncrypted { get; set; }
             public Dictionary<string, string> Values { get; set; } = new Dictionary<string, string>();
             public Dictionary<string, string> ConnectionStrings { get; set; } = new Dictionary<string, string>();
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public HostStartSettings Host { get; set; }
 
             public void SetSecret(string name, string value)
             {

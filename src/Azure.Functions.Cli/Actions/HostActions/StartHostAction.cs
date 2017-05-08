@@ -25,6 +25,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Extensions.Http;
+using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -35,6 +36,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         const int DefaultPort = 7071;
         const TraceLevel DefaultDebugLevel = TraceLevel.Info;
         const int DefaultTimeout = 20;
+        private readonly ISecretsManager _secretsManager;
 
         public int Port { get; set; }
 
@@ -50,12 +52,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public DebuggerType Debugger { get; set; }
 
+        public StartHostAction(ISecretsManager secretsManager)
+        {
+            this._secretsManager = secretsManager;
+        }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
+            var hostSettings = _secretsManager.GetHostStartSettings();
+
             Parser
                 .Setup<int>('p', "port")
                 .WithDescription($"Local port to listen on. Default: {DefaultPort}")
-                .SetDefault(DefaultPort)
+                .SetDefault(hostSettings.LocalHttpPort == default(int) ? DefaultPort : hostSettings.LocalHttpPort)
                 .Callback(p => Port = p);
 
             Parser
@@ -73,7 +82,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Parser
                 .Setup<string>("cors")
                 .WithDescription($"A comma separated list of CORS origins with no spaces. Example: https://functions.azure.com,https://functions-staging.azure.com")
-                .SetDefault(string.Empty)
+                .SetDefault(hostSettings.Cors ?? string.Empty)
                 .Callback(c => CorsOrigins = c);
 
             Parser
