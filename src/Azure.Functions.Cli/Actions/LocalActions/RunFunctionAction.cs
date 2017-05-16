@@ -169,6 +169,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 var adminInvocation = JsonConvert.SerializeObject(new FunctionInvocation { Input = invocation });
 
+                if (functionMetadata.IsHttpFunction())
+                {
+                    ColoredConsole.WriteLine(WarningColor("NOTE: the 'func run' command only supports POST for HTTP triggers. For other verbs, consider a REST client like cURL or Postman."));
+                }
+
                 var response = functionMetadata.IsHttpFunction()
                     ? await client.PostAsync($"api/{FunctionName}", new StringContent(invocation, Encoding.UTF8, invocation.IsJson() ? "application/json" : "plain/text"))
                     : await client.PostAsync($"admin/functions/{FunctionName}", new StringContent(adminInvocation, Encoding.UTF8, "application/json"));
