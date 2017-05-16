@@ -10,12 +10,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "set-publish-username", Context = Context.Azure, HelpText = "Set source control publishing username and password for all Function Apps in Azure")]
     class SetPublishPasswordAction : BasePublishUserAction
     {
-        private IArmManager _armManager;
-
         public SetPublishPasswordAction(IArmManager armManager)
-        {
-            _armManager = armManager;
-        }
+            : base(armManager)
+        { }
 
         public override async Task RunAsync()
         {

@@ -7,14 +7,11 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "get-publish-username", Context = Context.Azure, HelpText = "Get the source control publishing username for all Function Apps in Azure.")]
-    class GetPublishUserNameAction : BaseAction
+    class GetPublishUserNameAction : BaseAzureAction
     {
-        private readonly IArmManager _armManager;
-
         public GetPublishUserNameAction(IArmManager armManager)
-        {
-            _armManager = armManager;
-        }
+            : base(armManager)
+        { }
 
         public override async Task RunAsync()
         {

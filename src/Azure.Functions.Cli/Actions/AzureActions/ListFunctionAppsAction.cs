@@ -9,14 +9,13 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "list", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "List all Function Apps in the selected Azure subscription")]
-    class ListFunctionAppsAction : BaseAction
+    class ListFunctionAppsAction : BaseAzureAction
     {
-        private readonly IArmManager _armManager;
         private readonly ISettings _settings;
 
         public ListFunctionAppsAction(IArmManager armManager, ISettings settings)
+            : base(armManager)
         {
-            _armManager = armManager;
             _settings = settings;
         }
 

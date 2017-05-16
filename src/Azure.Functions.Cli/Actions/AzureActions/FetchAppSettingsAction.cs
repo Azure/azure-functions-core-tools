@@ -11,12 +11,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "fetch", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Retrieve App Settings from your Azure-hosted Function App and store locally")]
     internal class FetchAppSettingsAction : BaseFunctionAppAction
     {
-        private readonly IArmManager _armManager;
         private ISecretsManager _secretsManager;
 
         public FetchAppSettingsAction(IArmManager armManager, ISecretsManager secretsManager)
+            : base(armManager)
         {
-            _armManager = armManager;
             _secretsManager = secretsManager;
         }
 

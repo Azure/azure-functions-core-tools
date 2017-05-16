@@ -24,7 +24,11 @@ namespace Azure.Functions.Cli.Arm
             _authHelper = authHelper;
             _client = client;
             _settings = settings;
-            Task.Run(async () => await SelectTenantAsync(_settings.CurrentSubscription)).Wait();
+        }
+
+        public async Task Initialize()
+        {
+            await SelectTenantAsync(_settings.CurrentSubscription);
         }
 
         public async Task<AuthenticationHeaderValue> GetAuthenticationHeader(string id)

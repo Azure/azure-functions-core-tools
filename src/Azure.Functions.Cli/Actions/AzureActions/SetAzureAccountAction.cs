@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            var tenants = ArmManager.GetTenants();
+            var tenants = _armManager.GetTenants();
             var validSub = tenants
                 .Select(t => t.subscriptions)
                 .SelectMany(s => s)

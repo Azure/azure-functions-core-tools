@@ -8,12 +8,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "portal", Context = Context.Azure, HelpText = "Launch default browser with link to the current app in https://portal.azure.com")]
     class PortalAction : BaseFunctionAppAction
     {
-        private readonly IArmManager _armManager;
-
         public PortalAction(IArmManager armManager)
-        {
-            _armManager = armManager;
-        }
+            : base(armManager)
+        { }
 
         public override async Task RunAsync()
         {

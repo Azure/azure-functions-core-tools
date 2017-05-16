@@ -548,6 +548,7 @@
   <ItemGroup>
     <Compile Include="ActionAttribute.cs" />
     <Compile Include="Actions\AzureActions\BaseAzureAccountAction.cs" />
+    <Compile Include="Actions\AzureActions\BaseAzureAction.cs" />
     <Compile Include="Actions\AzureActions\BaseFunctionAppAction.cs" />
     <Compile Include="Actions\AzureActions\BasePublishUserAction.cs" />
     <Compile Include="Actions\AzureActions\EnableGitRepoAction.cs" />
@@ -642,6 +643,7 @@
     <Compile Include="Helpers\SecurityHelpers.cs" />
     <Compile Include="Interfaces\IAction.cs" />
     <Compile Include="Interfaces\IFunctionsLocalServer.cs" />
+    <Compile Include="Interfaces\IInitializableAction.cs" />
     <Compile Include="Interfaces\IProcessInfo.cs" />
     <Compile Include="Interfaces\IProcessManager.cs" />
     <Compile Include="Interfaces\ISecretsManager.cs" />

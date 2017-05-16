@@ -11,8 +11,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         public ListAzureAccountsAction(IArmManager armManager, ISettings settings)
             : base(armManager, settings)
-        {
-        }
+        { }
 
         public override async Task RunAsync()
         {

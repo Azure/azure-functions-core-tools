@@ -8,20 +8,19 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    abstract class BaseAzureAccountAction : BaseAction
+    abstract class BaseAzureAccountAction : BaseAzureAction
     {
-        public readonly IArmManager ArmManager;
         public readonly ISettings Settings;
 
         public BaseAzureAccountAction(IArmManager armManager, ISettings settings)
+            : base(armManager)
         {
-            ArmManager = armManager;
             Settings = settings;
         }
 
         public async Task PrintAccountsAsync()
         {
-            var tenants = ArmManager.GetTenants();
+            var tenants = _armManager.GetTenants();
             var currentSub = Settings.CurrentSubscription;
             var subscriptions = tenants
                 .Select(t => t.subscriptions)
@@ -42,7 +41,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     currentSub = Settings.CurrentSubscription;
                 }
 
-                await ArmManager.SelectTenantAsync(currentSub);
+                await _armManager.SelectTenantAsync(currentSub);
 
                 var longestName = subscriptions.Max(s => s.displayName.Length) + subscriptions.First().subscriptionId.Length + "( ) ".Length;
 

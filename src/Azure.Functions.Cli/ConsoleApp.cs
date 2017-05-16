@@ -43,6 +43,11 @@ namespace Azure.Functions.Cli
             {
                 try
                 {
+                    if (action is IInitializableAction)
+                    {
+                        var initializableAction = action as IInitializableAction;
+                        await initializableAction.Initialize();
+                    }
                     // All Actions are async. No return value is expected from any action.
                     await action.RunAsync();
                 }

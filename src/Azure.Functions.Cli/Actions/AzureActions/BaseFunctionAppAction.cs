@@ -1,13 +1,16 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
+using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    abstract class BaseFunctionAppAction : BaseAction
+    abstract class BaseFunctionAppAction : BaseAzureAction
     {
         public string FunctionAppName { get; set; }
+
+        public BaseFunctionAppAction(IArmManager armManager) : base(armManager)
+        { }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

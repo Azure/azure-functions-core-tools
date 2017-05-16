@@ -1,13 +1,18 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
+using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    abstract class BasePublishUserAction : BaseAction
+    abstract class BasePublishUserAction : BaseAzureAction
     {
         public string UserName { get; set; }
+
+        public BasePublishUserAction(IArmManager armManager) : base(armManager)
+        { }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

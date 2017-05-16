@@ -12,12 +12,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         public LoginAction(IArmManager armManager, ISettings settings)
             : base(armManager, settings)
-        {
-        }
+        { }
 
         public override async Task RunAsync()
         {
-            await ArmManager.LoginAsync();
+            await _armManager.LoginAsync();
             await PrintAccountsAsync();
         }
     }

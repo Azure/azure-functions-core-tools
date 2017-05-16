@@ -11,17 +11,16 @@ using Azure.Functions.Cli.Common;
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "fetch-connection-string", Context = Context.Azure, SubContext = Context.Storage, HelpText = "Add a local app setting using the value from an Azure Storage account. Requires Azure login.")]
-    internal class AddStorageAccountSettingAction : BaseAction
+    internal class AddStorageAccountSettingAction : BaseAzureAction
     {
-        private readonly IArmManager _armManager;
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
 
         public string StorageAccountName { get; set; }
 
         public AddStorageAccountSettingAction(IArmManager armManager, ISettings settings, ISecretsManager secretsManager)
+            : base(armManager)
         {
-            _armManager = armManager;
             _settings = settings;
             _secretsManager = secretsManager;
         }

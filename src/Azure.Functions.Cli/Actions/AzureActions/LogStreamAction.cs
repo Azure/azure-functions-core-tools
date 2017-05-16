@@ -13,12 +13,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Show interactive streaming logs for an Azure-hosted Function App")]
     class LogStreamAction : BaseFunctionAppAction
     {
-        private readonly IArmManager _armManager;
-
         public LogStreamAction(IArmManager armManager)
-        {
-            _armManager = armManager;
-        }
+            : base(armManager)
+        { }
 
         public override async Task RunAsync()
         {

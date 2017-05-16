@@ -19,12 +19,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "publish", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Publish the current directory contents to an Azure Function App. Locally deleted files are not removed from destination.")]
     internal class PublishFunctionApp : BaseFunctionAppAction
     {
-        private readonly IArmManager _armManager;
         private readonly ISettings _settings;
 
         public PublishFunctionApp(IArmManager armManager, ISettings settings)
+            : base(armManager)
         {
-            _armManager = armManager;
             _settings = settings;
         }
 

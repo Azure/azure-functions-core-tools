@@ -5,14 +5,12 @@ using Azure.Functions.Cli.Arm;
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "logout", Context = Context.Azure, HelpText = "Log out of Azure account")]
-    class LogoutAction : BaseAction
+    class LogoutAction : BaseAzureAction
     {
-        private readonly IArmManager _armManager;
 
         public LogoutAction(IArmManager armManager)
-        {
-            _armManager = armManager;
-        }
+            : base(armManager)
+        { }
 
         public override Task RunAsync()
         {

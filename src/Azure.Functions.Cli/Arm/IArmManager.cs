@@ -8,6 +8,7 @@ namespace Azure.Functions.Cli.Arm
 {
     internal interface IArmManager
     {
+        Task Initialize();
         Task<IEnumerable<Site>> GetFunctionAppsAsync();
         Task<IEnumerable<Site>> GetFunctionAppsAsync(Subscription subscription);
         Task<Site> GetFunctionAppAsync(string name);

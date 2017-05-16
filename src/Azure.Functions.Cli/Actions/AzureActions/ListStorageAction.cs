@@ -9,14 +9,13 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "list", Context = Context.Azure, SubContext = Context.Storage, HelpText = "List all Storage Accounts in the selected Azure subscription")]
-    class ListStorageAction : BaseAction
+    class ListStorageAction : BaseAzureAction
     {
-        private readonly IArmManager _armManager;
         private readonly ISettings _settings;
 
         public ListStorageAction(IArmManager armManager, ISettings settings)
+            : base (armManager)
         {
-            _armManager = armManager;
             _settings = settings;
         }
 
