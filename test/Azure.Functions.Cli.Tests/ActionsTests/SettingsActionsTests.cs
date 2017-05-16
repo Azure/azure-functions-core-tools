@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             // Assert
             content.Should().Contain(name);
             content.Should().Contain("IsEncrypted");
-            content.Should().Contain("true");
+            content.Should().Contain("false");
         }
 
         [Theory]
@@ -63,13 +63,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             var content = File.ReadAllText(settingsPath);
             content.Should().Contain(name);
-            content.Should().NotContain(value);
-            content.Should().Contain("true");
-
-            Program.Main(new[] { "settings", "decrypt" });
-
-            content = File.ReadAllText(settingsPath);
-            content.Should().Contain(name);
             content.Should().Contain(value);
             content.Should().Contain("false");
 
@@ -79,6 +72,13 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().Contain(name);
             content.Should().NotContain(value);
             content.Should().Contain("true");
+
+            Program.Main(new[] { "settings", "decrypt" });
+
+            content = File.ReadAllText(settingsPath);
+            content.Should().Contain(name);
+            content.Should().Contain(value);
+            content.Should().Contain("false");
         }
 
         [Theory]
