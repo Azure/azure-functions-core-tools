@@ -113,7 +113,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var scriptPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
             var settings = SelfHostWebHostSettingsFactory.Create(ConsoleTraceLevel, scriptPath);
 
-            ReadSecrets();
+            await ReadSecrets(scriptPath);
 
             var baseAddress = Setup();
 
@@ -256,27 +256,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// It also sets up a FileSystemWatcher that kills the current running process
         /// when local.settings.json is updated.
         /// </summary>
-        private void ReadSecrets()
+        private async Task ReadSecrets(string scriptPath)
         {
-            try
-            {
-                var secretsManager = new SecretsManager();
-                var secrets = secretsManager.GetSecrets();
-                UpdateEnvironmentVariables(secrets);
-                UpdateAppSettings(secrets);
-                UpdateConnectionStrings(secretsManager.GetConnectionStrings());
-            }
-            catch (Exception e)
-            {
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.Error.WriteLine(WarningColor(e.ToString()));
-                }
-                else
-                {
-                    ColoredConsole.Error.WriteLine(WarningColor(e.Message));
-                }
-            }
+            var secrets = _secretsManager.GetSecrets();
+            UpdateEnvironmentVariables(secrets);
+            UpdateAppSettings(secrets);
+            UpdateConnectionStrings(_secretsManager.GetConnectionStrings());
+
+            await CheckNonOptionalSettings(secrets, scriptPath);
 
             fsWatcher = new FileSystemWatcher(Path.GetDirectoryName(SecretsManager.AppSettingsFilePath), SecretsManager.AppSettingsFileName);
             fsWatcher.Changed += (s, e) =>
@@ -285,6 +272,72 @@ namespace Azure.Functions.Cli.Actions.HostActions
             };
             fsWatcher.EnableRaisingEvents = true;
         }
+
+        internal static async Task CheckNonOptionalSettings(IDictionary<string, string> secrets, string scriptPath)
+        {
+            try
+            {
+                // FirstOrDefault returns a KeyValuePair<string, string> which is a struct so it can't be null.
+                var azureWebJobsStorage = secrets.FirstOrDefault(pair => pair.Key.Equals("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)).Value;
+                var functionJsonFiles = await FileSystemHelpers
+                    .GetDirectories(scriptPath)
+                    .Select(d => Path.Combine(d, "function.json"))
+                    .Where(FileSystemHelpers.FileExists)
+                    .Select(async f => (filePath: f, content: await FileSystemHelpers.ReadAllTextFromFileAsync(f)))
+                    .WhenAll();
+
+                var functionsJsons = functionJsonFiles
+                    .Select(t => (filePath: t.filePath, jObject: JsonConvert.DeserializeObject<JObject>(t.content)))
+                    .Where(b => b.jObject["bindings"] != null);
+
+                var allHttpTrigger = functionsJsons
+                    .Select(b => b.jObject["bindings"])
+                    .SelectMany(i => i)
+                    .Where(b => b?["type"] != null)
+                    .Select(b => b["type"].ToString())
+                    .Where(b => b.IndexOf("Trigger") != -1)
+                    .All(t => t == "httpTrigger");
+
+                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allHttpTrigger)
+                {
+                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. This is required for all triggers other than HTTP. "
+                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
+                }
+
+                foreach ((var filePath, var functionJson) in functionsJsons)
+                {
+                    foreach (JObject binding in functionJson["bindings"])
+                    {
+                        foreach (var token in binding)
+                        {
+                            if (token.Key == "connection" || token.Key == "apiKey" || token.Key == "accountSid" || token.Key == "authToken")
+                            {
+                                var appSettingName = token.Value.ToString();
+                                if (string.IsNullOrWhiteSpace(appSettingName))
+                                {
+                                    ColoredConsole.WriteLine(WarningColor($"Warning: '{token.Key}' property in '{filePath}' is empty."));
+                                }
+                                else if (!secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    ColoredConsole
+                                        .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
+                                            $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}."));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception e) when (!(e is CliException))
+            {
+                ColoredConsole.WriteLine(WarningColor($"Warning: unable to verify all settings from {SecretsManager.AppSettingsFileName} and function.json files."));
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(e);
+                }
+            }
+        }
+
         /// <summary>
         /// Code is based on:
         /// https://msdn.microsoft.com/en-us/library/system.configuration.configurationmanager.appsettings(v=vs.110).aspx

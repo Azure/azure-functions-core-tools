@@ -118,6 +118,11 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
+        internal static IEnumerable<string> GetDirectories(string scriptPath)
+        {
+            return Instance.Directory.GetDirectories(scriptPath);
+        }
+
         private static void DeleteFileSystemInfo(FileSystemInfoBase fileSystemInfo, bool ignoreErrors)
         {
             if (!fileSystemInfo.Exists)

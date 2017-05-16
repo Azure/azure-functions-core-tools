@@ -233,7 +233,14 @@ namespace Azure.Functions.Cli.Common
             {
                 if (IsEncrypted)
                 {
-                    return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                    try
+                    {
+                        return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                    }
+                    catch (Exception e)
+                    {
+                        throw new CliException("Failed to decrypt settings. Encrypted settings only be edited through 'func settings add'.", e);
+                    }
                 }
                 else
                 {
@@ -245,7 +252,14 @@ namespace Azure.Functions.Cli.Common
             {
                 if (IsEncrypted)
                 {
-                    return ConnectionStrings.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                    try
+                    {
+                        return ConnectionStrings.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                    }
+                    catch (Exception e)
+                    {
+                        throw new CliException("Failed to decrypt settings. Encrypted settings only be edited through 'func settings add'.", e);
+                    }
                 }
                 else
                 {
