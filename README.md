@@ -133,7 +133,7 @@ create  Create a new Function from a template, using the Yeoman generator
 run     Run a function directly
 ```
 
-For consistency, the `func init` command can also be invoked via `func function app init`.
+For consistency, the `func init` command can also be invoked via `func functionapp init`.
 
 ```
 func functionapp init
