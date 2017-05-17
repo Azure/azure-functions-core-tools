@@ -22,11 +22,13 @@ namespace Azure.Functions.Cli
         private const int Port = 7071;
         private readonly IProcessManager _processManager;
         private readonly ISettings _settings;
+        private readonly ISecretsManager _secretsManager;
 
-        public FunctionsLocalServer(IProcessManager processManager, ISettings settings)
+        public FunctionsLocalServer(IProcessManager processManager, ISettings settings, ISecretsManager secretesManager)
         {
             _settings = settings;
             _processManager = processManager;
+            _secretsManager = secretesManager;
         }
 
         public async Task<HttpClient> ConnectAsync(TimeSpan timeout)
@@ -41,9 +43,25 @@ namespace Azure.Functions.Cli
             return new HttpClient() { BaseAddress = server, Timeout = timeout };
         }
 
-        private async Task<Uri> DiscoverServer(int iteration = 0)
+        private async Task<Uri> DiscoverServer()
+        {
+            var hostSettings = _secretsManager.GetHostStartSettings();
+            if (hostSettings.LocalHttpPort != default(int))
+            {
+                var server = new Uri($"http://localhost:{hostSettings.LocalHttpPort}");
+                if (await IsRightServer(server))
+                {
+                    return server;
+                }
+            }
+
+            return await RecursiveDiscoverServer(0);
+        }
+
+        private async Task<Uri> RecursiveDiscoverServer(int iteration = 0)
         {
             var server = new Uri($"http://localhost:{Port + iteration}");
+
             if (!await server.IsServerRunningAsync())
             {
                 // create the server
@@ -68,8 +86,8 @@ namespace Azure.Functions.Cli
                 //TODO: factor out to PlatformHelper.LaunchInNewConsole and implement for Mac using AppleScript
                 var exeName = System.Reflection.Assembly.GetEntryAssembly().Location;
                 var exe = PlatformHelper.IsWindows
-                    ? new Executable(exeName, $"host start -p {Port + iteration}", streamOutput: false, shareConsole: true)
-                    : new Executable("mono", $"{exeName} host start -p {Port + iteration}", streamOutput: false, shareConsole: false);
+                    ? new Executable(exeName, $"host start -p {Port + iteration} --pause-on-error", streamOutput: false, shareConsole: true)
+                    : new Executable("mono", $"{exeName} host start -p {Port + iteration} --pause-on-error", streamOutput: false, shareConsole: false);
 
                 exe.RunAsync().Ignore();
                 await Task.Delay(500);
@@ -83,21 +101,13 @@ namespace Azure.Functions.Cli
             }
             else
             {
-                var hostId = await GetHostId(ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory));
-                using (var client = new HttpClient())
+                if (await IsRightServer(server))
                 {
-                    var response = await client.GetAsync(new Uri(server, "admin/host/status"));
-                    response.EnsureSuccessStatusCode();
-
-                    var hostStatus = await response.Content.ReadAsAsync<HostStatus>();
-                    if (!hostStatus.Id.Equals(hostId, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return await DiscoverServer(iteration + 1);
-                    }
-                    else
-                    {
-                        return server;
-                    }
+                    return server;
+                }
+                else
+                {
+                    return await RecursiveDiscoverServer(iteration + 1);
                 }
             }
         }
@@ -112,6 +122,26 @@ namespace Azure.Functions.Cli
 
             var hostConfig = JsonConvert.DeserializeObject<JToken>(await FileSystemHelpers.ReadAllTextFromFileAsync(hostJson));
             return hostConfig["id"]?.ToString() ?? string.Empty;
+        }
+
+        private static async Task<bool> IsRightServer(Uri server)
+        {
+            try
+            {
+                var hostId = await GetHostId(ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory));
+                using (var client = new HttpClient())
+                {
+                    var response = await client.GetAsync(new Uri(server, "admin/host/status"));
+                    response.EnsureSuccessStatusCode();
+
+                    var hostStatus = await response.Content.ReadAsAsync<HostStatus>();
+                    return hostStatus.Id.Equals(hostId, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
