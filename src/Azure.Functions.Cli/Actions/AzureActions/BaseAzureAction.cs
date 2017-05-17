@@ -1,5 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -13,9 +15,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             _armManager = armManager;
         }
 
-        public Task Initialize()
+        public async Task Initialize()
         {
-            return _armManager.Initialize();
+            try
+            {
+                await _armManager.Initialize();
+            }
+            catch (Exception e)
+            {
+                throw new CliException("Error during login to azure. Please verify your internet connection or try again later.", e);
+            }
         }
     }
 }
