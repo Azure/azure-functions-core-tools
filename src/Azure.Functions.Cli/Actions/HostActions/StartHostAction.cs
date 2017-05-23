@@ -34,15 +34,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
     {
         private FileSystemWatcher fsWatcher;
         const int DefaultPort = 7071;
-        const TraceLevel DefaultDebugLevel = TraceLevel.Info;
         const int DefaultTimeout = 20;
         private readonly ISecretsManager _secretsManager;
 
         public int Port { get; set; }
 
         public int NodeDebugPort { get; set; }
-
-        public TraceLevel ConsoleTraceLevel { get; set; }
 
         public string CorsOrigins { get; set; }
 
@@ -72,12 +69,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"Port for node debugger to use. Default: value from launch.json or {DebuggerHelper.DefaultNodeDebugPort}")
                 .SetDefault(DebuggerHelper.GetNodeDebuggerPort())
                 .Callback(p => NodeDebugPort = p);
-
-            Parser
-                .Setup<TraceLevel>('d', "debugLevel")
-                .WithDescription($"Console trace level (off, verbose, info, warning or error). Default: {DefaultDebugLevel}")
-                .SetDefault(DefaultDebugLevel)
-                .Callback(p => ConsoleTraceLevel = p);
 
             Parser
                 .Setup<string>("cors")
@@ -111,7 +102,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Utilities.PrintLogo();
 
             var scriptPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-            var settings = SelfHostWebHostSettingsFactory.Create(ConsoleTraceLevel, scriptPath);
+            var traceLevel = await ScriptHostHelpers.GetTraceLevel(scriptPath);
+            var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, scriptPath);
 
             await ReadSecrets(scriptPath);
 

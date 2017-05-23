@@ -4,15 +4,20 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Description;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Helpers
 {
     public static class ScriptHostHelpers
     {
+        private const TraceLevel DefaultTraceLevel = TraceLevel.Info;
+
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
             var functionErrors = new Dictionary<string, Collection<string>>();
@@ -49,6 +54,26 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 return GetFunctionAppRootDirectory(parent);
+            }
+        }
+
+        internal static async Task<TraceLevel> GetTraceLevel(string scriptPath)
+        {
+            var filePath = Path.Combine(scriptPath, ScriptConstants.HostMetadataFileName);
+            if (!FileSystemHelpers.FileExists(filePath))
+            {
+                return DefaultTraceLevel;
+            }
+
+            var hostJson = JsonConvert.DeserializeObject<JObject>(await FileSystemHelpers.ReadAllTextFromFileAsync(filePath));
+            var traceLevelStr = hostJson["tracing"]?["consoleLevel"]?.ToString();
+            if (!string.IsNullOrEmpty(traceLevelStr) && Enum.TryParse(traceLevelStr, true, out TraceLevel traceLevel))
+            {
+                return traceLevel;
+            }
+            else
+            {
+                return DefaultTraceLevel;
             }
         }
     }
