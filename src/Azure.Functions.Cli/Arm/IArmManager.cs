@@ -31,6 +31,7 @@ namespace Azure.Functions.Cli.Arm
         Task<IEnumerable<ArmWrapper<object>>> getAzureResourceAsync(string resourceName);
         Task<StorageAccount> GetStorageAccountsAsync(ArmWrapper<object> armWrapper);
         Task<Dictionary<string, string>> GetFunctionAppAppSettings(Site functionApp);
+        Task UpdateFunctionAppAppSettings(Site functionApp, IDictionary<string, string> appSettings);
         Task<Dictionary<string, AppServiceConnectionString>> GetFunctionAppConnectionStrings(Site functionApp);
         Task<AuthenticationHeaderValue> GetAuthenticationHeader(string id);
     }

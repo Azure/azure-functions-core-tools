@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
@@ -20,15 +23,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     internal class PublishFunctionApp : BaseFunctionAppAction
     {
         private readonly ISettings _settings;
+        private readonly ISecretsManager _secretsManager;
 
-        public PublishFunctionApp(IArmManager armManager, ISettings settings)
+        public bool PublishLocalSettings { get; set; }
+        public bool OverwriteSettings { get; set; }
+
+        public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager)
             : base(armManager)
         {
             _settings = settings;
+            _secretsManager = secretsManager;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
+            Parser
+                .Setup<bool>('i', "publish-local-settings")
+                .WithDescription("Updates App Settings for the function app in Azure during deployment.")
+                .Callback(f => PublishLocalSettings = f);
+            Parser
+                .Setup<bool>('y', "overwrite-settings")
+                .WithDescription("Only to be used in conjunction with -i. Overwrites AppSettings in Azure with local value if different. Default is prompt.")
+                .Callback(f => OverwriteSettings = f);
+
             return base.ParseArgs(args);
         }
 
@@ -63,9 +80,68 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
                     }
 
+                    if (PublishLocalSettings)
+                    {
+                        await PublishAppSettings(functionApp);
+                    }
+
                     ColoredConsole.WriteLine("Upload completed successfully.");
                 }
             }, 2);
+        }
+
+        private async Task PublishAppSettings(Site functionApp)
+        {
+            var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
+            var localAppSettings = _secretsManager.GetSecrets();
+            var appSettings = MergeAppSettings(azureAppSettings, localAppSettings);
+            await _armManager.UpdateFunctionAppAppSettings(functionApp, appSettings);
+        }
+
+        private IDictionary<string, string> MergeAppSettings(IDictionary<string, string> azure, IDictionary<string, string> local)
+        {
+            var result = new Dictionary<string, string>(azure);
+            foreach (var pair in local)
+            {
+                if (result.ContainsKeyCaseInsensitive(pair.Key) &&
+                    !result.GetValueCaseInsensitive(pair.Key).Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    ColoredConsole.WriteLine($"App setting {pair.Key} is different between azure and {SecretsManager.AppSettingsFileName}");
+                    if (OverwriteSettings)
+                    {
+                        ColoredConsole.WriteLine("Overwriting setting in azure with local value because '--overwrite-settings [-y]' was specified.");
+                        result[pair.Key] = pair.Value;
+                    }
+                    else
+                    {
+                        var answer = string.Empty;
+                        do
+                        {
+                            ColoredConsole.WriteLine(QuestionColor("Would you like to overwrite value in azure? [yes/no/show]"));
+                            answer = Console.ReadLine();
+                            if (answer.Equals("show", StringComparison.OrdinalIgnoreCase))
+                            {
+                                ColoredConsole
+                                    .WriteLine($"Azure: {azure.GetValueCaseInsensitive(pair.Key)}")
+                                    .WriteLine($"Locally: {pair.Value}");
+                            }
+                        } while (!answer.Equals("yes", StringComparison.OrdinalIgnoreCase) &&
+                                 !answer.Equals("no", StringComparison.OrdinalIgnoreCase));
+
+                        if (answer.Equals("yes", StringComparison.OrdinalIgnoreCase))
+                        {
+                            result[pair.Key] = pair.Value;
+                        }
+                    }
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"Setting {pair.Key} = ****");
+                    result[pair.Key] = pair.Value;
+                }
+            }
+
+            return result;
         }
 
         private static StreamContent CreateZip(string path)

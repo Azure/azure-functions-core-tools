@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Arm
         public static readonly ArmUriTemplate SitePublishingCredentials = new ArmUriTemplate($"{Site.TemplateUrl}/config/PublishingCredentials/list", websitesApiVersion);
         public static readonly ArmUriTemplate SiteConfig = new ArmUriTemplate($"{Site.TemplateUrl}/config/web", websitesApiVersion);
         public static readonly ArmUriTemplate GetSiteAppSettings = new ArmUriTemplate(Site.TemplateUrl + "/config/AppSettings/list", websitesApiVersion);
+        public static readonly ArmUriTemplate PutSiteAppSettings = new ArmUriTemplate(Site.TemplateUrl + "/config/AppSettings", websitesApiVersion);
         public static readonly ArmUriTemplate GetSiteConnectionStrings = new ArmUriTemplate(Site.TemplateUrl + "/config/ConnectionStrings/list", websitesApiVersion);
 
         public static readonly ArmUriTemplate StorageRegister = new ArmUriTemplate($"{Subscription.TemplateUrl}/providers/Microsoft.Storage/register", storageApiVersion);

@@ -64,6 +64,11 @@ namespace Azure.Functions.Cli.Arm
             return armResponse.Properties;
         }
 
+        public async Task UpdateFunctionAppAppSettings(Site site, IDictionary<string, string> appSettings)
+        {
+            await ArmHttpAsync(HttpMethod.Put, ArmUriTemplates.PutSiteAppSettings.Bind(site), new { properties = appSettings });
+        }
+
         public async Task<Dictionary<string, AppServiceConnectionString>> GetFunctionAppConnectionStrings(Site functionApp)
         {
             var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, AppServiceConnectionString>>>(HttpMethod.Post, ArmUriTemplates.GetSiteConnectionStrings.Bind(functionApp));

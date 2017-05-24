@@ -14,13 +14,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            if (args.Any())
+            if (args.Any() && !args.First().StartsWith("-"))
             {
                 FunctionAppName = args.First();
             }
             else
             {
-                throw new CliArgumentsException("Must specify functionApp name.", 
+                throw new CliArgumentsException("Must specify functionApp name.", Parser.Parse(args),
                     new CliArgument { Name = nameof(FunctionAppName), Description = "Function App name" });
             }
 
