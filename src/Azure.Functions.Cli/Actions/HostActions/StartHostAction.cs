@@ -192,6 +192,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 }
                 DisableCoreLogging(config);
                 DisplayHttpFunctionsInfo(config);
+                DisplayDisabledFunctions(config);
                 await SetupDebuggerAsync(config);
                 if (PlatformHelper.IsWindows)
                 {
@@ -201,6 +202,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
             catch (Exception ex)
             {
                 ColoredConsole.Error.WriteLine(ErrorColor($"Unable to retrieve functions list: {ex.Message}"));
+            }
+        }
+
+        private void DisplayDisabledFunctions(HttpSelfHostConfiguration config)
+        {
+            WebScriptHostManager hostManager = config.DependencyResolver.GetService<WebScriptHostManager>();
+
+            if (hostManager != null)
+            {
+                foreach (var function in hostManager.Instance.Functions.Where(f => f.Metadata.IsDisabled))
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
+                }
             }
         }
 
