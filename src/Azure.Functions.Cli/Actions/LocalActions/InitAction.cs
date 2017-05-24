@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     class InitAction : BaseAction
     {
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
+        public bool InitSourceControl { get; set; }
 
         public string FolderName { get; set; } = string.Empty;
 
@@ -60,10 +61,17 @@ local.settings.json
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            if (args.Any())
+            Parser
+                .Setup<bool>('n', "no-source-control")
+                .SetDefault(false)
+                .WithDescription("Skip running git init. Default is false.")
+                .Callback(f => InitSourceControl = !f);
+
+            if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
             }
+
             return base.ParseArgs(args);
         }
 
@@ -113,23 +121,26 @@ local.settings.json
                 ColoredConsole.Error.WriteLine(ErrorColor("Unable to configure launch.json. Check the file for more info"));
             }
 
-            try
+            if (InitSourceControl)
             {
-                var checkGitRepoExe = new Executable("git", "rev-parse --git-dir");
-                var result = await checkGitRepoExe.RunAsync();
-                if (result != 0)
+                try
                 {
-                    var exe = new Executable("git", $"init");
-                    await exe.RunAsync(l => ColoredConsole.WriteLine(l), l => ColoredConsole.Error.WriteLine(l));
+                    var checkGitRepoExe = new Executable("git", "rev-parse --git-dir");
+                    var result = await checkGitRepoExe.RunAsync();
+                    if (result != 0)
+                    {
+                        var exe = new Executable("git", $"init");
+                        await exe.RunAsync(l => ColoredConsole.WriteLine(l), l => ColoredConsole.Error.WriteLine(l));
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine("Directory already a git repository.");
+                    }
                 }
-                else
+                catch (FileNotFoundException)
                 {
-                    ColoredConsole.WriteLine("Directory already a git repository.");
+                    ColoredConsole.WriteLine(WarningColor("unable to find git on the path"));
                 }
-            }
-            catch (FileNotFoundException)
-            {
-                ColoredConsole.WriteLine(WarningColor("unable to find git on the path"));
             }
         }
     }
