@@ -639,6 +639,7 @@
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Helpers\DebuggerHelper.cs" />
     <Compile Include="Helpers\PlatformHelper.cs" />
+    <Compile Include="Helpers\RetryHelper.cs" />
     <Compile Include="Helpers\ScriptHostHelpers.cs" />
     <Compile Include="Helpers\SecurityHelpers.cs" />
     <Compile Include="Interfaces\IAction.cs" />

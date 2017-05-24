@@ -39,21 +39,33 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine(WarningColor($"Publish {functionAppRoot} contents to an Azure Function App. Locally deleted files are not removed from destination."));
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
-            using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
-            using (var request = new HttpRequestMessage())
+            await RetryHelper.Retry(async () =>
             {
-                request.Method = HttpMethod.Put;
-                request.RequestUri = new Uri("api/zip/site/wwwroot", UriKind.Relative);
-                request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
-                ColoredConsole.WriteLine("Creating archive for current directory...");
-                request.Content = CreateZip(functionAppRoot);
-                ColoredConsole.WriteLine("Uploading archive...");
-                var response = await client.SendAsync(request);
-                response.EnsureSuccessStatusCode();
-                response = await client.PostAsync("api/functions/synctriggers", content: null);
-                response.EnsureSuccessStatusCode();
-                ColoredConsole.WriteLine("Upload completed successfully.");
-            }
+                using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                using (var request = new HttpRequestMessage(HttpMethod.Put, new Uri("api/zip/site/wwwroot", UriKind.Relative)))
+                {
+                    request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+
+                    ColoredConsole.WriteLine("Creating archive for current directory...");
+
+                    request.Content = CreateZip(functionAppRoot);
+
+                    ColoredConsole.WriteLine("Uploading archive...");
+                    var response = await client.SendAsync(request);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new CliException($"Error uploading archive ({response.StatusCode}).");
+                    }
+
+                    response = await client.PostAsync("api/functions/synctriggers", content: null);
+                    if(!response.IsSuccessStatusCode)
+                    {
+                        throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
+                    }
+
+                    ColoredConsole.WriteLine("Upload completed successfully.");
+                }
+            }, 2);
         }
 
         private static StreamContent CreateZip(string path)
