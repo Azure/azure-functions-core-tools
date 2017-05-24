@@ -31,9 +31,9 @@ namespace Azure.Functions.Cli
             _secretsManager = secretesManager;
         }
 
-        public async Task<HttpClient> ConnectAsync(TimeSpan timeout)
+        public async Task<HttpClient> ConnectAsync(TimeSpan timeout, bool noInteractive)
         {
-            var server = await DiscoverServer();
+            var server = await DiscoverServer(noInteractive);
             var startTime = DateTime.UtcNow;
             while (!await server.IsServerRunningAsync() &&
                 startTime.Add(timeout) > DateTime.UtcNow)
@@ -43,7 +43,7 @@ namespace Azure.Functions.Cli
             return new HttpClient() { BaseAddress = server, Timeout = timeout };
         }
 
-        private async Task<Uri> DiscoverServer()
+        private async Task<Uri> DiscoverServer(bool noInteractive)
         {
             var hostSettings = _secretsManager.GetHostStartSettings();
             if (hostSettings.LocalHttpPort != default(int))
@@ -55,17 +55,17 @@ namespace Azure.Functions.Cli
                 }
             }
 
-            return await RecursiveDiscoverServer(0);
+            return await RecursiveDiscoverServer(0, noInteractive);
         }
 
-        private async Task<Uri> RecursiveDiscoverServer(int iteration = 0)
+        private async Task<Uri> RecursiveDiscoverServer(int iteration, bool noInteractive)
         {
             var server = new Uri($"http://localhost:{Port + iteration}");
 
             if (!await server.IsServerRunningAsync())
             {
                 // create the server
-                if (_settings.DisplayLaunchingRunServerWarning)
+                if (_settings.DisplayLaunchingRunServerWarning && !noInteractive)
                 {
                     ColoredConsole
                         .WriteLine()
@@ -107,7 +107,7 @@ namespace Azure.Functions.Cli
                 }
                 else
                 {
-                    return await RecursiveDiscoverServer(iteration + 1);
+                    return await RecursiveDiscoverServer(iteration + 1, noInteractive);
                 }
             }
         }

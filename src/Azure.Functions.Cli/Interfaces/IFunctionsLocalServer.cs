@@ -6,6 +6,6 @@ namespace Azure.Functions.Cli.Interfaces
 {
     internal interface IFunctionsLocalServer
     {
-        Task<HttpClient> ConnectAsync(TimeSpan timeout);
+        Task<HttpClient> ConnectAsync(TimeSpan timeout, bool noInteractive);
     }
 }

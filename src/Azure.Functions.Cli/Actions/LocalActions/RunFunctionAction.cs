@@ -31,6 +31,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Content { get; set; }
         public string FileName { get; set; }
         public bool Debug { get; set; }
+        public bool NoInteractive { get; set; }
 
         public RunFunctionAction(IFunctionsLocalServer scriptServer)
         {
@@ -56,6 +57,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Attach a debugger to the host process before running the function")
                 .Callback(d => Debug = d);
 
+            Parser
+                .Setup<bool>("no-interactive")
+                .WithDescription("Don't prompt or expect any stdin.")
+                .Callback(f => NoInteractive = f);
+
             if (args.Any())
             {
                 FunctionName = args
@@ -76,7 +82,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
-            using (var client = await _scriptServer.ConnectAsync(Timeout))
+            using (var client = await _scriptServer.ConnectAsync(Timeout, NoInteractive))
             {
                 var hostStatusResponse = await client.GetAsync("admin/host/status");
                 var functionStatusResponse = await client.GetAsync($"admin/functions/{FunctionName}/status");
@@ -152,10 +158,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                                 .WriteLine(ErrorColor("Unable to configure node debugger. Check your launch.json."));
                             return;
                         }
+                        else if (!NoInteractive)
+                        {
+                            ColoredConsole.WriteLine("launch.json configured.");
+                        }
                         else
                         {
                             ColoredConsole
-                            .Write("launch.json configured. Setup your break points, launch debugger (F5), and press any key to continue...");
+                                .Write("launch.json configured. Setup your break points, launch debugger (F5), and press any key to continue...");
                             Console.ReadKey();
                         }
                     }
