@@ -576,6 +576,7 @@
     <Compile Include="Actions\LocalActions\EncryptSettingsAction.cs" />
     <Compile Include="Actions\LocalActions\InitAction.cs" />
     <Compile Include="Actions\LocalActions\ListSettingsAction.cs" />
+    <Compile Include="Actions\LocalActions\ListTemplatesAction.cs" />
     <Compile Include="Actions\LocalActions\RunFunctionAction.cs" />
     <Compile Include="ActionType.cs" />
     <Compile Include="Arm\ArmManager.cs" />

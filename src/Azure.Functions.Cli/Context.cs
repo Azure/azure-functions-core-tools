@@ -28,7 +28,10 @@ namespace Azure.Functions.Cli
         Subscriptions,
 
         [Description("Commands for managing environment settings for the local Functions host")]
-        Settings
+        Settings,
+
+        [Description("Commands for listing available function templates")]
+        Templates
     }
 
     internal static class ContextEnumExtensions
