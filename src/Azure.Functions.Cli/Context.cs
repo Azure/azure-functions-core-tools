@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli
         [Description("Commands to list and select Azure subscriptions")]
         Account,
 
-        [Description("Commands for working with a local function app")]
+        [Description("Commands for working with a local functions project")]
         FunctionApp,
 
         [Description("Commands to work with Azure Storage")]
