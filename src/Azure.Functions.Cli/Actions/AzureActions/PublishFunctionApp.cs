@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
@@ -165,7 +166,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var client = new HttpClient
             {
                 BaseAddress = url,
-                MaxResponseContentBufferSize = 30 * 1024 * 1024
+                MaxResponseContentBufferSize = 30 * 1024 * 1024,
+                Timeout = Timeout.InfiniteTimeSpan
             };
 
             client.DefaultRequestHeaders.Authorization = await _armManager.GetAuthenticationHeader(_settings.CurrentSubscription);
