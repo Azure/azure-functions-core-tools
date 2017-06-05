@@ -48,11 +48,7 @@ namespace Azure.Functions.Cli
             var hostSettings = _secretsManager.GetHostStartSettings();
             if (hostSettings.LocalHttpPort != default(int))
             {
-                var server = new Uri($"http://localhost:{hostSettings.LocalHttpPort}");
-                if (await IsRightServer(server))
-                {
-                    return server;
-                }
+                return new Uri($"http://localhost:{hostSettings.LocalHttpPort}");
             }
 
             return await RecursiveDiscoverServer(0, noInteractive);
@@ -129,6 +125,11 @@ namespace Azure.Functions.Cli
             try
             {
                 var hostId = await GetHostId(ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory));
+                if (string.IsNullOrWhiteSpace(hostId))
+                {
+                    return true;
+                }
+
                 using (var client = new HttpClient())
                 {
                     var response = await client.GetAsync(new Uri(server, "admin/host/status"));
