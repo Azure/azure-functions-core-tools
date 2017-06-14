@@ -17,10 +17,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            if (args.Length > 0)
-                _username = args[0];
-            if (args.Length > 1)
-                _password = args[1];
+            Parser.Setup<string>('u')
+                .WithDescription("username")
+                .Callback(username => _username = username);
+
+            Parser.Setup<string>('w')
+                .WithDescription("password")
+                .Callback(password => _password = password);
             
             return base.ParseArgs(args);
         }
