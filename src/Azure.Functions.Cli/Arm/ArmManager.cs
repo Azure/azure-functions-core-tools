@@ -107,7 +107,6 @@ namespace Azure.Functions.Cli.Arm
         public Task LoginAsync(string username, string password)
         {
             _authHelper.ClearTokenCache();
-            Console.WriteLine(username, password);
             return _authHelper.GetTokenByUpn(username, password);
         }
 
