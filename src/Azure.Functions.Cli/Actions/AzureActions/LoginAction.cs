@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Text;
+using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
@@ -33,9 +35,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (string.IsNullOrWhiteSpace(_username))
                 await _armManager.LoginAsync();
             else
+            {
+                if (string.IsNullOrWhiteSpace(_password))
+                    _password = PromptForPassword();
+
                 await _armManager.LoginAsync(_username, _password);
+            }
 
             await PrintAccountsAsync();
+        }
+
+        private static string PromptForPassword()
+        {
+            Console.Write("password: ");
+            var password = new StringBuilder();
+            while (true)
+            {
+                var key = Console.ReadKey(true);
+                if (key.Key == ConsoleKey.Enter)
+                    break;
+                password.Append(key.KeyChar);
+            }
+            Console.Write(Environment.NewLine);
+            return password.ToString();
         }
     }
 }
