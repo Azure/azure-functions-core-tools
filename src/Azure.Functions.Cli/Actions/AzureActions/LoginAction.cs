@@ -2,6 +2,7 @@
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
@@ -19,12 +20,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            Parser.Setup<string>('u')
-                .WithDescription("username")
+            Parser.Setup<string>('u', "username")
+                .WithDescription("Username to use for non-interactive login. Note that accounts with 2 factor-auth require interactive login. Default: interactive.")
                 .Callback(username => _username = username);
 
-            Parser.Setup<string>('w')
-                .WithDescription("password")
+            Parser.Setup<string>('w', "password")
+                .WithDescription("Password to use for non-interactive login only in conjunction with -u. Default: prompt")
                 .Callback(password => _password = password);
             
             return base.ParseArgs(args);
