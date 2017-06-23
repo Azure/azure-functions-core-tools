@@ -7,13 +7,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     abstract class BaseAzureAction : BaseAction, IInitializableAction
     {
         protected readonly IArmManager _armManager;
+        private readonly bool _requiresLogin;
 
-        public BaseAzureAction(IArmManager armManager)
+        protected BaseAzureAction(
+            IArmManager armManager,
+            bool requiresLogin = true)
         {
             _armManager = armManager;
+            _requiresLogin = requiresLogin;
         }
 
         public async Task Initialize()
-        { }
+        {
+            if(_requiresLogin)
+                await _armManager.Initialize();
+        }
     }
 }

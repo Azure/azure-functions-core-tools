@@ -12,8 +12,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         public readonly ISettings Settings;
 
-        public BaseAzureAccountAction(IArmManager armManager, ISettings settings)
-            : base(armManager)
+        public BaseAzureAccountAction(
+            IArmManager armManager, 
+            ISettings settings,
+            bool requiresLogin = true)
+            : base(armManager, requiresLogin)
         {
             Settings = settings;
         }

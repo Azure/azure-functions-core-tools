@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private string _password = string.Empty;
 
         public LoginAction(IArmManager armManager, ISettings settings)
-            : base(armManager, settings)
+            : base(armManager, settings, requiresLogin: false)
         { }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
