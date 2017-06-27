@@ -1,7 +1,5 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -9,22 +7,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     abstract class BaseAzureAction : BaseAction, IInitializableAction
     {
         protected readonly IArmManager _armManager;
+        private readonly bool _requiresLogin;
 
-        public BaseAzureAction(IArmManager armManager)
+        protected BaseAzureAction(
+            IArmManager armManager,
+            bool requiresLogin = true)
         {
             _armManager = armManager;
+            _requiresLogin = requiresLogin;
         }
 
         public async Task Initialize()
         {
-            try
-            {
+            if(_requiresLogin)
                 await _armManager.Initialize();
-            }
-            catch (Exception e)
-            {
-                throw new CliException("Error during login to azure. Please verify your internet connection or try again later.", e);
-            }
         }
     }
 }

@@ -104,6 +104,12 @@ namespace Azure.Functions.Cli.Arm
             return _authHelper.AcquireTokens();
         }
 
+        public Task LoginAsync(string username, string password)
+        {
+            _authHelper.ClearTokenCache();
+            return _authHelper.GetTokenByUpn(username, password);
+        }
+
         public IEnumerable<string> DumpTokenCache()
         {
             return _authHelper.DumpTokenCache();

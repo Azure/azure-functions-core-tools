@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Arm
         Task<ArmWebsitePublishingCredentials> GetUserAsync();
         Task UpdateUserAsync(string userName, string password);
         Task LoginAsync();
+        Task LoginAsync(string username, string password);
         IEnumerable<string> DumpTokenCache();
         Task SelectTenantAsync(string id);
         void Logout();
