@@ -41,8 +41,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("settings delete settingName", typeof(DeleteSettingAction))]
         [InlineData("settings list", typeof(ListSettingsAction))]
         [InlineData("init", typeof(InitAction))]
-        [InlineData("functionapp init", typeof(InitAction))]
-        [InlineData("functionapp create", typeof(InitAction))]
         [InlineData("run functionName", typeof(RunFunctionAction))]
         [InlineData("function run functionName", typeof(RunFunctionAction))]
         [InlineData("-v", typeof(HelpAction))]
