@@ -3,11 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ARMClient.Authentication;
+using ARMClient.Authentication.AADAuthentication;
+using ARMClient.Authentication.Contracts;
+using ARMClient.Library;
+using Autofac;
 using FluentAssertions;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Actions.LocalActions;
+using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Interfaces;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
@@ -54,10 +63,45 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("--help", typeof(HelpAction))]
         public void ResolveCommandLineCorrectly(string args, Type type)
         {
-            var container = Program.InitializeAutofacContainer();
+            var container = InitializeContainerForTests();
             var app = new ConsoleApp(args.Split(' ').ToArray(), type.Assembly, container);
             var result = app.Parse();
             result.Should().BeOfType(type);
+        }
+
+        private IContainer InitializeContainerForTests()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.RegisterType<FunctionsLocalServer>()
+                .As<IFunctionsLocalServer>();
+
+            builder.Register(c => new PersistentAuthHelper { AzureEnvironments = AzureEnvironments.Prod })
+                .As<IAuthHelper>();
+
+            builder.Register(_ => new PersistentSettings())
+                .As<ISettings>()
+                .SingleInstance()
+                .ExternallyOwned();
+
+            builder.Register(c => new AzureClient(retryCount: 3, authHelper: c.Resolve<IAuthHelper>()))
+                .As<IAzureClient>();
+
+            builder.RegisterType<ArmManager>()
+                .As<IArmManager>();
+
+            builder.RegisterType<ProcessManager>()
+                .As<IProcessManager>();
+
+            var mockedSecretsManager = Substitute.For<ISecretsManager>();
+            builder.RegisterInstance(mockedSecretsManager)
+                .As<ISecretsManager>();
+            mockedSecretsManager.GetHostStartSettings().Returns(new HostStartSettings());
+
+            builder.RegisterType<TemplatesManager>()
+                .As<ITemplatesManager>();
+
+            return builder.Build();
         }
     }
 }
