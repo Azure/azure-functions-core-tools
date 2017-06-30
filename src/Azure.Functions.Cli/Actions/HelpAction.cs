@@ -13,6 +13,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 using System.Text;
 using Fclp.Internals;
 using Colors.Net.StringColorExtensions;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions
 {
@@ -56,6 +57,8 @@ namespace Azure.Functions.Cli.Actions
 
         public override Task RunAsync()
         {
+            ScriptHostHelpers.SetIsHelpRunning();
+
             Utilities.PrintLogo();
             if (!string.IsNullOrEmpty(_context) || !string.IsNullOrEmpty(_subContext))
             {

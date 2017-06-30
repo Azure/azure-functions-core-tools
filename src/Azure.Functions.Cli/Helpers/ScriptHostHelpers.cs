@@ -17,6 +17,12 @@ namespace Azure.Functions.Cli.Helpers
     public static class ScriptHostHelpers
     {
         private const TraceLevel DefaultTraceLevel = TraceLevel.Info;
+        private static bool _isHelpRunning = false;
+
+        public static void SetIsHelpRunning()
+        {
+            _isHelpRunning = true;
+        }
 
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
@@ -39,6 +45,11 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string GetFunctionAppRootDirectory(string startingDirectory)
         {
+            if (_isHelpRunning)
+            {
+                return startingDirectory;
+            }
+
             var hostJson = Path.Combine(startingDirectory, ScriptConstants.HostMetadataFileName);
             if (FileSystemHelpers.FileExists(hostJson))
             {
