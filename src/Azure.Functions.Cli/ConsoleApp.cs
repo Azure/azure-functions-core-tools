@@ -35,13 +35,13 @@ namespace Azure.Functions.Cli
         public static async Task RunAsync<T>(string[] args, IContainer container)
         {
             var app = new ConsoleApp(args, typeof(T).Assembly, container);
-            var action = app.Parse();
             // If all goes well, we will have an action to run.
             // This action can be an actual action, or just a HelpAction, but this method doesn't care
             // since HelpAction is still an IAction.
-            if (action != null)
+            try
             {
-                try
+                var action = app.Parse();
+                if (action != null)
                 {
                     if (action is IInitializableAction)
                     {
@@ -51,23 +51,23 @@ namespace Azure.Functions.Cli
                     // All Actions are async. No return value is expected from any action.
                     await action.RunAsync();
                 }
-                catch (Exception ex)
+            }
+            catch (Exception ex)
+            {
+                if (StaticSettings.IsDebug)
                 {
-                    if (StaticSettings.IsDebug)
-                    {
-                        // If CLI is in debug mode, display full call stack.
-                        ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
-                    }
-                    else
-                    {
-                        ColoredConsole.Error.WriteLine(ErrorColor(ex.Message));
-                    }
+                    // If CLI is in debug mode, display full call stack.
+                    ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
+                }
+                else
+                {
+                    ColoredConsole.Error.WriteLine(ErrorColor(ex.Message));
+                }
 
-                    if (args.Any(a => a.Equals("--pause-on-error", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        ColoredConsole.Write("Press any to continue....");
-                        Console.ReadKey(true);
-                    }
+                if (args.Any(a => a.Equals("--pause-on-error", StringComparison.OrdinalIgnoreCase)))
+                {
+                    ColoredConsole.Write("Press any to continue....");
+                    Console.ReadKey(true);
                 }
             }
         }
