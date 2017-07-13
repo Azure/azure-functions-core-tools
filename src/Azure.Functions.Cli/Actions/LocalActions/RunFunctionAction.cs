@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(t => Timeout = TimeSpan.FromSeconds(t));
             Parser
                 .Setup<string>('c', "content")
-                .WithDescription("Inline content")
+                .WithDescription("content to pass to the function, such as HTTP body")
                 .Callback(c => Content = c);
             Parser
                 .Setup<string>('f', "file")
