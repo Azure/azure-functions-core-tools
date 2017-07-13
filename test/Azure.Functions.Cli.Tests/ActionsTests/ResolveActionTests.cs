@@ -49,6 +49,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("", typeof(HelpAction))]
         [InlineData("help", typeof(HelpAction))]
         [InlineData("WrongName", typeof(HelpAction))]
+        [InlineData("azure functionapp --help", typeof(HelpAction))]
+        [InlineData("azure --help", typeof(HelpAction))]
+        [InlineData("--help", typeof(HelpAction))]
         public void ResolveCommandLineCorrectly(string args, Type type)
         {
             var container = Program.InitializeAutofacContainer();

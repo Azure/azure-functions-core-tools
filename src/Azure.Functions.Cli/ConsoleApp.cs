@@ -173,7 +173,7 @@ namespace Azure.Functions.Cli
         internal IAction Parse()
         {
             // If there is no args are passed, display help.
-            // If 1 arg is passed and it matched any of the strings in _helpArgs, display help.
+            // If args are passed and any it matched any of the strings in _helpArgs with a "-" then display help.
             // Otherwise, continue parsing.
             if (_args.Length == 0 ||
                 (_args.Length == 1 && _helpArgs.Any(ha => _args[0].Replace("-", "").Equals(ha, StringComparison.OrdinalIgnoreCase)))
@@ -182,13 +182,31 @@ namespace Azure.Functions.Cli
                 return new HelpAction(_actionAttributes, CreateAction);
             }
 
+            bool isHelp = false;
+            var argsToParse = Enumerable.Empty<string>();
             // this supports the format:
             //     `func help <context: optional> <subContext: optional> <action: optional>`
             // but help has to be the first word. So `func azure help` for example doesn't work
             // but `func help azure` should work.
-            var isHelp = _args.First().Equals("help", StringComparison.OrdinalIgnoreCase)
-                ? true
-                : false;
+            if (_args.First().Equals("help", StringComparison.OrdinalIgnoreCase))
+            {
+                argsToParse = _args.Skip(1);
+                isHelp = true;
+            }
+            else
+            {
+                // This is for passing --help anywhere in the command line.
+                var argsHelpIntersection = _args
+                    .Where(a => a.StartsWith("-"))
+                    .Select(a => a.ToLowerInvariant().Replace("-", ""))
+                    .Intersect(_helpArgs)
+                    .ToArray();
+                isHelp = argsHelpIntersection.Any();
+
+                argsToParse = isHelp
+                    ? _args.Where(a => !a.StartsWith("-") || argsHelpIntersection.Contains(a.Replace("-", "").ToLowerInvariant()))
+                    : _args;
+            }
  
             // We'll need to grab context arg: string, subcontext arg: string, action arg: string
             var contextStr = string.Empty;
@@ -201,7 +219,7 @@ namespace Azure.Functions.Cli
             var subContext = Context.None;
 
             // If isHelp, skip one and parse the rest of the command as usual.
-            var argsStack = new Stack<string>((isHelp ? _args.Skip(1) : _args).Reverse());
+            var argsStack = new Stack<string>(argsToParse.Reverse());
 
             // Grab the first string, but don't pop it off the stack.
             // If it's indeed a valid context, will remove it later.
