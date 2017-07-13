@@ -387,6 +387,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
                 }
+                else
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Skipping '{pair.Key}' from local settings as it's already defined in current environment variables."));
+                }
             }
         }
         /// <summary>
