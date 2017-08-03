@@ -9,6 +9,7 @@
         public const string CliVersion = "1.0.0-beta.100";
         public const string CliDebug = "CLI_DEBUG";
         public const string DefaultSqlProviderName = "System.Data.SqlClient";
+        public const string WebsiteHostname = "WEBSITE_HOSTNAME";
 
         public static class Errors
         {

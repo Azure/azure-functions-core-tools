@@ -105,9 +105,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var traceLevel = await ScriptHostHelpers.GetTraceLevel(scriptPath);
             var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, scriptPath);
 
-            await ReadSecrets(scriptPath);
 
             var baseAddress = Setup();
+
+            await ReadSecrets(scriptPath, baseAddress);
 
             var config = new HttpSelfHostConfiguration(baseAddress)
             {
@@ -262,10 +263,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// It also sets up a FileSystemWatcher that kills the current running process
         /// when local.settings.json is updated.
         /// </summary>
-        private async Task ReadSecrets(string scriptPath)
+        private async Task ReadSecrets(string scriptPath, Uri uri)
         {
             var secrets = _secretsManager.GetSecrets();
-            UpdateEnvironmentVariables(secrets);
+            UpdateEnvironmentVariables(secrets, uri);
             UpdateAppSettings(secrets);
             UpdateConnectionStrings(_secretsManager.GetConnectionStrings());
 
@@ -379,9 +380,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
+        private void UpdateEnvironmentVariables(IDictionary<string, string> secrets, Uri uri)
         {
-            foreach (var pair in secrets)
+            foreach (var pair in secrets.Concat(new[] { new KeyValuePair<string, string>(Constants.WebsiteHostname, uri.Authority) }))
             {
                 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pair.Key)))
                 {
