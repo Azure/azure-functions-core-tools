@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using ARMClient.Authentication.Contracts;
 using Azure.Functions.Cli.Arm.Models;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Arm
 {
@@ -32,7 +33,7 @@ namespace Azure.Functions.Cli.Arm
         Task<IEnumerable<ArmWrapper<object>>> getAzureResourceAsync(string resourceName);
         Task<StorageAccount> GetStorageAccountsAsync(ArmWrapper<object> armWrapper);
         Task<Dictionary<string, string>> GetFunctionAppAppSettings(Site functionApp);
-        Task UpdateFunctionAppAppSettings(Site functionApp, IDictionary<string, string> appSettings);
+        Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site functionApp, IDictionary<string, string> appSettings);
         Task<Dictionary<string, AppServiceConnectionString>> GetFunctionAppConnectionStrings(Site functionApp);
         Task<AuthenticationHeaderValue> GetAuthenticationHeader(string id);
     }

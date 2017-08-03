@@ -83,7 +83,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                     if (PublishLocalSettings)
                     {
-                        await PublishAppSettings(functionApp);
+                        var isSuccessful = await PublishAppSettings(functionApp);
+                        if (!isSuccessful)
+                        {
+                            return;
+                        }
                     }
 
                     ColoredConsole.WriteLine("Upload completed successfully.");
@@ -91,12 +95,21 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        private async Task PublishAppSettings(Site functionApp)
+        private async Task<bool> PublishAppSettings(Site functionApp)
         {
             var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
             var localAppSettings = _secretsManager.GetSecrets();
             var appSettings = MergeAppSettings(azureAppSettings, localAppSettings);
-            await _armManager.UpdateFunctionAppAppSettings(functionApp, appSettings);
+            var result = await _armManager.UpdateFunctionAppAppSettings(functionApp, appSettings);
+            if (!result.IsSuccessful)
+            {
+                ColoredConsole
+                    .Error
+                    .WriteLine(ErrorColor("Error updating app settings:"))
+                    .WriteLine(ErrorColor(result.ErrorResult));
+                return false;
+            }
+            return true;
         }
 
         private IDictionary<string, string> MergeAppSettings(IDictionary<string, string> azure, IDictionary<string, string> local)

@@ -5,6 +5,9 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.Common;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Arm
 {
@@ -64,9 +67,23 @@ namespace Azure.Functions.Cli.Arm
             return armResponse.Properties;
         }
 
-        public async Task UpdateFunctionAppAppSettings(Site site, IDictionary<string, string> appSettings)
+        public async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, IDictionary<string, string> appSettings)
         {
-            await ArmHttpAsync(HttpMethod.Put, ArmUriTemplates.PutSiteAppSettings.Bind(site), new { properties = appSettings });
+            var response = await _client.HttpInvoke(HttpMethod.Put, ArmUriTemplates.PutSiteAppSettings.Bind(site), new { properties = appSettings });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadAsAsync<ArmWrapper<Dictionary<string, string>>>();
+                return new HttpResult<Dictionary<string, string>, string>(result.Properties);
+            }
+            else
+            {
+                var result = await response.Content.ReadAsStringAsync();
+                var parsedResult = JsonConvert.DeserializeObject<JObject>(result);
+                var errorMessage = parsedResult["Message"].ToString();
+                return string.IsNullOrEmpty(errorMessage)
+                    ? new HttpResult<Dictionary<string, string>, string>(null, result)
+                    : new HttpResult<Dictionary<string, string>, string>(null, errorMessage);
+            }
         }
 
         public async Task<Dictionary<string, AppServiceConnectionString>> GetFunctionAppConnectionStrings(Site functionApp)

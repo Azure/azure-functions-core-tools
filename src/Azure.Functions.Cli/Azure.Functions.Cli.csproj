@@ -633,6 +633,7 @@
     <Compile Include="Common\FileSystemHelpers.cs" />
     <Compile Include="Common\FunctionNotFoundException.cs" />
     <Compile Include="Common\HostStartSettings.cs" />
+    <Compile Include="Common\HttpResult.cs" />
     <Compile Include="Common\OutputTheme.cs" />
     <Compile Include="Common\PersistentSettings.cs" />
     <Compile Include="Common\ProcessInfo.cs" />
