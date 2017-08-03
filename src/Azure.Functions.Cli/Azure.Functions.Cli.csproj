@@ -626,6 +626,7 @@
     <Compile Include="Arm\ArmResourceNotFoundException.cs" />
     <Compile Include="Common\CliArgumentException.cs" />
     <Compile Include="Common\CliException.cs" />
+    <Compile Include="Common\ConnectionString.cs" />
     <Compile Include="Common\Constants.cs" />
     <Compile Include="Common\DiskBacked.cs" />
     <Compile Include="Common\Executable.cs" />

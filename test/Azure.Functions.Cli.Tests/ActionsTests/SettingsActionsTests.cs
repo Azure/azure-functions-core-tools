@@ -10,6 +10,7 @@ using FluentAssertions;
 using NSubstitute;
 using Xunit;
 using Xunit.Abstractions;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
@@ -18,7 +19,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         public SettingsActionsTests(ITestOutputHelper output) : base(output) { }
 
         [Theory]
-        [InlineData("Name1", "Value1")]
         [InlineData("Name1", "Value1")]
         public void AddSettingsActionTest(string name, string value)
         {
@@ -108,6 +108,26 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             output = stringBuilder.ToString();
             output.Should().Contain(name);
             output.Should().Contain(value);
+        }
+
+        [Theory]
+        [InlineData("Name1", "Value1")]
+        public void AddConnectionString(string name, string value)
+        {
+            // Setup
+            Program.Main(new[] { "init" });
+
+            // Test
+            Program.Main(new[] { "settings", "add", name, value, "--connectionString" });
+
+            var content = File.ReadAllText(Path.Combine(WorkingDirectory, "local.settings.json"));
+
+            // Assert
+            content.Should().Contain(name);
+            content.Should().Contain("IsEncrypted");
+            content.Should().Contain("false");
+            content.Should().Contain(value);
+            content.Should().Contain(Constants.DefaultSqlProviderName);
         }
 
         [Fact]

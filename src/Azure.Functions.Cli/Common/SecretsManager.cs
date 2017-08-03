@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Helpers;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -66,7 +67,7 @@ namespace Azure.Functions.Cli.Common
             return appSettingsFile.GetValues();
         }
 
-        public IDictionary<string, string> GetConnectionStrings()
+        public IEnumerable<ConnectionString> GetConnectionStrings()
         {
             var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
             return appSettingsFile.GetConnectionStrings();
@@ -82,7 +83,7 @@ namespace Azure.Functions.Cli.Common
         public void SetConnectionString(string name, string value)
         {
             var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
-            appSettingsFile.SetConnectionString(name, value);
+            appSettingsFile.SetConnectionString(name, value, Constants.DefaultSqlProviderName);
             appSettingsFile.Commit();
         }
 
@@ -100,9 +101,9 @@ namespace Azure.Functions.Cli.Common
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
 
-                foreach(var pair in connectionStrings)
+                foreach(var connectionString in connectionStrings)
                 {
-                    settingsFile.SetConnectionString(pair.Key, pair.Value);
+                    settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
 
                 settingsFile.Commit();
@@ -123,9 +124,9 @@ namespace Azure.Functions.Cli.Common
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
 
-                foreach(var pair in connectionStrings)
+                foreach(var connectionString in connectionStrings)
                 {
-                    settingsFile.SetConnectionString(pair.Key, pair.Value);
+                    settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
 
                 settingsFile.Commit();
@@ -172,14 +173,14 @@ namespace Azure.Functions.Cli.Common
                 catch
                 {
                     Values = new Dictionary<string, string>();
-                    ConnectionStrings = new Dictionary<string, string>();
+                    ConnectionStrings = new Dictionary<string, JToken>();
                     IsEncrypted = true;
                 }
             }
 
             public bool IsEncrypted { get; set; }
             public Dictionary<string, string> Values { get; set; } = new Dictionary<string, string>();
-            public Dictionary<string, string> ConnectionStrings { get; set; } = new Dictionary<string, string>();
+            public Dictionary<string, JToken> ConnectionStrings { get; set; } = new Dictionary<string, JToken>();
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
             public HostStartSettings Host { get; set; }
@@ -196,16 +197,17 @@ namespace Azure.Functions.Cli.Common
                 };
             }
 
-            public void SetConnectionString(string name, string value)
+            public void SetConnectionString(string name, string value, string providerName)
             {
-                if (IsEncrypted)
+                value = IsEncrypted
+                    ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), null, DataProtectionScope.CurrentUser))
+                    : value;
+
+                ConnectionStrings[name] = JToken.FromObject(new
                 {
-                    ConnectionStrings[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), null, DataProtectionScope.CurrentUser));
-                }
-                else
-                {
-                    ConnectionStrings[name] = value;
-                };
+                    ConnectionString = value,
+                    ProviderName = providerName
+                });
             }
 
             public void RemoveSetting(string name)
@@ -248,22 +250,35 @@ namespace Azure.Functions.Cli.Common
                 }
             }
 
-            public IDictionary<string, string> GetConnectionStrings()
+            public IEnumerable<ConnectionString> GetConnectionStrings()
             {
-                if (IsEncrypted)
+                try
                 {
-                    try
+                    string DecryptIfNeeded(string value) => IsEncrypted
+                        ? Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), null, DataProtectionScope.CurrentUser))
+                        : value;
+
+                    return ConnectionStrings.Select(c =>
                     {
-                        return ConnectionStrings.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
-                    }
-                    catch (Exception e)
-                    {
-                        throw new CliException("Failed to decrypt settings. Encrypted settings only be edited through 'func settings add'.", e);
-                    }
+                        return c.Value.Type == JTokenType.String
+                            ? new ConnectionString
+                            {
+                                Name = c.Key,
+                                Value = DecryptIfNeeded(c.Value.ToString()),
+                                ProviderName = Constants.DefaultSqlProviderName
+                            }
+                            : new ConnectionString
+                            {
+                                Name = c.Key,
+                                Value = DecryptIfNeeded(c.Value["ConnectionString"]?.ToString()),
+                                ProviderName = c.Value["ProviderName"]?.ToString()
+                            };
+                    })
+                    .ToList();
                 }
-                else
+                catch (Exception e)
                 {
-                    return ConnectionStrings.ToDictionary(k => k.Key, v => v.Value);
+                    throw new CliException("Failed to decrypt settings. Encrypted settings only be edited through 'func settings add'.", e);
                 }
             }
         }

@@ -39,11 +39,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             ColoredConsole.WriteLine(TitleColor("Connection Strings:"));
-            foreach (var pair in _secretsManager.GetConnectionStrings())
+            foreach (var connectionString in _secretsManager.GetConnectionStrings())
             {
                 ColoredConsole
-                    .WriteLine($"   -> {TitleColor("Name")}: {pair.Key}")
-                    .WriteLine($"      {TitleColor("Value")}: {(ShowValues ? pair.Value : "*****")}")
+                    .WriteLine($"   -> {TitleColor("Name")}: {connectionString.Name}")
+                    .WriteLine($"      {TitleColor("Value")}: {(ShowValues ? connectionString.Value : "*****")}")
+                    .WriteLine($"      {TitleColor("ProviderName")}: {connectionString.ProviderName}")
                     .WriteLine();
             }
 

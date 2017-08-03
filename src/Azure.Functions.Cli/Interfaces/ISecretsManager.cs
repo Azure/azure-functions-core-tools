@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Interfaces
     internal interface ISecretsManager
     {
         IDictionary<string, string> GetSecrets();
-        IDictionary<string, string> GetConnectionStrings();
+        IEnumerable<ConnectionString> GetConnectionStrings();
         void SetSecret(string name, string value);
         void SetConnectionString(string name, string value);
         void DecryptSettings();

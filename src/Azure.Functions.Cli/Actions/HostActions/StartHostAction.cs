@@ -351,24 +351,25 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// All connection strings are set to have providerName = System.Data.SqlClient
         /// </summary>
         /// <param name="connectionStrings">ConnectionStringName => ConnectionStringValue map</param>
-        private void UpdateConnectionStrings(IDictionary<string, string> connectionStrings)
+        private void UpdateConnectionStrings(IEnumerable<ConnectionString> connectionStrings)
         {
             try
             {
                 var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
                 var settings = configFile.ConnectionStrings.ConnectionStrings;
                 settings.Clear();
-                foreach (var pair in connectionStrings)
+                foreach (var connectionString in connectionStrings)
                 {
-                    if (settings[pair.Key] == null)
+                    if (settings[connectionString.Name] == null)
                     {
-                        settings.Add(new ConnectionStringSettings(pair.Key, pair.Value, Constants.DefaultSqlProviderName));
+                        settings.Add(new ConnectionStringSettings(connectionString.Name, connectionString.Value, connectionString.ProviderName));
                     }
                     else
                     {
                         // No need to update providerName as we always start off with a clean .config
                         // every time the cli is updated.
-                        settings[pair.Key].ConnectionString = pair.Value;
+                        settings[connectionString.Name].ConnectionString = connectionString.Value;
+                        settings[connectionString.Name].ProviderName = connectionString.ProviderName;
                     }
                 }
                 configFile.Save(ConfigurationSaveMode.Modified);
