@@ -28,6 +28,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
+        public bool PublishLocalSettingsOnly { get; set; }
 
         public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager)
             : base(armManager)
@@ -43,8 +44,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("Updates App Settings for the function app in Azure during deployment.")
                 .Callback(f => PublishLocalSettings = f);
             Parser
+                .Setup<bool>('o', "publish-settings-only")
+                .WithDescription("Only publish settings and skip the content. Default is prompt.")
+                .Callback(f => PublishLocalSettingsOnly = f);
+            Parser
                 .Setup<bool>('y', "overwrite-settings")
-                .WithDescription("Only to be used in conjunction with -i. Overwrites AppSettings in Azure with local value if different. Default is prompt.")
+                .WithDescription("Only to be used in conjunction with -i or -o. Overwrites AppSettings in Azure with local value if different. Default is prompt.")
                 .Callback(f => OverwriteSettings = f);
 
             return base.ParseArgs(args);
@@ -57,42 +62,53 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine(WarningColor($"Publish {functionAppRoot} contents to an Azure Function App. Locally deleted files are not removed from destination."));
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
-            await RetryHelper.Retry(async () =>
+            if (PublishLocalSettingsOnly)
             {
-                using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
-                using (var request = new HttpRequestMessage(HttpMethod.Put, new Uri("api/zip/site/wwwroot", UriKind.Relative)))
+                var isSuccessful = await PublishAppSettings(functionApp);
+                if (!isSuccessful)
                 {
-                    request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
-
-                    ColoredConsole.WriteLine("Creating archive for current directory...");
-
-                    request.Content = CreateZip(functionAppRoot);
-
-                    ColoredConsole.WriteLine("Uploading archive...");
-                    var response = await client.SendAsync(request);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new CliException($"Error uploading archive ({response.StatusCode}).");
-                    }
-
-                    response = await client.PostAsync("api/functions/synctriggers", content: null);
-                    if(!response.IsSuccessStatusCode)
-                    {
-                        throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
-                    }
-
-                    if (PublishLocalSettings)
-                    {
-                        var isSuccessful = await PublishAppSettings(functionApp);
-                        if (!isSuccessful)
-                        {
-                            return;
-                        }
-                    }
-
-                    ColoredConsole.WriteLine("Upload completed successfully.");
+                    return;
                 }
-            }, 2);
+            }
+            else
+            {
+                await RetryHelper.Retry(async () =>
+                {
+                    using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                    using (var request = new HttpRequestMessage(HttpMethod.Put, new Uri("api/zip/site/wwwroot", UriKind.Relative)))
+                    {
+                        request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+
+                        ColoredConsole.WriteLine("Creating archive for current directory...");
+
+                        request.Content = CreateZip(functionAppRoot);
+
+                        ColoredConsole.WriteLine("Uploading archive...");
+                        var response = await client.SendAsync(request);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            throw new CliException($"Error uploading archive ({response.StatusCode}).");
+                        }
+
+                        response = await client.PostAsync("api/functions/synctriggers", content: null);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
+                        }
+
+                        if (PublishLocalSettings)
+                        {
+                            var isSuccessful = await PublishAppSettings(functionApp);
+                            if (!isSuccessful)
+                            {
+                                return;
+                            }
+                        }
+
+                        ColoredConsole.WriteLine("Upload completed successfully.");
+                    }
+                }, 2);
+            }
         }
 
         private async Task<bool> PublishAppSettings(Site functionApp)
