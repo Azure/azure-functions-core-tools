@@ -15,6 +15,6 @@
     "azfun": "lib/main.js",
     "azurefunctions": "lib/main.js"
   },
-  "os": ["win32"],
+  "os": ["win32", "darwin", "linux"],
   "dependencies": {}
 }

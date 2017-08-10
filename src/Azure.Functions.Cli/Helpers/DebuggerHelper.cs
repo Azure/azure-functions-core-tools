@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Newtonsoft.Json;

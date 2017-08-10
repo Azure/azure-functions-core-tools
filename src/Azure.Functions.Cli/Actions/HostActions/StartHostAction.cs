@@ -1,33 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Configuration;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Formatting;
-using System.ServiceModel;
 using System.Threading.Tasks;
-using System.Web.Http;
-using System.Web.Http.Cors;
-using System.Web.Http.SelfHost;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
-using EdgeJs;
 using Fclp;
-using Microsoft.Azure.WebJobs.Script;
-using Microsoft.Azure.WebJobs.Script.WebHost;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using WebJobs.Script.WebHost.Core;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Microsoft.Extensions.Logging.Console;
+using Microsoft.Azure.WebJobs.Script.WebHost;
 using static Colors.Net.StringStaticMethods;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Extensions.Http;
-using Azure.Functions.Cli.Interfaces;
-using System.Collections;
+using Microsoft.Azure.WebJobs.Host;
+using System.Net.Http;
+using Microsoft.Azure.WebJobs.Script;
+using Azure.Functions.Cli.Diagnostics;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -99,6 +99,32 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
+        public static IWebHost BuildWebHost(string url, IConfiguration configuration) =>
+            Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(new string[0])
+            .UseConfiguration(configuration)
+            .UseUrls(url)
+            .ConfigureLogging(b => b.AddConsole())
+            .UseStartup<Startup>()
+            .Build();
+
+        private async Task<IConfiguration> GetConfiguration(string scriptPath, Uri uri)
+        {
+            var secrets = _secretsManager.GetSecrets();
+            var connectionStrings = _secretsManager.GetConnectionStrings();
+            secrets.Add(Constants.WebsiteHostname, uri.Authority);
+
+            // Add our connection strings
+            secrets.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
+            secrets.Add("ConnectionStrings:blah", "blahblahblah");
+
+            await CheckNonOptionalSettings(secrets, scriptPath);
+
+            var configurationBuilder = new ConfigurationBuilder()
+                .AddInMemoryCollection(secrets);
+
+            return configurationBuilder.Build();
+        }
+
         public override async Task RunAsync()
         {
             Utilities.PrintLogo();
@@ -106,56 +132,54 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var scriptPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
             var traceLevel = await ScriptHostHelpers.GetTraceLevel(scriptPath);
             var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, scriptPath);
-
-
+            
             var baseAddress = Setup();
 
-            await ReadSecrets(scriptPath, baseAddress);
-
-            var config = new HttpSelfHostConfiguration(baseAddress)
-            {
-                IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Always,
-                TransferMode = TransferMode.Streamed,
-                HostNameComparisonMode = HostNameComparisonMode.Exact,
-                MaxReceivedMessageSize = 1 * 1024 * 1024 * 100 // 1 byte * 1,024 * 1,024 * 100 = 100 MB (or 104,857,600 bytes)
-            };
-
-            if (!string.IsNullOrEmpty(CorsOrigins))
-            {
-                var cors = new EnableCorsAttribute(CorsOrigins, "*", "*");
-                config.EnableCors(cors);
-            }
-            config.Formatters.Add(new JsonMediaTypeFormatter());
+            SetupConfigurationWatcher();
 
             Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={NodeDebugPort}", EnvironmentVariableTarget.Process);
 
-            WebApiConfig.Initialize(config, settings: settings);
+            IConfiguration configuration = await GetConfiguration(scriptPath, baseAddress);
+          
+            IWebHost host = BuildWebHost(baseAddress.ToString(), configuration);
 
-            using (var httpServer = new HttpSelfHostServer(config))
-            {
-                await httpServer.OpenAsync();
-                ColoredConsole.WriteLine($"Listening on {baseAddress}");
-                ColoredConsole.WriteLine("Hit CTRL-C to exit...");
-                await PostHostStartActions(config);
-                await Task.Delay(-1);
-                await httpServer.CloseAsync();
-            }
+            var runTask = host
+                .RunAsync();
+
+            var manager = host.Services.GetRequiredService<WebScriptHostManager>();
+            await manager.DelayUntilHostReady();
+
+            ColoredConsole.WriteLine($"Listening on {baseAddress}");
+            ColoredConsole.WriteLine("Hit CTRL-C to exit...");
+
+            DisableCoreLogging(manager);
+            DisplayHttpFunctionsInfo(manager, baseAddress);
+            DisplayDisabledFunctions(manager);
+
+            await runTask;
         }
 
-        private static void DisableCoreLogging(HttpSelfHostConfiguration config)
+        private void DisplayDisabledFunctions(WebScriptHostManager hostManager)
         {
-            WebScriptHostManager hostManager = config.DependencyResolver.GetService<WebScriptHostManager>();
-
             if (hostManager != null)
             {
-                hostManager.Instance.ScriptConfig.HostConfig.Tracing.ConsoleLevel = TraceLevel.Off;
+                foreach (var function in hostManager.Instance.Functions.Where(f => f.Metadata.IsDisabled))
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
+                }
             }
         }
 
-        private void DisplayHttpFunctionsInfo(HttpSelfHostConfiguration config)
+        private static void DisableCoreLogging(WebScriptHostManager hostManager)
         {
+            if (hostManager != null)
+            {
+                hostManager.Instance.ScriptConfig.HostConfig.Tracing.ConsoleLevel = System.Diagnostics.TraceLevel.Off;
+            }
+        }
 
-            WebScriptHostManager hostManager = config.DependencyResolver.GetService<WebScriptHostManager>();
+        private void DisplayHttpFunctionsInfo(WebScriptHostManager hostManager, Uri baseUri)
+        {
             if (hostManager != null)
             {
                 var httpFunctions = hostManager.Instance.Functions.Where(f => f.Metadata.IsHttpFunction());
@@ -177,75 +201,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
                         ? hostRoutePrefix
                         : $"{hostRoutePrefix}/";
-                    var url = $"{config.BaseAddress.ToString()}{hostRoutePrefix}{httpRoute}";
+                    var url = $"{baseUri.ToString()}{hostRoutePrefix}{httpRoute}";
                     ColoredConsole
                         .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(url)}")
-                        .WriteLine(); 
+                        .WriteLine();
                 }
             }
         }
 
-        private async Task PostHostStartActions(HttpSelfHostConfiguration config)
-        {
-            try
-            {
-                var totalRetryTimes = Timeout * 2;
-                var retries = 0;
-                while (!await config.BaseAddress.IsServerRunningAsync())
-                {
-                    retries++;
-                    await Task.Delay(TimeSpan.FromMilliseconds(500));
-                    if (retries % 10 == 0)
-                    {
-                        ColoredConsole.WriteLine(WarningColor("The host is taking longer than expected to start."));
-                    }
-                    else if (retries == totalRetryTimes)
-                    {
-                        throw new TimeoutException("Host was unable to start in specified time.");
-                    }
-                }
-                DisableCoreLogging(config);
-                DisplayHttpFunctionsInfo(config);
-                DisplayDisabledFunctions(config);
-                await SetupDebuggerAsync(config);
-                if (PlatformHelper.IsWindows)
-                {
-                    await DummyEdgeInit();
-                }
-            }
-            catch (Exception ex)
-            {
-                ColoredConsole.Error.WriteLine(ErrorColor($"Unable to retrieve functions list: {ex.Message}"));
-            }
-        }
-
-        private void DisplayDisabledFunctions(HttpSelfHostConfiguration config)
-        {
-            WebScriptHostManager hostManager = config.DependencyResolver.GetService<WebScriptHostManager>();
-
-            if (hostManager != null)
-            {
-                foreach (var function in hostManager.Instance.Functions.Where(f => f.Metadata.IsDisabled))
-                {
-                    ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
-                }
-            }
-        }
-
-        private async Task DummyEdgeInit()
-        {
-            // Sample: https://github.com/tjanczuk/edge
-            var func = Edge.Func(@"return function (data, callback) {
-                callback(null, 'Node.js welcomes ' + data);
-            }");
-            await func("init");
-        }
-
-        private async Task SetupDebuggerAsync(HttpSelfHostConfiguration config)
+        private async Task SetupDebuggerAsync(Uri baseUri)
         {
             if (Debugger == DebuggerType.Vs)
             {
-                using (var client = new HttpClient { BaseAddress = config.BaseAddress })
+                using (var client = new HttpClient { BaseAddress = baseUri})
                 {
                     await DebuggerHelper.AttachManagedAsync(client);
                 }
@@ -268,28 +236,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        /// <summary>
-        /// This method reads the secrets from local.settings.json and sets them
-        /// AppSettings are set in environment variables, ConfigurationManager.AppSettings
-        /// ConnectionStrings are only set in ConfigurationManager.ConnectionStrings
-        /// 
-        /// It also sets up a FileSystemWatcher that kills the current running process
-        /// when local.settings.json is updated.
-        /// </summary>
-        private async Task ReadSecrets(string scriptPath, Uri uri)
+        private void SetupConfigurationWatcher()
         {
-            var secrets = _secretsManager.GetSecrets();
-            var environment = Environment
-                    .GetEnvironmentVariables()
-                    .Cast<DictionaryEntry>()
-                    .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
-
-            UpdateEnvironmentVariables(secrets, uri);
-            UpdateAppSettings(secrets);
-            UpdateConnectionStrings(_secretsManager.GetConnectionStrings());
-
-            await CheckNonOptionalSettings(secrets.Union(environment), scriptPath);
-
             fsWatcher = new FileSystemWatcher(Path.GetDirectoryName(SecretsManager.AppSettingsFilePath), SecretsManager.AppSettingsFileName);
             fsWatcher.Changed += (s, e) =>
             {
@@ -363,102 +311,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        /// <summary>
-        /// Code is based on:
-        /// https://msdn.microsoft.com/en-us/library/system.configuration.configurationmanager.appsettings(v=vs.110).aspx
-        /// All connection strings are set to have providerName = System.Data.SqlClient
-        /// </summary>
-        /// <param name="connectionStrings">ConnectionStringName => ConnectionStringValue map</param>
-        private void UpdateConnectionStrings(IEnumerable<ConnectionString> connectionStrings)
-        {
-            try
-            {
-                var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-                var settings = configFile.ConnectionStrings.ConnectionStrings;
-                settings.Clear();
-                foreach (var connectionString in connectionStrings)
-                {
-                    if (settings[connectionString.Name] == null)
-                    {
-                        settings.Add(new ConnectionStringSettings(connectionString.Name, connectionString.Value, connectionString.ProviderName));
-                    }
-                    else
-                    {
-                        // No need to update providerName as we always start off with a clean .config
-                        // every time the cli is updated.
-                        settings[connectionString.Name].ConnectionString = connectionString.Value;
-                        settings[connectionString.Name].ProviderName = connectionString.ProviderName;
-                    }
-                }
-                configFile.Save(ConfigurationSaveMode.Modified);
-                ConfigurationManager.RefreshSection(configFile.ConnectionStrings.SectionInformation.Name);
-            }
-            catch (ConfigurationErrorsException)
-            {
-                ColoredConsole.Error.WriteLine(ErrorColor("Error updating ConfigurationManager.ConnectionStrings"));
-            }
-        }
-
-        private void UpdateEnvironmentVariables(IDictionary<string, string> secrets, Uri uri)
-        {
-            foreach (var pair in secrets.Concat(new[] { new KeyValuePair<string, string>(Constants.WebsiteHostname, uri.Authority) }))
-            {
-                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pair.Key)))
-                {
-                    Environment.SetEnvironmentVariable(pair.Key, pair.Value, EnvironmentVariableTarget.Process);
-                }
-                else
-                {
-                    ColoredConsole.WriteLine(WarningColor($"Skipping '{pair.Key}' from local settings as it's already defined in current environment variables."));
-                }
-            }
-        }
-        /// <summary>
-        /// Code is based on:
-        /// https://msdn.microsoft.com/en-us/library/system.configuration.configurationmanager.appsettings(v=vs.110).aspx
-        /// </summary>
-        /// <param name="appSettings"></param>
-        private static void UpdateAppSettings(IDictionary<string, string> appSettings)
-        {
-            try
-            {
-                var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-                var settings = configFile.AppSettings.Settings;
-                settings.Clear();
-                foreach (var pair in appSettings)
-                {
-                    if (settings[pair.Key] == null)
-                    {
-                        settings.Add(pair.Key, pair.Value);
-                    }
-                    else
-                    {
-                        settings[pair.Key].Value = pair.Value;
-                    }
-                }
-                configFile.Save(ConfigurationSaveMode.Modified);
-                ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
-            }
-            catch (ConfigurationErrorsException)
-            {
-                ColoredConsole.Error.WriteLine(ErrorColor("Error updating ConfigurationManager.AppSettings"));
-            }
-        }
-
         private Uri Setup()
         {
             var protocol = UseHttps ? "https" : "http";
             var actions = new List<InternalAction>();
-            if (SecurityHelpers.IsUrlAclConfigured(protocol, Port))
-            {
-                actions.Add(InternalAction.RemoveUrlAcl);
-            }
-
-            if (UseHttps && !SecurityHelpers.IsSSLConfigured(Port))
-            {
-                actions.Add(InternalAction.SetupSslCert);
-            }
-
+            
             if (actions.Any())
             {
                 string errors;
@@ -488,6 +345,32 @@ namespace Azure.Functions.Cli.Actions.HostActions
             if (disposing)
             {
                 fsWatcher.Dispose();
+            }
+        }
+
+        public class Startup
+        {
+            public Startup(IConfiguration configuration)
+            {
+                Configuration = configuration;
+            }
+
+            public IConfiguration Configuration { get; }
+
+            // This method gets called by the runtime. Use this method to add services to the container.
+            public IServiceProvider ConfigureServices(IServiceCollection services)
+            {
+                services.AddWebJobsScriptHost();
+
+                services.AddSingleton<ILoggerFactoryBuilder, ConsoleLoggerFactoryBuilder>();
+
+                return services.AddWebJobsScriptHostApplicationServices(Configuration);
+            }
+
+            // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+            public void Configure(IApplicationBuilder app, IApplicationLifetime applicationLifetime, IHostingEnvironment env, ILoggerFactory loggerFactory)
+            {
+                app.UseWebJobsScriptHost(applicationLifetime);
             }
         }
     }
