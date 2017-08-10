@@ -17,6 +17,7 @@
     "azfun": "lib/main.js",
     "azurefunctions": "lib/main.js"
   },
+<<<<<<< HEAD
   "os": [
     "win32"
   ],
@@ -26,4 +27,8 @@
     "tmp": "^0.0.33",
     "unzipper": "^0.8.9"
   }
+=======
+  "os": ["win32", "darwin", "linux"],
+  "dependencies": {}
+>>>>>>> Initial migration to .NET Core 2.0
 }
