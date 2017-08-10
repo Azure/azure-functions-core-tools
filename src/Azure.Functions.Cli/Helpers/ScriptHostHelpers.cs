@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ScriptHostHelpers
     {
-        private const TraceLevel DefaultTraceLevel = TraceLevel.Info;
+        private const System.Diagnostics.TraceLevel DefaultTraceLevel = System.Diagnostics.TraceLevel.Info;
         private static bool _isHelpRunning = false;
 
         public static void SetIsHelpRunning()
@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Helpers
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
             var functionErrors = new Dictionary<string, Collection<string>>();
-            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ConsoleTraceWriter(TraceLevel.Info), null, functionErrors);
+            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ConsoleTraceWriter(System.Diagnostics.TraceLevel.Info), null, functionErrors);
             var function = functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
             if (function == null)
             {
@@ -68,7 +68,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<TraceLevel> GetTraceLevel(string scriptPath)
+        internal static async Task<System.Diagnostics.TraceLevel> GetTraceLevel(string scriptPath)
         {
             var filePath = Path.Combine(scriptPath, ScriptConstants.HostMetadataFileName);
             if (!FileSystemHelpers.FileExists(filePath))
@@ -78,7 +78,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var hostJson = JsonConvert.DeserializeObject<JObject>(await FileSystemHelpers.ReadAllTextFromFileAsync(filePath));
             var traceLevelStr = hostJson["tracing"]?["consoleLevel"]?.ToString();
-            if (!string.IsNullOrEmpty(traceLevelStr) && Enum.TryParse(traceLevelStr, true, out TraceLevel traceLevel))
+            if (!string.IsNullOrEmpty(traceLevelStr) && Enum.TryParse(traceLevelStr, true, out System.Diagnostics.TraceLevel traceLevel))
             {
                 return traceLevel;
             }
