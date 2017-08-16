@@ -26,6 +26,7 @@ using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Azure.Functions.Cli.Interfaces;
+using System.Collections;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -266,11 +267,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task ReadSecrets(string scriptPath, Uri uri)
         {
             var secrets = _secretsManager.GetSecrets();
+            var environment = Environment
+                    .GetEnvironmentVariables()
+                    .Cast<DictionaryEntry>()
+                    .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
+
             UpdateEnvironmentVariables(secrets, uri);
             UpdateAppSettings(secrets);
             UpdateConnectionStrings(_secretsManager.GetConnectionStrings());
 
-            await CheckNonOptionalSettings(secrets, scriptPath);
+            await CheckNonOptionalSettings(secrets.Union(environment), scriptPath);
 
             fsWatcher = new FileSystemWatcher(Path.GetDirectoryName(SecretsManager.AppSettingsFilePath), SecretsManager.AppSettingsFileName);
             fsWatcher.Changed += (s, e) =>
@@ -280,7 +286,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             fsWatcher.EnableRaisingEvents = true;
         }
 
-        internal static async Task CheckNonOptionalSettings(IDictionary<string, string> secrets, string scriptPath)
+        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
         {
             try
             {
