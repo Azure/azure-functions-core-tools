@@ -1,6 +1,6 @@
 {
   "name": "azure-functions-core-tools",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Azure Functions Core Tools",
   "scripts": { },
   "author": "Microsoft",
