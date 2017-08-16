@@ -687,9 +687,6 @@
     <None Include="App.config">
       <SubType>Designer</SubType>
     </None>
-    <None Include="ApplicationInsights.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="npm\package.json" />
     <None Include="packages.config">
       <SubType>Designer</SubType>
