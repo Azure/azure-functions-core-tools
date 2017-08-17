@@ -11,7 +11,7 @@ let packagesDir = @".\packages\"
 
 let version = "1.0.0.0";
 
-RestorePackages ()
+Target "RestorePackages" RestorePackages
 
 Target "Clean" (fun _ ->
     CleanDirs [buildDir; testDir; deployDir]
@@ -60,6 +60,7 @@ Target "Zip" (fun _ ->
 
 // Dependencies
 "Clean"
+  ==> "RestorePackages"
   ==> "SetVersion"
   ==> "CompileApp"
   ==> "CompileTest"
