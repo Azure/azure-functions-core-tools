@@ -19,3 +19,8 @@ Publish
 *.ncrunchproject
 *.ncrunchsolution
 nCrunchTemp*
+
+.fake/
+build/
+deploy/
+dist/

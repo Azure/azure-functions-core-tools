@@ -1,0 +1,4 @@
+NUGET
+  remote: https://www.nuget.org/api/v2
+    FAKE (4.63)
+    xunit.runner.console (2.3.0-beta4-build3742)
