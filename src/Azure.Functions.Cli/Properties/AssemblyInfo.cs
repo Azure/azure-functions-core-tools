@@ -7,8 +7,8 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDescriptionAttribute("")]
 [assembly: GuidAttribute("6608738c-3bdb-47f5-bc62-66a8bdf9d884")]
 [assembly: AssemblyProductAttribute("Azure.Functions.Cli")]
-[assembly: AssemblyVersionAttribute("2")]
-[assembly: AssemblyFileVersionAttribute("2")]
+[assembly: AssemblyVersionAttribute("1.0.0.0")]
+[assembly: AssemblyFileVersionAttribute("1.0.0.0")]
 [assembly: InternalsVisibleToAttribute("Azure.Functions.Cli.Tests")]
 [assembly: InternalsVisibleToAttribute("DynamicProxyGenAssembly2")]
 namespace System {
@@ -17,8 +17,8 @@ namespace System {
         internal const System.String AssemblyDescription = "";
         internal const System.String Guid = "6608738c-3bdb-47f5-bc62-66a8bdf9d884";
         internal const System.String AssemblyProduct = "Azure.Functions.Cli";
-        internal const System.String AssemblyVersion = "2";
-        internal const System.String AssemblyFileVersion = "2";
+        internal const System.String AssemblyVersion = "1.0.0.0";
+        internal const System.String AssemblyFileVersion = "1.0.0.0";
         internal const System.String InternalsVisibleTo = "Azure.Functions.Cli.Tests";
         internal const System.String InternalsVisibleTo_1 = "DynamicProxyGenAssembly2";
     }

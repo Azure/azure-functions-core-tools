@@ -11,13 +11,10 @@ let packagesDir = @".\packages\"
 
 let version = "1.0.0.0";
 
+RestorePackages ()
+
 Target "Clean" (fun _ ->
     CleanDirs [buildDir; testDir; deployDir]
-)
-
-Target "RestorePackages" (fun _ ->
-    "./src/Azure.Functions.Cli/packages.config"
-    |> RestorePackage id
 )
 
 Target "SetVersion" (fun _ ->
@@ -50,6 +47,8 @@ Target "XUnitTest" (fun _ ->
        {p with
             HtmlOutputPath = Some (testDir @@ "result.html")
             ToolPath = packagesDir @@ @"xunit.runner.console\tools\net452\xunit.console.exe"
+            Parallel = NoParallelization
+
          })
 )
 
@@ -61,11 +60,10 @@ Target "Zip" (fun _ ->
 
 // Dependencies
 "Clean"
-  ==> "RestorePackages"
   ==> "SetVersion"
   ==> "CompileApp"
-//  ==> "CompileTest"
-//  ==> "XUnitTest"
+  ==> "CompileTest"
+  ==> "XUnitTest"
   ==> "Zip"
 
 // start build

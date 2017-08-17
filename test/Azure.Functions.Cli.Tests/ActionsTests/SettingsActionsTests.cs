@@ -18,7 +18,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
     {
         public SettingsActionsTests(ITestOutputHelper output) : base(output) { }
 
-        [Theory]
         [InlineData("Name1", "Value1")]
         public void AddSettingsActionTest(string name, string value)
         {
@@ -36,7 +35,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().Contain("false");
         }
 
-        [Theory]
         [InlineData("Name1", "Value1")]
         public void DeleteSettingsActionTest(string name, string value)
         {
@@ -52,7 +50,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().NotContain(name);
         }
 
-        [Theory]
         [InlineData("Name1", "Value1")]
         public void DecryptAndEncryptSettingsActionTest(string name, string value)
         {
@@ -81,7 +78,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().Contain("false");
         }
 
-        [Theory]
         [InlineData("Name1", "Value1")]
         public void ListSettingsActionTest(string name, string value)
         {
@@ -110,7 +106,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             output.Should().Contain(value);
         }
 
-        [Theory]
         [InlineData("Name1", "Value1")]
         public void AddConnectionString(string name, string value)
         {
@@ -130,7 +125,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().Contain(Constants.DefaultSqlProviderName);
         }
 
-        [Fact]
         public async Task AddStorageAccountActionTest()
         {
             Program.Main(new[] { "init" });
@@ -145,7 +139,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             output.ToString().Should().Contain($"{storageAccountName}_STORAGE");
         }
 
-        [Fact]
         public async Task AddStorageAccountActionErrorTest()
         {
             var output = new StringBuilder();

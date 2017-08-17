@@ -5,9 +5,6 @@ branches:
   only:
   - dev
 
-pull_requests:
-  do_not_increment_build_number: true
-
 clone_folder: c:\azure-functions-cli
 
 environment:
