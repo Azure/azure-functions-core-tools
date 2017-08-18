@@ -1,15 +1,23 @@
+#load "./buildUtils.fsx"
 #r @"packages/FAKE/tools/FakeLib.dll"
+
+open System
+open System.IO
+open System.Net
 
 open Fake
 open Fake.AssemblyInfoFile
 open Fake.Testing
+open Signing
 
 let buildDir  = @".\dist\build\"
 let testDir   = @".\dist\test\"
+let downloadDir  = @".\dist\download\"
 let deployDir = @".\deploy\"
 let packagesDir = @".\packages\"
-
-let version = System.Environment.GetEnvironmentVariable "APPVEYOR_BUILD_NUMBER"
+let toolsDir = @".\tools\"
+let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
+let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 
 Target "RestorePackages" (fun _ ->
     !! "./**/packages.config"
@@ -26,7 +34,8 @@ Target "RestorePackages" (fun _ ->
 )
 
 Target "Clean" (fun _ ->
-    CleanDirs [buildDir; testDir; deployDir]
+    if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
+    CleanDirs [buildDir; testDir; downloadDir; deployDir]
 )
 
 Target "SetVersion" (fun _ ->
@@ -41,7 +50,7 @@ Target "SetVersion" (fun _ ->
          Attribute.InternalsVisibleTo "DynamicProxyGenAssembly2"]
 )
 
-Target "CompileApp" (fun _ ->
+Target "Compile" (fun _ ->
     !! @"src\**\*.csproj"
       |> MSBuildRelease buildDir "Build"
       |> Log "AppBuild-Output: "
@@ -70,16 +79,57 @@ let excludedFiles = [
 ]
 
 Target "Zip" (fun _ ->
-    !! (buildDir + @"/**/*.*")
+    !! (buildDir @@ @"/**/*.*")
         |> (fun f -> List.fold (--) f excludedFiles)
-        |> Zip buildDir (deployDir + "Azure.Functions.Cli.zip")
+        |> Zip buildDir (deployDir @@ "Azure.Functions.Cli.zip")
+)
+
+let notSigned (includes: FileIncludes) =
+    let sigCheckResult = RunSigCheck buildDir
+    includes
+    |> Seq.filter (fun f ->
+        sigCheckResult.Rows
+        |> Seq.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
+
+Target "GenerateZipToSign" (fun _ ->
+    !! (buildDir @@ "/**/Microsoft.Azure.*.dll")
+       ++ (buildDir @@ "/**/func.exe")
+       |> notSigned
+       |> Zip buildDir (deployDir @@ version + ".zip")
+)
+
+// Target "UploadZipToSign" (fun _ ->
+//     UploadZip (deployDir @@ version + ".zip")
+// )
+
+// Target  "EnqueueSignMessage" (fun _ ->
+//     PushQueueMessage (version + ".zip")
+// )
+
+// Target "PollSigningResult" (fun _ ->
+//     match PollBlobForZip (version + ".zip") (downloadDir @@ "signed.zip") with
+//     | true -> ()
+//     | false -> targetError "Error" null |> ignore
+// )
+
+Target "DownloadNugetExe" (fun _ ->
+    use webClient = new WebClient ()
+    webClient.DownloadFile (nugetUri, buildDir @@ "NuGet.exe")
+)
+
+Target "DownloadTools" (fun _ ->
+    use webClient = new WebClient ()
+    (Uri ("https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe"), toolsDir @@ "sigcheck.exe")
+    |> webClient.DownloadFile
 )
 
 Dependencies
 "Clean"
+  ==> "DownloadTools"
   ==> "RestorePackages"
   ==> "SetVersion"
-  ==> "CompileApp"
+  ==> "Compile"
+  ==> "DownloadNugetExe"
   ==> "CompileTest"
   ==> "XUnitTest"
   ==> "Zip"
