@@ -3,7 +3,7 @@ image: Visual Studio 2017
 
 branches:
   only:
-  - dev
+  - master
 
 clone_folder: c:\azure-functions-cli
 
@@ -14,3 +14,9 @@ build_script:
 - cmd: build.cmd
 
 test: off
+
+artifacts:
+- path: deploy\*.zip
+  name: Release
+- path: dist\test\*.html
+  name: Test
