@@ -11,7 +11,19 @@ let packagesDir = @".\packages\"
 
 let version = "1.0.0.0";
 
-Target "RestorePackages" RestorePackages
+Target "RestorePackages" (fun _ ->
+    !! "./**/packages.config"
+    |> Seq.iter (RestorePackage (fun p ->
+        {p with
+            Sources =
+            [
+                "https://www.nuget.org/api/v2/"
+                "https://www.myget.org/F/azure-appservice/api/v2"
+                "https://www.myget.org/F/fusemandistfeed/api/v2"
+                "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/"
+                "https://www.myget.org/F/xunit/api/v3/index.json"
+            ]}))
+)
 
 Target "Clean" (fun _ ->
     CleanDirs [buildDir; testDir; deployDir]
