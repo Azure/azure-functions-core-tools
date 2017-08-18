@@ -7,6 +7,7 @@ namespace Azure.Functions.Cli.Common
     {
         public static RichString TitleColor(string value) => DarkCyan(value);
         public static RichString VerboseColor(string value) => Green(value);
+        public static RichString LinksColor(string value) => Cyan(value);
         public static RichString AdditionalInfoColor(string value) => Cyan(value);
         public static RichString ExampleColor(string value) => DarkGreen(value);
         public static RichString ErrorColor(string value) => Red(value);

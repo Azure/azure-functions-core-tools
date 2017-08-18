@@ -22,6 +22,7 @@ using Microsoft.Azure.WebJobs.Script.WebHost;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -155,10 +156,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
 
             WebScriptHostManager hostManager = config.DependencyResolver.GetService<WebScriptHostManager>();
-
             if (hostManager != null)
             {
-                foreach (var function in hostManager.Instance.Functions.Where(f => f.Metadata.IsHttpFunction()))
+                var httpFunctions = hostManager.Instance.Functions.Where(f => f.Metadata.IsHttpFunction());
+                if (httpFunctions.Any())
+                {
+                    ColoredConsole
+                        .WriteLine()
+                        .WriteLine(Yellow("Http Functions:"))
+                        .WriteLine();
+                }
+
+                foreach (var function in httpFunctions)
                 {
                     var httpRoute = function.Metadata.Bindings.FirstOrDefault(b => b.Type == "httpTrigger").Raw["route"]?.ToString();
                     httpRoute = httpRoute ?? function.Name;
@@ -168,7 +177,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
                         ? hostRoutePrefix
                         : $"{hostRoutePrefix}/";
-                    ColoredConsole.WriteLine($"{TitleColor($"Http Function {function.Name}:")} {config.BaseAddress.ToString()}{hostRoutePrefix}{httpRoute}");
+                    var url = $"{config.BaseAddress.ToString()}{hostRoutePrefix}{httpRoute}";
+                    ColoredConsole
+                        .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(url)}")
+                        .WriteLine(); 
                 }
             }
         }
