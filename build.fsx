@@ -1,4 +1,4 @@
-#r @"packages\FAKE\tools\FakeLib.dll"
+#r @"packages/FAKE/tools/FakeLib.dll"
 
 open Fake
 open Fake.AssemblyInfoFile
@@ -9,7 +9,7 @@ let testDir   = @".\dist\test\"
 let deployDir = @".\deploy\"
 let packagesDir = @".\packages\"
 
-let version = "1.0.0.0";
+let version = System.Environment.GetEnvironmentVariable "APPVEYOR_BUILD_NUMBER"
 
 Target "RestorePackages" (fun _ ->
     !! "./**/packages.config"
@@ -60,17 +60,21 @@ Target "XUnitTest" (fun _ ->
             HtmlOutputPath = Some (testDir @@ "result.html")
             ToolPath = packagesDir @@ @"xunit.runner.console\tools\net452\xunit.console.exe"
             Parallel = NoParallelization
-
          })
 )
 
+let excludedFiles = [
+    "/**/*.pdb"
+    "/**/*.xml"
+]
+
 Target "Zip" (fun _ ->
-    !! (buildDir + @"\**\*.*")
-        -- "*.zip"
+    !! (buildDir + @"/**/*.*")
+        |> (fun f -> List.fold (--) f excludedFiles)
         |> Zip buildDir (deployDir + "Azure.Functions.Cli.zip")
 )
 
-// Dependencies
+Dependencies
 "Clean"
   ==> "RestorePackages"
   ==> "SetVersion"
