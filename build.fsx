@@ -66,6 +66,7 @@ Target "XUnitTest" (fun _ ->
 let excludedFiles = [
     "/**/*.pdb"
     "/**/*.xml"
+    "/**/*.resources.dll"
 ]
 
 Target "Zip" (fun _ ->
