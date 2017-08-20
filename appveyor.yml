@@ -16,7 +16,7 @@ build_script:
 test: off
 
 artifacts:
-- path: deploy\*.zip
+- path: deploy\Azure.Functions.*.zip
   name: Release
 - path: dist\test\*.html
   name: Test

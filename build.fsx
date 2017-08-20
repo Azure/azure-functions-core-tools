@@ -1,15 +1,17 @@
 #r "packages/FAKE/tools/FakeLib.dll"
-#r "packages/Azure.Data.Wrappers/lib/net46/Azure.Data.Wrappers.dll"
-#r "packages/WindowsAzure.Storage/lib/net45/Microsoft.WindowsAzure.Storage.dll"
+#r "packages/WindowsAzure.Storage/lib/net40/Microsoft.WindowsAzure.Storage.dll"
 #r "Microsoft.VisualBasic"
 
 open System
 open System.IO
 open System.Net
 open System.Threading.Tasks
-open Microsoft.VisualBasic.FileIO
 
-open Azure.Data.Wrappers
+open Microsoft.VisualBasic.FileIO
+open Microsoft.WindowsAzure
+open Microsoft.WindowsAzure.Storage
+open Microsoft.WindowsAzure.Storage.Blob
+open Microsoft.WindowsAzure.Storage.Queue
 open Fake
 open Fake.AssemblyInfoFile
 open Fake.ProcessHelper
@@ -23,7 +25,6 @@ let inline awaitTask (task: Task) =
     task
     |> Async.AwaitTask
     |> Async.RunSynchronously
-    |> ignore
 
 let env = Environment.GetEnvironmentVariable
 let connectionString =
@@ -120,68 +121,77 @@ type SigningInfo =
         ``Machine Type``: string; }
 
 Target "GenerateZipToSign" (fun _ ->
-    let RunSigCheck path =
+    let sigCheckResult =
         ExecProcessAndReturnMessages (fun info ->
             info.FileName <- sigCheckExe
             info.WorkingDirectory <- Environment.CurrentDirectory
-            info.Arguments <- "-nobanner -c -accepteula -e " + path
+            info.Arguments <- "-nobanner -c -accepteula -e " + buildDir
         ) (TimeSpan.FromMinutes 2.0)
         |> fun result ->
             result.Messages
+            |> Seq.skip 1
             |> String.concat Environment.NewLine
             |> (fun csv ->
                 use parser = new TextFieldParser (new StringReader (csv))
                 parser.TextFieldType <- FieldType.Delimited
-                parser.SetDelimiters ","
+                parser.SetDelimiters [| "," |]
                 seq {
-                    while not parser.EndOfData do
+                    while (not parser.EndOfData) do
                         let fields = parser.ReadFields ()
                         yield { Path = fields.[0]; Verified = fields.[1]; Date = fields.[2];
                             Publisher = fields.[3]; Company = fields.[4]; Description = fields.[5];
                             Product = fields.[6]; ``Product Version`` = fields.[7];
                             ``File Version`` = fields.[8]; ``Machine Type`` = fields.[9] }
-                    }
+                } |> Array.ofSeq
             )
-
+    printfn "%s: %d" "sigcheck result has length" (sigCheckResult |> Array.length)
     let notSigned (includes: FileIncludes) =
         includes
         |> Seq.filter (fun f ->
-            RunSigCheck buildDir
-            |> Seq.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
+            sigCheckResult
+            |> Array.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
 
     !! (buildDir @@ "/**/Microsoft.Azure.*.dll")
        ++ (buildDir @@ "/**/func.exe")
+       ++ (buildDir @@ "/azurefunctions/functions.js")
+       ++ (buildDir @@ "/azurefunctions/http/request.js")
+       ++ (buildDir @@ "/azurefunctions/http/response.js")
        |> notSigned
        |> Zip buildDir toSignZipPath
 )
 
+let storageAccount = CloudStorageAccount.Parse connectionString
+let blobClient = storageAccount.CreateCloudBlobClient ()
+let queueClient = storageAccount.CreateCloudQueueClient ()
+
 Target "UploadZipToSign" (fun _ ->
-    let container = Container ("azure-functions-cli", connectionString)
-    container.CreateIfNotExists () |> awaitTask
-    container.Save (toSignZipName, File.ReadAllBytes (toSignZipPath)) |> awaitTask
+    let container = blobClient.GetContainerReference "azure-functions-cli"
+    container.CreateIfNotExists () |> ignore
+    let blobRef = container.GetBlockBlobReference toSignZipName
+    blobRef.UploadFromStream <| File.OpenRead(toSignZipPath)
 )
 
 Target  "EnqueueSignMessage" (fun _ ->
-    let message = "SignAuthenticode;azure-functions-cli;" + toSignZipName
-    let queue = StorageQueue ("signing-jobs", connectionString)
-    queue.Send message |> awaitTask
+    let queue = queueClient.GetQueueReference "signing-jobs"
+    let message = CloudQueueMessage ("SignAuthenticode;azure-functions-cli;" + toSignZipName)
+    queue.AddMessage message
 )
 
 Target "WaitForSigning" (fun _ ->
     let rec downloadFile (startTime: DateTime) = async {
-        let container = Container ("azure-functions-cli-signed", connectionString)
-        let! result = container.Exists toSignZipName |> Async.AwaitTask
-        match result with
+        let container = blobClient.GetContainerReference "azure-functions-cli-signed"
+        container.CreateIfNotExists () |> ignore
+        let blob = container.GetBlockBlobReference toSignZipName
+        match blob.Exists () with
         | true ->
-            let blobRef = container.GetBlockReference (toSignZipName)
-            let fileStream = new FileStream (signedZipPath, FileMode.OpenOrCreate)
-            blobRef.DownloadToStreamAsync(fileStream) |> awaitTask
-            fileStream.Close ()
+            blob.DownloadToFile (signedZipPath, FileMode.OpenOrCreate)
             return Success signedZipPath
         | false ->
             if startTime.AddMinutes(10.0) < DateTime.UtcNow then
                 return Failure "Timeout"
-            else return! downloadFile startTime
+            else
+                do! Async.Sleep 5000
+                return! downloadFile startTime
     }
 
     let signed = downloadFile DateTime.UtcNow |> Async.RunSynchronously
