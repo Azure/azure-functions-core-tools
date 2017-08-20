@@ -24,3 +24,4 @@ nCrunchTemp*
 build/
 deploy/
 dist/
+tools/
