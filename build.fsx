@@ -1,7 +1,7 @@
-#r "Microsoft.VisualBasic"
 #r "packages/FAKE/tools/FakeLib.dll"
-#r "packages/Azure.Data.Wrappers/lib/netstandard1.3/Azure.Data.Wrappers.dll"
-#r "packages/WindowsAzure.Storage/lib/netstandard1.3/Microsoft.WindowsAzure.Storage.dll"
+#r "packages/Azure.Data.Wrappers/lib/net46/Azure.Data.Wrappers.dll"
+#r "packages/WindowsAzure.Storage/lib/net45/Microsoft.WindowsAzure.Storage.dll"
+#r "Microsoft.VisualBasic"
 
 open System
 open System.IO
