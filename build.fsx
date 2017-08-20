@@ -1,7 +1,5 @@
 #r "Microsoft.VisualBasic"
 #r "packages/FAKE/tools/FakeLib.dll"
-#r "packages/FSharp.Data/lib/net40/FSharp.Data.dll"
-#r "packages/FSharp.Data/lib/portable-net45+netcore45/FSharp.Data.dll"
 #r "packages/Azure.Data.Wrappers/lib/netstandard1.3/Azure.Data.Wrappers.dll"
 #r "packages/WindowsAzure.Storage/lib/netstandard1.3/Microsoft.WindowsAzure.Storage.dll"
 
