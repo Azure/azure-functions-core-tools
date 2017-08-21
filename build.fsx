@@ -110,15 +110,15 @@ Target "Zip" (fun _ ->
 
 type SigningInfo =
     { Path: string;
-        Verified: string;
-        Date: string;
-        Publisher: string;
-        Company: string;
-        Description: string;
-        Product: string;
-        ``Product Version``: string;
-        ``File Version``: string;
-        ``Machine Type``: string; }
+      Verified: string;
+      Date: string;
+      Publisher: string;
+      Company: string;
+      Description: string;
+      Product: string;
+      ``Product Version``: string;
+      ``File Version``: string;
+      ``Machine Type``: string; }
 
 Target "GenerateZipToSign" (fun _ ->
     let sigCheckResult =
@@ -144,7 +144,6 @@ Target "GenerateZipToSign" (fun _ ->
                             ``File Version`` = fields.[8]; ``Machine Type`` = fields.[9] }
                 } |> Array.ofSeq
             )
-    printfn "%s: %d" "sigcheck result has length" (sigCheckResult |> Array.length)
     let notSigned (includes: FileIncludes) =
         includes
         |> Seq.filter (fun f ->
@@ -152,10 +151,10 @@ Target "GenerateZipToSign" (fun _ ->
             |> Array.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
 
     !! (buildDir @@ "/**/Microsoft.Azure.*.dll")
-       ++ (buildDir @@ "/**/func.exe")
-       ++ (buildDir @@ "/azurefunctions/functions.js")
-       ++ (buildDir @@ "/azurefunctions/http/request.js")
-       ++ (buildDir @@ "/azurefunctions/http/response.js")
+       ++ (buildDir @@ "func.exe")
+       ++ (buildDir @@ "azurefunctions/functions.js")
+       ++ (buildDir @@ "azurefunctions/http/request.js")
+       ++ (buildDir @@ "azurefunctions/http/response.js")
        |> notSigned
        |> Zip buildDir toSignZipPath
 )
@@ -182,16 +181,14 @@ Target "WaitForSigning" (fun _ ->
         let container = blobClient.GetContainerReference "azure-functions-cli-signed"
         container.CreateIfNotExists () |> ignore
         let blob = container.GetBlockBlobReference toSignZipName
-        match blob.Exists () with
-        | true ->
+        if blob.Exists () then
             blob.DownloadToFile (signedZipPath, FileMode.OpenOrCreate)
             return Success signedZipPath
-        | false ->
-            if startTime.AddMinutes(10.0) < DateTime.UtcNow then
-                return Failure "Timeout"
-            else
-                do! Async.Sleep 5000
-                return! downloadFile startTime
+        elif startTime.AddMinutes 10.0 < DateTime.UtcNow then
+            return Failure "Timeout"
+        else
+            do! Async.Sleep 5000
+            return! downloadFile startTime
     }
 
     let signed = downloadFile DateTime.UtcNow |> Async.RunSynchronously
@@ -206,9 +203,13 @@ Target "DownloadNugetExe" (fun _ ->
 )
 
 Target "DownloadTools" (fun _ ->
-    use webClient = new WebClient ()
-    (Uri ("https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe"), sigCheckExe)
-    |> webClient.DownloadFile
+    if File.Exists sigCheckExe then
+        printfn "%s" "Skipping downloading sigcheck.exe since it's already there"
+    else
+        printfn "%s" "Downloading sigcheck.exe"
+        use webClient = new WebClient ()
+        (Uri ("https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe"), sigCheckExe)
+        |> webClient.DownloadFile
 )
 
 Dependencies
