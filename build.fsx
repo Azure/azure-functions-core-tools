@@ -196,9 +196,9 @@ Target "WaitForSigning" (fun _ ->
     match signed with
     | Success file ->
         Unzip buildDir file
-        MoveFile (buildDir @@ "azurefunctions/functions.js") (buildDir @@ "functions.js")
-        MoveFile (buildDir @@ "azurefunctions/http/request.js") (buildDir @@ "request.js")
-        MoveFile (buildDir @@ "azurefunctions/http/response.js") (buildDir @@ "response.js")
+        MoveFile (buildDir @@ "azurefunctions/") (buildDir @@ "functions.js")
+        MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "request.js")
+        MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "response.js")
     | Failure e -> targetError e null |> ignore
 )
 
