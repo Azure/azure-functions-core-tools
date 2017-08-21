@@ -147,7 +147,6 @@ Target "GenerateZipToSign" (fun _ ->
     let notSigned (includes: FileIncludes) =
         includes
         |> Seq.filter (fun f ->
-            f.EndsWith ".js" ||
             sigCheckResult
             |> Array.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
 
@@ -157,7 +156,7 @@ Target "GenerateZipToSign" (fun _ ->
        ++ (buildDir @@ "azurefunctions/http/request.js")
        ++ (buildDir @@ "azurefunctions/http/response.js")
        |> notSigned
-       |> Zip buildDir toSignZipPath
+       |> CreateZip buildDir toSignZipPath String.Empty 7 true
 )
 
 let storageAccount = CloudStorageAccount.Parse connectionString
@@ -194,7 +193,11 @@ Target "WaitForSigning" (fun _ ->
 
     let signed = downloadFile DateTime.UtcNow |> Async.RunSynchronously
     match signed with
-    | Success file -> Unzip buildDir file
+    | Success file ->
+        Unzip buildDir file
+        MoveFile (buildDir @@ "azurefunctions/functions.js") (buildDir @@ "functions.js")
+        MoveFile (buildDir @@ "azurefunctions/http/request.js") (buildDir @@ "request.js")
+        MoveFile (buildDir @@ "azurefunctions/http/response.js") (buildDir @@ "response.js")
     | Failure e -> targetError e null |> ignore
 )
 
