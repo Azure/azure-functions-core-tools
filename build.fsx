@@ -147,6 +147,7 @@ Target "GenerateZipToSign" (fun _ ->
     let notSigned (includes: FileIncludes) =
         includes
         |> Seq.filter (fun f ->
+            f.EndsWith ".js" ||
             sigCheckResult
             |> Array.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
 
