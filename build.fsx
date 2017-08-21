@@ -39,8 +39,11 @@ let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + ".zip"
+let toSignThirdPartyName = version + "-thridparty.zip"
 let toSignZipPath = deployDir @@ toSignZipName
+let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
+let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
 let finalZipPath = deployDir @@ "Azure.Functions.Cli.zip"
 
 Target "RestorePackages" (fun _ ->
@@ -152,12 +155,38 @@ Target "GenerateZipToSign" (fun _ ->
             |> Array.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
 
     !! (buildDir @@ "/**/Microsoft.Azure.*.dll")
-       ++ (buildDir @@ "func.exe")
-       ++ (buildDir @@ "azurefunctions/functions.js")
-       ++ (buildDir @@ "azurefunctions/http/request.js")
-       ++ (buildDir @@ "azurefunctions/http/response.js")
-       |> notSigned
-       |> CreateZip buildDir toSignZipPath String.Empty 7 true
+        ++ (buildDir @@ "func.exe")
+        ++ (buildDir @@ "azurefunctions/functions.js")
+        ++ (buildDir @@ "azurefunctions/http/request.js")
+        ++ (buildDir @@ "azurefunctions/http/response.js")
+        |> notSigned
+        |> CreateZip buildDir toSignZipPath String.Empty 7 true
+
+    let thirdParty = [|
+        "ARMClient.Authentication.dll"
+        "ARMClient.Library.dll"
+        "Autofac.dll"
+        "Autofac.Integration.WebApi.dll"
+        "Colors.Net.dll"
+        "EdgeJs.dll"
+        "FluentCommandLineParser.dll"
+        "FSharp.Compiler.Service.dll"
+        "FSharp.Compiler.Service.MSBuild.v12.dll"
+        "Humanizer.dll"
+        "Ignite.SharpNetSH.dll"
+        "NCrontab.dll"
+        "Newtonsoft.Json.dll"
+        "RestSharp.dll"
+        "SendGrid.CSharp.HTTP.Client.dll"
+        "SendGrid.dll"
+        "SendGrid.SmtpApi.dll"
+        "System.IO.Abstractions.dll"
+        "Twilio.Api.dll"
+    |]
+
+    !! (buildDir @@ "/**/*.dll")
+        |> Seq.filter (fun f -> thirdParty |> Array.contains (f |> Path.GetFileName))
+        |> Zip buildDir toSignThridPartyPath
 )
 
 let storageAccount = CloudStorageAccount.Parse connectionString
@@ -168,20 +197,27 @@ Target "UploadZipToSign" (fun _ ->
     let container = blobClient.GetContainerReference "azure-functions-cli"
     container.CreateIfNotExists () |> ignore
     let blobRef = container.GetBlockBlobReference toSignZipName
-    blobRef.UploadFromStream <| File.OpenRead(toSignZipPath)
+    blobRef.UploadFromStream <| File.OpenRead toSignZipPath
+
+    let blobRef = container.GetBlockBlobReference toSignThirdPartyName
+    blobRef.UploadFromStream <| File.OpenRead toSignThridPartyPath
+
 )
 
 Target  "EnqueueSignMessage" (fun _ ->
     let queue = queueClient.GetQueueReference "signing-jobs"
     let message = CloudQueueMessage ("SignAuthenticode;azure-functions-cli;" + toSignZipName)
     queue.AddMessage message
+
+    let message = CloudQueueMessage ("Sign3rdParty;azure-functions-cli;" + toSignThirdPartyName)
+    queue.AddMessage message
 )
 
 Target "WaitForSigning" (fun _ ->
-    let rec downloadFile (startTime: DateTime) = async {
+    let rec downloadFile fileName (startTime: DateTime) = async {
         let container = blobClient.GetContainerReference "azure-functions-cli-signed"
         container.CreateIfNotExists () |> ignore
-        let blob = container.GetBlockBlobReference toSignZipName
+        let blob = container.GetBlockBlobReference fileName
         if blob.Exists () then
             blob.DownloadToFile (signedZipPath, FileMode.OpenOrCreate)
             return Success signedZipPath
@@ -189,16 +225,21 @@ Target "WaitForSigning" (fun _ ->
             return Failure "Timeout"
         else
             do! Async.Sleep 5000
-            return! downloadFile startTime
+            return! downloadFile fileName startTime
     }
 
-    let signed = downloadFile DateTime.UtcNow |> Async.RunSynchronously
+    let signed = downloadFile toSignZipName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
     | Success file ->
         Unzip buildDir file
         MoveFile (buildDir @@ "azurefunctions/") (buildDir @@ "functions.js")
         MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "request.js")
         MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "response.js")
+    | Failure e -> targetError e null |> ignore
+
+    let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
+    match signed with
+    | Success file -> Unzip buildDir file
     | Failure e -> targetError e null |> ignore
 )
 
