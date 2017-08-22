@@ -27,12 +27,18 @@ namespace Azure.Functions.Cli.Diagnostics
         {
             if (!string.IsNullOrEmpty(value))
             {
-                var colorChar = Data.ConsoleColorToUnicode[color];
-                if (value[0] >= '\uE000')
+                if (Data.ConsoleColorToUnicode.TryGetValue(color, out char colorChar) ||
+                    Data.ConsoleColorToUnicode.TryGetValue(Console.ForegroundColor, out colorChar))
                 {
-                    value = value.Trim(value[0]);
+                    if (value[0] >= '\uE000')
+                    {
+                        value = value.Trim(value[0]);
+                    }
+
+                    value = $"{colorChar}{value}{colorChar}";
                 }
-                return new RichString($"{colorChar}{value}{colorChar}");
+
+                return new RichString(value);
             }
             else
             {
