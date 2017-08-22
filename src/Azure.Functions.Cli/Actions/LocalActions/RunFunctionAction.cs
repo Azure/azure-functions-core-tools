@@ -20,8 +20,8 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "run", Context = Context.Function, HelpText = "Run a function directly")]
-    [Action(Name = "run", HelpText = "Run a function directly")]
+    // [Action(Name = "run", Context = Context.Function, HelpText = "Run a function directly")]
+    // [Action(Name = "run", HelpText = "Run a function directly")]
     class RunFunctionAction : BaseAction
     {
         private readonly IFunctionsLocalServer _scriptServer;

@@ -73,16 +73,14 @@ namespace Azure.Functions.Cli.Common
 
         private static string Decrypt(byte[] value, string reason)
         {
-            var entropy = Encoding.UTF8.GetBytes(reason);
-            var bytes = ProtectedData.Unprotect(value, entropy, DataProtectionScope.LocalMachine);
+            var bytes = ProtectedData.Unprotect(value, reason);
             return Encoding.UTF8.GetString(bytes);
         }
 
         private static byte[] Encrypt(string value, string reason)
         {
-            var entropy = Encoding.UTF8.GetBytes(reason);
             var bytes = Encoding.UTF8.GetBytes(value);
-            return ProtectedData.Protect(bytes, entropy, DataProtectionScope.LocalMachine);
+            return ProtectedData.Protect(bytes, reason);
         }
     }
 }

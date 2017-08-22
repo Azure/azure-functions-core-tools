@@ -5,36 +5,25 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using ARMClient.Authentication;
-using ARMClient.Authentication.Contracts;
-using ARMClient.Library;
 using Azure.Functions.Cli.Arm.Models;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Interfaces;
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Arm
 {
     internal partial class ArmManager : IArmManager
     {
-        private readonly IAzureClient _client;
-        private readonly IAuthHelper _authHelper;
         private readonly ISettings _settings;
+        private readonly IArmTokenManager _tokenManager;
+        private readonly ArmClient _client;
 
-        public ArmManager(IAuthHelper authHelper, IAzureClient client, ISettings settings)
+        public ArmManager(ISettings settings, IArmTokenManager tokenManager)
         {
-            _authHelper = authHelper;
-            _client = client;
             _settings = settings;
-        }
-
-        public async Task Initialize()
-        {
-            await SelectTenantAsync(_settings.CurrentSubscription);
-        }
-
-        public async Task<AuthenticationHeaderValue> GetAuthenticationHeader(string id)
-        {
-            var token = await _authHelper.GetToken(id);
-            return new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            _tokenManager = tokenManager;
+            _client = new ArmClient(tokenManager, settings.CurrentTenant, retryCount: 3);
         }
 
         public async Task<IEnumerable<Site>> GetFunctionAppsAsync()
@@ -57,86 +46,6 @@ namespace Azure.Functions.Cli.Arm
             }
         }
 
-        public async Task<Site> CreateFunctionAppAsync(string subscriptionStr, string resourceGroupStr, string functionAppNameStr, string geoLocationStr)
-        {
-            var subscription = new Subscription(subscriptionStr, string.Empty);
-            var resourceGroup = await EnsureResourceGroupAsync(
-                new ResourceGroup(
-                    subscription.SubscriptionId,
-                    resourceGroupStr,
-                    geoLocationStr)
-                );
-
-            var storageAccount = await EnsureAStorageAccountAsync(resourceGroup);
-            var functionApp = new Site(subscription.SubscriptionId, resourceGroup.ResourceGroupName, functionAppNameStr);
-            var keys = await GetStorageAccountKeysAsync(storageAccount);
-            var connectionString = $"DefaultEndpointsProtocol=https;AccountName={storageAccount.StorageAccountName};AccountKey={keys.First().Value}";
-            await ArmHttpAsync<ArmWrapper<object>>(HttpMethod.Put, ArmUriTemplates.Site.Bind(functionApp),
-                    new
-                    {
-                        properties = new
-                        {
-                            siteConfig = new
-                            {
-                                appSettings = new Dictionary<string, string> {
-                                    { "AzureWebJobsStorage", connectionString },
-                                    { "AzureWebJobsDashboard", connectionString },
-                                    { "FUNCTIONS_EXTENSION_VERSION", "latest" },
-                                    { "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", connectionString },
-                                    { "WEBSITE_CONTENTSHARE", storageAccount.StorageAccountName.ToLowerInvariant() },
-                                    { $"{storageAccount.StorageAccountName}_STORAGE", connectionString },
-                                    { "WEBSITE_NODE_DEFAULT_VERSION", "6.5.0" }
-                                }
-                                .Select(e => new { name = e.Key, value = e.Value})
-                            },
-                            sku = "Dynamic"
-                        },
-                        location = geoLocationStr,
-                        kind = "functionapp"
-                    });
-
-            return functionApp;
-        }
-
-        public Task LoginAsync()
-        {
-            _authHelper.ClearTokenCache();
-            return _authHelper.AcquireTokens();
-        }
-
-        public Task LoginAsync(string username, string password)
-        {
-            _authHelper.ClearTokenCache();
-            return _authHelper.GetTokenByUpn(username, password);
-        }
-
-        public IEnumerable<string> DumpTokenCache()
-        {
-            return _authHelper.DumpTokenCache();
-        }
-
-        public async Task SelectTenantAsync(string id)
-        {
-            TokenCacheInfo token = null;
-            try
-            {
-                token = await _authHelper.GetToken(id);
-            }
-            catch { }
-
-            if (token == null || token.ExpiresOn < DateTimeOffset.Now)
-            {
-                await _authHelper.AcquireTokens();
-            }
-
-            await _authHelper.GetToken(id);
-        }
-
-        public void Logout()
-        {
-            _authHelper.ClearTokenCache();
-        }
-
         public async Task<Site> EnsureScmTypeAsync(Site functionApp)
         {
             functionApp = await LoadSiteConfigAsync(functionApp);
@@ -151,23 +60,44 @@ namespace Azure.Functions.Cli.Arm
             return functionApp;
         }
 
+        public async Task<IEnumerable<TenantSubscriptionMap>> GetTenants()
+        {
+            var tenants = await _tokenManager.GetTenants();
+            var tokenList = await tenants.Select(async t => new { Tenant = t, Token = await _tokenManager.GetToken(t) }).WhenAll();
+            using (var client = new HttpClient())
+            {
+                client.BaseAddress = new Uri(Constants.ArmConstants.ArmResource);
+                return await tokenList
+                .Select(async t =>
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Get, "/subscriptions?api-version=2014-04-01");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", t.Token);
+                    var response = await client.SendAsync(request);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var resString = await response.Content.ReadAsStringAsync();
+                        var subscriptions = JsonConvert.DeserializeObject<ArmSubscriptionsArray>(resString);
+                        return new TenantSubscriptionMap
+                        {
+                            TenantId = t.Tenant,
+                            Subscriptions = subscriptions.Value
+                        };
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                })
+                .WhenAll();
+            }
+        }
+
         private async Task<T> ArmHttpAsync<T>(HttpMethod method, Uri uri, object payload = null)
         {
             var response = await _client.HttpInvoke(method, uri, payload);
             response.EnsureSuccessStatusCode();
 
             return await response.Content.ReadAsAsync<T>();
-        }
-
-        public async Task<TenantCacheInfo> GetCurrentTenantAsync()
-        {
-            var token = await _authHelper.GetToken(id: string.Empty);
-            return _authHelper.GetTenantsInfo().FirstOrDefault(t => t.tenantId.Equals(token.TenantId, StringComparison.OrdinalIgnoreCase));
-        }
-
-        public IEnumerable<TenantCacheInfo> GetTenants()
-        {
-            return _authHelper.GetTenantsInfo();
         }
 
         private async Task ArmHttpAsync(HttpMethod method, Uri uri, object payload = null)
