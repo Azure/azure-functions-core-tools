@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Common
     internal class SecretsManager : ISecretsManager
     {
         private static bool warningPrinted = false;
+        private const string reason = "secrets.manager.1";
 
         public static string AppSettingsFilePath
         {
@@ -101,7 +102,7 @@ namespace Azure.Functions.Cli.Common
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
 
-                foreach(var connectionString in connectionStrings)
+                foreach (var connectionString in connectionStrings)
                 {
                     settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
@@ -124,7 +125,7 @@ namespace Azure.Functions.Cli.Common
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
 
-                foreach(var connectionString in connectionStrings)
+                foreach (var connectionString in connectionStrings)
                 {
                     settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
@@ -189,7 +190,7 @@ namespace Azure.Functions.Cli.Common
             {
                 if (IsEncrypted)
                 {
-                    Values[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), null, DataProtectionScope.CurrentUser));
+                    Values[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), reason));
                 }
                 else
                 {
@@ -200,7 +201,7 @@ namespace Azure.Functions.Cli.Common
             public void SetConnectionString(string name, string value, string providerName)
             {
                 value = IsEncrypted
-                    ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), null, DataProtectionScope.CurrentUser))
+                    ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), reason))
                     : value;
 
                 ConnectionStrings[name] = JToken.FromObject(new
@@ -237,7 +238,7 @@ namespace Azure.Functions.Cli.Common
                 {
                     try
                     {
-                        return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                        return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), reason)));
                     }
                     catch (Exception e)
                     {
@@ -255,7 +256,7 @@ namespace Azure.Functions.Cli.Common
                 try
                 {
                     string DecryptIfNeeded(string value) => IsEncrypted
-                        ? Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), null, DataProtectionScope.CurrentUser))
+                        ? Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), reason))
                         : value;
 
                     return ConnectionStrings.Select(c =>

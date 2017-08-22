@@ -13,10 +13,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         private string _username = string.Empty;
         private string _password = string.Empty;
+        private readonly IArmTokenManager _tokenManager;
 
-        public LoginAction(IArmManager armManager, ISettings settings)
-            : base(armManager, settings, requiresLogin: false)
-        { }
+        public LoginAction(IArmManager armManager, ISettings settings, IArmTokenManager tokenManager)
+            : base(armManager, settings)
+        {
+            _tokenManager = tokenManager;
+        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -27,20 +30,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Parser.Setup<string>('w', "password")
                 .WithDescription("Password to use for non-interactive login only in conjunction with -u. Default: prompt")
                 .Callback(password => _password = password);
-            
+
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
             if (string.IsNullOrWhiteSpace(_username))
-                await _armManager.LoginAsync();
+            {
+                await _tokenManager.Login();
+            }
             else
             {
                 if (string.IsNullOrWhiteSpace(_password))
+                {
                     _password = PromptForPassword();
-
-                await _armManager.LoginAsync(_username, _password);
+                }
             }
 
             await PrintAccountsAsync();

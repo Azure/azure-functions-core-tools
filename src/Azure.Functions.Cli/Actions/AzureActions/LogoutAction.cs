@@ -7,16 +7,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "logout", Context = Context.Azure, HelpText = "Log out of Azure account")]
     class LogoutAction : BaseAction
     {
-        private readonly IArmManager _armManager;
+        private readonly IArmTokenManager _tokenManager;
 
-        public LogoutAction(IArmManager armManager)
+        public LogoutAction(IArmTokenManager tokenManager)
         {
-            _armManager = armManager;
+            _tokenManager = tokenManager;
         }
 
         public override Task RunAsync()
         {
-            _armManager.Logout();
+            _tokenManager.Logout();
             return Task.CompletedTask;
         }
     }

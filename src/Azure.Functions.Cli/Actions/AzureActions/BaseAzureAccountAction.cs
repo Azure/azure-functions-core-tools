@@ -13,26 +13,25 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public readonly ISettings Settings;
 
         public BaseAzureAccountAction(
-            IArmManager armManager, 
-            ISettings settings,
-            bool requiresLogin = true)
-            : base(armManager, requiresLogin)
+            IArmManager armManager,
+            ISettings settings)
+            : base(armManager)
         {
             Settings = settings;
         }
 
         public async Task PrintAccountsAsync()
         {
-            var tenants = _armManager.GetTenants();
+            var tenants = await _armManager.GetTenants();
             var currentSub = Settings.CurrentSubscription;
             var subscriptions = tenants
-                .Select(t => t.subscriptions)
+                .Select(t => t.Subscriptions)
                 .SelectMany(s => s)
                 .Select(s => new
                 {
-                    displayName = s.displayName,
-                    subscriptionId = s.subscriptionId,
-                    isCurrent = s.subscriptionId.Equals(currentSub, StringComparison.OrdinalIgnoreCase)
+                    displayName = s.DisplayName,
+                    subscriptionId = s.SubscriptionId,
+                    isCurrent = s.SubscriptionId.Equals(currentSub, StringComparison.OrdinalIgnoreCase)
                 })
                 .Distinct();
 
@@ -44,7 +43,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     currentSub = Settings.CurrentSubscription;
                 }
 
-                await _armManager.SelectTenantAsync(currentSub);
+                var currentTenant = tenants.FirstOrDefault(t => t.Subscriptions.Any(s => s.SubscriptionId.Equals(currentSub, StringComparison.OrdinalIgnoreCase)));
+                Settings.CurrentTenant = currentTenant?.TenantId;
 
                 var longestName = subscriptions.Max(s => s.displayName.Length) + subscriptions.First().subscriptionId.Length + "( ) ".Length;
 

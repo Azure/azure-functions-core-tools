@@ -4,23 +4,13 @@ using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    abstract class BaseAzureAction : BaseAction, IInitializableAction
+    abstract class BaseAzureAction : BaseAction
     {
         protected readonly IArmManager _armManager;
-        private readonly bool _requiresLogin;
 
-        protected BaseAzureAction(
-            IArmManager armManager,
-            bool requiresLogin = true)
+        protected BaseAzureAction(IArmManager armManager)
         {
             _armManager = armManager;
-            _requiresLogin = requiresLogin;
-        }
-
-        public async Task Initialize()
-        {
-            if(_requiresLogin)
-                await _armManager.Initialize();
         }
     }
 }
