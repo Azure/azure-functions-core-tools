@@ -68,5 +68,7 @@ namespace Azure.Functions.Cli.Common
         public bool RunFirstTimeCliExperience { get { return GetConfig(true); } set { SetConfig(value); } }
 
         public string CurrentSubscription { get { return GetConfig(string.Empty); } set { SetConfig(value); } }
+
+        public string CurrentTenant { get { return GetConfig(string.Empty); } set { SetConfig(value); } }
     }
 }
