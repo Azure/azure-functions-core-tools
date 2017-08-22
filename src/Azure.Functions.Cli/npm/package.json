@@ -3,7 +3,7 @@
   "version": "1.0.2",
   "description": "Azure Functions Core Tools",
   "scripts": {
-    "postinstall": "node lib/install.js"
+    "build": "dotnet build ../ -o ./npm/bin"
   },
   "author": "Microsoft",
   "license": "MIT",
@@ -17,18 +17,6 @@
     "azfun": "lib/main.js",
     "azurefunctions": "lib/main.js"
   },
-<<<<<<< HEAD
-  "os": [
-    "win32"
-  ],
-  "dependencies": {
-    "chalk": "^2.1.0",
-    "command-exists": "^1.2.2",
-    "tmp": "^0.0.33",
-    "unzipper": "^0.8.9"
-  }
-=======
   "os": ["win32", "darwin", "linux"],
   "dependencies": {}
->>>>>>> Initial migration to .NET Core 2.0
 }

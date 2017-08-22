@@ -99,15 +99,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        public static IWebHost BuildWebHost(string url, IConfiguration configuration) =>
-            Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(new string[0])
-            .UseConfiguration(configuration)
-            .UseUrls(url)
-            .ConfigureLogging(b => b.AddConsole())
-            .UseStartup<Startup>()
-            .Build();
+        public async Task<IWebHost> BuildWebHost(string scriptPath, Uri baseAddress)
+        {
+            IDictionary<string, string> settings = await GetConfigurationSettings(scriptPath, baseAddress);
 
-        private async Task<IConfiguration> GetConfiguration(string scriptPath, Uri uri)
+            return Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(new string[0])
+                .UseUrls(baseAddress.ToString())
+                .ConfigureLogging(b => b.AddConsole())
+                .UseStartup<Startup>()
+                .ConfigureAppConfiguration(c => c.AddInMemoryCollection(settings))
+                .Build();
+        }
+
+        private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
             var secrets = _secretsManager.GetSecrets();
             var connectionStrings = _secretsManager.GetConnectionStrings();
@@ -115,14 +119,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // Add our connection strings
             secrets.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
-            secrets.Add("ConnectionStrings:blah", "blahblahblah");
+            secrets.Add(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
 
             await CheckNonOptionalSettings(secrets, scriptPath);
 
-            var configurationBuilder = new ConfigurationBuilder()
-                .AddInMemoryCollection(secrets);
-
-            return configurationBuilder.Build();
+            return secrets;
         }
 
         public override async Task RunAsync()
@@ -139,10 +140,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={NodeDebugPort}", EnvironmentVariableTarget.Process);
 
-            IConfiguration configuration = await GetConfiguration(scriptPath, baseAddress);
-          
-            IWebHost host = BuildWebHost(baseAddress.ToString(), configuration);
-
+            IWebHost host = await BuildWebHost(scriptPath, baseAddress);
             var runTask = host
                 .RunAsync();
 
