@@ -9,8 +9,6 @@ using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace Azure.Functions.Cli
 {
@@ -20,7 +18,6 @@ namespace Azure.Functions.Cli
         {
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
-
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
         }
 
