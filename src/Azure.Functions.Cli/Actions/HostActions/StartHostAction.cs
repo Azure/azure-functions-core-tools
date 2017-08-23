@@ -138,8 +138,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             SetupConfigurationWatcher();
 
-            Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={NodeDebugPort}", EnvironmentVariableTarget.Process);
-
             IWebHost host = await BuildWebHost(scriptPath, baseAddress);
             var runTask = host
                 .RunAsync();
