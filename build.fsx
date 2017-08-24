@@ -162,6 +162,9 @@ Target "GenerateZipToSign" (fun _ ->
         |> notSigned
         |> CreateZip buildDir toSignZipPath String.Empty 7 true
 
+    Rename (buildDir @@ "edge/x64/node.dll") (buildDir @@ "edge/x64/node_x64.dll")
+    Rename (buildDir @@ "edge/x86/node.dll") (buildDir @@ "edge/x86/node_x64.dll")
+
     let thirdParty = [|
         "ARMClient.Authentication.dll"
         "ARMClient.Library.dll"
@@ -182,11 +185,13 @@ Target "GenerateZipToSign" (fun _ ->
         "SendGrid.SmtpApi.dll"
         "System.IO.Abstractions.dll"
         "Twilio.Api.dll"
+        "node_x64.dll"
+        "node_x86.dll"
     |]
 
     !! (buildDir @@ "/**/*.dll")
         |> Seq.filter (fun f -> thirdParty |> Array.contains (f |> Path.GetFileName))
-        |> Zip buildDir toSignThridPartyPath
+        |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
 )
 
 let storageAccount = CloudStorageAccount.Parse connectionString
@@ -239,7 +244,10 @@ Target "WaitForSigning" (fun _ ->
 
     let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
-    | Success file -> Unzip buildDir file
+    | Success file ->
+        Unzip buildDir file
+        MoveFile (buildDir @@ "node_x64.dll") (buildDir @@ "edge/x64/node.dll")
+        MoveFile (buildDir @@ "node_x86.dll") (buildDir @@ "edge/x86/node.dll")
     | Failure e -> targetError e null |> ignore
 )
 
