@@ -17,24 +17,21 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WebJobs.Script.WebHost.Core;
-using static Azure.Functions.Cli.Common.OutputTheme;
-using Microsoft.Extensions.Logging.Console;
 using Microsoft.Azure.WebJobs.Script.WebHost;
-using static Colors.Net.StringStaticMethods;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.Azure.WebJobs.Host;
 using System.Net.Http;
 using Microsoft.Azure.WebJobs.Script;
 using Azure.Functions.Cli.Diagnostics;
+using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
     [Action(Name = "start", Context = Context.Host, HelpText = "Launches the functions runtime host")]
-    internal class StartHostAction : BaseAction, IDisposable
+    internal class StartHostAction : BaseAction
     {
-        private FileSystemWatcher fsWatcher;
         const int DefaultPort = 7071;
         const int DefaultTimeout = 20;
         private readonly ISecretsManager _secretsManager;
@@ -99,17 +96,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(string scriptPath, Uri baseAddress)
+        private async Task<IWebHost> BuildWebHost(WebHostSettings hostSettings, Uri baseAddress)
         {
-            IDictionary<string, string> settings = await GetConfigurationSettings(scriptPath, baseAddress);
+            IDictionary<string, string> settings = await GetConfigurationSettings(hostSettings.ScriptPath, baseAddress);
 
             UpdateEnvironmentVariables(settings);
 
-            return Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(new string[0])
+            return Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>())
+                .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(baseAddress.ToString())
                 .ConfigureLogging(b => b.AddConsole())
-                .UseStartup<Startup>()
                 .ConfigureAppConfiguration(c => c.AddEnvironmentVariables())
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostSettings, CorsOrigins)))
                 .Build();
         }
 
@@ -153,9 +151,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             
             var baseAddress = Setup();
 
-            SetupConfigurationWatcher();
-
-            IWebHost host = await BuildWebHost(scriptPath, baseAddress);
+            IWebHost host = await BuildWebHost(settings, baseAddress);
             var runTask = host
                 .RunAsync();
 
@@ -249,16 +245,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private void SetupConfigurationWatcher()
-        {
-            fsWatcher = new FileSystemWatcher(Path.GetDirectoryName(SecretsManager.AppSettingsFilePath), SecretsManager.AppSettingsFileName);
-            fsWatcher.Changed += (s, e) =>
-            {
-                Environment.Exit(ExitCodes.Success);
-            };
-            fsWatcher.EnableRaisingEvents = true;
-        }
-
         internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
         {
             try
@@ -341,49 +327,54 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return new Uri($"{protocol}://localhost:{Port}");
         }
 
-        /// <summary>
-        /// Since this is a CLI, we will never really have multiple instances of
-        /// StartHostAction objects and there is no concern for memory leaking
-        /// or not disposing properly of resources since the whole process would
-        /// die eventually.
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")]
-        public void Dispose()
+        public class Startup : IStartup
         {
-            Dispose(true);
-        }
+            private readonly WebHostBuilderContext _builderContext;
+            private readonly WebHostSettings _hostSettings;
+            private readonly string[] _corsOrigins;
 
-        private void Dispose(bool disposing)
-        {
-            if (disposing)
+            public Startup(WebHostBuilderContext builderContext, WebHostSettings hostSettings, string corsOrigins)
             {
-                fsWatcher.Dispose();
-            }
-        }
+                _builderContext = builderContext;
+                _hostSettings = hostSettings;
 
-        public class Startup
-        {
-            public Startup(IConfiguration configuration)
-            {
-                Configuration = configuration;
+                if (!string.IsNullOrEmpty(corsOrigins))
+                {
+                    _corsOrigins = corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                }
             }
 
-            public IConfiguration Configuration { get; }
-
-            // This method gets called by the runtime. Use this method to add services to the container.
             public IServiceProvider ConfigureServices(IServiceCollection services)
             {
+                if (_corsOrigins != null)
+                {
+                    services.AddCors();
+                }
+
                 services.AddWebJobsScriptHost();
 
                 services.AddSingleton<ILoggerFactoryBuilder, ConsoleLoggerFactoryBuilder>();
+                services.AddSingleton<WebHostSettings>(_hostSettings);
 
-                return services.AddWebJobsScriptHostApplicationServices(Configuration);
+                return services.AddWebJobsScriptHostApplicationServices(_builderContext.Configuration);
             }
-
-            // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-            public void Configure(IApplicationBuilder app, IApplicationLifetime applicationLifetime, IHostingEnvironment env, ILoggerFactory loggerFactory)
+            
+            public void Configure(IApplicationBuilder app)
             {
+                IApplicationLifetime applicationLifetime = app.ApplicationServices
+                    .GetRequiredService<IApplicationLifetime>();
+                
                 app.UseWebJobsScriptHost(applicationLifetime);
+
+                if (_corsOrigins != null)
+                {
+                    app.UseCors(builder =>
+                    {
+                        builder.WithOrigins(_corsOrigins)
+                            .AllowAnyHeader()
+                            .AllowAnyMethod();
+                    });
+                }
             }
         }
     }

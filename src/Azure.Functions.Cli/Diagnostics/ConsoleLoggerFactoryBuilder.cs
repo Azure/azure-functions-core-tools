@@ -21,7 +21,8 @@ namespace Azure.Functions.Cli.Diagnostics
                 scriptConfig.HostConfig.LoggerFactory.AddApplicationInsights(clientFactory);
             }
 
-            scriptConfig.HostConfig.LoggerFactory.AddColoredConsole((n, l) => l >= LogLevel.Information, false);
+            // TODO: Get trace level, add console logger
+            // scriptConfig.HostConfig.LoggerFactory.AddColoredConsole((n, l) => l >= LogLevel.Information, false);
         }
     }
 }
