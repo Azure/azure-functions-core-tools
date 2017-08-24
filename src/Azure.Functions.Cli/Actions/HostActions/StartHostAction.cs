@@ -99,15 +99,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        public async Task<IWebHost> BuildWebHost(string scriptPath, Uri baseAddress)
+        private async Task<IWebHost> BuildWebHost(string scriptPath, Uri baseAddress)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(scriptPath, baseAddress);
+
+            UpdateEnvironmentVariables(settings);
 
             return Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(new string[0])
                 .UseUrls(baseAddress.ToString())
                 .ConfigureLogging(b => b.AddConsole())
                 .UseStartup<Startup>()
-                .ConfigureAppConfiguration(c => c.AddInMemoryCollection(settings))
+                .ConfigureAppConfiguration(c => c.AddEnvironmentVariables())
                 .Build();
         }
 
@@ -124,6 +126,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await CheckNonOptionalSettings(secrets, scriptPath);
 
             return secrets;
+        }
+
+        private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
+        {
+            foreach (var secret in secrets)
+            {
+                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
+                {
+                    Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
+                }
+                else
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' from local settings as it's already defined in current environment variables."));
+                }
+            }
         }
 
         public override async Task RunAsync()
