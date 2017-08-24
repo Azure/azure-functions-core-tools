@@ -1,6 +1,6 @@
 {
   "name": "azure-functions-core-tools",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "Azure Functions Core Tools",
   "scripts": {
     "build": "dotnet build ../ -o ./npm/bin"
@@ -17,6 +17,12 @@
     "azfun": "lib/main.js",
     "azurefunctions": "lib/main.js"
   },
-  "os": ["win32", "darwin", "linux"],
-  "dependencies": {}
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ],
+  "dependencies": {
+    "command-exists": "^1.2.2"
+  }
 }
