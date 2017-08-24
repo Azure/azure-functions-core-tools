@@ -6,14 +6,24 @@ var version = require('../package.json').version;
 var chalk = require('chalk');
 var path = require('path');
 var fs = require('fs');
+var os = require('os');
+var rimraf = require('rimraf');
+
+function getPath() {
+    var bin = path.join(os.homedir(), '.azurefunctions', 'bin');
+    if (fs.existsSync(bin)) {
+        rimraf.sync(bin);
+    }
+    return bin;
+}
+
 
 var url = 'https://functionscdn.azureedge.net/public/' + version + '/Azure.Functions.Cli.zip';
 https.get(url, function (response) {
         if (response.statusCode === 200) {
-            var bin = path.join(path.dirname(fs.realpathSync(__filename)), '../bin');
             response
                 .pipe(unzipper.Extract({
-                    path: bin
+                    path: getPath()
                 }));
         } else {
             console.error(chalk.red('Error downloading zip file from ' + url));
