@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Common
             using (var client = new HttpClient())
             {
                 client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/");
-                var templatesResponse = await client.GetAsync("https://functions.azure.com/api/templates?runtime=latest");
+                var templatesResponse = await client.GetAsync("https://zufu.blob.core.windows.net/clitemplates/clitemplates.json");
                 return await templatesResponse.Content.ReadAsAsync<IEnumerable<Template>>();
             }
         }
