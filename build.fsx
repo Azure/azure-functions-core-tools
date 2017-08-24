@@ -26,6 +26,11 @@ let inline awaitTask (task: Task) =
     |> Async.AwaitTask
     |> Async.RunSynchronously
 
+let MoveFileTo (source, destination) =
+    if File.Exists destination then
+        File.Delete destination
+    File.Move (source, destination)
+
 let env = Environment.GetEnvironmentVariable
 let connectionString =
     "DefaultEndpointsProtocol=https;AccountName=" + (env "FILES_ACCOUNT_NAME") + ";AccountKey=" + (env "FILES_ACCOUNT_KEY")
@@ -162,8 +167,8 @@ Target "GenerateZipToSign" (fun _ ->
         |> notSigned
         |> CreateZip buildDir toSignZipPath String.Empty 7 true
 
-    Rename (buildDir @@ "edge/x64/node.dll") (buildDir @@ "edge/x64/node_x64.dll")
-    Rename (buildDir @@ "edge/x86/node.dll") (buildDir @@ "edge/x86/node_x64.dll")
+    MoveFileTo (buildDir @@ "edge/x64/node.dll", buildDir @@ "node_x64.dll")
+    MoveFileTo (buildDir @@ "edge/x86/node.dll", buildDir @@ "node_x86.dll")
 
     let thirdParty = [|
         "ARMClient.Authentication.dll"
@@ -246,8 +251,8 @@ Target "WaitForSigning" (fun _ ->
     match signed with
     | Success file ->
         Unzip buildDir file
-        MoveFile (buildDir @@ "node_x64.dll") (buildDir @@ "edge/x64/node.dll")
-        MoveFile (buildDir @@ "node_x86.dll") (buildDir @@ "edge/x86/node.dll")
+        MoveFileTo (buildDir @@ "node_x64.dll", buildDir @@ "edge/x64/node.dll")
+        MoveFileTo (buildDir @@ "node_x86.dll", buildDir @@ "edge/x86/node.dll")
     | Failure e -> targetError e null |> ignore
 )
 
