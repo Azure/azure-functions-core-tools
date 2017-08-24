@@ -1,22 +1,28 @@
 {
   "name": "azure-functions-core-tools",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "Azure Functions Core Tools",
-  "scripts": { 
+  "scripts": {
     "build": "dotnet build ../ -o ./npm/bin"
   },
   "author": "Microsoft",
   "license": "MIT",
   "preferGlobal": true,
-  "repository" : {
-    "type" : "git",
-    "url" : "https://github.com/Azure/azure-functions-cli.git"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Azure/azure-functions-cli.git"
   },
   "bin": {
     "func": "lib/main.js",
     "azfun": "lib/main.js",
     "azurefunctions": "lib/main.js"
   },
-  "os": ["win32", "darwin", "linux"],
-  "dependencies": {}
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ],
+  "dependencies": {
+    "command-exists": "^1.2.2"
+  }
 }
