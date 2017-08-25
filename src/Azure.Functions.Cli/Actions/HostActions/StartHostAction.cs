@@ -105,7 +105,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>())
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(baseAddress.ToString())
-                .ConfigureLogging(b => b.AddConsole())
                 .ConfigureAppConfiguration(c => c.AddEnvironmentVariables())
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostSettings, CorsOrigins)))
                 .Build();
@@ -361,11 +360,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             
             public void Configure(IApplicationBuilder app)
             {
-                IApplicationLifetime applicationLifetime = app.ApplicationServices
-                    .GetRequiredService<IApplicationLifetime>();
-                
-                app.UseWebJobsScriptHost(applicationLifetime);
-
                 if (_corsOrigins != null)
                 {
                     app.UseCors(builder =>
@@ -375,6 +369,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                             .AllowAnyMethod();
                     });
                 }
+
+                IApplicationLifetime applicationLifetime = app.ApplicationServices
+                    .GetRequiredService<IApplicationLifetime>();
+                
+                app.UseWebJobsScriptHost(applicationLifetime);
             }
         }
     }
