@@ -168,10 +168,10 @@ Target "GenerateZipToSign" (fun _ ->
         |> CreateZip buildDir toSignZipPath String.Empty 7 true
 
     MoveFileTo (buildDir @@ "edge/x64/node.dll", buildDir @@ "node_x64.dll")
-    MoveFileTo (buildDir @@ "edge/x64/edge_nativeclr.node", buildDir @@ "edge_nativeclr_x64.node")
+    MoveFileTo (buildDir @@ "edge/x64/edge_nativeclr.node", buildDir @@ "edge_nativeclr_x64.dll")
 
     MoveFileTo (buildDir @@ "edge/x86/node.dll", buildDir @@ "node_x86.dll")
-    MoveFileTo (buildDir @@ "edge/x86/edge_nativeclr.node", buildDir @@ "edge_nativeclr_x86.node")
+    MoveFileTo (buildDir @@ "edge/x86/edge_nativeclr.node", buildDir @@ "edge_nativeclr_x86.dll")
 
     let thirdParty = [|
         "ARMClient.Authentication.dll"
@@ -257,10 +257,10 @@ Target "WaitForSigning" (fun _ ->
     | Success file ->
         Unzip buildDir file
         MoveFileTo (buildDir @@ "node_x64.dll", buildDir @@ "edge/x64/node.dll")
-        MoveFileTo (buildDir @@ "edge_nativeclr_x64.node", buildDir @@ "edge/x64/edge_nativeclr.node")
+        MoveFileTo (buildDir @@ "edge_nativeclr_x64.dll", buildDir @@ "edge/x64/edge_nativeclr.node")
 
         MoveFileTo (buildDir @@ "node_x86.dll", buildDir @@ "edge/x86/node.dll")
-        MoveFileTo (buildDir @@ "edge_nativeclr_x86.node", buildDir @@ "edge/x86/edge_nativeclr.node")
+        MoveFileTo (buildDir @@ "edge_nativeclr_x86.dll", buildDir @@ "edge/x86/edge_nativeclr.node")
     | Failure e -> targetError e null |> ignore
 )
 
