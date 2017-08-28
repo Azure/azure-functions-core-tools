@@ -91,6 +91,7 @@ printfn "Current dir is %A" currentDirectory
 Target "Compile" (fun _ ->
     DotNetCli.Publish (fun p ->
         { p with
+            VersionSuffix = env "APPVEYOR_BUILD_NUMBER"
             Project = projectPath @@ "Azure.Functions.Cli.csproj"
             Output = currentDirectory @@ buildDir
             Configuration = "release" })
