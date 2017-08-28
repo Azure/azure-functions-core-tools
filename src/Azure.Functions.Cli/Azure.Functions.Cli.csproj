@@ -5,11 +5,13 @@
     <Version>2.0.0-beta1$(VersionSuffix)</Version>
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
+    <Title>Azure Functions Cli</Title>
     <Copyright>© .NET Foundation.  All rights reserved.</Copyright>
     <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Azure/azure-functions-cli</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.1" />
