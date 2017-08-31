@@ -63,21 +63,21 @@ namespace Azure.Functions.Cli.Actions
 
         private void SetupSslCert()
         {
-            var cert = SecurityHelpers.CreateSelfSignedCertificate("localhost");
+            // var cert = SecurityHelpers.CreateSelfSignedCertificate("localhost");
 
-            new[]
-            {
-                new X509Store(StoreName.My, StoreLocation.LocalMachine),
-                new X509Store(StoreName.Root, StoreLocation.CurrentUser)
-            }
-            .Where(store => !store.Certificates.Contains(cert))
-            .ToList()
-            .ForEach(store =>
-            {
-                store.Open(OpenFlags.MaxAllowed);
-                store.Add(cert);
-                store.Close();
-            });
+            // new[]
+            // {
+            //     new X509Store(StoreName.My, StoreLocation.LocalMachine),
+            //     new X509Store(StoreName.Root, StoreLocation.CurrentUser)
+            // }
+            // .Where(store => !store.Certificates.Contains(cert))
+            // .ToList()
+            // .ForEach(store =>
+            // {
+            //     store.Open(OpenFlags.MaxAllowed);
+            //     store.Add(cert);
+            //     store.Close();
+            // });
         }
     }
 

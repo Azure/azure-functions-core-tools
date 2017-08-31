@@ -26,6 +26,8 @@ using Microsoft.Azure.WebJobs.Script;
 using Azure.Functions.Cli.Diagnostics;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using static Colors.Net.StringStaticMethods;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -45,6 +47,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public int Timeout { get; set; }
 
         public bool UseHttps { get; set; }
+
+        public string CertPath { get; set; }
+
+        public string CertPassword { get; set; }
 
         public DebuggerType Debugger { get; set; }
 
@@ -88,6 +94,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(s => UseHttps = s);
 
             Parser
+                .Setup<string>("cert")
+                .WithDescription("for use with --useHttps. The path to a pfx file that contains a private key")
+                .Callback(c => CertPath = c);
+
+            Parser
+                .Setup<string>("password")
+                .WithDescription("to use with --cert. Either the password, or a file that contains the password for the pfx file")
+                .Callback(p => CertPassword = p);
+
+            Parser
                 .Setup<DebuggerType>("debug")
                 .WithDescription("Default is None. Options are VSCode and VS")
                 .SetDefault(DebuggerType.None)
@@ -96,13 +112,27 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(WebHostSettings hostSettings, Uri baseAddress)
+        private async Task<IWebHost> BuildWebHost(WebHostSettings hostSettings, Uri baseAddress, X509Certificate2 certificate)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostSettings.ScriptPath, baseAddress);
 
             UpdateEnvironmentVariables(settings);
 
-            return Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>())
+            var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
+
+            if (UseHttps)
+            {
+                defaultBuilder
+                .UseKestrel(options =>
+                {
+                    options.Listen(IPAddress.Loopback, baseAddress.Port, listenOptins =>
+                    {
+                        listenOptins.UseHttps(certificate);
+                    });
+                });
+            }
+
+            return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(baseAddress.ToString())
                 .ConfigureAppConfiguration(c => c.AddEnvironmentVariables())
@@ -147,12 +177,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var scriptPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
             var traceLevel = await ScriptHostHelpers.GetTraceLevel(scriptPath);
             var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, scriptPath);
-            
-            var baseAddress = Setup();
 
-            IWebHost host = await BuildWebHost(settings, baseAddress);
-            var runTask = host
-                .RunAsync();
+            (var baseAddress, var certificate) = Setup();
+
+            IWebHost host = await BuildWebHost(settings, baseAddress, certificate);
+            var runTask = host.RunAsync();
 
             var manager = host.Services.GetRequiredService<WebScriptHostManager>();
             await manager.DelayUntilHostReady();
@@ -221,7 +250,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (Debugger == DebuggerType.Vs)
             {
-                using (var client = new HttpClient { BaseAddress = baseUri})
+                using (var client = new HttpClient { BaseAddress = baseUri })
                 {
                     await DebuggerHelper.AttachManagedAsync(client);
                 }
@@ -309,21 +338,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private Uri Setup()
+        private (Uri, X509Certificate2) Setup()
         {
             var protocol = UseHttps ? "https" : "http";
-            var actions = new List<InternalAction>();
-            
-            if (actions.Any())
-            {
-                string errors;
-                if (!ConsoleApp.RelaunchSelfElevated(new InternalUseAction { Port = Port, Actions = actions, Protocol = protocol }, out errors))
-                {
-                    ColoredConsole.WriteLine("Error: " + errors);
-                    Environment.Exit(ExitCodes.GeneralError);
-                }
-            }
-            return new Uri($"{protocol}://localhost:{Port}");
+            X509Certificate2 cert = UseHttps
+                ? SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
+                : null;
+            return (new Uri($"{protocol}://localhost:{Port}"), cert);
         }
 
         public class Startup : IStartup
@@ -357,7 +378,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 return services.AddWebJobsScriptHostApplicationServices(_builderContext.Configuration);
             }
-            
+
             public void Configure(IApplicationBuilder app)
             {
                 if (_corsOrigins != null)
@@ -372,7 +393,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 IApplicationLifetime applicationLifetime = app.ApplicationServices
                     .GetRequiredService<IApplicationLifetime>();
-                
+
                 app.UseWebJobsScriptHost(applicationLifetime);
             }
         }
