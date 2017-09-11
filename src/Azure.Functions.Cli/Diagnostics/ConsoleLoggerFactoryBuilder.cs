@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Diagnostics
             }
 
             // TODO: Get trace level, add console logger
-            // scriptConfig.HostConfig.LoggerFactory.AddColoredConsole((n, l) => l >= LogLevel.Information, false);
+            scriptConfig.HostConfig.LoggerFactory.AddColoredConsole((cat, lvl) => cat.StartsWith("Worker."), false);
         }
     }
 }
