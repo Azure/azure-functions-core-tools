@@ -195,8 +195,8 @@ Target "GenerateZipToSign" (fun _ ->
         "Twilio.Api.dll"
         "node_x64.dll"
         "node_x86.dll"
-        "edge_nativeclr_x64.node"
-        "edge_nativeclr_x86.node"
+        "edge_nativeclr_x64.dll"
+        "edge_nativeclr_x86.dll"
     |]
 
     !! (buildDir @@ "/**/*.dll")
