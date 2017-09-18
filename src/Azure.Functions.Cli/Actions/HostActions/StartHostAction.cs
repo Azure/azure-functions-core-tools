@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -11,23 +8,28 @@ using Colors.Net;
 using Fclp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using WebJobs.Script.WebHost.Core;
-using Microsoft.Azure.WebJobs.Script.WebHost;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using System.Net.Http;
 using Microsoft.Azure.WebJobs.Script;
-using Azure.Functions.Cli.Diagnostics;
+using Microsoft.Azure.WebJobs.Script.WebHost;
+using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
+using WebJobs.Script.WebHost.Core;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using static Colors.Net.StringStaticMethods;
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
+
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -371,12 +373,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     services.AddCors();
                 }
 
-                services.AddWebJobsScriptHost();
+                services.AddAuthentication()
+                    .AddScriptJwtBearer()
+                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { });
+
+                services.AddWebJobsScriptHostAuthorization();
 
                 services.AddSingleton<ILoggerFactoryBuilder, ConsoleLoggerFactoryBuilder>();
                 services.AddSingleton<WebHostSettings>(_hostSettings);
-
-                return services.AddWebJobsScriptHostApplicationServices(_builderContext.Configuration);
+                
+                return services.AddWebJobsScriptHost(_builderContext.Configuration);
             }
 
             public void Configure(IApplicationBuilder app)
