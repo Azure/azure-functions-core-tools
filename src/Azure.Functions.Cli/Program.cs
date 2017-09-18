@@ -72,6 +72,9 @@ namespace Azure.Functions.Cli
             builder.RegisterType<SecretsManager>()
                 .As<ISecretsManager>();
 
+            builder.RegisterType<ProxyManager>()
+                .As<IProxyManager>();
+
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();
 

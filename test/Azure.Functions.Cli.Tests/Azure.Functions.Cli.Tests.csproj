@@ -448,6 +448,7 @@
     <Compile Include="ActionsTests\ActionTestsBase.cs" />
     <Compile Include="ActionsTests\LoginActionTests.cs" />
     <Compile Include="ActionsTests\InitActionTests.cs" />
+    <Compile Include="ActionsTests\ProxyActionsTests.cs" />
     <Compile Include="ActionsTests\ResolveActionTests.cs" />
     <Compile Include="ActionsTests\SettingsActionsTests.cs" />
     <Compile Include="ActionsTests\StartHostActionTests.cs" />

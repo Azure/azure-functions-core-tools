@@ -61,6 +61,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("azure functionapp --help", typeof(HelpAction))]
         [InlineData("azure --help", typeof(HelpAction))]
         [InlineData("--help", typeof(HelpAction))]
+        [InlineData("proxy new", typeof(CreateProxyAction))]
+        [InlineData("proxy create", typeof(CreateProxyAction))]
+        [InlineData("proxy init", typeof(InitProxiesAction))]
+        [InlineData("proxy delete", typeof(DeleteProxyAction))]
+        [InlineData("proxy show", typeof(ShowProxyAction))]
+        [InlineData("proxy list", typeof(ListProxiesAction))]
         public void ResolveCommandLineCorrectly(string args, Type type)
         {
             var container = InitializeContainerForTests();
@@ -100,6 +106,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();
+
+            builder.RegisterType<ProxyManager>()
+                .As<IProxyManager>();
 
             return builder.Build();
         }

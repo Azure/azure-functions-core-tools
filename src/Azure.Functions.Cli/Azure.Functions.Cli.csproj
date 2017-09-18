@@ -597,13 +597,18 @@
     <Compile Include="Actions\LocalActions\AddSettingAction.cs" />
     <Compile Include="Actions\AzureActions\AddStorageAccountSettingAction.cs" />
     <Compile Include="Actions\LocalActions\CreateFunctionAction.cs" />
+    <Compile Include="Actions\LocalActions\CreateProxyAction.cs" />
     <Compile Include="Actions\LocalActions\DecryptSettingAction.cs" />
+    <Compile Include="Actions\LocalActions\DeleteProxyAction.cs" />
     <Compile Include="Actions\LocalActions\DeleteSettingAction.cs" />
     <Compile Include="Actions\LocalActions\EncryptSettingsAction.cs" />
     <Compile Include="Actions\LocalActions\InitAction.cs" />
+    <Compile Include="Actions\LocalActions\InitProxiesAction.cs" />
+    <Compile Include="Actions\LocalActions\ListProxiesAction.cs" />
     <Compile Include="Actions\LocalActions\ListSettingsAction.cs" />
     <Compile Include="Actions\LocalActions\ListTemplatesAction.cs" />
     <Compile Include="Actions\LocalActions\RunFunctionAction.cs" />
+    <Compile Include="Actions\LocalActions\ShowProxyAction.cs" />
     <Compile Include="ActionType.cs" />
     <Compile Include="Arm\ArmManager.cs" />
     <Compile Include="Arm\ArmManagerPartials\ResourceGroupArmManager.cs" />
@@ -643,6 +648,10 @@
     <Compile Include="Common\PersistentSettings.cs" />
     <Compile Include="Common\ProcessInfo.cs" />
     <Compile Include="Common\ProcessManager.cs" />
+    <Compile Include="Common\ProxyConfig.cs" />
+    <Compile Include="Common\ProxyDefinition.cs" />
+    <Compile Include="Common\ProxyManager.cs" />
+    <Compile Include="Common\MatchCondition.cs" />
     <Compile Include="Common\SafeConsole.cs" />
     <Compile Include="Common\SecretsManager.cs" />
     <Compile Include="Common\SelfHostWebHostSettingsFactory.cs" />
@@ -668,6 +677,7 @@
     <Compile Include="Extensions\ZipArchiveExtensions.cs" />
     <Compile Include="FunctionsLocalServer.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="Helpers\ConsoleHelper.cs" />
     <Compile Include="Helpers\DebuggerHelper.cs" />
     <Compile Include="Helpers\PlatformHelper.cs" />
     <Compile Include="Helpers\RetryHelper.cs" />
@@ -678,6 +688,7 @@
     <Compile Include="Interfaces\IInitializableAction.cs" />
     <Compile Include="Interfaces\IProcessInfo.cs" />
     <Compile Include="Interfaces\IProcessManager.cs" />
+    <Compile Include="Interfaces\IProxyManager.cs" />
     <Compile Include="Interfaces\ISecretsManager.cs" />
     <Compile Include="Interfaces\ISettings.cs" />
     <Compile Include="Interfaces\ITemplatesManager.cs" />
@@ -691,6 +702,8 @@
     <None Include="App.config">
       <SubType>Designer</SubType>
     </None>
+    <EmbeddedResource Include="azurefunctions\proxy\SampleProxy.json" />
+    <EmbeddedResource Include="azurefunctions\proxy\RequestResponseOverride.json" />
     <None Include="npm\package.json" />
     <None Include="packages.config">
       <SubType>Designer</SubType>

@@ -1,0 +1,18 @@
+﻿{
+  "matchCondition": {
+    "route": "/mocks",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  "requestOverrides": {
+    "backend.request.headers.MyRequestHeader": "1"
+  },
+  "responseOverrides": {
+    "response.statusCode": "200",
+    "response.statusReason": "OK",
+    "response.body": "MyResponseBody",
+    "response.headers.MyResponseHeader": "1"
+  }
+}

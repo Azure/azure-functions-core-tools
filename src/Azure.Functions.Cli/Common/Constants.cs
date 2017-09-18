@@ -10,6 +10,7 @@
         public const string CliDebug = "CLI_DEBUG";
         public const string DefaultSqlProviderName = "System.Data.SqlClient";
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
+        public const string ProxiesFileName = "proxies.json";
 
         public static class Errors
         {
