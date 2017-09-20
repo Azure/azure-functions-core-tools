@@ -100,15 +100,20 @@ namespace Azure.Functions.Cli.Common
             public ProxyFile(string filePath)
             {
                 _filePath = filePath;
-                try
+                if (File.Exists(_filePath))
                 {
-                    var content = FileSystemHelpers.ReadAllTextFromFile(_filePath);
-                    var proxyConfig = JsonConvert.DeserializeObject<ProxyConfig>(content);
-                    Proxies = proxyConfig.ProxyMap;
-                }
-                catch
-                {
-                    Proxies = new Dictionary<string, ProxyDefinition>();
+                    try
+                    {
+                        var content = FileSystemHelpers.ReadAllTextFromFile(_filePath);
+                        var proxyConfig = JsonConvert.DeserializeObject<ProxyConfig>(content);
+                        Proxies = proxyConfig.ProxyMap;
+                    }
+                    catch
+                    {
+                        // throw the exception if the underlying proxies.json file has become invalid
+                        ColoredConsole.WriteLine($"Exception while reading proxy file {_filePath}.");
+                        throw;
+                    }
                 }
             }
 

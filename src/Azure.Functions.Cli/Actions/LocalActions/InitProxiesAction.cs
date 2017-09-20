@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -28,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>("json-path")
                 .WithDescription("Proxy json file path")
-                .Callback(n => ProxyFilePath = n);
+                .Callback(n => ProxyFilePath = n.TrimQuotes());
 
             return Parser.Parse(args);
         }

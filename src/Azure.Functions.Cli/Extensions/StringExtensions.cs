@@ -22,5 +22,10 @@ namespace Azure.Functions.Cli.Extensions
                 return false;
             }
         }
+
+        public static string TrimQuotes(this string input)
+        {
+            return input.Trim(new char[] { '\'', '\"' });
+        }
     }
 }

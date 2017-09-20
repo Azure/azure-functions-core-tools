@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -28,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>('n', "name")
                 .WithDescription("Proxy name")
-                .Callback(n => ProxyName = n);
+                .Callback(n => ProxyName = n.TrimQuotes());
 
             return Parser.Parse(args);
         }

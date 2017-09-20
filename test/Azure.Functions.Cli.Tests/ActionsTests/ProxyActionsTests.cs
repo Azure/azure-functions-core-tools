@@ -21,6 +21,8 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("proxy create --name MyProxy4 --route MyRoute4 --methods GET --backend-url http://httpbin.org/ip  ")]
         [InlineData("proxy create --name MyProxy5 --route MyRoute5 --methods GET POST --backend-url http://httpbin.org/ip ")]
         [InlineData("proxy create --name MyProxy6 --template SampleProxy")]
+        [InlineData("proxy create --name MyProxy7 --route '{*path}' --methods GET POST --backend-url \"http://%REMOTE_HOST%/{path}\" ")]
+        [InlineData("proxy create --name MyProxy8 --route '/MyRoute8' --methods GET --backend-url 'http://httpbin.org/ip'  ")]
         public void AddProxyActionTest(string args)
         {
             // Setup
@@ -36,6 +38,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             // Assert
             content.Should().Contain(proxyName);
+            content.Should().NotContain("'");
         }
 
         [Fact]

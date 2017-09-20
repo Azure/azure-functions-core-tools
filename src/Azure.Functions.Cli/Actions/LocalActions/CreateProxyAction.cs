@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Common;
@@ -20,7 +21,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string ProxyName { get; set; }
         public List<string> Methods { get; set; }
         public string Route { get; set; }
-        public Uri BackendUrl { get; set; }
+        public string BackendUrl { get; set; }
         public string TemplateName { get; set; }
 
         public CreateProxyAction(IProxyManager proxyManager)
@@ -33,23 +34,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>('n', "name")
                 .WithDescription("Proxy name")
-                .Callback(n => ProxyName = n);
+                .Callback(n => ProxyName = n.TrimQuotes());
             Parser
                 .Setup<string>('r', "route")
                 .WithDescription("Route template")
-                .Callback(r => Route = r);
+                .Callback(r => Route = r.TrimQuotes());
             Parser
                 .Setup<List<string>>("methods")
                 .WithDescription("One or more http methods(space delimited).")
                 .Callback(m => Methods = m);            
             Parser
-                .Setup<Uri>("backend-url")
+                .Setup<string>("backend-url")
                 .WithDescription("Backend Url")
-                .Callback(b => BackendUrl = b);
+                .Callback(b => BackendUrl = b.TrimQuotes());
             Parser
                 .Setup<string>('t', "template")
                 .WithDescription("Template name")
-                .Callback(t => TemplateName = t);
+                .Callback(t => TemplateName = t.TrimQuotes());
 
             return Parser.Parse(args);
         }
@@ -109,6 +110,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
                 _proxyManager.AddProxy(ProxyName, TemplateName);
+                return Task.CompletedTask;
+            }
+
+            if(!string.IsNullOrEmpty(BackendUrl) &&
+               !BackendUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+               !BackendUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor($"backend-url {BackendUrl} must start with 'http://' or 'https://' "));
                 return Task.CompletedTask;
             }
 
