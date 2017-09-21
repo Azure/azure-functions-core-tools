@@ -27,6 +27,7 @@
   "dependencies": {
     "chalk": "^2.1.0",
     "command-exists": "^1.2.2",
+    "glob": "^7.1.2",
     "rimraf": "^2.6.1",
     "tmp": "^0.0.33",
     "unzipper": "^0.8.9"
