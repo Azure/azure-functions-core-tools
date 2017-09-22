@@ -12,7 +12,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public class ProxyActionsTests : ActionTestsBase
     {
-        public ProxyActionsTests(ITestOutputHelper output) : base(output) { }
+        public ProxyActionsTests(ITestOutputHelper output) : base(output)
+        {
+        }
 
         [Theory]
         [InlineData("proxy create --name MyProxy --route MyRoute")]
@@ -39,6 +41,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             // Assert
             content.Should().Contain(proxyName);
             content.Should().NotContain("'");
+
+            // cleanup
+            CleanUp();
         }
 
         [Fact]
@@ -57,6 +62,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             // Assert
             content.Should().Contain("MyProxy");
             content.Should().NotContain("MyProxy2");
+
+            // cleanup
+            CleanUp();
         }
 
         [Fact]
@@ -79,6 +87,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             // Assert
             var output = stringBuilder.ToString();
             output.Should().Contain("MyRoute");
+
+            // cleanup
+            CleanUp();
         }
     }
 }

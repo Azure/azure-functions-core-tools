@@ -16,8 +16,11 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public class SettingsActionsTests : ActionTestsBase
     {
-        public SettingsActionsTests(ITestOutputHelper output) : base(output) { }
+        public SettingsActionsTests(ITestOutputHelper output) : base(output)
+        {
+        }
 
+        [Theory]
         [InlineData("Name1", "Value1")]
         public void AddSettingsActionTest(string name, string value)
         {
@@ -33,8 +36,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().Contain(name);
             content.Should().Contain("IsEncrypted");
             content.Should().Contain("false");
+
+            // cleanup
+            CleanUp();
         }
 
+        [Theory]
         [InlineData("Name1", "Value1")]
         public void DeleteSettingsActionTest(string name, string value)
         {
@@ -48,8 +55,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             // Assert
             content.Should().NotContain(name);
+
+            // cleanup
+            CleanUp();
         }
 
+        [Theory]
         [InlineData("Name1", "Value1")]
         public void DecryptAndEncryptSettingsActionTest(string name, string value)
         {
@@ -76,8 +87,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().Contain(name);
             content.Should().Contain(value);
             content.Should().Contain("false");
+
+            // cleanup
+            CleanUp();
         }
 
+        [Theory]
         [InlineData("Name1", "Value1")]
         public void ListSettingsActionTest(string name, string value)
         {
@@ -104,8 +119,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             output = stringBuilder.ToString();
             output.Should().Contain(name);
             output.Should().Contain(value);
+
+            // cleanup
+            CleanUp();
         }
 
+        [Theory]
         [InlineData("Name1", "Value1")]
         public void AddConnectionString(string name, string value)
         {
@@ -123,8 +142,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             content.Should().Contain("false");
             content.Should().Contain(value);
             content.Should().Contain(Constants.DefaultSqlProviderName);
+
+            // cleanup
+            CleanUp();
         }
 
+        [Fact]
         public async Task AddStorageAccountActionTest()
         {
             Program.Main(new[] { "init" });
@@ -137,8 +160,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             // Assert
             output.ToString().Should().Contain($"{storageAccountName}_STORAGE");
+
+            // cleanup
+            CleanUp();
         }
 
+        [Fact]
         public async Task AddStorageAccountActionErrorTest()
         {
             var output = new StringBuilder();
@@ -148,6 +175,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             await action.RunAsync();
 
             output.ToString().Should().Contain("Can't find storage account with name");
+
+            // cleanup
+            CleanUp();
         }
 
         private AddStorageAccountSettingAction SetupForStorageAccount(string storageAccountName, StringBuilder output)
@@ -160,10 +190,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             ColoredConsole.Out = console;
             ColoredConsole.Error = console;
 
-
             var armManager = Substitute.For<IArmManager>();
             var storageAccount = new StorageAccount(currentSubscription, "resource", storageAccountName, "location") { StorageAccountKey = storageAccountKey };
-            armManager.GetStorageAccountsAsync().Returns(new[] {storageAccount});
+            armManager.GetStorageAccountsAsync().Returns(new[] { storageAccount });
             armManager.LoadAsync(Arg.Any<StorageAccount>()).Returns(storageAccount);
 
             var secretsManager = Substitute.For<ISecretsManager>();

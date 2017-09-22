@@ -1,5 +1,11 @@
 ﻿using System;
 using System.IO;
+using System.IO.Abstractions;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using Azure.Functions.Cli.Common;
+using Colors.Net;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
@@ -10,13 +16,15 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
         protected string WorkingDirectory { get; private set; }
 
+        private readonly IConsoleWriter _out;
+        private readonly IConsoleWriter _error;
+
         protected ActionTestsBase(ITestOutputHelper output)
         {
             Output = output;
-            WorkingDirectory = Path.GetTempFileName();
-            CleanUp(WorkingDirectory);
-            Directory.CreateDirectory(WorkingDirectory);
-            Environment.CurrentDirectory = WorkingDirectory;
+            _out = ColoredConsole.Out;
+            _error = ColoredConsole.Error;
+            CleanUp();
         }
 
         public void Dispose()
@@ -24,7 +32,18 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             CleanUp(WorkingDirectory);
         }
 
-        private void CleanUp(string path)
+        protected void CleanUp([CallerMemberName]string name = null)
+        {
+            WorkingDirectory = Path.GetTempFileName();
+            InternalCleanUp(WorkingDirectory);
+            Directory.CreateDirectory(WorkingDirectory);
+            Environment.CurrentDirectory = WorkingDirectory;
+            FileSystemHelpers.Instance = new FileSystem();
+            ColoredConsole.Out = _out;
+            ColoredConsole.Error = _error;
+        }
+
+        private void InternalCleanUp(string path)
         {
             try
             {

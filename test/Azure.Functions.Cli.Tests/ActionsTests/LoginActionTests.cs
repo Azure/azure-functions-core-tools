@@ -11,7 +11,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public class LoginActionTests : ActionTestsBase
     {
-        public LoginActionTests(ITestOutputHelper output) : base(output) { }
+        public LoginActionTests(ITestOutputHelper output) : base(output)
+        {
+        }
 
         [Fact]
         public async Task Defaults_To_Interactive_Login()
@@ -27,6 +29,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             // Assert
             armManagerMock.Verify(m => m.LoginAsync(), Times.Once);
+
+            // cleanup
+            CleanUp();
         }
 
         [Fact]
@@ -37,7 +42,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             var action = new LoginAction(armManagerMock.Object, settingsMock.Object);
             var username = Guid.NewGuid().ToString();
             var password = Guid.NewGuid().ToString();
-            var args = new [] { "-u", username , "-w", password };
+            var args = new[] { "-u", username, "-w", password };
 
             // Test
             action.ParseArgs(args);
@@ -48,6 +53,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                 It.Is<string>(s => s == username),
                 It.Is<string>(s => s == password)
             ), Times.Once);
+
+            // cleanup
+            CleanUp();
         }
     }
 }

@@ -8,9 +8,11 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public class InitActionTests : ActionTestsBase
     {
-        public InitActionTests(ITestOutputHelper output) : base(output) { }
+        public InitActionTests(ITestOutputHelper output) : base(output)
+        {
+        }
 
-        //[Theory]
+        [Theory]
         [InlineData(null)]
         [InlineData(".")]
         [InlineData("newFolder")]
@@ -45,6 +47,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                 .HaveCount(expectedFolders,
                 $"Expected to have {expectedFolders}, but got {folders.Count()}, which are {folders.Aggregate(string.Empty, (a, b) => string.Join(",", a, b))}");
             folders.Should().Contain(".git");
+
+            // cleanup
+            CleanUp();
         }
     }
 }
