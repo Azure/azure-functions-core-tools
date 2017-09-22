@@ -100,7 +100,7 @@ local.settings.json
                 }
             }
 
-            var setupNodeDebugResult = await DebuggerHelper.TrySetupNodeDebuggerAsync();
+            var setupNodeDebugResult = await DebuggerHelper.TrySetupDebuggerAsync();
 
             if (setupNodeDebugResult == DebuggerStatus.Created)
             {

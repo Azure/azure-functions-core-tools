@@ -150,7 +150,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                     else if (scriptType == ScriptType.Javascript)
                     {
-                        var Debugger = await DebuggerHelper.TrySetupNodeDebuggerAsync();
+                        var Debugger = await DebuggerHelper.TrySetupDebuggerAsync();
                         if (Debugger == DebuggerStatus.Error)
                         {
                             ColoredConsole
