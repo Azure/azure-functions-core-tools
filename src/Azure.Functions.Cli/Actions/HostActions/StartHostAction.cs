@@ -54,9 +54,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public DebuggerType Debugger { get; set; }
 
-        public DebuggerRuntime DebugRuntime { get; set; }
-
-        public int DebugPort { get; set; }
+        public IDictionary<string, string> IConfigurationArguments { get; set; } = new Dictionary<string, string>()
+        {
+            ["node:debug"] = "true",
+            ["java:debug"] = "true"
+        };
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -102,9 +104,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(p => CertPassword = p);
 
             Parser
-                .Setup<string>('d', "debug")
-                .WithDescription($"Default is None, options are VSCode or VS,\r\ndebug runtime options are Node listening on port {(int)DebuggerPort.DefaultNodePort} or Java listening on port {(int)DebuggerPort.DefaultJavaPort}\r\ndefault is Node on port {(int)DebuggerPort.DefaultNodePort}. Example: --debug VsCode;java")
-                .Callback(d => { var f = DebuggerHelper.ProcessDebuggerArgs(d); Debugger = f.Item1; DebugRuntime = f.Item2; DebugPort = f.Item3; });
+                .Setup<string>('w', "workers")
+                .WithDescription("Arguments to configure language workers, separated by ','. Example: --workers node:debug=<node-debug-port>,java:path=<path-to-worker-jar>")
+                .Callback(w =>
+                {
+                    foreach (var arg in w.Split(','))
+                    {
+                        var pair = arg.Split('=');
+                        var section = pair[0];
+                        var value = pair.Count() == 2 ? pair[1] : string.Empty;
+                        IConfigurationArguments[section] = value;
+                    }
+                });
 
             return Parser.Parse(args);
         }
@@ -129,10 +140,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 });
             }
 
+            var arguments = IConfigurationArguments.Select(pair => $"/workers:{pair.Key}={pair.Value}").ToArray();
+
             return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(baseAddress.ToString())
-                .ConfigureAppConfiguration(c => c.AddEnvironmentVariables())
+                .ConfigureAppConfiguration(configBuilder => {
+                    configBuilder.AddEnvironmentVariables()
+                        .AddCommandLine(arguments);
+                })
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostSettings, CorsOrigins)))
                 .Build();
         }
@@ -177,20 +193,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var baseAddress, var certificate) = Setup();
 
-            if (DebugRuntime != DebuggerRuntime.None)
-            {
-                switch (DebugRuntime)
-                {
-                    case DebuggerRuntime.Java:
-                        Environment.SetEnvironmentVariable("JAVA_OPTS", $"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={DebugPort}", EnvironmentVariableTarget.Process);
-                        break;
-
-                    default:
-                        Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={DebugPort}", EnvironmentVariableTarget.Process);
-                        break;
-                }
-            }
-
             IWebHost host = await BuildWebHost(settings, baseAddress, certificate);
             var runTask = host.RunAsync();
 
@@ -203,11 +205,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             DisableCoreLogging(manager);
             DisplayHttpFunctionsInfo(manager, baseAddress);
             DisplayDisabledFunctions(manager);
+            await SetupDebuggerAsync(baseAddress);
 
-            if (DebugRuntime != DebuggerRuntime.None)
-            {
-                await SetupDebuggerAsync(baseAddress);
-            }
             await runTask;
         }
 
@@ -272,8 +271,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (Debugger == DebuggerType.VsCode)
             {
-                var nodeDebugger = await DebuggerHelper.TrySetupNodeDebuggerAsync();
-                if (nodeDebugger == DebuggerStatus.Error)
+                var debuggerStatus = await DebuggerHelper.TrySetupDebuggerAsync();
+                if (debuggerStatus == DebuggerStatus.Error)
                 {
                     ColoredConsole
                         .Error
