@@ -42,8 +42,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public int Port { get; set; }
 
-        public int NodeDebugPort { get; set; }
-
         public string CorsOrigins { get; set; }
 
         public int Timeout { get; set; }
@@ -55,6 +53,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public string CertPassword { get; set; }
 
         public DebuggerType Debugger { get; set; }
+
+        public DebuggerRuntime DebugRuntime { get; set; }
+
+        public int DebugPort { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -70,12 +72,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"Local port to listen on. Default: {DefaultPort}")
                 .SetDefault(hostSettings.LocalHttpPort == default(int) ? DefaultPort : hostSettings.LocalHttpPort)
                 .Callback(p => Port = p);
-
-            Parser
-                .Setup<int>('n', "nodeDebugPort")
-                .WithDescription($"Port for node debugger to use. Default: value from launch.json or {DebuggerHelper.DefaultNodeDebugPort}")
-                .SetDefault(DebuggerHelper.GetNodeDebuggerPort())
-                .Callback(p => NodeDebugPort = p);
 
             Parser
                 .Setup<string>("cors")
@@ -106,10 +102,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(p => CertPassword = p);
 
             Parser
-                .Setup<DebuggerType>("debug")
-                .WithDescription("Default is None. Options are VSCode and VS")
-                .SetDefault(DebuggerType.None)
-                .Callback(d => Debugger = d);
+                .Setup<string>('d', "debug")
+                .WithDescription($"Default is None, options are VSCode or VS,\r\ndebug runtime options are Node listening on port {(int)DebuggerPort.DefaultNodePort} or Java listening on port {(int)DebuggerPort.DefaultJavaPort}\r\ndefault is Node on port {(int)DebuggerPort.DefaultNodePort}. Example: --debug VsCode;java")
+                .Callback(d => { var f = DebuggerHelper.ProcessDebuggerArgs(d); Debugger = f.Item1; DebugRuntime = f.Item2; DebugPort = f.Item3; });
 
             return Parser.Parse(args);
         }
@@ -182,6 +177,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var baseAddress, var certificate) = Setup();
 
+            if (DebugRuntime != DebuggerRuntime.None)
+            {
+                switch (DebugRuntime)
+                {
+                    case DebuggerRuntime.Java:
+                        Environment.SetEnvironmentVariable("JAVA_OPTS", $"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={DebugPort}", EnvironmentVariableTarget.Process);
+                        break;
+
+                    default:
+                        Environment.SetEnvironmentVariable("EDGE_NODE_PARAMS", $"--debug={DebugPort}", EnvironmentVariableTarget.Process);
+                        break;
+                }
+            }
+
             IWebHost host = await BuildWebHost(settings, baseAddress, certificate);
             var runTask = host.RunAsync();
 
@@ -195,6 +204,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             DisplayHttpFunctionsInfo(manager, baseAddress);
             DisplayDisabledFunctions(manager);
 
+            if (DebugRuntime != DebuggerRuntime.None)
+            {
+                await SetupDebuggerAsync(baseAddress);
+            }
             await runTask;
         }
 
@@ -260,7 +273,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             else if (Debugger == DebuggerType.VsCode)
             {
                 var nodeDebugger = await DebuggerHelper.TrySetupNodeDebuggerAsync();
-                if (nodeDebugger == NodeDebuggerStatus.Error)
+                if (nodeDebugger == DebuggerStatus.Error)
                 {
                     ColoredConsole
                         .Error
@@ -381,7 +394,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 services.AddSingleton<ILoggerFactoryBuilder, ConsoleLoggerFactoryBuilder>();
                 services.AddSingleton<WebHostSettings>(_hostSettings);
-                
+
                 return services.AddWebJobsScriptHost(_builderContext.Configuration);
             }
 
