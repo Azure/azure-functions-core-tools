@@ -51,7 +51,7 @@ namespace Azure.Functions.Cli.Common
 
         private DiskBacked(T value, string path, string encryptionReason = null)
         {
-            Value = value;
+            Value = value ?? new T();
             _path = path;
             _encryptionReason = encryptionReason;
         }

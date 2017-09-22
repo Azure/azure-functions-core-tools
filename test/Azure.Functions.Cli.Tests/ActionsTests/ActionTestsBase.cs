@@ -37,9 +37,8 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                     Directory.Delete(path, recursive: true);
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Output.WriteLine(ex.ToString());
             }
         }
     }
