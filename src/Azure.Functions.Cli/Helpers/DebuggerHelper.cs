@@ -11,12 +11,19 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    internal enum NodeDebuggerStatus
+    internal enum DebuggerStatus
     {
         Created,
         AlreadyCreated,
         Updated,
         Error
+    }
+
+    internal enum DebuggerRuntime
+    {
+        None,
+        Java,
+        Node
     }
 
     internal enum DebuggerType
@@ -29,9 +36,9 @@ namespace Azure.Functions.Cli.Helpers
     internal static class DebuggerHelper
     {
         const int Retries = 20;
-        public const int DefaultNodeDebugPort = 5858;
 
         static string LaunchJsonPath => Path.Combine(ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory), ".vscode", "launch.json");
+
         static readonly VsCodeLaunch DefaultLaunchJson = new VsCodeLaunch
         {
             Version = "0.2.0",
@@ -42,7 +49,14 @@ namespace Azure.Functions.Cli.Helpers
                     Name = "Attach to Azure Functions",
                     Type = "node",
                     Request = "attach",
-                    Port = DefaultNodeDebugPort
+                    Port = 5858
+                },
+                new VsCodeLaunchConfiguration
+                {
+                    Name = "Attach to Azure Functions (Java)",
+                    Type = "java",
+                    Request = "attach",
+                    Port = 5005
                 }
             }
         };
@@ -53,34 +67,7 @@ namespace Azure.Functions.Cli.Helpers
             return response.IsSuccessStatusCode;
         }
 
-        public static int GetNodeDebuggerPort()
-        {
-            try
-            {
-                if (FileSystemHelpers.FileExists(LaunchJsonPath))
-                {
-                    var response = JsonConvert.DeserializeObject<VsCodeLaunch>(FileSystemHelpers.ReadAllTextFromFile(LaunchJsonPath));
-                    var config = response.Configurations
-                        .FirstOrDefault(c => c.Type.Equals("node", StringComparison.OrdinalIgnoreCase) &&
-                                             c.Request.Equals("attach", StringComparison.OrdinalIgnoreCase));
-                    if (config != null)
-                    {
-                        return config.Port;
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.Error.WriteLine(ErrorColor(e.ToString()));
-                }
-            }
-
-            return DefaultNodeDebugPort;
-        }
-
-        public static async Task<NodeDebuggerStatus> TrySetupNodeDebuggerAsync()
+        public static async Task<DebuggerStatus> TrySetupDebuggerAsync()
         {
             try
             {
@@ -93,22 +80,22 @@ namespace Azure.Functions.Cli.Helpers
                 if (existingLaunchJson == null)
                 {
                     await FileSystemHelpers.WriteAllTextToFileAsync(LaunchJsonPath, JsonConvert.SerializeObject(DefaultLaunchJson, Formatting.Indented));
-                    return NodeDebuggerStatus.Created;
+                    return DebuggerStatus.Created;
                 }
 
                 var functionsDebugConfig = existingLaunchJson.Configurations
-                        .FirstOrDefault(c => c.Type.Equals("node", StringComparison.OrdinalIgnoreCase) &&
-                                             c.Request.Equals("attach", StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(c => c.Type.Equals("node", StringComparison.OrdinalIgnoreCase) &&
+                                         c.Request.Equals("attach", StringComparison.OrdinalIgnoreCase));
 
                 if (functionsDebugConfig == null)
                 {
-                    existingLaunchJson.Configurations = existingLaunchJson.Configurations.Concat(DefaultLaunchJson.Configurations);
+                    existingLaunchJson.Configurations.Concat(DefaultLaunchJson.Configurations);
                     await FileSystemHelpers.WriteAllTextToFileAsync(LaunchJsonPath, JsonConvert.SerializeObject(existingLaunchJson, Formatting.Indented));
-                    return NodeDebuggerStatus.Updated;
+                    return DebuggerStatus.Updated;
                 }
                 else
                 {
-                    return NodeDebuggerStatus.AlreadyCreated;
+                    return DebuggerStatus.AlreadyCreated;
                 }
             }
             catch (Exception e)
@@ -117,7 +104,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     ColoredConsole.Error.WriteLine(ErrorColor(e.ToString()));
                 }
-                return NodeDebuggerStatus.Error;
+                return DebuggerStatus.Error;
             }
         }
     }

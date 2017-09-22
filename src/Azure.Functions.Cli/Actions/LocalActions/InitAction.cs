@@ -100,21 +100,21 @@ local.settings.json
                 }
             }
 
-            var setupNodeDebugResult = await DebuggerHelper.TrySetupNodeDebuggerAsync();
+            var setupNodeDebugResult = await DebuggerHelper.TrySetupDebuggerAsync();
 
-            if (setupNodeDebugResult == NodeDebuggerStatus.Created)
+            if (setupNodeDebugResult == DebuggerStatus.Created)
             {
                 ColoredConsole.WriteLine("Created launch.json");
             }
-            else if (setupNodeDebugResult == NodeDebuggerStatus.Updated)
+            else if (setupNodeDebugResult == DebuggerStatus.Updated)
             {
                 ColoredConsole.WriteLine("Added Azure Functions attach target to existing launch.json");
             }
-            else if (setupNodeDebugResult == NodeDebuggerStatus.AlreadyCreated)
+            else if (setupNodeDebugResult == DebuggerStatus.AlreadyCreated)
             {
                 ColoredConsole.WriteLine("launch.json already configured. Skipped!");
             }
-            else if (setupNodeDebugResult == NodeDebuggerStatus.Error)
+            else if (setupNodeDebugResult == DebuggerStatus.Error)
             {
                 ColoredConsole.Error.WriteLine(ErrorColor("Unable to configure launch.json. Check the file for more info"));
             }

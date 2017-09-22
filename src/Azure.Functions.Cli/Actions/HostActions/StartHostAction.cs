@@ -42,8 +42,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public int Port { get; set; }
 
-        public int NodeDebugPort { get; set; }
-
         public string CorsOrigins { get; set; }
 
         public int Timeout { get; set; }
@@ -55,6 +53,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public string CertPassword { get; set; }
 
         public DebuggerType Debugger { get; set; }
+
+        public string[] IConfigurationArguments { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -70,12 +70,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"Local port to listen on. Default: {DefaultPort}")
                 .SetDefault(hostSettings.LocalHttpPort == default(int) ? DefaultPort : hostSettings.LocalHttpPort)
                 .Callback(p => Port = p);
-
-            Parser
-                .Setup<int>('n', "nodeDebugPort")
-                .WithDescription($"Port for node debugger to use. Default: value from launch.json or {DebuggerHelper.DefaultNodeDebugPort}")
-                .SetDefault(DebuggerHelper.GetNodeDebuggerPort())
-                .Callback(p => NodeDebugPort = p);
 
             Parser
                 .Setup<string>("cors")
@@ -105,11 +99,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription("to use with --cert. Either the password, or a file that contains the password for the pfx file")
                 .Callback(p => CertPassword = p);
 
-            Parser
-                .Setup<DebuggerType>("debug")
-                .WithDescription("Default is None. Options are VSCode and VS")
-                .SetDefault(DebuggerType.None)
-                .Callback(d => Debugger = d);
+            IConfigurationArguments = args.Where(arg => arg.StartsWith('/')).ToArray();
 
             return Parser.Parse(args);
         }
@@ -137,7 +127,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(baseAddress.ToString())
-                .ConfigureAppConfiguration(c => c.AddEnvironmentVariables())
+                .ConfigureAppConfiguration(configBuilder => {
+                    configBuilder.AddEnvironmentVariables()
+                        .AddCommandLine(IConfigurationArguments);
+                })
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostSettings, CorsOrigins)))
                 .Build();
         }
@@ -194,6 +187,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             DisableCoreLogging(manager);
             DisplayHttpFunctionsInfo(manager, baseAddress);
             DisplayDisabledFunctions(manager);
+            await SetupDebuggerAsync(baseAddress);
 
             await runTask;
         }
@@ -259,8 +253,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (Debugger == DebuggerType.VsCode)
             {
-                var nodeDebugger = await DebuggerHelper.TrySetupNodeDebuggerAsync();
-                if (nodeDebugger == NodeDebuggerStatus.Error)
+                var debuggerStatus = await DebuggerHelper.TrySetupDebuggerAsync();
+                if (debuggerStatus == DebuggerStatus.Error)
                 {
                     ColoredConsole
                         .Error
@@ -381,7 +375,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 services.AddSingleton<ILoggerFactoryBuilder, ConsoleLoggerFactoryBuilder>();
                 services.AddSingleton<WebHostSettings>(_hostSettings);
-                
+
                 return services.AddWebJobsScriptHost(_builderContext.Configuration);
             }
 
