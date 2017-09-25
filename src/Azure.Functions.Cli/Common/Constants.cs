@@ -22,7 +22,7 @@
         {
             public const string AADAuthorityBase = "https://login.microsoftonline.com";
             public const string CommonAADAuthority = "https://login.microsoftonline.com/common";
-            public const string ArmResource = "https://management.azure.com/";
+            public const string ArmResource = "https://management.core.windows.net/";
             public const string AADClientId = "1950a258-227b-4e31-a9cf-717495945fc2";
         }
     }
