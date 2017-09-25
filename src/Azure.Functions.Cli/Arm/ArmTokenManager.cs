@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Arm
             try
             {
                 var authContext = new AuthenticationContext($"{Constants.ArmConstants.AADAuthorityBase}/{tenantId}", _tokenCache);
-                var result = await authContext.AcquireTokenSilentAsync(Constants.ArmConstants.ArmResource, Constants.ArmConstants.AADClientId);
+                var result = await authContext.AcquireTokenSilentAsync(Constants.ArmConstants.ArmAudience, Constants.ArmConstants.AADClientId);
                 return result.AccessToken;
             }
             catch
@@ -68,7 +68,7 @@ namespace Azure.Functions.Cli.Arm
         {
             var authContext = new AuthenticationContext(Constants.ArmConstants.CommonAADAuthority, _tokenCache);
             _tokenCache.Clear();
-            var code = await authContext.AcquireDeviceCodeAsync(Constants.ArmConstants.ArmResource, Constants.ArmConstants.AADClientId);
+            var code = await authContext.AcquireDeviceCodeAsync(Constants.ArmConstants.ArmAudience, Constants.ArmConstants.AADClientId);
 
             ColoredConsole
                 .WriteLine($"To sign in, use a web browser to open the page {code.VerificationUrl} and enter the code {code.UserCode} to authenticate.");
@@ -87,7 +87,7 @@ namespace Azure.Functions.Cli.Arm
                 authContext = new AuthenticationContext($"{Constants.ArmConstants.AADAuthorityBase}/{tenant}", _tokenCache);
                 try
                 {
-                    return authContext.AcquireTokenSilentAsync(Constants.ArmConstants.ArmResource, Constants.ArmConstants.AADClientId);
+                    return authContext.AcquireTokenSilentAsync(Constants.ArmConstants.ArmAudience, Constants.ArmConstants.AADClientId);
                 }
                 catch
                 {
@@ -107,7 +107,7 @@ namespace Azure.Functions.Cli.Arm
         {
             using (var client = new HttpClient())
             {
-                client.BaseAddress = new Uri(Constants.ArmConstants.ArmResource);
+                client.BaseAddress = new Uri(Constants.ArmConstants.ArmDomain);
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var response = await client.GetAsync("/tenants?api-version=2014-06-01");
                 response.EnsureSuccessStatusCode();

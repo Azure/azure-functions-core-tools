@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Arm
             var tokenList = await tenants.Select(async t => new { Tenant = t, Token = await _tokenManager.GetToken(t) }).WhenAll();
             using (var client = new HttpClient())
             {
-                client.BaseAddress = new Uri(Constants.ArmConstants.ArmResource);
+                client.BaseAddress = new Uri(Constants.ArmConstants.ArmDomain);
                 return await tokenList
                 .Select(async t =>
                 {
