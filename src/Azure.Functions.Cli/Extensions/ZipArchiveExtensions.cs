@@ -9,6 +9,9 @@ namespace Azure.Functions.Cli.Extensions
         {
             using (var stream = File.Open(fileName, FileMode.Open))
             {
+                // Kudu only handles Windows paths in the zip
+                zipRoot = zipRoot.Replace("/", "\\");
+                zippedName = zippedName.Replace("/", "\\");
                 archive.AddFile(zippedName, zipRoot, stream);
             }
         }
