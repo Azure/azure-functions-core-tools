@@ -56,8 +56,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public IDictionary<string, string> IConfigurationArguments { get; set; } = new Dictionary<string, string>()
         {
-            ["node:debug"] = "true",
-            ["java:debug"] = "true"
+            ["node:debug"] = "9229",
+            ["java:debug"] = "5005"
         };
 
         public StartHostAction(ISecretsManager secretsManager)
@@ -102,6 +102,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Setup<string>("password")
                 .WithDescription("to use with --cert. Either the password, or a file that contains the password for the pfx file")
                 .Callback(p => CertPassword = p);
+
+            Parser
+                .Setup<DebuggerType>("debug")
+                .WithDescription("Default is None. Options are VSCode and VS")
+                .SetDefault(DebuggerType.None)
+                .Callback(d => Debugger = d);
 
             Parser
                 .Setup<string>('w', "workers")
@@ -276,7 +282,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole
                         .Error
-                        .WriteLine(ErrorColor("Unable to configure node debugger. Check your launch.json."));
+                        .WriteLine(ErrorColor("Unable to configure vscode debugger. Check your launch.json."));
                     return;
                 }
                 else
