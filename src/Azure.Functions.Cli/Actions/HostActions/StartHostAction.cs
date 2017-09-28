@@ -56,8 +56,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public IDictionary<string, string> IConfigurationArguments { get; set; } = new Dictionary<string, string>()
         {
-            ["node:debug"] = "9229",
-            ["java:debug"] = "5005"
+            ["node:debug"] = Constants.NodeDebugPort.ToString(),
+            ["java:debug"] = Constants.JavaDebugPort.ToString(),
         };
 
         public StartHostAction(ISecretsManager secretsManager)

@@ -19,13 +19,6 @@ namespace Azure.Functions.Cli.Helpers
         Error
     }
 
-    internal enum DebuggerRuntime
-    {
-        None,
-        Java,
-        Node
-    }
-
     internal enum DebuggerType
     {
         None,
@@ -49,14 +42,14 @@ namespace Azure.Functions.Cli.Helpers
                     Name = "Attach to Azure Functions",
                     Type = "node",
                     Request = "attach",
-                    Port = 9229
+                    Port = Constants.NodeDebugPort
                 },
                 new VsCodeLaunchConfiguration
                 {
                     Name = "Attach to Azure Functions (Java)",
                     Type = "java",
                     Request = "attach",
-                    Port = 5005
+                    Port = Constants.JavaDebugPort
                 }
             }
         };

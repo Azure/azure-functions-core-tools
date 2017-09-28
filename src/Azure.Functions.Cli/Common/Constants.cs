@@ -10,6 +10,8 @@
         public const string CliDebug = "CLI_DEBUG";
         public const string DefaultSqlProviderName = "System.Data.SqlClient";
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
+        public const int NodeDebugPort = 5858;
+        public const int JavaDebugPort = 5005;
 
         public static class Errors
         {
