@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.Helpers
                     Name = "Attach to Azure Functions",
                     Type = "node",
                     Request = "attach",
-                    Port = 5858
+                    Port = 9229
                 },
                 new VsCodeLaunchConfiguration
                 {
