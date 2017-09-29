@@ -10,6 +10,7 @@ using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Helpers;
 using Newtonsoft.Json.Linq;
+using Microsoft.Azure.WebJobs.Script;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -22,9 +23,16 @@ namespace Azure.Functions.Cli.Common
         {
             get
             {
-                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-                var newFilePath = Path.Combine(rootPath, "local.settings.json");
-                var oldFilePath = Path.Combine(rootPath, "appsettings.json");
+                var newFile = "local.settings.json";
+                var oldFile = "appsettings.json";
+                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, new List<string>
+                {
+                    ScriptConstants.HostMetadataFileName,
+                    newFile,
+                    oldFile,
+                });
+                var newFilePath = Path.Combine(rootPath, newFile);
+                var oldFilePath = Path.Combine(rootPath, oldFile);
                 if (!FileSystemHelpers.FileExists(oldFilePath))
                 {
                     return newFilePath;

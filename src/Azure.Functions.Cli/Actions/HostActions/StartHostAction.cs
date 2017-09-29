@@ -54,6 +54,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public DebuggerType Debugger { get; set; }
 
+        public string ScriptRoot { get; set; }
+
         public IDictionary<string, string> IConfigurationArguments { get; set; } = new Dictionary<string, string>()
         {
             ["node:debug"] = Constants.NodeDebugPort.ToString(),
@@ -121,6 +123,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         var value = pair.Count() == 2 ? pair[1] : string.Empty;
                         IConfigurationArguments[section] = value;
                     }
+                });
+
+            Parser
+                .Setup<string>("script-root")
+                .WithDescription($"The path to the root of the function app where the command will be executed.")
+                .SetDefault(".")
+                .Callback(dir => {
+                    var fullDirPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, dir));
+                    ScriptRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(fullDirPath);
                 });
 
             return Parser.Parse(args);
@@ -193,9 +204,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             Utilities.PrintLogo();
 
-            var scriptPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-            var traceLevel = await ScriptHostHelpers.GetTraceLevel(scriptPath);
-            var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, scriptPath);
+            var traceLevel = await ScriptHostHelpers.GetTraceLevel(ScriptRoot);
+            var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, ScriptRoot);
 
             (var baseAddress, var certificate) = Setup();
 

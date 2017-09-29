@@ -43,15 +43,16 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static string GetFunctionAppRootDirectory(string startingDirectory)
+        public static string GetFunctionAppRootDirectory(string startingDirectory, IEnumerable<string> searchFiles = null)
         {
             if (_isHelpRunning)
             {
                 return startingDirectory;
             }
 
-            var hostJson = Path.Combine(startingDirectory, ScriptConstants.HostMetadataFileName);
-            if (FileSystemHelpers.FileExists(hostJson))
+            searchFiles = searchFiles ?? new List<string> { ScriptConstants.HostMetadataFileName };
+
+            if (searchFiles.Any(file => FileSystemHelpers.FileExists(Path.Combine(startingDirectory, file))))
             {
                 return startingDirectory;
             }
@@ -60,11 +61,12 @@ namespace Azure.Functions.Cli.Helpers
 
             if (parent == null)
             {
-                throw new CliException($"Unable to find function project root. Expecting to have {ScriptConstants.HostMetadataFileName} in function project root.");
+                var files = searchFiles.Aggregate((accum, file) => $"{accum}, {file}");
+                throw new CliException($"Unable to find project root. Expecting to find one of {files} in project root.");
             }
             else
             {
-                return GetFunctionAppRootDirectory(parent);
+                return GetFunctionAppRootDirectory(parent, searchFiles);
             }
         }
 
