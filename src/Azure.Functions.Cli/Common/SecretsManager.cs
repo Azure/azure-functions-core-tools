@@ -23,42 +23,14 @@ namespace Azure.Functions.Cli.Common
         {
             get
             {
-                var newFile = "local.settings.json";
-                var oldFile = "appsettings.json";
+                var secretsFile = "local.settings.json";
                 var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, new List<string>
                 {
                     ScriptConstants.HostMetadataFileName,
-                    newFile,
-                    oldFile,
+                    secretsFile,
                 });
-                var newFilePath = Path.Combine(rootPath, newFile);
-                var oldFilePath = Path.Combine(rootPath, oldFile);
-                if (!FileSystemHelpers.FileExists(oldFilePath))
-                {
-                    return newFilePath;
-                }
-                else if (FileSystemHelpers.FileExists(oldFilePath) && FileSystemHelpers.FileExists(newFilePath))
-                {
-                    if (!warningPrinted)
-                    {
-                        ColoredConsole.WriteLine(WarningColor("Warning: found both 'local.settings.json' and 'appsettings.json'. Ignoring 'appsettings.json'."));
-                        warningPrinted = true;
-                    }
-                    return newFilePath;
-                }
-                else if (FileSystemHelpers.FileExists(oldFilePath))
-                {
-                    if (!warningPrinted)
-                    {
-                        ColoredConsole.WriteLine(WarningColor($"Warning: The filename 'appsettings.json' is deprecated. Rename it to local.settings.json"));
-                        warningPrinted = true;
-                    }
-                    return oldFilePath;
-                }
-                else
-                {
-                    return newFilePath;
-                }
+                var secretsFilePath = Path.Combine(rootPath, secretsFile);
+                return secretsFilePath;
             }
         }
 
