@@ -17,12 +17,23 @@ namespace Azure.Functions.Cli.Common
     {
         private static bool warningPrinted = false;
         private const string reason = "secrets.manager.1";
+        private readonly string _scriptRoot;
 
-        public static string AppSettingsFilePath
+        internal SecretsManager(string scriptRoot)
+        {
+            _scriptRoot = scriptRoot;
+        }
+
+        internal SecretsManager()
+            : this(Environment.CurrentDirectory)
+        {
+        }
+
+        public string AppSettingsFilePath
         {
             get
             {
-                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(_scriptRoot);
                 var newFilePath = Path.Combine(rootPath, "local.settings.json");
                 var oldFilePath = Path.Combine(rootPath, "appsettings.json");
                 if (!FileSystemHelpers.FileExists(oldFilePath))
@@ -54,7 +65,7 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        public static string AppSettingsFileName
+        public string AppSettingsFileName
         {
             get
             {

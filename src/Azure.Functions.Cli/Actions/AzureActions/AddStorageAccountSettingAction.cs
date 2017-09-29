@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 var name = $"{storageAccount.StorageAccountName}_STORAGE";
                 _secretsManager.SetSecret(name, storageAccount.GetConnectionString());
                 ColoredConsole
-                    .WriteLine($"Secret saved locally in {SecretsManager.AppSettingsFileName} under name {ExampleColor(name)}.")
+                    .WriteLine($"Secret saved locally in {_secretsManager.AppSettingsFileName} under name {ExampleColor(name)}.")
                     .WriteLine();
             }
         }

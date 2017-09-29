@@ -138,7 +138,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (result.ContainsKeyCaseInsensitive(pair.Key) &&
                     !result.GetValueCaseInsensitive(pair.Key).Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
                 {
-                    ColoredConsole.WriteLine($"App setting {pair.Key} is different between azure and {SecretsManager.AppSettingsFileName}");
+                    ColoredConsole.WriteLine($"App setting {pair.Key} is different between azure and {_secretsManager.AppSettingsFileName}");
                     if (OverwriteSettings)
                     {
                         ColoredConsole.WriteLine("Overwriting setting in azure with local value because '--overwrite-settings [-y]' was specified.");

@@ -49,7 +49,7 @@ appsettings.json
 local.settings.json
 "},
             { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), "{ }" },
-            { new Lazy<string>(() => SecretsManager.AppSettingsFileName), @"{
+            { new Lazy<string>(() => new SecretsManager().AppSettingsFileName), @"{
   ""IsEncrypted"": false,
   ""Values"": {
     ""AzureWebJobsStorage"": """"
