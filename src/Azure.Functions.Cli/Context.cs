@@ -31,7 +31,10 @@ namespace Azure.Functions.Cli
         Settings,
 
         [Description("Commands for listing available function templates")]
-        Templates
+        Templates,
+
+        [Description("Commands for installing extensions")]
+        Extensions
     }
 
     internal static class ContextEnumExtensions
