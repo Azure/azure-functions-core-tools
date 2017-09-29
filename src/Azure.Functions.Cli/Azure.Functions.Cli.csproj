@@ -14,6 +14,12 @@
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="Properties\ExtensionsProj.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="ExtensionsProj.txt" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.1" />
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="1.0.0" />

@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli
         private readonly IContainer _container;
         private readonly string[] _args;
         private readonly IEnumerable<TypeAttributePair> _actionAttributes;
-        private readonly string[] _helpArgs = new[] { "help", "h", "?", "version", "v" };
+        private readonly string[] _helpArgs = new[] { "help", "h", "?" };
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
         public static void Run<T>(string[] args, IContainer container)
