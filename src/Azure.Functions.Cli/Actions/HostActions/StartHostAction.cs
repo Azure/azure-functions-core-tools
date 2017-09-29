@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
     {
         const int DefaultPort = 7071;
         const int DefaultTimeout = 20;
-        private readonly ISecretsManager _secretsManager;
+        private ISecretsManager _secretsManager;
 
         public int Port { get; set; }
 
@@ -54,6 +54,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public DebuggerType Debugger { get; set; }
 
+        public string ScriptRoot { get; set; }
+
         public IDictionary<string, string> IConfigurationArguments { get; set; } = new Dictionary<string, string>()
         {
             ["node:debug"] = Constants.NodeDebugPort.ToString(),
@@ -67,18 +69,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            var hostSettings = _secretsManager.GetHostStartSettings();
 
             Parser
                 .Setup<int>('p', "port")
                 .WithDescription($"Local port to listen on. Default: {DefaultPort}")
-                .SetDefault(hostSettings.LocalHttpPort == default(int) ? DefaultPort : hostSettings.LocalHttpPort)
+                .SetDefault(DefaultPort)
                 .Callback(p => Port = p);
 
             Parser
                 .Setup<string>("cors")
                 .WithDescription($"A comma separated list of CORS origins with no spaces. Example: https://functions.azure.com,https://functions-staging.azure.com")
-                .SetDefault(hostSettings.Cors ?? string.Empty)
+                .SetDefault(string.Empty)
                 .Callback(c => CorsOrigins = c);
 
             Parser
@@ -121,6 +122,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         var value = pair.Count() == 2 ? pair[1] : string.Empty;
                         IConfigurationArguments[section] = value;
                     }
+                });
+
+            Parser
+                .Setup<string>("script-root")
+                .WithDescription($"The path to the root of the function app where the command will be executed.")
+                .SetDefault(".")
+                .Callback(dir => {
+                    var fullDirPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, dir));
+                    ScriptRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(fullDirPath);
+                    _secretsManager = new SecretsManager(ScriptRoot);
                 });
 
             return Parser.Parse(args);
@@ -193,9 +204,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             Utilities.PrintLogo();
 
-            var scriptPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-            var traceLevel = await ScriptHostHelpers.GetTraceLevel(scriptPath);
-            var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, scriptPath);
+            var hostSettings = _secretsManager.GetHostStartSettings();
+
+            var traceLevel = await ScriptHostHelpers.GetTraceLevel(ScriptRoot);
+            var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, ScriptRoot);
 
             (var baseAddress, var certificate) = Setup();
 
@@ -293,7 +305,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
+        internal async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
         {
             try
             {
@@ -320,8 +332,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allHttpTrigger)
                 {
-                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. This is required for all triggers other than HTTP. "
-                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
+                    throw new CliException($"Missing value for AzureWebJobsStorage in {_secretsManager.AppSettingsFileName}. This is required for all triggers other than HTTP. "
+                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {_secretsManager.AppSettingsFileName}.");
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
@@ -340,8 +352,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                                 else if (!secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     ColoredConsole
-                                        .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
-                                            $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}."));
+                                        .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {_secretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
+                                            $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {_secretsManager.AppSettingsFileName}."));
                                 }
                             }
                         }
@@ -350,7 +362,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             catch (Exception e) when (!(e is CliException))
             {
-                ColoredConsole.WriteLine(WarningColor($"Warning: unable to verify all settings from {SecretsManager.AppSettingsFileName} and function.json files."));
+                ColoredConsole.WriteLine(WarningColor($"Warning: unable to verify all settings from {_secretsManager.AppSettingsFileName} and function.json files."));
                 if (StaticSettings.IsDebug)
                 {
                     ColoredConsole.WriteLine(e);
