@@ -181,7 +181,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var memoryStream = new MemoryStream();
             using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                foreach (var fileName in FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" }))
+                foreach (var fileName in FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".gitignore", "local.settings.json", "project.lock.json" }))
                 {
                     zip.AddFile(fileName, fileName, path);
                 }
