@@ -20,7 +20,7 @@ npm i -g azure-functions-core-tools
 
 ### Dependencies
 
-There is a dependency on the .NET Core tools for the cross platofrm support. You can [install these here](https://www.microsoft.com/net/core).
+There is a dependency on the .NET Core tools for the cross platform support. You can [install these here](https://www.microsoft.com/net/core).
 
 ### Aliases
 
