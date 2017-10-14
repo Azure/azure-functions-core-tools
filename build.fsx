@@ -197,12 +197,12 @@ Target "GenerateZipToSign" (fun _ ->
         |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
 )
 
-let storageAccount = CloudStorageAccount.Parse connectionString
-let blobClient = storageAccount.CreateCloudBlobClient ()
-let queueClient = storageAccount.CreateCloudQueueClient ()
+let storageAccount = lazy CloudStorageAccount.Parse connectionString
+let blobClient = lazy storageAccount.Value.CreateCloudBlobClient ()
+let queueClient = lazy storageAccount.Value.CreateCloudQueueClient ()
 
 Target "UploadZipToSign" (fun _ ->
-    let container = blobClient.GetContainerReference "azure-functions-cli"
+    let container = blobClient.Value.GetContainerReference "azure-functions-cli"
     container.CreateIfNotExists () |> ignore
     let blobRef = container.GetBlockBlobReference toSignZipName
     blobRef.UploadFromStream <| File.OpenRead toSignZipPath
@@ -213,7 +213,7 @@ Target "UploadZipToSign" (fun _ ->
 )
 
 Target  "EnqueueSignMessage" (fun _ ->
-    let queue = queueClient.GetQueueReference "signing-jobs"
+    let queue = queueClient.Value.GetQueueReference "signing-jobs"
     let message = CloudQueueMessage ("SignAuthenticode;azure-functions-cli;" + toSignZipName)
     queue.AddMessage message
 
@@ -223,7 +223,7 @@ Target  "EnqueueSignMessage" (fun _ ->
 
 Target "WaitForSigning" (fun _ ->
     let rec downloadFile fileName (startTime: DateTime) = async {
-        let container = blobClient.GetContainerReference "azure-functions-cli-signed"
+        let container = blobClient.Value.GetContainerReference "azure-functions-cli-signed"
         container.CreateIfNotExists () |> ignore
         let blob = container.GetBlockBlobReference fileName
         if blob.Exists () then
