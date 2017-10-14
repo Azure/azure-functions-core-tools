@@ -4,22 +4,24 @@ var path = require('path');
 var fs = require('fs');
 var spawn = require('child_process').spawn;
 var fork = require('child_process').fork;
+var commandExists = require('command-exists');
+var os = require('os');
 var args = process.argv;
 
 function main() {
-    var isWin = /^win/.test(process.platform);
-    var bin = path.join(path.dirname(fs.realpathSync(__filename)), '../bin');
-
-    if (!isWin) {
-        console.log('Currently Azure Functions Core Tools is Windows only.\n');
-        console.log('Follow https://github.com/Azure/azure-functions-cli/issues/178 for updates.');
-        process.exit(1);
-    } else {
-        var funcProc = spawn(bin + '/func.exe', args.slice(2), { stdio : [process.stdin, process.stdout, process.stderr, 'pipe']});
-        funcProc.on('exit', function(code) {
-            process.exit(code);
-        });
-    }
+    commandExists('dotnet', function (err, commandExists) {
+        if (commandExists) {
+            var bin = path.join(os.homedir(), '.azurefunctions', 'bin');
+            var funcProc = spawn('dotnet', [bin + '/Azure.Functions.Cli.dll', ].concat(args.slice(2)), {
+                stdio: [process.stdin, process.stdout, process.stderr, 'pipe']
+            });
+            funcProc.on('exit', function (code) {
+                process.exit(code);
+            });
+        } else {
+            console.error("This requires dotnet cli to be on the path. Make sure to install .NET Core SDK 2.0 https://www.microsoft.com/net/core");
+        }
+    });
 }
 
 main();

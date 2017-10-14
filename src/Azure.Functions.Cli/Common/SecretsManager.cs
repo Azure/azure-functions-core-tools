@@ -10,46 +10,27 @@ using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Helpers;
 using Newtonsoft.Json.Linq;
+using Microsoft.Azure.WebJobs.Script;
 
 namespace Azure.Functions.Cli.Common
 {
     internal class SecretsManager : ISecretsManager
     {
         private static bool warningPrinted = false;
+        private const string reason = "secrets.manager.1";
 
         public static string AppSettingsFilePath
         {
             get
             {
-                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-                var newFilePath = Path.Combine(rootPath, "local.settings.json");
-                var oldFilePath = Path.Combine(rootPath, "appsettings.json");
-                if (!FileSystemHelpers.FileExists(oldFilePath))
+                var secretsFile = "local.settings.json";
+                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, new List<string>
                 {
-                    return newFilePath;
-                }
-                else if (FileSystemHelpers.FileExists(oldFilePath) && FileSystemHelpers.FileExists(newFilePath))
-                {
-                    if (!warningPrinted)
-                    {
-                        ColoredConsole.WriteLine(WarningColor("Warning: found both 'local.settings.json' and 'appsettings.json'. Ignoring 'appsettings.json'."));
-                        warningPrinted = true;
-                    }
-                    return newFilePath;
-                }
-                else if (FileSystemHelpers.FileExists(oldFilePath))
-                {
-                    if (!warningPrinted)
-                    {
-                        ColoredConsole.WriteLine(WarningColor($"Warning: The filename 'appsettings.json' is deprecated. Rename it to local.settings.json"));
-                        warningPrinted = true;
-                    }
-                    return oldFilePath;
-                }
-                else
-                {
-                    return newFilePath;
-                }
+                    ScriptConstants.HostMetadataFileName,
+                    secretsFile,
+                });
+                var secretsFilePath = Path.Combine(rootPath, secretsFile);
+                return secretsFilePath;
             }
         }
 
@@ -101,7 +82,7 @@ namespace Azure.Functions.Cli.Common
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
 
-                foreach(var connectionString in connectionStrings)
+                foreach (var connectionString in connectionStrings)
                 {
                     settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
@@ -124,7 +105,7 @@ namespace Azure.Functions.Cli.Common
                     settingsFile.SetSecret(pair.Key, pair.Value);
                 }
 
-                foreach(var connectionString in connectionStrings)
+                foreach (var connectionString in connectionStrings)
                 {
                     settingsFile.SetConnectionString(connectionString.Name, connectionString.Value, connectionString.ProviderName);
                 }
@@ -189,7 +170,7 @@ namespace Azure.Functions.Cli.Common
             {
                 if (IsEncrypted)
                 {
-                    Values[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), null, DataProtectionScope.CurrentUser));
+                    Values[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), reason));
                 }
                 else
                 {
@@ -200,7 +181,7 @@ namespace Azure.Functions.Cli.Common
             public void SetConnectionString(string name, string value, string providerName)
             {
                 value = IsEncrypted
-                    ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), null, DataProtectionScope.CurrentUser))
+                    ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), reason))
                     : value;
 
                 ConnectionStrings[name] = JToken.FromObject(new
@@ -237,7 +218,7 @@ namespace Azure.Functions.Cli.Common
                 {
                     try
                     {
-                        return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), null, DataProtectionScope.CurrentUser)));
+                        return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), reason)));
                     }
                     catch (Exception e)
                     {
@@ -255,7 +236,7 @@ namespace Azure.Functions.Cli.Common
                 try
                 {
                     string DecryptIfNeeded(string value) => IsEncrypted
-                        ? Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), null, DataProtectionScope.CurrentUser))
+                        ? Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), reason))
                         : value;
 
                     return ConnectionStrings.Select(c =>

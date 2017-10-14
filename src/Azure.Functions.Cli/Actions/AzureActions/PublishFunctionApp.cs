@@ -25,16 +25,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
+        private readonly IArmTokenManager _tokenManager;
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
         public bool PublishLocalSettingsOnly { get; set; }
 
-        public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager)
+        public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
             : base(armManager)
         {
             _settings = settings;
             _secretsManager = secretsManager;
+            _tokenManager = tokenManager;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -179,7 +181,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var memoryStream = new MemoryStream();
             using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                foreach (var fileName in FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" }))
+                foreach (var fileName in FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".gitignore", "local.settings.json", "project.lock.json" }))
                 {
                     zip.AddFile(fileName, fileName, path);
                 }
@@ -198,8 +200,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 MaxResponseContentBufferSize = 30 * 1024 * 1024,
                 Timeout = Timeout.InfiniteTimeSpan
             };
-
-            client.DefaultRequestHeaders.Authorization = await _armManager.GetAuthenticationHeader(_settings.CurrentSubscription);
+            var token = await _tokenManager.GetToken(_settings.CurrentTenant);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             return client;
         }
     }

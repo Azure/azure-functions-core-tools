@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
@@ -8,7 +9,47 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class ConsoleHelper
     {
-        public static T DisplaySelectionWizard<T>(IEnumerable<T> options)
+        internal static T DisplaySelectionWizard<T>(IEnumerable<T> options)
+        {
+            // Console.CursorTop behaves very differently on Unix vs Windows for some reason
+            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? DisplaySelectionWizardWindows(options)
+                : DisplaySelectionWizardUnix(options);
+        }
+
+        private static T DisplaySelectionWizardUnix<T>(IEnumerable<T> options)
+        {
+            if (!options.Any())
+            {
+                return default(T);
+            }
+
+            // The windows one expects to remain on the same line, but not this version.
+            ColoredConsole.WriteLine();
+
+            var optionsArray = options.ToArray();
+            for (var i = 0; i < optionsArray.Length; i++)
+            {
+                ColoredConsole.WriteLine($"{i + 1}. {optionsArray[i].ToString()}");
+            }
+
+            while (true)
+            {
+                ColoredConsole.Write(TitleColor("Choose option: "));
+                var response = Console.ReadLine();
+                if (int.TryParse(response, out int selection))
+                {
+                    selection -= 1;
+
+                    if (selection == 0 || (selection > 0 && selection < optionsArray.Length))
+                    {
+                        return optionsArray[selection];
+                    }
+                }
+            }
+        }
+
+        private static T DisplaySelectionWizardWindows<T>(IEnumerable<T> options)
         {
             var current = 0;
             var next = current;

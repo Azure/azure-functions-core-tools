@@ -25,3 +25,5 @@ build/
 deploy/
 dist/
 buildtools/
+tools/
+/src/Azure.Functions.Cli/Properties/launchSettings.json

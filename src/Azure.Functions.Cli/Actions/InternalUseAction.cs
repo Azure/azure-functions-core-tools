@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Fclp;
-using Ignite.SharpNetSH;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions
@@ -54,12 +53,6 @@ namespace Azure.Functions.Cli.Actions
             {
                 switch (action)
                 {
-                    case InternalAction.SetupUrlAcl:
-                        SetupUrlAcl();
-                        break;
-                    case InternalAction.RemoveUrlAcl:
-                        RemoveUrlAcl();
-                        break;
                     case InternalAction.SetupSslCert:
                         SetupSslCert();
                         break;
@@ -68,50 +61,29 @@ namespace Azure.Functions.Cli.Actions
             return Task.CompletedTask;
         }
 
-        private void SetupUrlAcl()
-        {
-            NetSH.CMD.Http.Add.UrlAcl($"{Protocol}://+:{Port}/", $"{Environment.UserDomainName}\\{Environment.UserName}", null);
-        }
-
-        private void RemoveUrlAcl()
-        {
-            NetSH.CMD.Http.Delete.UrlAcl($"{Protocol}://+:{Port}/");
-        }
-
         private void SetupSslCert()
         {
-            var cert = SecurityHelpers.CreateSelfSignedCertificate("localhost");
+            // var cert = SecurityHelpers.CreateSelfSignedCertificate("localhost");
 
-            new[]
-            {
-                new X509Store(StoreName.My, StoreLocation.LocalMachine),
-                new X509Store(StoreName.Root, StoreLocation.CurrentUser)
-            }
-            .Where(store => !store.Certificates.Contains(cert))
-            .ToList()
-            .ForEach(store =>
-            {
-                store.Open(OpenFlags.MaxAllowed);
-                store.Add(cert);
-                store.Close();
-            });
-
-            if (!(NetSH.CMD.Http.Show.SSLCert($"0.0.0.0:{Port}")?.ResponseObject?.Count > 0))
-            {
-                NetSH.CMD.Http.Add.SSLCert(
-                    ipPort: $"0.0.0.0:{Port}",
-                    certHash: cert.Thumbprint,
-                    certStoreName: "MY",
-                    appId: Assembly.GetExecutingAssembly().GetType().GUID);
-            }
+            // new[]
+            // {
+            //     new X509Store(StoreName.My, StoreLocation.LocalMachine),
+            //     new X509Store(StoreName.Root, StoreLocation.CurrentUser)
+            // }
+            // .Where(store => !store.Certificates.Contains(cert))
+            // .ToList()
+            // .ForEach(store =>
+            // {
+            //     store.Open(OpenFlags.MaxAllowed);
+            //     store.Add(cert);
+            //     store.Close();
+            // });
         }
     }
 
     internal enum InternalAction
     {
         None,
-        SetupUrlAcl,
-        RemoveUrlAcl,
         SetupSslCert
     }
 }

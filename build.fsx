@@ -34,6 +34,7 @@ let MoveFileTo (source, destination) =
 let env = Environment.GetEnvironmentVariable
 let connectionString =
     "DefaultEndpointsProtocol=https;AccountName=" + (env "FILES_ACCOUNT_NAME") + ";AccountKey=" + (env "FILES_ACCOUNT_KEY")
+let projectPath = "./src/Azure.Functions.Cli/"
 let buildDir  = "./dist/build/"
 let testDir   = "./dist/test/"
 let downloadDir  = "./dist/download/"
@@ -50,20 +51,6 @@ let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
 let finalZipPath = deployDir @@ "Azure.Functions.Cli.zip"
-
-Target "RestorePackages" (fun _ ->
-    !! "./**/packages.config"
-    |> Seq.iter (RestorePackage (fun p ->
-        {p with
-            Sources =
-            [
-                "https://www.nuget.org/api/v2/"
-                "https://www.myget.org/F/azure-appservice/api/v2"
-                "https://www.myget.org/F/fusemandistfeed/api/v2"
-                "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/"
-                "https://www.myget.org/F/xunit/api/v3/index.json"
-            ]}))
-)
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
@@ -82,26 +69,32 @@ Target "SetVersion" (fun _ ->
          Attribute.InternalsVisibleTo "DynamicProxyGenAssembly2"]
 )
 
+Target "RestorePackages" (fun _ ->
+    let additionalArgs = [
+        "--source"
+        "https://www.nuget.org/api/v2/"
+        "--source"
+        "https://www.myget.org/F/azure-appservice/api/v2"
+        "--source"
+        "https://www.myget.org/F/fusemandistfeed/api/v2"
+        "--source"
+        "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/"
+        "--source"
+        "https://www.myget.org/F/xunit/api/v3/index.json"
+    ]
+    DotNetCli.Restore (fun p ->
+        { p with
+            Project = projectPath @@ "Azure.Functions.Cli.csproj"
+            AdditionalArgs = additionalArgs })
+)
+printfn "Current dir is %A" currentDirectory
 Target "Compile" (fun _ ->
-    !! @"src\**\*.csproj"
-      |> MSBuildRelease buildDir "Build"
-      |> Log "AppBuild-Output: "
-)
-
-Target "CompileTest" (fun _ ->
-    !! @"test\**\*.csproj"
-      |> MSBuildDebug testDir "Build"
-      |> Log "TestBuild-Output: "
-)
-
-Target "XUnitTest" (fun _ ->
-    !! (testDir + @"\Azure.Functions.Cli.Tests.dll")
-      |> xUnit2 (fun p ->
-       {p with
-            HtmlOutputPath = Some (testDir @@ "result.html")
-            ToolPath = packagesDir @@ @"xunit.runner.console\tools\net452\xunit.console.exe"
-            Parallel = NoParallelization
-         })
+    DotNetCli.Publish (fun p ->
+        { p with
+            VersionSuffix = env "APPVEYOR_BUILD_NUMBER"
+            Project = projectPath @@ "Azure.Functions.Cli.csproj"
+            Output = currentDirectory @@ buildDir
+            Configuration = "release" })
 )
 
 let excludedFiles = [
@@ -283,15 +276,7 @@ Dependencies
 "Clean"
   ==> "DownloadTools"
   ==> "RestorePackages"
-  ==> "SetVersion"
   ==> "Compile"
-  ==> "DownloadNugetExe"
-  ==> "CompileTest"
-  ==> "XUnitTest"
-  ==> "GenerateZipToSign"
-  ==> "UploadZipToSign"
-  ==> "EnqueueSignMessage"
-  ==> "WaitForSigning"
   ==> "Zip"
 
 // start build

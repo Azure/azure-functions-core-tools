@@ -37,18 +37,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            var tenants = _armManager.GetTenants();
+            var tenants = await _armManager.GetTenants();
             var validSub = tenants
-                .Select(t => t.subscriptions)
+                .Select(t => t.Subscriptions)
                 .SelectMany(s => s)
-                .Any(s => s.subscriptionId.Equals(Subscription));
-            if (validSub)
+                .Any(s => s.SubscriptionId.Equals(Subscription, StringComparison.OrdinalIgnoreCase));
+            var tenant = tenants
+                .FirstOrDefault(t => t.Subscriptions.Any(s => s.SubscriptionId.Equals(Subscription, StringComparison.OrdinalIgnoreCase)));
+
+            if (validSub && tenant != null)
             {
                 Settings.CurrentSubscription = Subscription;
+                Settings.CurrentTenant = tenant.TenantId;
             }
             else
             {
-                ColoredConsole.Error.WriteLine($"Unable to find ${Subscription}");
+                ColoredConsole.Error.WriteLine($"Unable to find {Subscription}");
             }
             await PrintAccountsAsync();
         }

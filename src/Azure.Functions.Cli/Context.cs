@@ -35,6 +35,8 @@ namespace Azure.Functions.Cli
 
         [Description("Commands for managing function proxies")]
         Proxy,
+        [Description("Commands for installing extensions")]
+        Extensions
     }
 
     internal static class ContextEnumExtensions

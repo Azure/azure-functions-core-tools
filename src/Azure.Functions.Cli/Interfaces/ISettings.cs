@@ -10,6 +10,8 @@ namespace Azure.Functions.Cli.Interfaces
 
         string CurrentSubscription { get; set; }
 
+        string CurrentTenant { get; set; }
+
         Dictionary<string, object> GetSettings();
 
         void SetSetting(string name, string value);

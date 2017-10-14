@@ -11,6 +11,7 @@ using System.Net.Http;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Arm.Models;
+using System.Net.Http.Headers;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -18,10 +19,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     internal class ListFunctionsActions : BaseFunctionAppAction
     {
         private readonly ISettings _settings;
+        private readonly IArmTokenManager _tokenManager;
 
-        public ListFunctionsActions(IArmManager armManager, ISettings settings) : base(armManager)
+        public ListFunctionsActions(IArmManager armManager, ISettings settings, IArmTokenManager tokenManager) : base(armManager)
         {
             _settings = settings;
+            _tokenManager = tokenManager;
         }
 
         public override async Task RunAsync()
@@ -33,7 +36,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri($"https://{functionApp.ScmUri}") })
                     {
-                        client.DefaultRequestHeaders.Authorization = await _armManager.GetAuthenticationHeader(_settings.CurrentSubscription);
+                        var token = await _tokenManager.GetToken(_settings.CurrentTenant);
+                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                         var response = await client.GetAsync(new Uri("api/functions", UriKind.Relative));
 

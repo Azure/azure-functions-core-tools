@@ -1,9 +1,11 @@
 {
   "name": "azure-functions-core-tools",
-  "version": "1.0.4",
+  "version": "2.0.1-beta.18",
   "description": "Azure Functions Core Tools",
   "scripts": {
-    "postinstall": "node lib/install.js"
+    "build": "dotnet publish ../ -o ./npm/bin -c release",
+    "postinstall": "node lib/install.js",
+    "uninstall": "node lib/uninstall.js"
   },
   "author": "Microsoft",
   "license": "MIT",
@@ -18,11 +20,15 @@
     "azurefunctions": "lib/main.js"
   },
   "os": [
-    "win32"
+    "win32",
+    "darwin",
+    "linux"
   ],
   "dependencies": {
     "chalk": "^2.1.0",
     "command-exists": "^1.2.2",
+    "glob": "^7.1.2",
+    "rimraf": "^2.6.1",
     "tmp": "^0.0.33",
     "unzipper": "^0.8.9"
   }

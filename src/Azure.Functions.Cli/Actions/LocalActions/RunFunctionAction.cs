@@ -20,8 +20,8 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "run", Context = Context.Function, HelpText = "Run a function directly")]
-    [Action(Name = "run", HelpText = "Run a function directly")]
+    // [Action(Name = "run", Context = Context.Function, HelpText = "Run a function directly")]
+    // [Action(Name = "run", HelpText = "Run a function directly")]
     class RunFunctionAction : BaseAction
     {
         private readonly IFunctionsLocalServer _scriptServer;
@@ -150,8 +150,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                     else if (scriptType == ScriptType.Javascript)
                     {
-                        var nodeDebugger = await DebuggerHelper.TrySetupNodeDebuggerAsync();
-                        if (nodeDebugger == NodeDebuggerStatus.Error)
+                        var Debugger = await DebuggerHelper.TrySetupDebuggerAsync();
+                        if (Debugger == DebuggerStatus.Error)
                         {
                             ColoredConsole
                                 .Error

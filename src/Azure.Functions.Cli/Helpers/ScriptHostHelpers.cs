@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ScriptHostHelpers
     {
-        private const TraceLevel DefaultTraceLevel = TraceLevel.Info;
+        private const System.Diagnostics.TraceLevel DefaultTraceLevel = System.Diagnostics.TraceLevel.Info;
         private static bool _isHelpRunning = false;
 
         public static void SetIsHelpRunning()
@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Helpers
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
             var functionErrors = new Dictionary<string, Collection<string>>();
-            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ConsoleTraceWriter(TraceLevel.Info), null, functionErrors);
+            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ConsoleTraceWriter(System.Diagnostics.TraceLevel.Info), null, functionErrors);
             var function = functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
             if (function == null)
             {
@@ -43,15 +43,16 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static string GetFunctionAppRootDirectory(string startingDirectory)
+        public static string GetFunctionAppRootDirectory(string startingDirectory, IEnumerable<string> searchFiles = null)
         {
             if (_isHelpRunning)
             {
                 return startingDirectory;
             }
 
-            var hostJson = Path.Combine(startingDirectory, ScriptConstants.HostMetadataFileName);
-            if (FileSystemHelpers.FileExists(hostJson))
+            searchFiles = searchFiles ?? new List<string> { ScriptConstants.HostMetadataFileName };
+
+            if (searchFiles.Any(file => FileSystemHelpers.FileExists(Path.Combine(startingDirectory, file))))
             {
                 return startingDirectory;
             }
@@ -60,15 +61,16 @@ namespace Azure.Functions.Cli.Helpers
 
             if (parent == null)
             {
-                throw new CliException($"Unable to find function project root. Expecting to have {ScriptConstants.HostMetadataFileName} in function project root.");
+                var files = searchFiles.Aggregate((accum, file) => $"{accum}, {file}");
+                throw new CliException($"Unable to find project root. Expecting to find one of {files} in project root.");
             }
             else
             {
-                return GetFunctionAppRootDirectory(parent);
+                return GetFunctionAppRootDirectory(parent, searchFiles);
             }
         }
 
-        internal static async Task<TraceLevel> GetTraceLevel(string scriptPath)
+        internal static async Task<System.Diagnostics.TraceLevel> GetTraceLevel(string scriptPath)
         {
             var filePath = Path.Combine(scriptPath, ScriptConstants.HostMetadataFileName);
             if (!FileSystemHelpers.FileExists(filePath))
@@ -78,7 +80,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var hostJson = JsonConvert.DeserializeObject<JObject>(await FileSystemHelpers.ReadAllTextFromFileAsync(filePath));
             var traceLevelStr = hostJson["tracing"]?["consoleLevel"]?.ToString();
-            if (!string.IsNullOrEmpty(traceLevelStr) && Enum.TryParse(traceLevelStr, true, out TraceLevel traceLevel))
+            if (!string.IsNullOrEmpty(traceLevelStr) && Enum.TryParse(traceLevelStr, true, out System.Diagnostics.TraceLevel traceLevel))
             {
                 return traceLevel;
             }

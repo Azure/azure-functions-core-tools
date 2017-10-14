@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Extensions
 
         public static string FixFileNameForZip(this string value, string zipRoot)
         {
-            return value.Substring(zipRoot.Length).TrimStart(new[] { '\\' }).Replace('\\', '/');
+            return value.Substring(zipRoot.Length).TrimStart(new[] { '\\', '/' }).Replace('\\', '/');
         }
     }
 }

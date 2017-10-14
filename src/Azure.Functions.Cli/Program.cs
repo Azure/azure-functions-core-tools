@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Threading;
-using ARMClient.Authentication;
-using ARMClient.Authentication.AADAuthentication;
-using ARMClient.Authentication.Contracts;
-using ARMClient.Library;
 using Autofac;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
@@ -53,16 +48,13 @@ namespace Azure.Functions.Cli
             builder.RegisterType<FunctionsLocalServer>()
                 .As<IFunctionsLocalServer>();
 
-            builder.Register(c => new PersistentAuthHelper { AzureEnvironments = AzureEnvironments.Prod })
-                .As<IAuthHelper>();
-
             builder.Register(_ => new PersistentSettings())
                 .As<ISettings>()
                 .SingleInstance()
                 .ExternallyOwned();
 
-            builder.Register(c => new AzureClient(retryCount: 3, authHelper: c.Resolve<IAuthHelper>()))
-                .As<IAzureClient>();
+            builder.RegisterType<ArmTokenManager>()
+                .As<IArmTokenManager>();
 
             builder.RegisterType<ArmManager>()
                 .As<IArmManager>();
