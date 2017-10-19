@@ -5,13 +5,12 @@ var fs = require('fs');
 var spawn = require('child_process').spawn;
 var fork = require('child_process').fork;
 var commandExists = require('command-exists');
-var os = require('os');
 var args = process.argv;
 
 function main() {
     commandExists('dotnet', function (err, commandExists) {
         if (commandExists) {
-            var bin = path.join(os.homedir(), '.azurefunctions', 'bin');
+            var bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
             var funcProc = spawn('dotnet', [bin + '/Azure.Functions.Cli.dll', ].concat(args.slice(2)), {
                 stdio: [process.stdin, process.stdout, process.stderr, 'pipe']
             });

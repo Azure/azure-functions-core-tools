@@ -6,13 +6,12 @@ var version = require('../package.json').version;
 var chalk = require('chalk');
 var path = require('path');
 var fs = require('fs');
-var os = require('os');
 var rimraf = require('rimraf');
 var glob = require('glob');
 var execSync = require('child_process').execSync;
 
 function getPath() {
-    var bin = path.join(os.homedir(), '.azurefunctions', 'bin');
+    var bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
     if (fs.existsSync(bin)) {
         rimraf.sync(bin);
     }
