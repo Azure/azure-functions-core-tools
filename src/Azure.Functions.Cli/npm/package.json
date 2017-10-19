@@ -4,8 +4,7 @@
   "description": "Azure Functions Core Tools",
   "scripts": {
     "build": "dotnet publish ../ -o ./npm/bin -c release",
-    "postinstall": "node lib/install.js",
-    "uninstall": "node lib/uninstall.js"
+    "postinstall": "node lib/install.js"
   },
   "author": "Microsoft",
   "license": "MIT",
