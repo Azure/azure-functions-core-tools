@@ -1,4 +1,4 @@
-﻿using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
+using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
@@ -29,14 +29,14 @@ using System.Threading.Tasks;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using static Colors.Net.StringStaticMethods;
 
-
 namespace Azure.Functions.Cli.Actions.HostActions
 {
     [Action(Name = "start", Context = Context.Host, HelpText = "Launches the functions runtime host")]
+    [Action(Name = "start", HelpText = "Launches the functions runtime host")]
     internal class StartHostAction : BaseAction
     {
-        const int DefaultPort = 7071;
-        const int DefaultTimeout = 20;
+        private const int DefaultPort = 7071;
+        private const int DefaultTimeout = 20;
         private readonly ISecretsManager _secretsManager;
 
         public int Port { get; set; }
@@ -128,7 +128,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Setup<string>("script-root")
                 .WithDescription($"The path to the root of the function app where the command will be executed.")
                 .SetDefault(".")
-                .Callback(dir => {
+                .Callback(dir =>
+                {
                     var fullDirPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, dir));
                     ScriptRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(fullDirPath);
                 });
@@ -161,7 +162,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(baseAddress.ToString())
-                .ConfigureAppConfiguration(configBuilder => {
+                .ConfigureAppConfiguration(configBuilder =>
+                {
                     configBuilder.AddEnvironmentVariables()
                         .AddCommandLine(arguments);
                 })
