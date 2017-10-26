@@ -11,11 +11,9 @@ namespace Azure.Functions.Cli.Helpers
     {
         public static async Task<string> EnsureExtensionsProjectExistsAsync()
         {
-            var extensionsDir = Path.Combine(Environment.CurrentDirectory, "functions-extensions");
-            var extensionsProj = Path.Combine(extensionsDir, "extensions.csproj");
+            var extensionsProj = Path.Combine(Environment.CurrentDirectory, "extensions.csproj");
             if (!FileSystemHelpers.FileExists(extensionsProj))
             {
-                FileSystemHelpers.EnsureDirectory(extensionsDir);
                 var assembly = typeof(ExtensionsHelper).Assembly;
                 var extensionsProjText = string.Empty;
                 using (Stream resource = assembly.GetManifestResourceStream(assembly.GetName().Name + ".ExtensionsProj.txt"))
