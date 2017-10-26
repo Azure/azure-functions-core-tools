@@ -25,8 +25,8 @@
     <PackageReference Include="AccentedCommandLineParser" Version="1.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.0.0" />
     <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.1.0-beta1-20170921" />
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.0.0-beta1-10022" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.0-beta1-11308" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.0.0-beta1-10026" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.0-beta1-11353" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
     <PackageReference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" Version="3.16.0" />
   </ItemGroup>
