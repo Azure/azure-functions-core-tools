@@ -17,13 +17,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     internal class InstallExtensionAction : BaseAction
     {
         public string Package { get; set; }
+
         public string Version { get; set; }
 
         public string OutputPath { get; set; }
-
-        public InstallExtensionAction()
-        {
-        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
