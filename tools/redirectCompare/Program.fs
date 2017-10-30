@@ -1,4 +1,4 @@
-﻿// Learn more about F# at http://fsharp.org
+// Learn more about F# at http://fsharp.org
 // See the 'F# Tutorial' project for more help.
 
 open System.IO
@@ -22,7 +22,7 @@ type Config = XmlProvider<"""
 </configuration>
 """>
 
-let source = new WebClient () |> fun x -> x.DownloadString("https://raw.githubusercontent.com/Azure/azure-webjobs-sdk-script/dev/src/WebJobs.Script.WebHost/Web.config") |> Config.Parse
+let source = new WebClient () |> fun x -> x.DownloadString("https://raw.githubusercontent.com/Azure/azure-webjobs-sdk-script/v1.x/src/WebJobs.Script.WebHost/Web.config") |> Config.Parse
 let dest = "..\\..\\..\\..\\src\\Azure.Functions.Cli\\App.config" |> File.ReadAllText |> Config.Parse
 
 for assembly in source.Runtime.AssemblyBinding.DependentAssemblies do
