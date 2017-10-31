@@ -7,6 +7,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{C57EBA1F-1C48-451A-80D6-F6AA7C881CF8}</ProjectGuid>
+    <DependsOnNETStandard>true</DependsOnNETStandard>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Azure.Functions.Cli.Tests</RootNamespace>
