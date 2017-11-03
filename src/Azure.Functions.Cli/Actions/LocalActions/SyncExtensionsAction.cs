@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using static Azure.Functions.Cli.Common.OutputTheme;
 using Colors.Net;
 using Fclp;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -33,9 +32,36 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public async override Task RunAsync()
         {
             var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync();
+            var runtimeId = GetRuntimeIdentifierParameter();
 
-            var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath}");
+            var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath} {runtimeId}");
             await installExtensions.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
+        }
+
+        private static string GetRuntimeIdentifierParameter()
+        {
+            string os = null;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                os = "win";
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                os = "osx";
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                os = "linux";
+            }
+            else
+            {
+                return string.Empty;
+            }
+
+            string arch = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+
+            return $"-r {os}-{arch}";
         }
     }
 }
