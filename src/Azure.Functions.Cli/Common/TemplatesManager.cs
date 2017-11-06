@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Common
                 var response = "n";
                 do
                 {
-                    ColoredConsole.Write("A directory with the name {Name} already exists. Overwrite [y/n]? [n] ");
+                    ColoredConsole.Write($"A directory with the name {Name} already exists. Overwrite [y/n]? [n] ");
                     response = Console.ReadLine();
                 } while (response != "n" && response != "y");
                 if (response == "n")
