@@ -1,6 +1,6 @@
 {
   "name": "azure-functions-core-tools",
-  "version": "2.0.1-beta.18",
+  "version": "2.0.1-beta.21",
   "description": "Azure Functions Core Tools",
   "scripts": {
     "build": "dotnet publish ../ -o ./npm/bin -c release",
@@ -27,6 +27,7 @@
     "chalk": "^2.1.0",
     "command-exists": "^1.2.2",
     "glob": "^7.1.2",
+    "progress": "^2.0.0",
     "rimraf": "^2.6.1",
     "tmp": "^0.0.33",
     "unzipper": "^0.8.9"

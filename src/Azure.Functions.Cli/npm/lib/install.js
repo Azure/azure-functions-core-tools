@@ -9,6 +9,7 @@ var fs = require('fs');
 var rimraf = require('rimraf');
 var glob = require('glob');
 var execSync = require('child_process').execSync;
+var ProgressBar = require('progress');
 
 function getPath() {
     var bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
@@ -20,8 +21,17 @@ function getPath() {
 
 var url = 'https://functionscdn.azureedge.net/public/' + version + '/Azure.Functions.Cli.zip';
 https.get(url, function (response) {
+
+        var bar = new ProgressBar('[:bar] Downloading Azure Functions Cli', { 
+            total: Number(response.headers['content-length']),
+            width: 18
+        });
+
         if (response.statusCode === 200) {
             var installPath = getPath();
+            response.on('data', function(data) {
+                bar.tick(data.length);
+            })
             var unzipStream = unzipper.Extract({ path: installPath })
                 .on('close', () => installWorkers(installPath));
             response.pipe(unzipStream);
