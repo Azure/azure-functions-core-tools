@@ -1,6 +1,6 @@
 {
   "name": "azure-functions-core-tools",
-  "version": "2.0.1-beta.21",
+  "version": "2.0.1-beta.22",
   "description": "Azure Functions Core Tools",
   "scripts": {
     "build": "dotnet publish ../ -o ./npm/bin -c release",
