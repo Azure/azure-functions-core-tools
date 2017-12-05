@@ -23,6 +23,8 @@ To install globally for non-Windows platforms:
 ```
 npm i -g azure-functions-core-tools@core
 ```
+This installs an advanced beta version of the cli, so it is highly recommended that while using the core tag, you enable the `beta` runtime in function app settings, otherwise you may not see the same results as running locally.
+
 
 ### Dependencies
 
