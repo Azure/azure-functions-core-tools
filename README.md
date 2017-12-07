@@ -12,11 +12,23 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 **NOTE**: This package only currently works on Windows, since the underlying Functions Host is not yet cross-platform. You can upvote this GitHub issue if you're interested in running on other platforms: [make the Azure Functions Core Tools cross platform](https://github.com/Azure/azure-functions-cli/issues/13).
 
-To install globally:
+To install globally for Windows:
 
 ```
 npm i -g azure-functions-core-tools
 ```
+
+To install globally for non-Windows platforms:
+
+```
+npm i -g azure-functions-core-tools@core
+```
+This installs a higher beta version of the cli, so it is highly recommended that while using the core tag, you [enable the `beta` runtime](https://docs.microsoft.com/en-us/azure/azure-functions/functions-versions#target-the-version-20-runtime) in function app settings, otherwise you may not see the same results as running locally.
+
+
+### Dependencies
+
+There is a dependency on the .NET Core tools for the cross platform support. You can [install these here](https://www.microsoft.com/net/core).
 
 ### Aliases
 
