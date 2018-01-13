@@ -34,7 +34,12 @@ namespace Azure.Functions.Cli.Common
         [JsonProperty("language")]
         public string Language { get; set; }
 
+        [JsonProperty("category")]
+        public IEnumerable<string> Category { get; set; }
+
         [JsonProperty("userPrompt")]
         public IEnumerable<string> UserPrompt { get; set; }
+
+        public bool IsExperimental => this.Category?.Any(c => c.Contains("experimental")) ?? false;
     }
 }
