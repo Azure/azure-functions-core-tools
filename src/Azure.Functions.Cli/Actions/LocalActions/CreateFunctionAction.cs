@@ -62,11 +62,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var templates = await _templatesManager.Templates;
 
             ColoredConsole.Write("Select a language: ");
-            var language = Language ?? ConsoleHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Distinct());
+            var language = UnformatLabel(Language ?? ConsoleHelper.DisplaySelectionWizard(templates.GroupBy(t => t.Metadata.Language).Select(g => FormatLabel(g.Key, g.All(t => t.Metadata.IsExperimental)))));
             ColoredConsole.WriteLine(TitleColor(language));
 
             ColoredConsole.Write("Select a template: ");
-            var name = TemplateName ?? ConsoleHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(language, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+            var name = UnformatLabel(TemplateName ?? ConsoleHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(language, StringComparison.OrdinalIgnoreCase)).Select(t => FormatLabel(t.Metadata.Name, t.Metadata.IsExperimental)).Distinct()));
             ColoredConsole.WriteLine(TitleColor(name));
 
             var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(language, StringComparison.OrdinalIgnoreCase));
@@ -82,6 +82,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 functionName = string.IsNullOrEmpty(functionName) ? template.Metadata.DefaultFunctionName : functionName;
                 await _templatesManager.Deploy(functionName, template);
             }
+
+            string FormatLabel(string label, bool isExperimental) => label + (isExperimental ? " (Experimental)" : "");
+            string UnformatLabel(string label) => label.Replace(" (Experimental)", "");
         }
     }
 }
