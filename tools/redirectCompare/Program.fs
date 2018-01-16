@@ -33,3 +33,12 @@ for assembly in source.Runtime.AssemblyBinding.DependentAssemblies do
         printfn "Different: %s" destElement.Value.AssemblyIdentity.Name
     else if destElement.IsNone then
         printfn "Not in dest: %s" assembly.AssemblyIdentity.Name
+
+for assembly in dest.Runtime.AssemblyBinding.DependentAssemblies do
+    let destElement =
+        source.Runtime.AssemblyBinding.DependentAssemblies
+        |> Array.tryFind (fun x -> x.AssemblyIdentity.Name = assembly.AssemblyIdentity.Name)
+    if destElement.IsSome && (destElement.Value.BindingRedirect.NewVersion <> assembly.BindingRedirect.NewVersion || destElement.Value.BindingRedirect.OldVersion <> assembly.BindingRedirect.OldVersion) then
+        printfn "Different: %s" destElement.Value.AssemblyIdentity.Name
+    else if destElement.IsNone then
+        printfn "Not in source: %s" assembly.AssemblyIdentity.Name
