@@ -1,3 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
@@ -18,14 +26,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using static Colors.Net.StringStaticMethods;
 
@@ -205,8 +205,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             Utilities.PrintLogo();
 
-            var traceLevel = await ScriptHostHelpers.GetTraceLevel(ScriptRoot);
-            var settings = SelfHostWebHostSettingsFactory.Create(traceLevel, ScriptRoot);
+            var settings = SelfHostWebHostSettingsFactory.Create(ScriptRoot);
 
             (var baseAddress, var certificate) = Setup();
 
@@ -219,7 +218,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             ColoredConsole.WriteLine($"Listening on {baseAddress}");
             ColoredConsole.WriteLine("Hit CTRL-C to exit...");
 
-            DisableCoreLogging(manager);
             DisplayHttpFunctionsInfo(manager, baseAddress);
             DisplayDisabledFunctions(manager);
             await SetupDebuggerAsync(baseAddress);
@@ -235,14 +233,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
                 }
-            }
-        }
-
-        private static void DisableCoreLogging(WebScriptHostManager hostManager)
-        {
-            if (hostManager != null)
-            {
-                hostManager.Instance.ScriptConfig.HostConfig.Tracing.ConsoleLevel = System.Diagnostics.TraceLevel.Off;
             }
         }
 
@@ -408,7 +398,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 services.AddWebJobsScriptHostAuthorization();
 
-                services.AddSingleton<ILoggerFactoryBuilder, ConsoleLoggerFactoryBuilder>();
+                services.AddSingleton<ILoggerProviderFactory, ConsoleLoggerProviderFactory>();
                 services.AddSingleton<WebHostSettings>(_hostSettings);
 
                 return services.AddWebJobsScriptHost(_builderContext.Configuration);

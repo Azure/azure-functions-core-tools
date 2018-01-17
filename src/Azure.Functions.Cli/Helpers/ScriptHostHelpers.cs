@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
+using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Description;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -27,7 +24,7 @@ namespace Azure.Functions.Cli.Helpers
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
             var functionErrors = new Dictionary<string, Collection<string>>();
-            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ConsoleTraceWriter(System.Diagnostics.TraceLevel.Info), null, functionErrors);
+            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ColoredConsoleLogger(LogCategories.Startup, (cat, level) => level >= Microsoft.Extensions.Logging.LogLevel.Information), functionErrors);
             var function = functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
             if (function == null)
             {
@@ -67,26 +64,6 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 return GetFunctionAppRootDirectory(parent, searchFiles);
-            }
-        }
-
-        internal static async Task<System.Diagnostics.TraceLevel> GetTraceLevel(string scriptPath)
-        {
-            var filePath = Path.Combine(scriptPath, ScriptConstants.HostMetadataFileName);
-            if (!FileSystemHelpers.FileExists(filePath))
-            {
-                return DefaultTraceLevel;
-            }
-
-            var hostJson = JsonConvert.DeserializeObject<JObject>(await FileSystemHelpers.ReadAllTextFromFileAsync(filePath));
-            var traceLevelStr = hostJson["tracing"]?["consoleLevel"]?.ToString();
-            if (!string.IsNullOrEmpty(traceLevelStr) && Enum.TryParse(traceLevelStr, true, out System.Diagnostics.TraceLevel traceLevel))
-            {
-                return traceLevel;
-            }
-            else
-            {
-                return DefaultTraceLevel;
             }
         }
     }

@@ -1,42 +1,24 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
-using System;
+﻿using System;
+using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
     public class ColoredConsoleLoggerProvider : ILoggerProvider
     {
-        private readonly ConsoleLoggerProvider _innerProvider;
-        private bool _disposedValue = false;
+        private readonly Func<string, LogLevel, bool> _filter;
 
-        public ColoredConsoleLoggerProvider(Func<string, LogLevel, bool> filter, bool includeScopes)
+        public ColoredConsoleLoggerProvider(Func<string, LogLevel, bool> filter)
         {
-            _innerProvider = new ConsoleLoggerProvider(filter, includeScopes);
+            _filter = filter;
         }
 
         public ILogger CreateLogger(string categoryName)
         {
-            ConsoleLogger logger = (ConsoleLogger)_innerProvider.CreateLogger(categoryName);
-            logger.Console = new LoggerConsole();
-            return logger;
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposedValue)
-            {
-                if (disposing)
-                {
-                    _innerProvider.Dispose();
-                }
-
-                _disposedValue = true;
-            }
+            return new ColoredConsoleLogger(categoryName, _filter);
         }
 
         public void Dispose()
         {
-            Dispose(true);
         }
     }
 }
