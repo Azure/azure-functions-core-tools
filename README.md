@@ -107,6 +107,9 @@ Actions:
 enable-git-repo     Enable git repository on your Azure-hosted Function App
 fetch-app-settings  Retrieve App Settings from your Azure-hosted Function App and store locally. Alias: fetch
 list                List all Function Apps in the selected Azure subscription
+list-functions      List functions in a given function app on azure
+logstream           Show interactive streaming logs for an Azure-hosted Function App
+publish             Publish the current directory contents to an Azure Function App
 ```
 
 The `func azure storage list` command will show storage accounts in the selected subscription. You can then set up a connection string locally with this storage account name using `func settings add-storage-account`.
