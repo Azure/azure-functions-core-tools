@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.15
+VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{CF86C17E-5C8A-4810-87BF-10548537A771}"
 	ProjectSection(SolutionItems) = preProject
@@ -21,6 +21,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{3FD809C2
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "redirectCompare", "tools\redirectCompare\redirectCompare.fsproj", "{DFE7F321-00D7-47E0-8653-6329CDE3D78C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "packageConfigParser", "packageConfigParser\packageConfigParser.csproj", "{8463BC17-B28E-4171-A5B0-EF503980334F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{DFE7F321-00D7-47E0-8653-6329CDE3D78C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DFE7F321-00D7-47E0-8653-6329CDE3D78C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DFE7F321-00D7-47E0-8653-6329CDE3D78C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8463BC17-B28E-4171-A5B0-EF503980334F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8463BC17-B28E-4171-A5B0-EF503980334F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8463BC17-B28E-4171-A5B0-EF503980334F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8463BC17-B28E-4171-A5B0-EF503980334F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -47,6 +53,7 @@ Global
 		{6608738C-3BDB-47F5-BC62-66A8BDF9D884} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
 		{C57EBA1F-1C48-451A-80D6-F6AA7C881CF8} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
 		{DFE7F321-00D7-47E0-8653-6329CDE3D78C} = {3FD809C2-9986-4659-A82A-CE7B165530E6}
+		{8463BC17-B28E-4171-A5B0-EF503980334F} = {3FD809C2-9986-4659-A82A-CE7B165530E6}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {15E08A4A-EF7C-4E42-BB11-DA397493F547}
