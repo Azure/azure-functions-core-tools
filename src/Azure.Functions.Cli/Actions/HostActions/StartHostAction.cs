@@ -166,15 +166,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             secrets.Add(Constants.WebsiteHostname, uri.Authority);
 
             // Add our connection strings
-            if (c.ProviderName == Constants.DefaultSqlProviderName)
-            {
-                secrets.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
-            }
-            else
-            {
-                secrets.AddRange(connectionStrings.ToDictionary(c => $"{c.ProviderName}CONNSTR_{c.Name}", c => c.Value));
-            }
-
+            secrets.AddRange(connectionStrings.ToDictionary(c => (c.ProviderName == Constants.DefaultSqlProviderName) ? $"ConnectionStrings:{c.Name}" : $"{c.ProviderName}CONNSTR_{c.Name}", c => c.Value));
             secrets.Add(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
 
             await CheckNonOptionalSettings(secrets, scriptPath);
