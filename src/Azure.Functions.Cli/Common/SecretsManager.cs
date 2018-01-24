@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Helpers;
 using Newtonsoft.Json.Linq;
