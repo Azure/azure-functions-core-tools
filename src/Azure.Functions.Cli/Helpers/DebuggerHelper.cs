@@ -50,6 +50,13 @@ namespace Azure.Functions.Cli.Helpers
                     Type = "java",
                     Request = "attach",
                     Port = Constants.JavaDebugPort
+                },
+                new VsCodeLaunchConfiguration
+                {
+                    Name = "Attach to Azure Functions (.NET)",
+                    Type = "coreclr",
+                    Request = "attach",
+                    ProcessId = Constants.DotNetClrProcessId
                 }
             }
         };
@@ -124,5 +131,8 @@ namespace Azure.Functions.Cli.Helpers
 
         [JsonProperty("port")]
         public int Port { get; set; }
+
+        [JsonProperty("processId")]
+        public string ProcessId { get; set; }
     }
 }

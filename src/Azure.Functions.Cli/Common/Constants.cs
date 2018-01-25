@@ -12,6 +12,7 @@ namespace Azure.Functions.Cli.Common
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
         public const int NodeDebugPort = 5858;
         public const int JavaDebugPort = 5005;
+        public const string DotNetClrProcessId = @"${command:pickProcess}";
 
         public static class Errors
         {
