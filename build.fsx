@@ -40,6 +40,7 @@ let downloadDir  = "./dist/download/"
 let deployDir = "./deploy/"
 let packagesDir = "./packages/"
 let toolsDir = "./buildtools/"
+let platform = getBuildParamOrDefault "platform" "x86"
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
@@ -49,7 +50,7 @@ let toSignZipPath = deployDir @@ toSignZipName
 let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let finalZipPath = deployDir @@ "Azure.Functions.Cli.zip"
+let finalZipPath = deployDir @@ "Azure.Functions.Cli." + platform + ".zip"
 
 Target "RestorePackages" (fun _ ->
     !! "./**/packages.config"
@@ -84,7 +85,7 @@ Target "SetVersion" (fun _ ->
 
 Target "Compile" (fun _ ->
     !! @"src\**\*.csproj"
-      |> MSBuildRelease buildDir "Build"
+      |> MSBuildReleaseExt buildDir [("platform", platform)] "Build"
       |> Log "AppBuild-Output: "
 )
 
@@ -280,18 +281,17 @@ Target "DownloadTools" (fun _ ->
 )
 
 Dependencies
-"Clean"
-  ==> "DownloadTools"
+"DownloadTools"
   ==> "RestorePackages"
   ==> "SetVersion"
   ==> "Compile"
   ==> "DownloadNugetExe"
   ==> "CompileTest"
   ==> "XUnitTest"
-  ==> "GenerateZipToSign"
-  ==> "UploadZipToSign"
-  ==> "EnqueueSignMessage"
-  ==> "WaitForSigning"
+  =?> ("GenerateZipToSign", hasBuildParam "sign")
+  =?> ("UploadZipToSign", hasBuildParam "sign")
+  =?> ("EnqueueSignMessage", hasBuildParam "sign")
+  =?> ("WaitForSigning", hasBuildParam "sign")
   ==> "Zip"
 
 // start build
