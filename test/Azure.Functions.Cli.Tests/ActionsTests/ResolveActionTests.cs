@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using NSubstitute;
 using Xunit;
+using System.IO.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
@@ -54,6 +55,10 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("--help", typeof(HelpAction))]
         public void ResolveCommandLineCorrectly(string args, Type type)
         {
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            FileSystemHelpers.Instance = fileSystem;
+
             var container = InitializeContainerForTests();
             var app = new ConsoleApp(args.Split(' ').ToArray(), type.Assembly, container);
             var result = app.Parse();
