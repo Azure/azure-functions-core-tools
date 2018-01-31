@@ -31,23 +31,25 @@ let MoveFileTo (source, destination) =
 let env = Environment.GetEnvironmentVariable
 let connectionString =
     "DefaultEndpointsProtocol=https;AccountName=" + (env "FILES_ACCOUNT_NAME") + ";AccountKey=" + (env "FILES_ACCOUNT_KEY")
-let buildDir  = "./dist/build/"
-let testDir   = "./dist/test/"
-let downloadDir  = "./dist/download/"
-let deployDir = "./deploy/"
 let packagesDir = "./packages/"
 let toolsDir = "./buildtools/"
 let platform = getBuildParamOrDefault "platform" "x86"
+let buildDir  = "./dist/build" + platform + "/"
+let testDir   = "./dist/test" + platform + "/"
+let deployDir = "./deploy" + platform + "/"
+let downloadDir  = "./dist/download" + platform + "/"
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
-let toSignZipName = version + ".zip"
-let toSignThirdPartyName = version + "-thridparty.zip"
+let toSignZipName = version + platform + ".zip"
+let toSignThirdPartyName = version + platform + "-thridparty.zip"
 let toSignZipPath = deployDir @@ toSignZipName
 let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
 let finalZipPath = deployDir @@ "Azure.Functions.Cli." + platform + ".zip"
+
+
 
 Target "RestorePackages" (fun _ ->
     !! "./**/packages.config"
