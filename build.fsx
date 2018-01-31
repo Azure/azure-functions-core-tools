@@ -8,13 +8,10 @@ open System.Net
 open System.Threading.Tasks
 
 open Microsoft.VisualBasic.FileIO
-open Microsoft.WindowsAzure
 open Microsoft.WindowsAzure.Storage
-open Microsoft.WindowsAzure.Storage.Blob
 open Microsoft.WindowsAzure.Storage.Queue
 open Fake
 open Fake.AssemblyInfoFile
-open Fake.ProcessHelper
 open Fake.Testing
 
 type Result<'TSuccess,'TFailure> =
@@ -91,18 +88,18 @@ Target "Compile" (fun _ ->
 
 Target "CompileTest" (fun _ ->
     !! @"test\**\*.csproj"
-      |> MSBuildDebug testDir "Build"
+      |> MSBuild testDir "Build" [("platform", platform)]
       |> Log "TestBuild-Output: "
 )
 
 Target "XUnitTest" (fun _ ->
     !! (testDir + @"\Azure.Functions.Cli.Tests.dll")
       |> xUnit2 (fun p ->
-       {p with
+        {p with
             HtmlOutputPath = Some (testDir @@ "result.html")
-            ToolPath = packagesDir @@ @"xunit.runner.console\tools\net452\xunit.console.exe"
+            ToolPath = packagesDir @@ @"xunit.runner.console\tools\net452\xunit.console" + (if platform = "x86" then @".x86.exe" else ".exe")
             Parallel = NoParallelization
-         })
+        })
 )
 
 let excludedFiles = [
