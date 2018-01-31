@@ -1,12 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ARMClient.Authentication;
-using ARMClient.Authentication.AADAuthentication;
-using ARMClient.Authentication.Contracts;
-using ARMClient.Library;
 using Autofac;
 using FluentAssertions;
 using Azure.Functions.Cli.Actions;
@@ -50,8 +43,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("settings delete settingName", typeof(DeleteSettingAction))]
         [InlineData("settings list", typeof(ListSettingsAction))]
         [InlineData("init", typeof(InitAction))]
-        [InlineData("run functionName", typeof(RunFunctionAction))]
-        [InlineData("function run functionName", typeof(RunFunctionAction))]
         [InlineData("-v", typeof(HelpAction))]
         [InlineData("-version", typeof(HelpAction))]
         [InlineData("--version", typeof(HelpAction))]
@@ -76,16 +67,12 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             builder.RegisterType<FunctionsLocalServer>()
                 .As<IFunctionsLocalServer>();
 
-            builder.Register(c => new PersistentAuthHelper { AzureEnvironments = AzureEnvironments.Prod })
-                .As<IAuthHelper>();
-
             builder.Register(_ => new PersistentSettings())
                 .As<ISettings>()
-                .SingleInstance()
-                .ExternallyOwned();
+                .SingleInstance();
 
-            builder.Register(c => new AzureClient(retryCount: 3, authHelper: c.Resolve<IAuthHelper>()))
-                .As<IAzureClient>();
+            builder.RegisterType<ArmTokenManager>()
+                .As<IArmTokenManager>();
 
             builder.RegisterType<ArmManager>()
                 .As<IArmManager>();
