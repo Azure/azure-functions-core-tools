@@ -7,15 +7,10 @@ open System.IO
 open System.Net
 open System.Threading.Tasks
 
-open Microsoft.VisualBasic.FileIO
-open Microsoft.WindowsAzure
 open Microsoft.WindowsAzure.Storage
-open Microsoft.WindowsAzure.Storage.Blob
 open Microsoft.WindowsAzure.Storage.Queue
 open Fake
 open Fake.AssemblyInfoFile
-open Fake.ProcessHelper
-open Fake.Testing
 
 type Result<'TSuccess,'TFailure> =
     | Success of 'TSuccess
@@ -128,78 +123,62 @@ type SigningInfo =
       ``Machine Type``: string; }
 
 Target "GenerateZipToSign" (fun _ ->
-    let sigCheckResult =
-        ExecProcessAndReturnMessages (fun info ->
-            info.FileName <- sigCheckExe
-            info.WorkingDirectory <- Environment.CurrentDirectory
-            info.Arguments <- "-nobanner -c -accepteula -e " + buildDir
-        ) (TimeSpan.FromMinutes 2.0)
-        |> fun result ->
-            result.Messages
-            |> Seq.skip 1
-            |> String.concat Environment.NewLine
-            |> (fun csv ->
-                use parser = new TextFieldParser (new StringReader (csv))
-                parser.TextFieldType <- FieldType.Delimited
-                parser.SetDelimiters [| "," |]
-                seq {
-                    while (not parser.EndOfData) do
-                        let fields = parser.ReadFields ()
-                        yield { Path = fields.[0]; Verified = fields.[1]; Date = fields.[2];
-                            Publisher = fields.[3]; Company = fields.[4]; Description = fields.[5];
-                            Product = fields.[6]; ``Product Version`` = fields.[7];
-                            ``File Version`` = fields.[8]; ``Machine Type`` = fields.[9] }
-                } |> Array.ofSeq
-            )
-    let notSigned (includes: FileIncludes) =
-        includes
-        |> Seq.filter (fun f ->
-            f.EndsWith ".js" ||
-            sigCheckResult
-            |> Array.exists (fun i -> i.Path = f && i.Verified = "Unsigned"))
+    let firstParty = [
+        "func.dll"
+        "Microsoft.Azure.AppService.Proxy.Client.Contract.dll"
+        "Microsoft.Azure.WebJobs.dll"
+        "Microsoft.Azure.WebJobs.Extensions.dll"
+        "Microsoft.Azure.WebJobs.Extensions.Http.dll"
+        "Microsoft.Azure.WebJobs.Host.dll"
+        "Microsoft.Azure.WebJobs.Logging.ApplicationInsights.dll"
+        "Microsoft.Azure.WebJobs.Logging.dll"
+        "Microsoft.Azure.WebJobs.Script.dll"
+        "Microsoft.Azure.WebJobs.Script.Grpc.dll"
+        "Microsoft.Azure.WebJobs.Script.WebHost.dll"
+        "Microsoft.Azure.WebSites.DataProtection.dll"
+    ]
 
-    !! (buildDir @@ "/**/Microsoft.Azure.*.dll")
-        ++ (buildDir @@ "func.exe")
-        ++ (buildDir @@ "azurefunctions/functions.js")
-        ++ (buildDir @@ "azurefunctions/http/request.js")
-        ++ (buildDir @@ "azurefunctions/http/response.js")
-        |> notSigned
-        |> CreateZip buildDir toSignZipPath String.Empty 7 true
-
-    MoveFileTo (buildDir @@ "edge/x64/node.dll", buildDir @@ "node_x64.dll")
-    MoveFileTo (buildDir @@ "edge/x64/edge_nativeclr.node", buildDir @@ "edge_nativeclr_x64.dll")
-
-    MoveFileTo (buildDir @@ "edge/x86/node.dll", buildDir @@ "node_x86.dll")
-    MoveFileTo (buildDir @@ "edge/x86/edge_nativeclr.node", buildDir @@ "edge_nativeclr_x86.dll")
-
-    let thirdParty = [|
-        "ARMClient.Authentication.dll"
-        "ARMClient.Library.dll"
+    let thirdParty = [
+        "AccentedCommandLineParser.dll"
         "Autofac.dll"
-        "Autofac.Integration.WebApi.dll"
+        "Autofac.Extensions.DependencyInjection.dll"
         "Colors.Net.dll"
-        "EdgeJs.dll"
-        "FluentCommandLineParser.dll"
         "FSharp.Compiler.Service.dll"
-        "FSharp.Compiler.Service.MSBuild.v12.dll"
-        "Humanizer.dll"
-        "Ignite.SharpNetSH.dll"
+        "Google.Protobuf.dll"
+        "Grpc.Core.dll"
         "NCrontab.dll"
+        "Newtonsoft.Json.Bson.dll"
         "Newtonsoft.Json.dll"
-        "RestSharp.dll"
-        "SendGrid.CSharp.HTTP.Client.dll"
-        "SendGrid.dll"
-        "SendGrid.SmtpApi.dll"
+        "Remotion.Linq.dll"
+        "SQLitePCLRaw.batteries_green.dll"
+        "SQLitePCLRaw.batteries_v2.dll"
+        "SQLitePCLRaw.core.dll"
+        "SQLitePCLRaw.provider.e_sqlite3.dll"
+        "StackExchange.Redis.StrongName.dll"
         "System.IO.Abstractions.dll"
-        "Twilio.Api.dll"
-        "node_x64.dll"
-        "node_x86.dll"
-        "edge_nativeclr_x64.node"
-        "edge_nativeclr_x86.node"
-    |]
+        "grpc_csharp_ext.x64.dll"
+        "grpc_csharp_ext.x86.dll"
+        "e_sqlite3_winx64.dll"
+        "e_sqlite3_winx86.dll"
+        "grpc_node_winx86_node48.node"
+        "grpc_node_winx86_node57.node"
+        "grpc_node_winx64_node57.node"
+    ]
+
+    MoveFileTo (buildDir @@ "runtimes/win/native/grpc_csharp_ext.x64.dll", buildDir @@ "grpc_csharp_ext.x64.dll")
+    MoveFileTo (buildDir @@ "runtimes/win/native/grpc_csharp_ext.x86.dll", buildDir @@ "grpc_csharp_ext.x86.dll")
+    MoveFileTo (buildDir @@ "runtimes/win7-x64/native/e_sqlite3.dll", buildDir @@ "e_sqlite3_winx64.dll")
+    MoveFileTo (buildDir @@ "runtimes/win7-x86/native/e_sqlite3.dll", buildDir @@ "e_sqlite3_winx86.dll")
+    MoveFileTo (buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node", buildDir @@ "grpc_node_winx86_node48.dll")
+    MoveFileTo (buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node", buildDir @@ "grpc_node_winx86_node57.dll")
+    MoveFileTo (buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node", buildDir @@ "grpc_node_winx64_node57.dll")
 
     !! (buildDir @@ "/**/*.dll")
-        |> Seq.filter (fun f -> thirdParty |> Array.contains (f |> Path.GetFileName))
+        |> Seq.filter (fun f -> firstParty |> List.contains (f |> Path.GetFileName))
+        |> CreateZip buildDir toSignZipPath String.Empty 7 true
+
+    !! (buildDir @@ "/**/*.dll")
+        |> Seq.filter (fun f -> thirdParty |> List.contains (f |> Path.GetFileName))
         |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
 )
 
@@ -244,22 +223,20 @@ Target "WaitForSigning" (fun _ ->
 
     let signed = downloadFile toSignZipName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
-    | Success file ->
-        Unzip buildDir file
-        MoveFile (buildDir @@ "azurefunctions/") (buildDir @@ "functions.js")
-        MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "request.js")
-        MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "response.js")
+    | Success file -> Unzip buildDir file
     | Failure e -> targetError e null |> ignore
 
     let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
     | Success file ->
         Unzip buildDir file
-        MoveFileTo (buildDir @@ "node_x64.dll", buildDir @@ "edge/x64/node.dll")
-        MoveFileTo (buildDir @@ "edge_nativeclr_x64.dll", buildDir @@ "edge/x64/edge_nativeclr.node")
-
-        MoveFileTo (buildDir @@ "node_x86.dll", buildDir @@ "edge/x86/node.dll")
-        MoveFileTo (buildDir @@ "edge_nativeclr_x86.dll", buildDir @@ "edge/x86/edge_nativeclr.node")
+        MoveFileTo (buildDir @@ "grpc_csharp_ext.x64.dll", buildDir @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
+        MoveFileTo (buildDir @@ "grpc_csharp_ext.x86.dll", buildDir @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
+        MoveFileTo (buildDir @@ "e_sqlite3_winx64.dll", buildDir @@ "runtimes/win7-x64/native/e_sqlite3.dll")
+        MoveFileTo (buildDir @@ "e_sqlite3_winx86.dll", buildDir @@ "runtimes/win7-x86/native/e_sqlite3.dll")
+        MoveFileTo (buildDir @@ "grpc_node_winx86_node48.dll", buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node")
+        MoveFileTo (buildDir @@ "grpc_node_winx86_node57.dll", buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node")
+        MoveFileTo (buildDir @@ "grpc_node_winx64_node57.dll", buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node")
     | Failure e -> targetError e null |> ignore
 )
 
@@ -284,6 +261,10 @@ Dependencies
   ==> "RestorePackages"
   ==> "Compile"
   ==> "Test"
+  =?> ("GenerateZipToSign", hasBuildParam "sign")
+  =?> ("UploadZipToSign", hasBuildParam "sign")
+  =?> ("EnqueueSignMessage", hasBuildParam "sign")
+  =?> ("WaitForSigning", hasBuildParam "sign")
   ==> "Zip"
 
 // start build
