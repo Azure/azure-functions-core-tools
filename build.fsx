@@ -160,9 +160,9 @@ Target "GenerateZipToSign" (fun _ ->
         "grpc_csharp_ext.x86.dll"
         "e_sqlite3_winx64.dll"
         "e_sqlite3_winx86.dll"
-        "grpc_node_winx86_node48.node"
-        "grpc_node_winx86_node57.node"
-        "grpc_node_winx64_node57.node"
+        "grpc_node_winx86_node48.dll"
+        "grpc_node_winx86_node57.dll"
+        "grpc_node_winx64_node57.dll"
     ]
 
     MoveFileTo (buildDir @@ "runtimes/win/native/grpc_csharp_ext.x64.dll", buildDir @@ "grpc_csharp_ext.x64.dll")
