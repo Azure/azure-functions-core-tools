@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Fclp;
-using System.Runtime.InteropServices;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using Azure.Functions.Cli.Common;
-using System.IO;
-using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {

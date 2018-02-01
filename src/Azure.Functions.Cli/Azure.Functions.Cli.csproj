@@ -19,7 +19,9 @@
     <None Remove="Properties\ExtensionsProj.txt" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="ExtensionsProj.txt" />
+    <EmbeddedResource Include="ExtensionsProj.txt">
+      <LogicalName>$(AssemblyName).ExtensionsProj.txt</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.1" />
