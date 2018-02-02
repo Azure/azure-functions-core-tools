@@ -47,7 +47,7 @@ let toSignZipPath = deployDir @@ toSignZipName
 let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let targetRuntimes = ["win-x86"; "win-x64"; "oxs-x64"; "linux-x64"]
+let targetRuntimes = ["win-x86"; "win-x64"; "osx-x64"; "linux-x64"]
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
