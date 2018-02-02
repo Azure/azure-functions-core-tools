@@ -32,6 +32,7 @@ let connectionString =
 let projectPath = "./src/Azure.Functions.Cli/"
 let testProjectPath = "./test/Azure.Functions.Cli.Tests/"
 let buildDir  = "./dist/build/"
+let buildDirNoRuntime = buildDir @@ "no-runtime"
 let testDir   = "./dist/test/"
 let downloadDir  = "./dist/download/"
 let deployDir = "./deploy/"
@@ -46,7 +47,7 @@ let toSignZipPath = deployDir @@ toSignZipName
 let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let finalZipPath = deployDir @@ "Azure.Functions.Cli.zip"
+let targetRuntimes = ["win-x86"; "win-x64"; "oxs-x64"; "linux-x64"]
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
@@ -85,12 +86,22 @@ Target "RestorePackages" (fun _ ->
 )
 
 Target "Compile" (fun _ ->
+    targetRuntimes
+    |> List.iter (fun runtime ->
+        DotNetCli.Publish (fun p ->
+            { p with
+                VersionSuffix = env "APPVEYOR_BUILD_NUMBER"
+                Project = projectPath @@ "Azure.Functions.Cli.csproj"
+                Output = currentDirectory @@ buildDir @@ runtime
+                Configuration = "release"
+                Runtime = runtime }))
+
     DotNetCli.Publish (fun p ->
         { p with
             VersionSuffix = env "APPVEYOR_BUILD_NUMBER"
             Project = projectPath @@ "Azure.Functions.Cli.csproj"
-            Output = currentDirectory @@ buildDir
-            Configuration = "release" })
+            Output = currentDirectory @@ buildDirNoRuntime
+            Configuration = "release"})
 )
 
 Target "Test" (fun _ ->
@@ -101,13 +112,18 @@ Target "Test" (fun _ ->
 let excludedFiles = [
     "/**/*.pdb"
     "/**/*.xml"
-    "/**/*.resources.dll"
 ]
 
 Target "Zip" (fun _ ->
-    !! (buildDir @@ @"/**/*.*")
+    targetRuntimes
+    |> List.iter (fun runtime ->
+        !! (buildDir @@ runtime @@ @"/**/*.*")
+            |> (fun f -> List.fold (--) f excludedFiles)
+            |> Zip buildDir (deployDir @@ (runtime + ".zip")))
+
+    !! (buildDirNoRuntime @@ @"/**/*.*")
         |> (fun f -> List.fold (--) f excludedFiles)
-        |> Zip buildDir finalZipPath
+        |> Zip buildDir (deployDir @@ "no-runtime.zip")
 )
 
 type SigningInfo =
@@ -124,6 +140,7 @@ type SigningInfo =
 
 Target "GenerateZipToSign" (fun _ ->
     let firstParty = [
+        "func.exe"
         "func.dll"
         "Microsoft.Azure.AppService.Proxy.Client.Contract.dll"
         "Microsoft.Azure.WebJobs.dll"
@@ -165,21 +182,21 @@ Target "GenerateZipToSign" (fun _ ->
         "grpc_node_winx64_node57.dll"
     ]
 
-    MoveFileTo (buildDir @@ "runtimes/win/native/grpc_csharp_ext.x64.dll", buildDir @@ "grpc_csharp_ext.x64.dll")
-    MoveFileTo (buildDir @@ "runtimes/win/native/grpc_csharp_ext.x86.dll", buildDir @@ "grpc_csharp_ext.x86.dll")
-    MoveFileTo (buildDir @@ "runtimes/win7-x64/native/e_sqlite3.dll", buildDir @@ "e_sqlite3_winx64.dll")
-    MoveFileTo (buildDir @@ "runtimes/win7-x86/native/e_sqlite3.dll", buildDir @@ "e_sqlite3_winx86.dll")
-    MoveFileTo (buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node", buildDir @@ "grpc_node_winx86_node48.dll")
-    MoveFileTo (buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node", buildDir @@ "grpc_node_winx86_node57.dll")
-    MoveFileTo (buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node", buildDir @@ "grpc_node_winx64_node57.dll")
+    MoveFileTo (buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x64.dll", buildDirNoRuntime @@ "grpc_csharp_ext.x64.dll")
+    MoveFileTo (buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x86.dll", buildDirNoRuntime @@ "grpc_csharp_ext.x86.dll")
+    MoveFileTo (buildDirNoRuntime @@ "runtimes/win7-x64/native/e_sqlite3.dll", buildDirNoRuntime @@ "e_sqlite3_winx64.dll")
+    MoveFileTo (buildDirNoRuntime @@ "runtimes/win7-x86/native/e_sqlite3.dll", buildDirNoRuntime @@ "e_sqlite3_winx86.dll")
+    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx86_node48.dll")
+    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx86_node57.dll")
+    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx64_node57.dll")
 
-    !! (buildDir @@ "/**/*.dll")
+    !! (buildDirNoRuntime @@ "/**/*.dll")
         |> Seq.filter (fun f -> firstParty |> List.contains (f |> Path.GetFileName))
-        |> CreateZip buildDir toSignZipPath String.Empty 7 true
+        |> CreateZip buildDirNoRuntime toSignZipPath String.Empty 7 true
 
-    !! (buildDir @@ "/**/*.dll")
+    !! (buildDirNoRuntime @@ "/**/*.dll")
         |> Seq.filter (fun f -> thirdParty |> List.contains (f |> Path.GetFileName))
-        |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
+        |> CreateZip buildDirNoRuntime toSignThridPartyPath String.Empty 7 true
 )
 
 let storageAccount = lazy CloudStorageAccount.Parse connectionString
@@ -223,26 +240,21 @@ Target "WaitForSigning" (fun _ ->
 
     let signed = downloadFile toSignZipName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
-    | Success file -> Unzip buildDir file
+    | Success file -> Unzip buildDirNoRuntime file
     | Failure e -> targetError e null |> ignore
 
     let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
     | Success file ->
-        Unzip buildDir file
-        MoveFileTo (buildDir @@ "grpc_csharp_ext.x64.dll", buildDir @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
-        MoveFileTo (buildDir @@ "grpc_csharp_ext.x86.dll", buildDir @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
-        MoveFileTo (buildDir @@ "e_sqlite3_winx64.dll", buildDir @@ "runtimes/win7-x64/native/e_sqlite3.dll")
-        MoveFileTo (buildDir @@ "e_sqlite3_winx86.dll", buildDir @@ "runtimes/win7-x86/native/e_sqlite3.dll")
-        MoveFileTo (buildDir @@ "grpc_node_winx86_node48.dll", buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node")
-        MoveFileTo (buildDir @@ "grpc_node_winx86_node57.dll", buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node")
-        MoveFileTo (buildDir @@ "grpc_node_winx64_node57.dll", buildDir @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node")
+        Unzip buildDirNoRuntime file
+        MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x64.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x86.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
+        MoveFileTo (buildDirNoRuntime @@ "e_sqlite3_winx64.dll", buildDirNoRuntime @@ "runtimes/win7-x64/native/e_sqlite3.dll")
+        MoveFileTo (buildDirNoRuntime @@ "e_sqlite3_winx86.dll", buildDirNoRuntime @@ "runtimes/win7-x86/native/e_sqlite3.dll")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node48.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx64_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node")
     | Failure e -> targetError e null |> ignore
-)
-
-Target "DownloadNugetExe" (fun _ ->
-    use webClient = new WebClient ()
-    webClient.DownloadFile (nugetUri, buildDir @@ "NuGet.exe")
 )
 
 Target "DownloadTools" (fun _ ->
