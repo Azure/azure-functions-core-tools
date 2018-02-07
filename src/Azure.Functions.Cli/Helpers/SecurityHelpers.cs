@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.NativeMethods;
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
+using System.Text;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -37,9 +38,35 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string ReadPassword()
         {
-            var password = ConsoleNativeMethods.ReadPassword();
+            var password = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? ConsoleNativeMethods.ReadPassword()
+                : InternalReadPassword();
             System.Console.WriteLine();
             return password;
+        }
+
+        // https://stackoverflow.com/q/3404421/3234163
+        private static string InternalReadPassword()
+        {
+            var password = new StringBuilder();
+            while(true)
+            {
+                var key = Console.ReadKey(true);
+                if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
+                {
+                    password.Append(key.KeyChar);
+                    ColoredConsole.Write("*");
+                }
+                else if (key.Key == ConsoleKey.Backspace && password.Length > 0)
+                {
+                    password.Remove(password.Length - 1, 1);
+                    ColoredConsole.Write("\b \b");
+                }
+                else if (key.Key == ConsoleKey.Enter)
+                {
+                    return password.ToString();
+                }
+            }
         }
 
         internal static X509Certificate2 GetOrCreateCertificate(string certPath, string certPassword)
