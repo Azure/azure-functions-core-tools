@@ -283,6 +283,9 @@ namespace Azure.Functions.Cli
             // Grab whatever is left in the stack of args into an array.
             // This will be passed into the action as actions can optionally take args for their options.
             var args = argsStack.ToArray();
+
+            // Check if there is a --prefix or --script-root and update CurrentDirectory
+            UpdateCurrentDirectory(args);
             try
             {
                 // Give the action a change to parse its args.
@@ -304,6 +307,47 @@ namespace Azure.Functions.Cli
                 // This happens for actions that expect an ordered untyped options.
                 ColoredConsole.Error.WriteLine(ex.Message);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// This method will update Environment.CurrentDirectory
+        /// if there is a --script-root or a --prefix provided on the commandline
+        /// </summary>
+        /// <param name="args">args to check for --prefix or --script-root</param>
+        private void UpdateCurrentDirectory(string[] args)
+        {
+            // assume index of -1 means the string is not there
+            int index = -1;
+            for (var i = 0; i < args.Length; i++)
+            {
+                if (args[i].Equals("--script-root", StringComparison.OrdinalIgnoreCase)
+                    || args[i].Equals("--prefix", StringComparison.OrdinalIgnoreCase))
+                {
+                    // update the index to point to the following entry in args
+                    // which should contain the path for a prefix
+                    index = i + 1;
+                    break;
+                }
+            }
+
+            // make sure index still in the array
+            if (index != -1 && index < args.Length)
+            {
+                // Path.Combine takes care of checking if the path is full path or not.
+                // For example, Path.Combine(@"C:\temp", @"dir\dir")    => "C:\temp\dir\dir"
+                //              Path.Combine(@"C:\temp", @"C:\Windows") => "C:\Windows"
+                //              Path.Combine("/usr/bin", "dir/dir")     => "/usr/bin/dir/dir"
+                //              Path.Combine("/usr/bin", "/opt/dir")    => "/opt/dir"
+                var path = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, args[index]));
+                if (FileSystemHelpers.DirectoryExists(path))
+                {
+                    Environment.CurrentDirectory = path;
+                }
+                else
+                {
+                    throw new CliException($"\"{path}\" doesn't exist.");
+                }
             }
         }
 
