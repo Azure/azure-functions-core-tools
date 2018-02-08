@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Parser
                 .Setup<int>('n', "nodeDebugPort")
                 .WithDescription($"Port for node debugger to use. Default: value from launch.json or {DebuggerHelper.DefaultNodeDebugPort}")
-                .SetDefault(DebuggerHelper.GetNodeDebuggerPort())
+                .SetDefault(hostSettings.NodeDebugPort == default(int) ? DebuggerHelper.GetNodeDebuggerPort() : hostSettings.NodeDebugPort)
                 .Callback(p => NodeDebugPort = p);
 
             Parser

@@ -9,5 +9,8 @@ namespace Azure.Functions.Cli.Common
 
         [JsonProperty("CORS", DefaultValueHandling = DefaultValueHandling.Ignore)]
         public string Cors { get; set; }
+
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int NodeDebugPort { get; set; }
     }
 }
