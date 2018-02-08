@@ -59,9 +59,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-
-            ColoredConsole.WriteLine(WarningColor($"Publish {functionAppRoot} contents to an Azure Function App. Locally deleted files are not removed from destination."));
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             if (PublishLocalSettingsOnly)
@@ -74,6 +71,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
+                var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+                ColoredConsole.WriteLine(WarningColor($"Publish {functionAppRoot} contents to an Azure Function App. Locally deleted files are not removed from destination."));
                 await RetryHelper.Retry(async () =>
                 {
                     using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
