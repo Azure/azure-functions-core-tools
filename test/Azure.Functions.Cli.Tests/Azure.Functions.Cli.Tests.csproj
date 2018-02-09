@@ -541,6 +541,7 @@
     <Compile Include="ExtensionsTests\ProcessExtensionsTests.cs" />
     <Compile Include="ExtensionsTests\TaskExtensionsTests.cs" />
     <Compile Include="ExtensionsTests\UriExtensionsTests.cs" />
+    <Compile Include="GitIgnoreParserTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

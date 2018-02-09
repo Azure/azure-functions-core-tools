@@ -118,6 +118,11 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
+        internal static bool FileExists(object funcIgnoreFile)
+        {
+            throw new NotImplementedException();
+        }
+
         internal static IEnumerable<string> GetDirectories(string scriptPath)
         {
             return Instance.Directory.GetDirectories(scriptPath);

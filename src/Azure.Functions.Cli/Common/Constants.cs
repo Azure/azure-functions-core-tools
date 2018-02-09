@@ -11,6 +11,7 @@ namespace Azure.Functions.Cli.Common
         public const string DefaultSqlProviderName = "System.Data.SqlClient";
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
         public const string ProxiesFileName = "proxies.json";
+        public const string FuncIgnoreFile = ".funcignore";
 
         public static class Errors
         {
