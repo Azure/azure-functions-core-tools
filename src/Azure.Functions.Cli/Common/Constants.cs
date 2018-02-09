@@ -13,6 +13,7 @@ namespace Azure.Functions.Cli.Common
         public const int NodeDebugPort = 5858;
         public const int JavaDebugPort = 5005;
         public const string DotNetClrProcessId = @"${command:pickProcess}";
+        public const string FuncIgnoreFile = ".funcignore";
 
         public static class Errors
         {
