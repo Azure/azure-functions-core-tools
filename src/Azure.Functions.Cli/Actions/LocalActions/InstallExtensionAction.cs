@@ -14,12 +14,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         public string Package { get; set; }
         public string Version { get; set; }
-
         public string OutputPath { get; set; }
-
-        public InstallExtensionAction()
-        {
-        }
+        public string Source { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -41,14 +37,25 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(Path.Combine(".", "bin"))
                 .Callback(o => OutputPath = Path.GetFullPath(o));
 
+            Parser
+                .Setup<string>('s', "source")
+                .WithDescription("nuget feed source if other than nuget.org")
+                .SetDefault(string.Empty)
+                .Callback(s => Source = s);
+
             return Parser.Parse(args);
         }
 
         public async override Task RunAsync()
         {
             var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync();
+            var args = $"add {extensionsProj} package {Package} --version {Version}";
+            if (!string.IsNullOrEmpty(Source))
+            {
+                args += $" --source {Source}";
+            }
 
-            var addPackage = new Executable("dotnet", $"add {extensionsProj} package {Package} --version {Version}");
+            var addPackage = new Executable("dotnet", args);
             await addPackage.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
 
             var syncAction = new SyncExtensionsAction()
