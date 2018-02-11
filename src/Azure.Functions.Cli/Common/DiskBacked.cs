@@ -1,5 +1,4 @@
-﻿using System.Security.Cryptography;
-using System.Text;
+﻿using System.Text;
 using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Common

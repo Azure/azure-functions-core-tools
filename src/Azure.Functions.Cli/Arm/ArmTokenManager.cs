@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Arm.Models;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Azure.Functions.Cli.Common;
 using Colors.Net;

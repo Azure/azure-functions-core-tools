@@ -2,7 +2,6 @@
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 
 namespace Azure.Functions.Cli.Extensions
 {

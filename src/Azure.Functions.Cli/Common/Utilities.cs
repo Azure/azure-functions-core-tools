@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Colors.Net;
+﻿using Colors.Net;
 using Colors.Net.StringColorExtensions;
 
 namespace Azure.Functions.Cli

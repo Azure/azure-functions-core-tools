@@ -2,12 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
-using Colors.Net;
-using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Helpers;
 using Newtonsoft.Json.Linq;
 using Microsoft.Azure.WebJobs.Script;

@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;

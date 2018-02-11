@@ -4,8 +4,6 @@ using Microsoft.ApplicationInsights.Extensibility.Implementation;
 using Microsoft.Azure.WebJobs.Logging.ApplicationInsights;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Azure.Functions.Cli.Diagnostics
 {

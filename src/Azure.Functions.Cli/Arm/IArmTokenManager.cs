@@ -1,5 +1,4 @@
-﻿using Azure.Functions.Cli.Arm.Models;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Arm
