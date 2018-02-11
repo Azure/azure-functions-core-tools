@@ -13,7 +13,6 @@ namespace Azure.Functions.Cli.Common
 {
     internal class SecretsManager : ISecretsManager
     {
-        private static bool warningPrinted = false;
         private const string reason = "secrets.manager.1";
 
         public static string AppSettingsFilePath
