@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Tests
     {
         [Theory]
         [InlineData("invalid://example.com", false)]
-        public async Task IsServerRunningNegativeTest(string Url, bool expected)
+        public static async Task IsServerRunningNegativeTest(string Url, bool expected)
         {
             var uri = new Uri(Url);
             var result = await uri.IsServerRunningAsync();
@@ -29,11 +29,12 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("test", false)]
         [InlineData("", false)]
         [InlineData(null, false)]
-        public void IsJsonTest(string value, bool expected)
+        public static void IsJsonTest(string value, bool expected)
         {
             Assert.Equal(expected, value.IsJson());
         }
 
+        [Fact]
         public async Task IsServerRunningPositiveTest()
         {
             var port = GetAvailablePort();
