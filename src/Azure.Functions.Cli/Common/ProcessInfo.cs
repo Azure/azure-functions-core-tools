@@ -1,5 +1,4 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Common

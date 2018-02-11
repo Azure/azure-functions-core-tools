@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-using Azure.Functions.Cli.Arm;
-using Azure.Functions.Cli.Interfaces;
+﻿using Azure.Functions.Cli.Arm;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {

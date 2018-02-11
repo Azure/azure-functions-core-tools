@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Helpers;
