@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
         [Theory]
         [InlineData("c#", "httpTrigger", "newFunc")]
-        public async Task CreateFunctionActionTest(string language, string templateName, string FunctionName)
+        public static async Task CreateFunctionActionTest(string language, string templateName, string FunctionName)
         {
         }
     }
