@@ -24,6 +24,13 @@ To install globally for non-Windows platforms:
 ```
 npm i -g azure-functions-core-tools@core --unsafe-perm true
 ```
+
+>When installing on macOS and Linux, you may need to include the unsafe-perm flag, as follows:
+
+[Code and test Azure Functions locally](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)
+
+**NOTE**: That's due to npm behavior of post install script. if you sudo the npm command, which is the default on macs and linux, you most likely need --unsafe-perm, unless you have also set the npm user.
+
 This installs a higher beta version of the cli, so it is highly recommended that while using the core tag, you [enable the `beta` runtime](https://docs.microsoft.com/en-us/azure/azure-functions/functions-versions#target-the-version-20-runtime) in function app settings, otherwise you may not see the same results as running locally.
 
 
