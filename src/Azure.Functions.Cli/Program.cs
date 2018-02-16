@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Threading;
+using System.Net;
 using ARMClient.Authentication;
 using ARMClient.Authentication.AADAuthentication;
 using ARMClient.Authentication.Contracts;
@@ -17,6 +17,9 @@ namespace Azure.Functions.Cli
     {
         internal static void Main(string[] args)
         {
+            // Use a setting that more closely resembles production.
+            ServicePointManager.DefaultConnectionLimit = 50;
+
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
