@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Interfaces
         IDictionary<string, string> GetSecrets();
         IEnumerable<ConnectionString> GetConnectionStrings();
         void SetSecret(string name, string value);
-        void SetConnectionString(string name, string value);
+        void SetConnectionString(string name, string value, string ProviderName);
         void DecryptSettings();
         void EncryptSettings();
         void DeleteSecret(string name);

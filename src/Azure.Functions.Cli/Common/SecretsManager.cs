@@ -57,10 +57,10 @@ namespace Azure.Functions.Cli.Common
             appSettingsFile.Commit();
         }
 
-        public void SetConnectionString(string name, string value)
+        public void SetConnectionString(string name, string value, string ProviderName = Constants.DefaultSqlProviderName)
         {
             var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
-            appSettingsFile.SetConnectionString(name, value, Constants.DefaultSqlProviderName);
+            appSettingsFile.SetConnectionString(name, value, ProviderName);
             appSettingsFile.Commit();
         }
 
@@ -174,7 +174,7 @@ namespace Azure.Functions.Cli.Common
                 };
             }
 
-            public void SetConnectionString(string name, string value, string providerName)
+            public void SetConnectionString(string name, string value, string providerName = Constants.DefaultSqlProviderName)
             {
                 value = IsEncrypted
                     ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), reason))

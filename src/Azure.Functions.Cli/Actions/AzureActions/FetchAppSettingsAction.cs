@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 foreach (var connectionString in connectionStrings)
                 {
                     ColoredConsole.WriteLine($"Loading {connectionString.Key} = *****");
-                    _secretsManager.SetConnectionString(connectionString.Key, connectionString.Value.Value);
+                    _secretsManager.SetConnectionString(connectionString.Key, connectionString.Value.Value, connectionString.Value.Type);
                 }
 
             }

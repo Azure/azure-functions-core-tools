@@ -8,6 +8,6 @@ namespace Azure.Functions.Cli.Arm.Models
         public string Value { get; set; }
 
         [JsonProperty("type")]
-        public int Type { get; set; }
+        public string Type { get; set; }
     }
 }
