@@ -11,8 +11,6 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 ## Installing
 
-**NOTE**: This package only currently works on Windows, since the underlying Functions Host is not yet cross-platform. You can upvote this GitHub issue if you're interested in running on other platforms: [make the Azure Functions Core Tools cross platform](https://github.com/Azure/azure-functions-cli/issues/13).
-
 To install globally for Windows:
 
 ```
