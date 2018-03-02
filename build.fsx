@@ -272,7 +272,6 @@ Dependencies
   ==> "DownloadTools"
   ==> "RestorePackages"
   ==> "Compile"
-  ==> "Test"
   =?> ("GenerateZipToSign", hasBuildParam "sign")
   =?> ("UploadZipToSign", hasBuildParam "sign")
   =?> ("EnqueueSignMessage", hasBuildParam "sign")
