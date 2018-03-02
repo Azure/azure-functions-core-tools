@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
+     <AssemblyName>func</AssemblyName>
     <Version>2.0.0-beta1$(VersionSuffix)</Version>
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
