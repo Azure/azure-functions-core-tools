@@ -119,11 +119,11 @@ Target "Zip" (fun _ ->
     |> List.iter (fun runtime ->
         !! (buildDir @@ runtime @@ @"/**/*.*")
             |> (fun f -> List.fold (--) f excludedFiles)
-            |> Zip buildDir (deployDir @@ ("Azure.Functions.Cli." + runtime + ".zip")))
+            |> Zip (buildDir @@ runtime) (deployDir @@ ("Azure.Functions.Cli." + runtime + ".zip")))
 
     !! (buildDirNoRuntime @@ @"/**/*.*")
         |> (fun f -> List.fold (--) f excludedFiles)
-        |> Zip buildDir (deployDir @@ "Azure.Functions.Cli.no-runtime.zip")
+        |> Zip buildDirNoRuntime (deployDir @@ "Azure.Functions.Cli.no-runtime.zip")
 )
 
 type SigningInfo =
