@@ -9,42 +9,71 @@
 
 The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
 
+## Versions
+
+**v1** (v1.x branch): Requires .NET 4.7.1 Windows Only
+
+**v2** (master branch): Self-contained cross-platform package
+
 ## Installing
 
-To install globally for Windows:
+### Windows
 
-```
+Both v1 and v2 of the runtime can be installed on Windows.
+
+To install v1:
+
+```bash
 npm i -g azure-functions-core-tools
 ```
 
-To install globally for non-Windows platforms:
+To install v2:
 
-```
+```bash
 npm i -g azure-functions-core-tools@core --unsafe-perm true
 ```
 
->When installing on macOS and Linux, you may need to include the unsafe-perm flag, as follows:
+### Mac
+
+**Homebew**:
+
+```bash
+brew tap azure/functions
+brew install azure-functions-core-tools
+```
+
+### Linux
+
+#### Ubuntu/Debian
+
+1. Register the Microsoft Product key as trusted.
+
+```bash
+curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
+```
+
+2. Set up package feed
+##### Ubuntu 16.04 / Linux Mint 18
+
+```bash
+sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-xenial-prod xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
+
+sudo apt-get update
+```
+
+3. Install
+
+```bash
+sudo apt-get install azure-functions-core-tools
+```
 
 [Code and test Azure Functions locally](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)
 
-**NOTE**: That's due to npm behavior of post install script. if you sudo the npm command, which is the default on macs and linux, you most likely need --unsafe-perm, unless you have also set the npm user.
-
-This installs a higher beta version of the cli, so it is highly recommended that while using the core tag, you [enable the `beta` runtime](https://docs.microsoft.com/en-us/azure/azure-functions/functions-versions#target-the-version-20-runtime) in function app settings, otherwise you may not see the same results as running locally.
+**NOTE**: npm can be used on all platforms. On unix platforms, you may need to specify `--unsafe-perm` if you are running npm with sudo. That's due to npm behavior of post install script.
 
 
-### Dependencies
-
-There is a dependency on the .NET Core tools for the cross platform support. You can [install these here](https://www.microsoft.com/net/core).
-
-### Aliases
-
-The package sets up the following global aliases:
-
-```
-func
-azfun
-azure-functions
-```
+**NOTE**: If you're running the v2 on Windows, Linux, or Mac, make sure to [enable the `beta` runtime](https://docs.microsoft.com/en-us/azure/azure-functions/functions-versions#target-the-version-20-runtime) in function app settings, otherwise you may not see the same results as running locally.
 
 ## Commands
 
