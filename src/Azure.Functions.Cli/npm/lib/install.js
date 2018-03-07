@@ -48,7 +48,12 @@ https.get(url, function (response) {
             var unzipStream = unzipper.Extract({
                     path: installPath
                 })
-                .on('close', () => installWorkers(installPath));
+                .on('close', () => {
+                    installWorkers(installPath)
+                    if (os.platform() === 'linux' || os.platform() === 'darwin') {
+                        fs.chmodSync(`${installPath}/func`, 755);
+                    }
+                });
             response.pipe(unzipStream);
         } else {
             console.error(chalk.red('Error downloading zip file from ' + url));
