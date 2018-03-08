@@ -36,7 +36,6 @@ csx
 .vs
 edge
 Publish
-.vscode
 
 *.user
 *.suo
@@ -114,7 +113,7 @@ local.settings.json
             }
 
             await WriteFiles();
-            await WriteLaunchJson();
+            await WriteExtensionsJson();
             await SetupSourceControl();
             await WriteDockerfile();
             await WriteSample();
@@ -217,6 +216,21 @@ COPY . /home/site/wwwroot";
             }
         }
 
+        private async Task WriteExtensionsJson()
+        {
+            var file = Path.Combine(Environment.CurrentDirectory, ".vscode", "extensions.json");
+            if (!FileSystemHelpers.DirectoryExists(Path.GetDirectoryName(file)))
+            {
+                FileSystemHelpers.CreateDirectory(Path.GetDirectoryName(file));
+            }
+
+            await WriteFiles(file, @"{
+    ""recommendations"": [
+        ""ms-azuretools.vscode-azurefunctions""
+    ]
+}");
+        }
+
         private async Task SetupSourceControl()
         {
             if (InitSourceControl)
@@ -239,28 +253,6 @@ COPY . /home/site/wwwroot";
                 {
                     ColoredConsole.WriteLine(WarningColor("unable to find git on the path"));
                 }
-            }
-        }
-
-        private async Task WriteLaunchJson()
-        {
-            var setupNodeDebugResult = await DebuggerHelper.TrySetupDebuggerAsync();
-
-            if (setupNodeDebugResult == DebuggerStatus.Created)
-            {
-                ColoredConsole.WriteLine("Created launch.json");
-            }
-            else if (setupNodeDebugResult == DebuggerStatus.Updated)
-            {
-                ColoredConsole.WriteLine("Added Azure Functions attach target to existing launch.json");
-            }
-            else if (setupNodeDebugResult == DebuggerStatus.AlreadyCreated)
-            {
-                ColoredConsole.WriteLine("launch.json already configured. Skipped!");
-            }
-            else if (setupNodeDebugResult == DebuggerStatus.Error)
-            {
-                ColoredConsole.Error.WriteLine(ErrorColor("Unable to configure launch.json. Check the file for more info"));
             }
         }
 
