@@ -54,11 +54,24 @@ sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
 ```
 
 2. Set up package feed
+##### Ubuntu 17.10
+
+```bash
+sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-artful-prod artful main" > /etc/apt/sources.list.d/dotnetdev.list'
+sudo apt-get update
+```
+
+##### Ubuntu 17.04
+
+```bash
+sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-zesty-prod zesty main" > /etc/apt/sources.list.d/dotnetdev.list'
+sudo apt-get update
+```
+
 ##### Ubuntu 16.04 / Linux Mint 18
 
 ```bash
 sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-xenial-prod xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
-
 sudo apt-get update
 ```
 
