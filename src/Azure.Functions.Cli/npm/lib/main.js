@@ -1,19 +1,19 @@
 #! /usr/bin/env node
 
-var path = require('path');
-var fs = require('fs');
-var spawn = require('child_process').spawn;
-var fork = require('child_process').fork;
-var commandExists = require('command-exists');
-var args = process.argv;
+const path = require('path');
+const fs = require('fs');
+const spawn = require('child_process').spawn;
+const fork = require('child_process').fork;
+const commandExists = require('command-exists');
+const args = process.argv;
 
 function main() {
-    var bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
-    var funcProc = spawn(bin + '/func', args.slice(2), {
+    const bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
+    const funcProc = spawn(bin + '/func', args.slice(2), {
         stdio: [process.stdin, process.stdout, process.stderr, 'pipe']
     });
 
-    funcProc.on('exit', function (code) {
+    funcProc.on('exit', code => {
         process.exit(code);
     });
 }

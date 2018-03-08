@@ -1,26 +1,26 @@
 #! /usr/bin/env node
 
-var unzipper = require('unzipper');
-var https = require('https');
-var version = require('../package.json').version;
-var chalk = require('chalk');
-var path = require('path');
-var fs = require('fs');
-var rimraf = require('rimraf');
-var glob = require('glob');
-var execSync = require('child_process').execSync;
-var ProgressBar = require('progress');
-var os = require('os');
+const unzipper = require('unzipper');
+const https = require('https');
+const version = require('../package.json').version;
+const chalk = require('chalk');
+const path = require('path');
+const fs = require('fs');
+const rimraf = require('rimraf');
+const glob = require('glob');
+const execSync = require('child_process').execSync;
+const ProgressBar = require('progress');
+const os = require('os');
 
 function getPath() {
-    var bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
+    const bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
     if (fs.existsSync(bin)) {
         rimraf.sync(bin);
     }
-    return bin;
+    return bin
 }
 
-var platform = '';
+let platform = '';
 
 if (os.platform() === 'win32') {
     platform = 'win-x64';
@@ -32,20 +32,18 @@ if (os.platform() === 'win32') {
     throw Error('platform ' + os.platform() + ' isn\'t supported');
 }
 
-var url = 'https://functionscdn.azureedge.net/public/' + version + '/Azure.Functions.Cli.' + platform + '.' + version + '.zip';
-https.get(url, function (response) {
+const url = 'https://functionscdn.azureedge.net/public/' + version + '/Azure.Functions.Cli.' + platform + '.' + version + '.zip';
+https.get(url, response => {
 
-        var bar = new ProgressBar('[:bar] Downloading Azure Functions Cli', { 
+        const bar = new ProgressBar('[:bar] Downloading Azure Functions Cli', { 
             total: Number(response.headers['content-length']),
             width: 18
         });
 
         if (response.statusCode === 200) {
-            var installPath = getPath();
-            response.on('data', function(data) {
-                bar.tick(data.length);
-            })
-            var unzipStream = unzipper.Extract({ path: installPath })
+            const installPath = getPath();
+            response.on('data', data => bar.tick(data.length));
+            const unzipStream = unzipper.Extract({ path: installPath })
                 .on('close', () => {
                     if (os.platform() === 'linux' || os.platform() === 'darwin') {
                         fs.chmodSync(`${installPath}/func`, 755);
@@ -58,22 +56,7 @@ https.get(url, function (response) {
             process.exit(1);
         }
     })
-    .on('error', function (err) {
+    .on('error', err => {
         console.error(chalk.red(err));
         process.exit(1);
     });
-
-function installWorkers(installPath) {
-  glob(`${installPath}/workers/*/*.targets`, (err, files) => {
-    if (err)
-      return console.error(chalk.red(err));
-    files.forEach(runTarget);
-  });
-}
-
-function runTarget(targetsFile) {
-  var workingDirectory = path.dirname(targetsFile);
-  console.log(`Language worker install targets found in '${workingDirectory}'.`);
-  console.log(`Executing 'dotnet msbuild ${targetsFile}'.`);
-  execSync(`dotnet msbuild ${targetsFile}`, { cwd: workingDirectory, stdio: [0, 1, 2] });
-}
