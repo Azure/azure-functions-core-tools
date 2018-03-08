@@ -10,6 +10,7 @@ var rimraf = require('rimraf');
 var glob = require('glob');
 var execSync = require('child_process').execSync;
 var ProgressBar = require('progress');
+var os = require('os');
 
 function getPath() {
     var bin = path.resolve(path.join(path.dirname(__filename), '..', 'bin'));
@@ -19,7 +20,19 @@ function getPath() {
     return bin;
 }
 
-var url = 'https://functionscdn.azureedge.net/public/' + version + '/Azure.Functions.Cli.zip';
+var platform = '';
+
+if (os.platform() === 'win32') {
+    platform = 'win-x64';
+} else if (os.platform() === 'darwin') {
+    platform = 'osx-x64';
+} else if (os.platform() === 'linux') {
+    platform = 'linux-x64';
+} else {
+    throw Error('platform ' + os.platform() + ' isn\'t supported');
+}
+
+var url = 'https://functionscdn.azureedge.net/public/' + version + '/Azure.Functions.Cli.' + platform + '.' + version + '.zip';
 https.get(url, function (response) {
 
         var bar = new ProgressBar('[:bar] Downloading Azure Functions Cli', { 
@@ -33,7 +46,11 @@ https.get(url, function (response) {
                 bar.tick(data.length);
             })
             var unzipStream = unzipper.Extract({ path: installPath })
-                .on('close', () => installWorkers(installPath));
+                .on('close', () => {
+                    if (os.platform() === 'linux' || os.platform() === 'darwin') {
+                        fs.chmodSync(`${installPath}/func`, 755);
+                    }
+                });
             response.pipe(unzipStream);
         } else {
             console.error(chalk.red('Error downloading zip file from ' + url));
