@@ -5,3 +5,13 @@ clone_folder: c:\azure-functions-cli
 
 build_script:
 - cmd: build.cmd
+
+artifacts:
+- path: deploy\Azure.Functions.*.zip
+  name: Release
+- path: deployx86\Azure.Functions.*.zip
+  name: Release
+- path: deployx64\Azure.Functions.*.zip
+  name: Release
+- path: dist\test\*.html
+  name: Test
