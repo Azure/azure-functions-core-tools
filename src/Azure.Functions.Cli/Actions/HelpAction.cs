@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.Actions
                 .Distinct()
                 .OrderBy(c => c.ToLowerCaseString());
             ColoredConsole
-                .WriteLine($"Azure Functions Core Tools ({Constants.CliVersion})")
+                .WriteLine($"Azure Functions Core Tools ({Constants.CliVersion} beta)")
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}")
                 .WriteLine("Usage: func [context] [context] <action> [-/--options]")
                 .WriteLine();

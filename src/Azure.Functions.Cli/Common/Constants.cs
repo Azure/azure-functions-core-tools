@@ -6,7 +6,6 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsStorageAccountNamePrefix = "AzureFunctions";
         public const string StorageAccountArmType = "Microsoft.Storage/storageAccounts";
         public const string FunctionAppArmKind = "functionapp";
-        public const string CliVersion = "2.0.1-beta.22";
         public const string CliDebug = "CLI_DEBUG";
         public const string DefaultSqlProviderName = "System.Data.SqlClient";
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
@@ -14,6 +13,8 @@ namespace Azure.Functions.Cli.Common
         public const int JavaDebugPort = 5005;
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
+
+        public static object CliVersion => typeof(Constants).Assembly.GetName().Version;
 
         public static class Errors
         {
