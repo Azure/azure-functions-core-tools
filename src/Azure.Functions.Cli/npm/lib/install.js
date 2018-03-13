@@ -51,7 +51,7 @@ https.get(url, function (response) {
                 .on('close', () => {
                     installWorkers(installPath)
                     if (os.platform() === 'linux' || os.platform() === 'darwin') {
-                        fs.chmodSync(`${installPath}/func`, 755);
+                        fs.chmodSync(`${installPath}/func`, 0o755);
                     }
                 });
             response.pipe(unzipStream);
