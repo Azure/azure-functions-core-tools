@@ -46,7 +46,7 @@ https.get(url, response => {
             const unzipStream = unzipper.Extract({ path: installPath })
                 .on('close', () => {
                     if (os.platform() === 'linux' || os.platform() === 'darwin') {
-                        fs.chmodSync(`${installPath}/func`, 755);
+                        fs.chmodSync(`${installPath}/func`, 0o755);
                     }
                 });
             response.pipe(unzipStream);
