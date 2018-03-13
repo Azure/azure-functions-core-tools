@@ -826,8 +826,12 @@
       <Link>edge\edge.js</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="azurefunctions\http\request.js" />
-    <Content Include="azurefunctions\http\response.js" />
+    <Content Include="azurefunctions\http\request.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="azurefunctions\http\response.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="azurefunctions\proxy\RequestResponseOverride.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
