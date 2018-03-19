@@ -53,6 +53,8 @@ project.lock.json
 .secrets
 appsettings.json
 local.settings.json
+
+node_modules
 "},
             { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), "{ }" },
             { new Lazy<string>(() => SecretsManager.AppSettingsFileName), @"{
