@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Helpers
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
             var functionErrors = new Dictionary<string, Collection<string>>();
-            var functions = ScriptHost.ReadFunctionMetadata(new ScriptHostConfiguration(), new ColoredConsoleLogger(LogCategories.Startup, (cat, level) => level >= Microsoft.Extensions.Logging.LogLevel.Information), functionErrors);
+            var functions = ScriptHost.ReadFunctionsMetadata(Directory.EnumerateDirectories(Environment.CurrentDirectory), new ColoredConsoleLogger(LogCategories.Startup, (cat, level) => level >= Microsoft.Extensions.Logging.LogLevel.Information), functionErrors);
             var function = functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
             if (function == null)
             {

@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Diagnostics
 {
     public class ConsoleLoggerProviderFactory : ILoggerProviderFactory
     {
-        public IEnumerable<ILoggerProvider> CreateLoggerProviders(ScriptHostConfiguration scriptConfig, ScriptSettingsManager settingsManager, Func<bool> isFileLoggingEnabled, Func<bool> isPrimary)
+        public IEnumerable<ILoggerProvider> CreateLoggerProviders(string hostInstanceId, ScriptHostConfiguration scriptConfig, ScriptSettingsManager settingsManager, Func<bool> isFileLoggingEnabled, Func<bool> isPrimary)
         {
             List<ILoggerProvider> loggerProviders = new List<ILoggerProvider>();
 
@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Diagnostics
             if (!string.IsNullOrEmpty(settingsManager?.ApplicationInsightsInstrumentationKey))
             {
                 ITelemetryClientFactory clientFactory = scriptConfig.HostConfig.GetService<ITelemetryClientFactory>() ??
-                    new ConsoleTelemetryClientFactory(settingsManager.ApplicationInsightsInstrumentationKey, scriptConfig.LogFilter.Filter);
+                    new ConsoleTelemetryClientFactory(settingsManager.ApplicationInsightsInstrumentationKey, scriptConfig.ApplicationInsightsSamplingSettings, scriptConfig.LogFilter.Filter);
 
                 loggerProviders.Add(new ApplicationInsightsLoggerProvider(clientFactory));
             }

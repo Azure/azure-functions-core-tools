@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace Azure.Functions.Cli.Common
 {
     internal static class Constants
@@ -14,7 +16,8 @@ namespace Azure.Functions.Cli.Common
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
 
-        public static object CliVersion => typeof(Constants).Assembly.GetName().Version;
+        public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
+        public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
 
         public static class Errors
         {
