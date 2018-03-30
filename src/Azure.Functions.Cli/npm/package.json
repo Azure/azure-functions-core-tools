@@ -1,35 +1,34 @@
 {
-  "name": "azure-functions-core-tools",
-  "version": "2.0.1-beta.22",
-  "description": "Azure Functions Core Tools",
-  "scripts": {
-    "build": "dotnet publish ../ -o ./npm/bin -c release",
-    "postinstall": "node lib/install.js"
-  },
-  "author": "Microsoft",
-  "license": "MIT",
-  "preferGlobal": true,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Azure/azure-functions-cli.git"
-  },
-  "bin": {
-    "func": "lib/main.js",
-    "azfun": "lib/main.js",
-    "azurefunctions": "lib/main.js"
-  },
-  "os": [
-    "win32",
-    "darwin",
-    "linux"
-  ],
-  "dependencies": {
-    "chalk": "^2.1.0",
-    "command-exists": "^1.2.2",
-    "glob": "^7.1.2",
-    "progress": "^2.0.0",
-    "rimraf": "^2.6.1",
-    "tmp": "^0.0.33",
-    "unzipper": "^0.8.9"
-  }
+    "name": "azure-functions-core-tools",
+    "version": "2.0.1-beta.25",
+    "description": "Azure Functions Core Tools",
+    "scripts": {
+        "postinstall": "node lib/install.js"
+    },
+    "author": "Microsoft",
+    "license": "MIT",
+    "preferGlobal": true,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Azure/azure-functions-core-tools.git"
+    },
+    "bin": {
+        "func": "lib/main.js",
+        "azfun": "lib/main.js",
+        "azurefunctions": "lib/main.js"
+    },
+    "os": [
+        "win32",
+        "darwin",
+        "linux"
+    ],
+    "dependencies": {
+        "chalk": "^2.1.0",
+        "command-exists": "^1.2.2",
+        "glob": "^7.1.2",
+        "progress": "^2.0.0",
+        "rimraf": "^2.6.1",
+        "tmp": "^0.0.33",
+        "unzipper": "^0.8.9"
+    }
 }
