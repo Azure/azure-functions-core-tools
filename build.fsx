@@ -90,7 +90,6 @@ Target "Compile" (fun _ ->
     |> List.iter (fun runtime ->
         DotNetCli.Publish (fun p ->
             { p with
-                AdditionalArgs = [ "/p:Version=" + env "APPVEYOR_BUILD_NUMBER" ]
                 Project = projectPath @@ "Azure.Functions.Cli.csproj"
                 Output = currentDirectory @@ buildDir @@ runtime
                 Configuration = "release"
@@ -98,7 +97,6 @@ Target "Compile" (fun _ ->
 
     DotNetCli.Publish (fun p ->
         { p with
-            AdditionalArgs = [ "/p:Version=" + env "APPVEYOR_BUILD_NUMBER" ]
             Project = projectPath @@ "Azure.Functions.Cli.csproj"
             Output = currentDirectory @@ buildDirNoRuntime
             Configuration = "release"})
