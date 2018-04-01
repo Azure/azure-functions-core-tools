@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.Actions
                 .Distinct()
                 .OrderBy(c => c.ToLowerCaseString());
             ColoredConsole
-                .WriteLine($"Azure Functions Core Tools ({Constants.CliVersion}-beta.{Constants.CliBetaRevision})")
+                .WriteLine($"Azure Functions Core Tools ({Constants.CliDisplayVersion})")
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}")
                 .WriteLine("Usage: func [context] [context] <action> [-/--options]")
                 .WriteLine();
@@ -196,7 +196,7 @@ namespace Azure.Functions.Cli.Actions
                     ColoredConsole.WriteLine();
                 }
             }
-            catch(CliArgumentsException e)
+            catch (CliArgumentsException e)
             {
                 if (e.Arguments.Any())
                 {
