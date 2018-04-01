@@ -23,8 +23,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool InitDocker { get; set; }
 
-        public bool InitSample { get; set; }
-
         public string FolderName { get; set; } = string.Empty;
 
         internal readonly Dictionary<Lazy<string>, string> fileToContentMap = new Dictionary<Lazy<string>, string>
@@ -86,12 +84,6 @@ node_modules
                  .WithDescription("")
                  .Callback(d => InitDocker = d);
 
-            Parser
-                .Setup<bool>("sample")
-                .SetDefault(false)
-                .WithDescription("")
-                .Callback(s => InitSample = s);
-
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -118,28 +110,16 @@ node_modules
             await WriteExtensionsJson();
             await SetupSourceControl();
             await WriteDockerfile();
-            await WriteSample();
             PostInit();
         }
 
         private void PostInit()
         {
-            if (InitSample || InitDocker)
+            if (InitDocker)
             {
                 ColoredConsole
                     .WriteLine()
                     .WriteLine(Yellow("Next Steps:"));
-            }
-
-            if (InitSample)
-            {
-                ColoredConsole
-                    .Write(Green("Run> "))
-                    .WriteLine(DarkCyan("func start"));
-
-                ColoredConsole
-                    .WriteLine("To start your functions, then hit the URL displayed for the function.")
-                    .WriteLine();
             }
 
             if (InitDocker)
@@ -159,50 +139,6 @@ node_modules
                 ColoredConsole
                     .WriteLine("To run the container then trigger your function on port 8080.")
                     .WriteLine();
-            }
-        }
-
-        private async Task WriteSample()
-        {
-            if (InitSample)
-            {
-                const string functionJson = @"{
-  ""disabled"": false,
-  ""bindings"": [
-    {
-      ""authLevel"": ""anonymous"",
-      ""type"": ""httpTrigger"",
-      ""direction"": ""in"",
-      ""name"": ""req""
-    },
-    {
-      ""type"": ""http"",
-      ""direction"": ""out"",
-      ""name"": ""res""
-    }
-  ]
-}
-";
-                const string indexJs = @"module.exports = function (context, req) {
-    context.log('JavaScript HTTP trigger function processed a request.');
-
-    if (req.query.name || (req.body && req.body.name)) {
-        context.res = {
-            // status: 200, /* Defaults to 200 */
-            body: 'Hello ' + (req.query.name || req.body.name)
-        };
-    }
-    else {
-        context.res = {
-            status: 400,
-            body: 'Please pass a name on the query string or in the request body'
-        };
-    }
-    context.done();
-};";
-                FileSystemHelpers.CreateDirectory("HttpFunction");
-                await WriteFiles(Path.Combine("HttpFunction", "function.json"), functionJson);
-                await WriteFiles(Path.Combine("HttpFunction", "index.js"), indexJs);
             }
         }
 
