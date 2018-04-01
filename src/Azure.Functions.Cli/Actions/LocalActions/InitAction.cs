@@ -25,42 +25,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string FolderName { get; set; } = string.Empty;
 
-        internal readonly Dictionary<Lazy<string>, string> fileToContentMap = new Dictionary<Lazy<string>, string>
+        internal readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
-            { new Lazy<string>(() => ".gitignore"),  @"
-bin
-obj
-csx
-.vs
-edge
-Publish
-
-*.user
-*.suo
-*.cscfg
-*.Cache
-project.lock.json
-
-/packages
-/TestResults
-
-/tools/NuGet.exe
-/App_Data
-/secrets
-/data
-.secrets
-appsettings.json
-local.settings.json
-
-node_modules
-"},
-            { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), "{ }" },
-            { new Lazy<string>(() => SecretsManager.AppSettingsFileName), @"{
-  ""IsEncrypted"": false,
-  ""Values"": {
-    ""AzureWebJobsStorage"": """"
-  }
-}"}
+            { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore },
+            { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), StaticResources.HostJson },
+            { new Lazy<string>(() => SecretsManager.AppSettingsFileName), StaticResources.LocalSettingsJson }
         };
 
         private readonly ITemplatesManager _templatesManager;
@@ -146,11 +115,7 @@ node_modules
         {
             if (InitDocker)
             {
-                const string dockerfileContent = @"FROM microsoft/azure-functions-runtime:v2.0.0-beta1
-ENV AzureWebJobsScriptRoot=/home/site/wwwroot
-COPY . /home/site/wwwroot";
-
-                await WriteFiles("Dockerfile", dockerfileContent);
+                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
             }
         }
 
@@ -162,11 +127,7 @@ COPY . /home/site/wwwroot";
                 FileSystemHelpers.CreateDirectory(Path.GetDirectoryName(file));
             }
 
-            await WriteFiles(file, @"{
-    ""recommendations"": [
-        ""ms-azuretools.vscode-azurefunctions""
-    ]
-}");
+            await WriteFiles(file, await StaticResources.VsCodeExtensionsJson);
         }
 
         private async Task SetupSourceControl()
@@ -198,7 +159,7 @@ COPY . /home/site/wwwroot";
         {
             foreach (var pair in fileToContentMap)
             {
-                await WriteFiles(pair.Key.Value, pair.Value);
+                await WriteFiles(pair.Key.Value, await pair.Value);
             }
         }
 

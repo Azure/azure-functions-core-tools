@@ -14,18 +14,7 @@ namespace Azure.Functions.Cli.Helpers
             if (!FileSystemHelpers.FileExists(extensionsProj))
             {
                 FileSystemHelpers.EnsureDirectory(extensionsDir);
-                var assembly = typeof(ExtensionsHelper).Assembly;
-                var extensionsProjText = string.Empty;
-                using (Stream resource = assembly.GetManifestResourceStream(assembly.GetName().Name + ".ExtensionsProj.txt"))
-                using (var reader = new StreamReader(resource))
-                {
-                    while (!reader.EndOfStream)
-                    {
-                        var line = await reader.ReadLineAsync();
-                        extensionsProjText += $"{line}{Environment.NewLine}";
-                    }
-                }
-                await FileSystemHelpers.WriteAllTextToFileAsync(extensionsProj, extensionsProjText);
+                await FileSystemHelpers.WriteAllTextToFileAsync(extensionsProj, await StaticResources.ExtensionsProject);
             }
             return extensionsProj;
         }

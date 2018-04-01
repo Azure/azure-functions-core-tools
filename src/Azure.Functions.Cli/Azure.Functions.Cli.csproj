@@ -16,11 +16,29 @@
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
   </PropertyGroup>
   <ItemGroup>
-    <None Remove="Properties\ExtensionsProj.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="ExtensionsProj.txt">
-      <LogicalName>$(AssemblyName).ExtensionsProj.txt</LogicalName>
+    <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
+      <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet.template">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python.template">
+      <LogicalName>$(AssemblyName).Dockerfile.python</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.node.template">
+      <LogicalName>$(AssemblyName).Dockerfile.node</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\gitignore.template">
+      <LogicalName>$(AssemblyName).gitignore</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\host.json.template">
+      <LogicalName>$(AssemblyName).host.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\local.settings.json.template">
+      <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\vscode.extensions.json.template">
+      <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
