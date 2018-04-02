@@ -23,13 +23,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool InitDocker { get; set; }
 
+        public string Language { get; set; }
+
         public string FolderName { get; set; } = string.Empty;
+
+        // map of names and their aliases
+        private static IDictionary<string, IEnumerable<string>> availableLanguages = new Dictionary<string, IEnumerable<string>>
+        {
+            {  "CSharp", new [] { "c#" } },
+            { "Javascript", new [] { "js" } },
+            { "Python", new []  { "py" } },
+        };
 
         internal readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore },
             { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), StaticResources.HostJson },
-            { new Lazy<string>(() => SecretsManager.AppSettingsFileName), StaticResources.LocalSettingsJson }
         };
 
         private readonly ITemplatesManager _templatesManager;
@@ -53,6 +62,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                  .WithDescription("")
                  .Callback(d => InitDocker = d);
 
+            Parser
+                .Setup<string>('l', "language")
+                .SetDefault(string.Empty)
+                .Callback(l => Language = l);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -75,11 +89,49 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 Environment.CurrentDirectory = folderPath;
             }
 
+            var language = Language ?? SelectionMenuHelper.DisplaySelectionWizard(availableLanguages.Keys);
+            ColoredConsole.WriteLine(TitleColor(language));
+
+            language = NormalizeLanguage(language);
             await WriteFiles();
+            await WriteLocalSettingsJson(language);
             await WriteExtensionsJson();
             await SetupSourceControl();
-            await WriteDockerfile();
+            await WriteDockerfile(language);
+
             PostInit();
+        }
+
+        internal static string NormalizeLanguage(string language)
+        {
+            if (string.IsNullOrWhiteSpace(language))
+            {
+                throw new ArgumentNullException(nameof(language), "Language can't be empty");
+            }
+            else if (!availableLanguages.Keys.Concat(availableLanguages.SelectMany(p => p.Value))
+                .Any(l => l.Equals(language, StringComparison.OrdinalIgnoreCase)))
+            {
+                var languages = availableLanguages.Keys.Aggregate((a, b) => $"{a}, {b}");
+                throw new ArgumentException($"Language {language} is not a valid option. Options are {languages}");
+            }
+
+            var klanguage = availableLanguages.Keys.FirstOrDefault(k => k.Equals(language, StringComparison.OrdinalIgnoreCase));
+
+            if(!string.IsNullOrEmpty(klanguage))
+            {
+                return klanguage;
+            }
+            else
+            {
+                return availableLanguages.First(p => p.Value.Any(v => v.Equals(language, StringComparison.OrdinalIgnoreCase))).Key;
+            }
+        }
+
+        private async Task WriteLocalSettingsJson(string language)
+        {
+            var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
+            localSettingsJsonContent = localSettingsJsonContent.Replace(Constants.FunctionsLanguageSetting, language);
+            await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
         private void PostInit()
@@ -111,11 +163,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private async Task WriteDockerfile()
+        private async Task WriteDockerfile(string language)
         {
             if (InitDocker)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
+                if (language == "C#")
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
+                }
+                else if (language == "Javascript")
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
+                }
+                else if (language == "Python")
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfilePython);
+                }
             }
         }
 

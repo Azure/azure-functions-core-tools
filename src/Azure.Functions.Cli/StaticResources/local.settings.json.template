@@ -1,6 +1,7 @@
 {
   "IsEncrypted": false,
   "Values": {
-    "AzureWebJobsStorage": ""
+    "FUNCTION_LANGUAGE": "{FUNCTION_LANGUAGE}",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true"
   }
 }

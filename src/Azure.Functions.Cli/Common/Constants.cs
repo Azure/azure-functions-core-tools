@@ -15,11 +15,13 @@ namespace Azure.Functions.Cli.Common
         public const int JavaDebugPort = 5005;
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
+        public const string FunctionsLanguageSetting = "FUNCTION_LANGUAGE";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
         public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
 
         public static string CliDisplayVersion => $"{Constants.CliVersion}-beta.{Constants.CliBetaRevision}";
+
 
         public static class Errors
         {
