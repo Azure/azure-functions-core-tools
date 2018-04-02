@@ -88,6 +88,10 @@ sudo apt-get install azure-functions-core-tools
 
 **NOTE**: If you're running the v2 on Windows, Linux, or Mac, make sure to [enable the `beta` runtime](https://docs.microsoft.com/en-us/azure/azure-functions/functions-versions#target-the-version-20-runtime) in function app settings, otherwise you may not see the same results as running locally.
 
+## Known Issues:
+
+`func extensions` command require the `dotnet` cli to be installed and on your path. This requirement is tracked [here](https://github.com/Azure/azure-functions-core-tools/issues/367)
+
 ## Default Directories
 
 * `CurrentDirectory`: is the default directory the functions runtime looks for functions in.
