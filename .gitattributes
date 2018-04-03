@@ -31,6 +31,7 @@
 *.less text=auto
 *.js text eol=lf
 *.json text eol=lf
+*.sh text eol=lf
 *.lisp text=auto
 *.clj text=auto
 *.sql text=auto
