@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Octokit;
 using Xunit;
+using System.Runtime.InteropServices;
 
 namespace Azure.Functions.Cli.Tests
 {
@@ -56,7 +57,11 @@ namespace Azure.Functions.Cli.Tests
                 return null;
             }
 
-            var jObject = JsonConvert.DeserializeObject<JObject>(File.ReadAllText(@"C:\azure-functions-cli\src\Azure.Functions.Cli\npm\package.json"));
+            var path = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? @"C:\azure-functions-cli\src\Azure.Functions.Cli\npm\package.json"
+                : @"/azure-functions-cli/src/Azure.Functions.Cli/npm/package.json";
+            
+            var jObject = JsonConvert.DeserializeObject<JObject>(File.ReadAllText(path));
             return jObject["version"]?.ToString() ?? string.Empty;
         }
     }
