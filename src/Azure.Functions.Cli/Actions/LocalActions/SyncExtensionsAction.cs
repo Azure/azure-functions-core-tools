@@ -31,11 +31,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync();
-            var runtimeId = GetRuntimeIdentifierParameter();
+            if (CommandChecker.CommandExists("dotnet"))
+            {
+                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync();
+                var runtimeId = GetRuntimeIdentifierParameter();
 
-            var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath} {runtimeId}");
-            await installExtensions.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
+                var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath} {runtimeId}");
+                await installExtensions.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
+            }
+            else
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor("Extensions command require dotnet on your path. Please make sure to install dotnet for your system from https://www.microsoft.com/net/download"));
+            }
         }
 
         private static string GetRuntimeIdentifierParameter()

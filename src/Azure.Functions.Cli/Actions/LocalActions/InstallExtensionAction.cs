@@ -48,22 +48,29 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync();
-            var args = $"add {extensionsProj} package {Package} --version {Version}";
-            if (!string.IsNullOrEmpty(Source))
+            if (CommandChecker.CommandExists("dotnet"))
             {
-                args += $" --source {Source}";
+                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync();
+                var args = $"add {extensionsProj} package {Package} --version {Version}";
+                if (!string.IsNullOrEmpty(Source))
+                {
+                    args += $" --source {Source}";
+                }
+
+                var addPackage = new Executable("dotnet", args);
+                await addPackage.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
+
+                var syncAction = new SyncExtensionsAction()
+                {
+                    OutputPath = OutputPath
+                };
+
+                await syncAction.RunAsync();
             }
-
-            var addPackage = new Executable("dotnet", args);
-            await addPackage.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
-
-            var syncAction = new SyncExtensionsAction()
+            else
             {
-                OutputPath = OutputPath
-            };
-
-            await syncAction.RunAsync();
+                ColoredConsole.Error.WriteLine(ErrorColor("Extensions command require dotnet on your path. Please make sure to install dotnet for your system from https://www.microsoft.com/net/download"));
+            }
         }
     }
 }
