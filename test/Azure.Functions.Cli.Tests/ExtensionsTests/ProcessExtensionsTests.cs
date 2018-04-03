@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Azure.Functions.Cli.Extensions;
 using Xunit;
+using System.Runtime.InteropServices;
 
 namespace Azure.Functions.Cli.Tests.ExtensionsTests
 {
@@ -11,7 +12,9 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
         [Fact]
         public async Task WaitForExitTest()
         {
-            Process process = Process.Start("cmd");
+            Process process = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? Process.Start("cmd")
+                : Process.Start("sh");
             var calledContinueWith = false;
 
             process.WaitForExitAsync().ContinueWith(_ => {

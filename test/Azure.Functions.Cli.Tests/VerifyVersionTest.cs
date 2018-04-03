@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.Tests
 
             var path = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? @"C:\azure-functions-cli\src\Azure.Functions.Cli\npm\package.json"
-                : Path.Combine(Environment.GetEnvironmentVariable("APPVEYOR_BUILD_FOLDER "), "/src/Azure.Functions.Cli/npm/package.json");
+                : "/home/appveyor/projects/azure-functions-core-tools/src/Azure.Functions.Cli/npm/package.json";
             
             var jObject = JsonConvert.DeserializeObject<JObject>(File.ReadAllText(path));
             return jObject["version"]?.ToString() ?? string.Empty;
