@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Tests
             var github = new GitHubClient(new ProductHeaderValue("azure-functions-core-tools"));
             var repo = await github.Repository.Get("Azure", "azure-functions-core-tools");
             var release = await github.Repository.Release.GetAll(repo.Id);
-            return release.FirstOrDefault()?.Name;
+            return release.FirstOrDefault(r => r.Name.Contains("beta"))?.Name;
         }
 
         private static async Task<string> GetNpmVersion()
