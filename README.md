@@ -90,7 +90,7 @@ sudo apt-get install azure-functions-core-tools
 
 ## Known Issues:
 
-`func extensions` command require the `dotnet` cli to be installed and on your path. This requirement is tracked [here](https://github.com/Azure/azure-functions-core-tools/issues/367)
+`func extensions` command require the `dotnet` cli to be installed and on your path. This requirement is tracked [here](https://github.com/Azure/azure-functions-core-tools/issues/367). You can install .NET Core for your platform from https://www.microsoft.com/net/download/
 
 ## Default Directories
 
