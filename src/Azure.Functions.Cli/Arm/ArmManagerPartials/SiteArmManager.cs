@@ -33,6 +33,8 @@ namespace Azure.Functions.Cli.Arm
             site.HostName = armSite.Properties.EnabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
             site.ScmUri = armSite.Properties.EnabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
             site.Location = armSite.Location;
+            site.Kind = armSite.Kind;
+            site.Sku = armSite.Properties.Sku;
             return site;
         }
 
