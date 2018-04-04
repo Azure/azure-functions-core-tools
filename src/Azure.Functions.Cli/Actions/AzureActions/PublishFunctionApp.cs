@@ -31,6 +31,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool PublishLocalSettingsOnly { get; set; }
         public bool ListIgnoredFiles { get; set; }
         public bool ListIncludedFiles { get; set; }
+        public bool RunFromZipDeploy { get; private set; }
 
         public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
             : base(armManager)
@@ -62,6 +63,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("list-included-files")
                 .WithDescription("Displays a list of files that will be included in publishing based on .funcignore")
                 .Callback(f => ListIncludedFiles = f);
+            Parser
+                .Setup<bool>("zip")
+                .WithDescription("")
+                .Callback(f => RunFromZipDeploy = f);
 
             return base.ParseArgs(args);
         }
@@ -105,11 +110,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-            ColoredConsole.WriteLine(WarningColor($"Publish {functionAppRoot} contents to an Azure Function App. Locally deleted files are not removed from destination."));
             await RetryHelper.Retry(async () =>
             {
                 using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
-                using (var request = new HttpRequestMessage(HttpMethod.Put, new Uri("api/zip/site/wwwroot", UriKind.Relative)))
+                using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri("api/zipdeploy", UriKind.Relative)))
                 {
                     request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
 
