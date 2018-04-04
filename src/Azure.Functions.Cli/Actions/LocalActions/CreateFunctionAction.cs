@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using System.Runtime.InteropServices;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -81,6 +80,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 ColoredConsole
                     .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
                     .WriteLine(WarningColor($"'{language}' has been set in your local.settings.json"));
+            }
+
+            if (language.Equals("csharp", StringComparison.OrdinalIgnoreCase))
+            {
+                language = "C#";
             }
 
             ColoredConsole.Write("Select a template: ");

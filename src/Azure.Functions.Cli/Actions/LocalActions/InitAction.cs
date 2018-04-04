@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>('l', "language")
-                .SetDefault(string.Empty)
+                .SetDefault(null)
                 .Callback(l => Language = l);
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -130,7 +130,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private async Task WriteLocalSettingsJson(string language)
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
-            localSettingsJsonContent = localSettingsJsonContent.Replace(Constants.FunctionsLanguageSetting, language);
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsLanguageSetting}}}", language);
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
