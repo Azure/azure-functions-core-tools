@@ -113,13 +113,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
-            // if consumption linux, or --zip, run from zip
             if (functionApp.IsLinux && !functionApp.IsDynamicLinux && RunFromZipDeploy)
             {
                 ColoredConsole
                     .WriteLine(ErrorColor("--zip is not supported with dedicated linux apps."));
             }
-            if (functionApp.IsDynamicLinux || RunFromZipDeploy)
+            // if consumption linux, or --zip, run from zip
+            else if (functionApp.IsDynamicLinux || RunFromZipDeploy)
             {
                 await PublishRunFromZip(functionApp, functionAppRoot, ignoreParser);
             }
