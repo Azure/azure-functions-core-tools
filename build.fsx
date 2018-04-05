@@ -265,11 +265,29 @@ Target "DownloadTools" (fun _ ->
         |> webClient.DownloadFile
 )
 
+Target "AddPythonWorker" (fun _ ->
+    use webClient = new WebClient ()
+    [
+        (Uri("https://raw.githubusercontent.com/Azure/azure-functions-python-worker/dev/python/worker.py"), toolsDir @@ "worker.py")
+        (Uri("https://raw.githubusercontent.com/Azure/azure-functions-python-worker/dev/python/worker.config.json"), toolsDir @@ "worker.config.json")
+    ]
+    |> Seq.iter webClient.DownloadFile
+
+    targetRuntimes
+    |> List.iter (fun runtime ->
+        let path = currentDirectory @@ buildDir @@ runtime @@ "workers" @@ "python"
+        CreateDir path
+        CopyFile (path @@ "worker.py") (toolsDir @@ "worker.py")
+        CopyFile (path @@ "worker.config.json") (toolsDir @@ "worker.config.json")
+    )
+)
+
 Dependencies
 "Clean"
   ==> "DownloadTools"
   ==> "RestorePackages"
   ==> "Compile"
+  ==> "AddPythonWorker"
   ==> "Test"
   =?> ("GenerateZipToSign", hasBuildParam "sign")
   =?> ("UploadZipToSign", hasBuildParam "sign")

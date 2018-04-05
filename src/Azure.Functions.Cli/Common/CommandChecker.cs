@@ -5,6 +5,9 @@ namespace Azure.Functions.Cli.Common
 {
     public static class CommandChecker
     {
+        public static bool CommandValid(string fileName, string args)
+            => CheckExitCode(fileName, args);
+
         public static bool CommandExists(string command)
             => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? CheckExitCode("where", command)

@@ -28,12 +28,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string FolderName { get; set; } = string.Empty;
 
         // map of names and their aliases
-        private static IDictionary<string, IEnumerable<string>> availableLanguages = new Dictionary<string, IEnumerable<string>>
+        private static readonly IDictionary<string, IEnumerable<string>> availableLanguages = new Dictionary<string, IEnumerable<string>>
         {
             {  "CSharp", new [] { "c#" } },
             { "Javascript", new [] { "js" } },
             { "Python", new []  { "py" } },
         };
+
+        private static string AvailableLanguagesList => availableLanguages.Keys.Aggregate((a, b) => $"{a}, {b}");
 
         internal readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -59,12 +61,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                  .Setup<bool>("docker")
                  .SetDefault(false)
-                 .WithDescription("")
+                 .WithDescription("Create a Dockerfile for the selected function app language.")
                  .Callback(d => InitDocker = d);
 
             Parser
                 .Setup<string>('l', "language")
                 .SetDefault(null)
+                .WithDescription($"Language for the functions. Options are: {AvailableLanguagesList}")
                 .Callback(l => Language = l);
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -89,10 +92,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 Environment.CurrentDirectory = folderPath;
             }
 
-            var language = Language ?? SelectionMenuHelper.DisplaySelectionWizard(availableLanguages.Keys);
-            ColoredConsole.WriteLine(TitleColor(language));
+            var language = string.Empty;
+
+            if (string.IsNullOrEmpty(Language))
+            {
+                ColoredConsole.Write("Select a language: ");
+                language = SelectionMenuHelper.DisplaySelectionWizard(availableLanguages.Keys);
+                ColoredConsole.WriteLine(TitleColor(language));
+            }
+            else
+            {
+                language = Language;
+            }
 
             language = NormalizeLanguage(language);
+            await InitLanguageSpecificArtifacts(language);
             await WriteFiles();
             await WriteLocalSettingsJson(language);
             await WriteExtensionsJson();
@@ -100,6 +114,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteDockerfile(language);
 
             PostInit();
+        }
+
+        private async Task InitLanguageSpecificArtifacts(string language)
+        {
+            if (language == "Python")
+            {
+                await PythonHelpers.InstallPackage();
+            }
         }
 
         internal static string NormalizeLanguage(string language)
@@ -111,8 +133,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (!availableLanguages.Keys.Concat(availableLanguages.SelectMany(p => p.Value))
                 .Any(l => l.Equals(language, StringComparison.OrdinalIgnoreCase)))
             {
-                var languages = availableLanguages.Keys.Aggregate((a, b) => $"{a}, {b}");
-                throw new ArgumentException($"Language {language} is not a valid option. Options are {languages}");
+                throw new ArgumentException($"Language {language} is not a valid option. Options are {AvailableLanguagesList}");
             }
 
             var klanguage = availableLanguages.Keys.FirstOrDefault(k => k.Equals(language, StringComparison.OrdinalIgnoreCase));

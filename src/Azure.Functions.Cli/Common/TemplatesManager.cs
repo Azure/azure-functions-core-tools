@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Colors.Net;
 using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -16,6 +17,68 @@ namespace Azure.Functions.Cli.Common
             get
             {
                 return GetTemplates();
+            }
+        }
+
+        public IEnumerable<Template> PythonTemplates
+        {
+            get
+            {
+                return new[]
+                {
+                    new Template
+                    {
+                        Files = new Dictionary<string, string>
+                        {
+                            { "main.py", @"import logging
+
+import azure.functions as func
+
+def main(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('Python HTTP trigger function processed a request.')
+
+    name = req.params.get('name')
+    if not name:
+        try:
+            req_body = req.get_json()
+        except ValueError:
+            pass
+        else:
+            name = req_body.get('name')
+
+    if name:
+        return func.HttpResponse(f""Hello {name}!"")
+    else:
+        return func.HttpResponse(
+             ""Please pass a name on the query string or in the request body"",
+             status_code = 400
+)"}
+                        },
+                        Id = "python-func",
+                        Function = JsonConvert.DeserializeObject<JObject>(@"{
+  'scriptFile': 'main.py',
+  'bindings': [
+    {
+      'authLevel': 'anonymous',
+      'type': 'httpTrigger',
+      'direction': 'in',
+      'name': 'req'
+    },
+    {
+      'type': 'http',
+      'direction': 'out',
+      'name': '$return'
+    }
+  ]
+}"),
+                        Metadata = new TemplateMetadata
+                        {
+                            Language = "Python",
+                            DefaultFunctionName = "HttpTriggerPython",
+                            Name = "HttpTrigger"
+                        }
+                    }
+                };
             }
         }
 

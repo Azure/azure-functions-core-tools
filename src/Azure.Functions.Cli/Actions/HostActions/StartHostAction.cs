@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -191,6 +192,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public override async Task RunAsync()
         {
+            PreRunConditions();
             Utilities.PrintLogo();
 
             var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
@@ -211,6 +213,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await SetupDebuggerAsync(baseAddress);
 
             await runTask;
+        }
+
+        private void PreRunConditions()
+        {
+            if (_secretsManager.GetSecrets().Any(p => p.Key == Constants.FunctionsLanguageSetting && p.Value == "Python"))
+            {
+                PythonHelpers.VerifyVirtualEnvironment();
+            }
         }
 
         private void DisplayDisabledFunctions(WebScriptHostManager hostManager)

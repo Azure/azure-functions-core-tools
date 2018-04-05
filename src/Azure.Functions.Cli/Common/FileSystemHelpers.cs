@@ -122,9 +122,9 @@ namespace Azure.Functions.Cli.Common
             throw new NotImplementedException();
         }
 
-        internal static IEnumerable<string> GetDirectories(string scriptPath)
+        internal static IEnumerable<string> GetDirectories(string path)
         {
-            return Instance.Directory.GetDirectories(scriptPath);
+            return Instance.Directory.GetDirectories(path);
         }
 
         private static void DeleteFileSystemInfo(FileSystemInfoBase fileSystemInfo, bool ignoreErrors)

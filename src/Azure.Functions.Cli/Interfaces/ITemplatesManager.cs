@@ -7,6 +7,9 @@ namespace Azure.Functions.Cli.Interfaces
     interface ITemplatesManager
     {
         Task<IEnumerable<Template>> Templates { get; }
+
+        IEnumerable<Template> PythonTemplates { get; }
+
         Task Deploy(string Name, Template template);
     }
 }

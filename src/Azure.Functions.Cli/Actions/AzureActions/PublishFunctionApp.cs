@@ -34,6 +34,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool ListIgnoredFiles { get; set; }
         public bool ListIncludedFiles { get; set; }
         public bool RunFromZipDeploy { get; private set; }
+        public bool Force { get; set; }
 
         public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
             : base(armManager)
@@ -67,8 +68,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(f => ListIncludedFiles = f);
             Parser
                 .Setup<bool>("zip")
-                .WithDescription("")
+                .WithDescription("Publish in Run-From-Zip package. Requires the app to have AzureWebJobsStorage setting defined.")
                 .Callback(f => RunFromZipDeploy = f);
+            Parser
+                .Setup<bool>("force")
+                .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
+                .Callback(f => Force = f);
 
             return base.ParseArgs(args);
         }
@@ -138,6 +143,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
 
             ColoredConsole.WriteLine("Uploading content...");
+            ValidateAppSettings(azureAppSettings);
             var sas = await UploadZipToStorage(zip, azureAppSettings);
 
             azureAppSettings["WEBSITE_USE_ZIP"] = sas;
@@ -154,6 +160,28 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else
             {
                 ColoredConsole.WriteLine("Deployment completed successfully.");
+            }
+        }
+
+        private void ValidateAppSettings(Dictionary<string, string> appSettings)
+        {
+            if (!appSettings.ContainsKey("AzureWebJobsStorage"))
+            {
+                throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing.");
+            }
+
+            if (appSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING") && !Force)
+            {
+                if (Force)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Removing Azure Files from '{FunctionAppName}' because --force was passed"));
+                    appSettings.Remove("WEBSITE_CONTENTSHARE");
+                    appSettings.Remove("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING");
+                }
+                else
+                {
+                    throw new CliException("Your app is configured with Azure Files for editing from Azure Portal.\nTo force publish use --force. This will remove Azure Files from your app.");
+                }
             }
         }
 
@@ -201,6 +229,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             const string containerName = "function-releases";
             const string blobNameFormat = "{0}-{1}.zip";
+
             var storageConnection = appSettings["AzureWebJobsStorage"];
             var storageAccount = CloudStorageAccount.Parse(storageConnection);
             var blobClient = storageAccount.CreateCloudBlobClient();

@@ -64,6 +64,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var templates = await _templatesManager.Templates;
+            templates = templates.Concat(_templatesManager.PythonTemplates);
 
             var language = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsLanguageSetting, StringComparison.OrdinalIgnoreCase)).Value;
 

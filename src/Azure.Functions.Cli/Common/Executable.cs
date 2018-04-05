@@ -14,15 +14,19 @@ namespace Azure.Functions.Cli.Common
         private bool _shareConsole;
         private bool _streamOutput;
         private readonly bool _visibleProcess;
+        private readonly string _workingDirectory;
 
-        public Executable(string exeName, string arguments = null, bool streamOutput = true, bool shareConsole = false, bool visibleProcess = false)
+        public Executable(string exeName, string arguments = null, bool streamOutput = true, bool shareConsole = false, bool visibleProcess = false, string workingDirectory = null)
         {
             _exeName = exeName;
             _arguments = arguments;
             _streamOutput = streamOutput;
             _shareConsole = shareConsole;
             _visibleProcess = visibleProcess;
+            _workingDirectory = workingDirectory;
         }
+
+        public string Command => $"{_exeName} {_arguments}";
 
         public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null)
         {
@@ -35,7 +39,7 @@ namespace Azure.Functions.Cli.Common
                 RedirectStandardError = _streamOutput,
                 RedirectStandardInput = _streamOutput,
                 RedirectStandardOutput = _streamOutput,
-                WorkingDirectory = Environment.CurrentDirectory
+                WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
             };
 
             Process process = null;

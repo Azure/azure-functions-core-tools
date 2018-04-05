@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Common
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
         public const string FunctionsLanguageSetting = "FUNCTIONS_LANGUAGE";
+        public const string RequirementsTxt = "requirements.txt";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
         public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
