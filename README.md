@@ -21,16 +21,28 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 Both v1 and v2 of the runtime can be installed on Windows.
 
-To install v1:
+To install v1 with npm:
 
 ```bash
 npm i -g azure-functions-core-tools
 ```
 
-To install v2:
+To install v1 with chocolatey:
+
+```bash
+choco install azure-functions-core-tools
+```
+
+To install v2 with npm:
 
 ```bash
 npm i -g azure-functions-core-tools@core --unsafe-perm true
+```
+
+To install v2 with chocolatey:
+
+```bash
+choco install azure-functions-core-tools --pre
 ```
 
 ### Mac
@@ -46,7 +58,7 @@ brew install azure-functions-core-tools
 
 #### Ubuntu/Debian
 
-1. Register the Microsoft Product key as trusted.
+1. Register the Microsoft Product key as trusted
 
 ```bash
 curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
@@ -79,6 +91,40 @@ sudo apt-get update
 
 ```bash
 sudo apt-get install azure-functions-core-tools
+```
+
+#### Fedora/CentOS/Red Hat/openSUSE
+
+1. Register the Microsoft signature key
+
+```bash
+sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+```
+
+2. Set up package feed
+##### yum
+
+```bash
+sudo sh -c 'echo -e "[packages-microsoft-com-prod]\nname=packages-microsoft-com-prod \nbaseurl=https://packages.microsoft.com/yumrepos/microsoft-rhel7.3-prod\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/dotnetdev.repo'
+```
+
+##### zypper
+
+```bash
+sudo sh -c 'echo -e "[packages-microsoft-com-prod]\nname=packages-microsoft-com-prod \nbaseurl=https://packages.microsoft.com/yumrepos/microsoft-rhel7.3-prod\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/zypp/repos.d/dotnetdev.repo'
+```
+
+3. Install
+##### yum
+
+```bash
+sudo yum install azure-functions-core-tools
+```
+
+##### zypper
+
+```bash
+sudo zypper install azure-functions-core-tools
 ```
 
 [Code and test Azure Functions locally](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)
