@@ -91,9 +91,9 @@ namespace Azure.Functions.Cli.Common
             DeleteFileSystemInfo(Instance.DirectoryInfo.FromDirectoryName(path), ignoreErrors);
         }
 
-        internal static IEnumerable<string> GetFiles(string directoryPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> excludedFiles = null)
+        internal static IEnumerable<string> GetFiles(string directoryPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> excludedFiles = null, string searchPattern = "*")
         {
-            foreach (var file in Instance.Directory.GetFiles(directoryPath, "*", SearchOption.TopDirectoryOnly))
+            foreach (var file in Instance.Directory.GetFiles(directoryPath, searchPattern, SearchOption.TopDirectoryOnly))
             {
                 var fileName = Path.GetFileName(file);
                 if (excludedFiles == null ||
@@ -109,7 +109,7 @@ namespace Azure.Functions.Cli.Common
                 if (excludedDirectories == null ||
                     !excludedDirectories.Any(d => d.Equals(directoryName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles))
+                    foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles, searchPattern))
                     {
                         yield return file;
                     }
