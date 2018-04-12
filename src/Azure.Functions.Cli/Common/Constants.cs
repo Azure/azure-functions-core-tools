@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Reflection;
 
 namespace Azure.Functions.Cli.Common
@@ -17,6 +19,7 @@ namespace Azure.Functions.Cli.Common
         public const string FuncIgnoreFile = ".funcignore";
         public const string FunctionsLanguageSetting = "FUNCTIONS_LANGUAGE";
         public const string RequirementsTxt = "requirements.txt";
+        public const string FunctionJsonFileName = "function.json";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
         public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
@@ -39,5 +42,76 @@ namespace Azure.Functions.Cli.Common
             public const string ArmDomain = "https://management.azure.com/";
             public const string AADClientId = "1950a258-227b-4e31-a9cf-717495945fc2";
         }
+
+        public static IDictionary<string, ExtensionPackage> BindingPackageMap { get; } = new ReadOnlyDictionary<string, ExtensionPackage>(
+                new Dictionary<string, ExtensionPackage> {
+                    { "servicebustrigger",
+                        new ExtensionPackage() {
+                        Name = "Microsoft.Azure.WebJobs.ServiceBus",
+                        Version =  "3.0.0-beta5" }
+                    },
+                    { "servicebus",
+                        new ExtensionPackage() {
+                        Name = "Microsoft.Azure.WebJobs.ServiceBus",
+                        Version =  "3.0.0-beta5" }
+                    },
+                    { "eventgubtrigger",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.EventHubs",
+                            Version =  "3.0.0-beta5"} },
+                    { "eventhub",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.EventHubs",
+                            Version =  "3.0.0-beta5"} },
+                    { "sendgrid",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.SendGrid",
+                            Version =  "3.0.0-beta5" } },
+                    { "token",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                            Version =  "1.0.0-beta3"} },
+                     { "excel",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                            Version =  "1.0.0-beta3"} },
+                    { "outlook",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                            Version =  "1.0.0-beta3"} },
+                    { "graphwebhooksubscription",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                            Version =  "1.0.0-beta3"} },
+                    { "onedrive",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                            Version =  "1.0.0-beta3"} },
+                    { "graphwebhooktrigger",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                            Version =  "1.0.0-beta3"} },
+                    { "activitytrigger",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
+                            Version =  "1.2.2-beta3"} },
+                    { "orchestrationtrigger",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
+                            Version =  "1.2.2-beta3"} },
+                    { "orchestrationclient",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
+                            Version =  "1.2.2-beta3"} },
+                    { "eventgridtrigger",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.EventGrid",
+                            Version =  "2.0.0-beta1"} },
+                    { "cosmosdbtrigger",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
+                            Version =  "3.0.0-beta7"} }
+                });
+
     }
 }
