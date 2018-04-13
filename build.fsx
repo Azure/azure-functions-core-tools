@@ -153,6 +153,7 @@ Target "GenerateZipToSign" (fun _ ->
         "Microsoft.Azure.WebSites.DataProtection.dll"
         "worker-bundle.js"
         "nodejsWorker.js"
+        "worker.py"
     ]
 
     let thirdParty = [
@@ -193,6 +194,7 @@ Target "GenerateZipToSign" (fun _ ->
     !! (buildDirNoRuntime @@ "/**/*.dll")
     ++ (buildDirNoRuntime @@ "workers/node/worker-bundle.js")
     ++ (buildDirNoRuntime @@ "workers/node/dist/src/nodejsWorker.js")
+    ++ (buildDirNoRuntime @@ "workers/python/worker.py")
         |> Seq.filter (fun f -> firstParty |> List.contains (f |> Path.GetFileName))
         |> CreateZip buildDirNoRuntime toSignZipPath String.Empty 7 true
 
@@ -259,6 +261,7 @@ Target "WaitForSigning" (fun _ ->
 
         MoveFileTo (buildDirNoRuntime @@ "nodejsWorker.js", buildDirNoRuntime @@ "workers/node/dist/src/nodejsWorker.js")
         MoveFileTo (buildDirNoRuntime @@ "worker-bundle.js", buildDirNoRuntime @@ "workers/node/worker-bundle.js")
+        MoveFileTo (buildDirNoRuntime @@ "worker.py", buildDirNoRuntime @@ "workers/python/worker.py")
     | Failure e -> targetError e null |> ignore
 )
 
