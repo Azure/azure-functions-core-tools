@@ -85,7 +85,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 var syncAction = new SyncExtensionsAction()
                 {
-                    OutputPath = OutputPath
+                    OutputPath = OutputPath,
+                    ConfigPath = ConfigPath
                 };
 
                 await syncAction.RunAsync();

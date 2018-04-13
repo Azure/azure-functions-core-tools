@@ -15,6 +15,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         public string Package { get; set; }
         public string Version { get; set; }
+        public string ConfigPath { get; set; }
 
         public string OutputPath { get; set; }
 
@@ -26,6 +27,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(Path.Combine(".", "bin"))
                 .Callback(o => OutputPath = Path.GetFullPath(o));
 
+            Parser
+               .Setup<string>('c', "configPath")
+               .WithDescription("path of the directory containing extensions.csproj file")
+               .SetDefault(string.Empty)
+               .Callback(s => ConfigPath = s);
             return Parser.Parse(args);
         }
 
@@ -33,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (CommandChecker.CommandExists("dotnet"))
             {
-                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync();
+                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(ConfigPath);
                 var runtimeId = GetRuntimeIdentifierParameter();
 
                 var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath} {runtimeId}");
