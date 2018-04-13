@@ -290,6 +290,11 @@ Target "AddPythonWorker" (fun _ ->
         CopyFile (path @@ "worker.py") (toolsDir @@ "worker.py")
         CopyFile (path @@ "worker.config.json") (toolsDir @@ "worker.config.json")
     )
+
+    let path = buildDirNoRuntime @@ "workers" @@ "python"
+    CreateDir path
+    CopyFile (path @@ "worker.py") (toolsDir @@ "worker.py")
+    CopyFile (path @@ "worker.config.json") (toolsDir @@ "worker.config.json")
 )
 
 Dependencies
