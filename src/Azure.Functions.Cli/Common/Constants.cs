@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Common
                         Name = "Microsoft.Azure.WebJobs.ServiceBus",
                         Version =  "3.0.0-beta5" }
                     },
-                    { "eventgubtrigger",
+                    { "eventhubtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventHubs",
                             Version =  "3.0.0-beta5"} },
