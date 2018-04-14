@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             Parser
                 .Setup<string>('l', "language")
-                .WithDescription($"Template programming language, such as C#, F#, JavaScript, etc. This is only used if local.settings.json doesn't have {Constants.FunctionsLanguageSetting} defined.")
+                .WithDescription($"Template programming language, such as C#, F#, JavaScript, etc.")
                 .Callback(l => Language = l);
 
             Parser
@@ -66,37 +66,63 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var templates = await _templatesManager.Templates;
             templates = templates.Concat(_templatesManager.PythonTemplates);
 
-            var language = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsLanguageSetting, StringComparison.OrdinalIgnoreCase)).Value;
+            var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
 
-            if (string.IsNullOrWhiteSpace(language))
+            if (!string.IsNullOrWhiteSpace(workerRuntime) && !string.IsNullOrWhiteSpace(Language))
             {
-                ColoredConsole.Write("Select a language: ");
-                language = Language ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Distinct());
+                // validate
+                var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
+                var language = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
+                if (worker != language)
+                {
+                    throw new CliException("Selected language doesn't match worker set in local.settings.json." +
+                        $"Selected worker is: {worker} and selected language is: {language}");
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(Language))
+            {
+                if (string.IsNullOrWhiteSpace(workerRuntime))
+                {
+                    ColoredConsole.Write("Select a language: ");
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Distinct());
+                    var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
 
-                ColoredConsole.WriteLine(TitleColor(language));
-
-                language = InitAction.NormalizeLanguage(language);
-
-                _secretsManager.SetSecret(Constants.FunctionsLanguageSetting, language);
+                    _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, worker.ToString());
+                    ColoredConsole
+                        .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
+                        .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
+                }
+                else
+                {
+                    var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
+                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(worker);
+                    ColoredConsole.Write("Select a language: ");
+                    Language = SelectionMenuHelper
+                        .DisplaySelectionWizard(templates
+                            .Select(t => t.Metadata.Language)
+                            .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
+                            .Distinct()
+                        );
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(Language))
+            {
+                var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
+                _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, worker.ToString());
                 ColoredConsole
                     .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
-                    .WriteLine(WarningColor($"'{language}' has been set in your local.settings.json"));
-            }
-
-            if (language.Equals("csharp", StringComparison.OrdinalIgnoreCase))
-            {
-                language = "C#";
+                    .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
             }
 
             ColoredConsole.Write("Select a template: ");
-            var name = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(language, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+            var name = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
             ColoredConsole.WriteLine(TitleColor(name));
 
-            var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(language, StringComparison.OrdinalIgnoreCase));
+            var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase));
 
             if (template == null)
             {
-                ColoredConsole.Error.WriteLine(ErrorColor($"Can't find template \"{name}\" in \"{language}\""));
+                ColoredConsole.Error.WriteLine(ErrorColor($"Can't find template \"{name}\" in \"{Language}\""));
             }
             else
             {

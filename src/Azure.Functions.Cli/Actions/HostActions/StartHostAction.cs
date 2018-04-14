@@ -217,7 +217,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private void PreRunConditions()
         {
-            if (_secretsManager.GetSecrets().Any(p => p.Key == Constants.FunctionsLanguageSetting && p.Value == "Python"))
+            if (_secretsManager.GetSecrets().Any(p => p.Key == Constants.FunctionsWorkerRuntime && p.Value == "Python"))
             {
                 PythonHelpers.VerifyVirtualEnvironment();
             }

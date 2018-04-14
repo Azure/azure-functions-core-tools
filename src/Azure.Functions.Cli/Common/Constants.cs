@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Common
         public const int JavaDebugPort = 5005;
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
-        public const string FunctionsLanguageSetting = "FUNCTIONS_LANGUAGE";
+        public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string RequirementsTxt = "requirements.txt";
         public const string FunctionJsonFileName = "function.json";
 

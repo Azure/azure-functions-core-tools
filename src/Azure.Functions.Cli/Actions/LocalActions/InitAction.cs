@@ -23,19 +23,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool InitDocker { get; set; }
 
-        public string Language { get; set; }
+        public string WorkerRuntime { get; set; }
 
         public string FolderName { get; set; } = string.Empty;
-
-        // map of names and their aliases
-        private static readonly IDictionary<string, IEnumerable<string>> availableLanguages = new Dictionary<string, IEnumerable<string>>
-        {
-            {  "CSharp", new [] { "c#" } },
-            { "Javascript", new [] { "js" } },
-            { "Python", new []  { "py" } },
-        };
-
-        private static string AvailableLanguagesList => availableLanguages.Keys.Aggregate((a, b) => $"{a}, {b}");
 
         internal readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -65,10 +55,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                  .Callback(d => InitDocker = d);
 
             Parser
-                .Setup<string>('l', "language")
+                .Setup<string>("worker-runtime")
                 .SetDefault(null)
-                .WithDescription($"Language for the functions. Options are: {AvailableLanguagesList}")
-                .Callback(l => Language = l);
+                .WithDescription($"Runtime framework for the functions. Options are: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}")
+                .Callback(w => WorkerRuntime= w);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -92,66 +82,41 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 Environment.CurrentDirectory = folderPath;
             }
 
-            var language = string.Empty;
+            WorkerRuntime workerRuntime;
 
-            if (string.IsNullOrEmpty(Language))
+            if (string.IsNullOrEmpty(WorkerRuntime))
             {
-                ColoredConsole.Write("Select a language: ");
-                language = SelectionMenuHelper.DisplaySelectionWizard(availableLanguages.Keys);
-                ColoredConsole.WriteLine(TitleColor(language));
+                ColoredConsole.Write("Select a worker runtime: ");
+                workerRuntime = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.AvailableWorkersList);
+                ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
             }
             else
             {
-                language = Language;
+                workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(WorkerRuntime);
             }
 
-            language = NormalizeLanguage(language);
-            await InitLanguageSpecificArtifacts(language);
+            await InitLanguageSpecificArtifacts(workerRuntime);
             await WriteFiles();
-            await WriteLocalSettingsJson(language);
+            await WriteLocalSettingsJson(workerRuntime);
             await WriteExtensionsJson();
             await SetupSourceControl();
-            await WriteDockerfile(language);
+            await WriteDockerfile(workerRuntime);
 
             PostInit();
         }
 
-        private async Task InitLanguageSpecificArtifacts(string language)
+        private async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime)
         {
-            if (language == "Python")
+            if (workerRuntime == Helpers.WorkerRuntime.python)
             {
                 await PythonHelpers.InstallPackage();
             }
         }
 
-        internal static string NormalizeLanguage(string language)
-        {
-            if (string.IsNullOrWhiteSpace(language))
-            {
-                throw new ArgumentNullException(nameof(language), "Language can't be empty");
-            }
-            else if (!availableLanguages.Keys.Concat(availableLanguages.SelectMany(p => p.Value))
-                .Any(l => l.Equals(language, StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new ArgumentException($"Language {language} is not a valid option. Options are {AvailableLanguagesList}");
-            }
-
-            var klanguage = availableLanguages.Keys.FirstOrDefault(k => k.Equals(language, StringComparison.OrdinalIgnoreCase));
-
-            if(!string.IsNullOrEmpty(klanguage))
-            {
-                return klanguage;
-            }
-            else
-            {
-                return availableLanguages.First(p => p.Value.Any(v => v.Equals(language, StringComparison.OrdinalIgnoreCase))).Key;
-            }
-        }
-
-        private async Task WriteLocalSettingsJson(string language)
+        private async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime)
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsLanguageSetting}}}", language);
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntime.ToString());
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
@@ -184,19 +149,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private async Task WriteDockerfile(string language)
+        private async Task WriteDockerfile(WorkerRuntime workerRuntime)
         {
             if (InitDocker)
             {
-                if (language == "C#")
+                if (workerRuntime == Helpers.WorkerRuntime.dotnet)
                 {
                     await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
                 }
-                else if (language == "Javascript")
+                else if (workerRuntime == Helpers.WorkerRuntime.node)
                 {
                     await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
                 }
-                else if (language == "Python")
+                else if (workerRuntime == Helpers.WorkerRuntime.python)
                 {
                     await WriteFiles("Dockerfile", await StaticResources.DockerfilePython);
                 }

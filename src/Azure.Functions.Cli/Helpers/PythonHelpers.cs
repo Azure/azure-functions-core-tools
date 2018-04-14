@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -58,7 +59,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task InstallPipWheel()
+        public static async Task InstallPipWheel()
         {
             ColoredConsole.WriteLine("Installing wheel package");
             var exe = new Executable("pip", "install wheel");
@@ -67,6 +68,17 @@ namespace Azure.Functions.Cli.Helpers
             if (exitCode != 0)
             {
                 throw new CliException($"Error running '{exe.Command}'. {sb.ToString()}");
+            }
+        }
+
+        public static async Task DownloadWheels()
+        {
+            ColoredConsole.WriteLine("Downloading wheels from requirements.txt to .wheels dir");
+            var exe = new Executable("pip", "wheel --wheel-dir=.wheels -r requirements.txt");
+            var exitCode = await exe.RunAsync(l => ColoredConsole.WriteLine(l), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+            if (exitCode != 0)
+            {
+                throw new CliException($"Error running '{exe.Command}'.");
             }
         }
 

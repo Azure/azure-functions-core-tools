@@ -35,6 +35,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool ListIncludedFiles { get; set; }
         public bool RunFromZipDeploy { get; private set; }
         public bool Force { get; set; }
+        public bool SkipWheelRestore { get; set; }
 
         public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
             : base(armManager)
@@ -70,6 +71,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("zip")
                 .WithDescription("Publish in Run-From-Zip package. Requires the app to have AzureWebJobsStorage setting defined.")
                 .Callback(f => RunFromZipDeploy = f);
+            Parser
+                .Setup<bool>("skip-wheel-restore")
+                .SetDefault(false)
+                .WithDescription("Skips generating .wheels folder when publishing python function apps.")
+                .Callback(f => SkipWheelRestore = f);
             Parser
                 .Setup<bool>("force")
                 .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
@@ -122,9 +128,30 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 ColoredConsole
                     .WriteLine(ErrorColor("--zip is not supported with dedicated linux apps."));
+                return;
             }
+
+            var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+
+            if (!string.IsNullOrWhiteSpace(workerRuntime))
+            {
+                var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
+                if (worker == WorkerRuntime.python)
+                {
+                    if (!SkipWheelRestore)
+                    {
+                        await PythonHelpers.InstallPipWheel();
+                        await PythonHelpers.DownloadWheels();
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine("Skipping wheels download");
+                    }
+                }
+            }
+
             // if consumption linux, or --zip, run from zip
-            else if (functionApp.IsDynamicLinux || RunFromZipDeploy)
+            if (functionApp.IsDynamicLinux || RunFromZipDeploy)
             {
                 await PublishRunFromZip(functionApp, functionAppRoot, ignoreParser);
             }
@@ -132,8 +159,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await PublishZipDeploy(functionApp, functionAppRoot, ignoreParser);
             }
-            // else same old same old
-
         }
 
         private async Task PublishRunFromZip(Site functionApp, string functionAppRoot, GitIgnoreParser ignoreParser)
