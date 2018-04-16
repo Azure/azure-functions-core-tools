@@ -739,6 +739,9 @@
     <Compile Include="Common\Utilities.cs" />
     <Compile Include="ConsoleApp.cs" />
     <Compile Include="Context.cs" />
+    <Compile Include="Diagnostics\CliLoggerFactoryBuilder.cs" />
+    <Compile Include="Diagnostics\ColoredConsoleLogger.cs" />
+    <Compile Include="Diagnostics\ColoredConsoleLoggerProvider.cs" />
     <Compile Include="Diagnostics\ConsoleTraceWriter.cs" />
     <Compile Include="Extensions\DictionaryExtensions.cs" />
     <Compile Include="Extensions\FunctionMetadataExtensions.cs" />
