@@ -23,6 +23,7 @@ namespace Azure.Functions.Cli
         private readonly string[] _args;
         private readonly IEnumerable<TypeAttributePair> _actionAttributes;
         private readonly string[] _helpArgs = new[] { "help", "h", "?" };
+        private readonly string[] _versionArgs = new[] { "version", "v" };
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
         public static void Run<T>(string[] args, IContainer container)
@@ -171,6 +172,11 @@ namespace Azure.Functions.Cli
         /// </summary>
         internal IAction Parse()
         {
+            if (_args.Length == 1 && _versionArgs.Any(va => _args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
+            {
+                ColoredConsole.WriteLine($"{Constants.CliDisplayVersion}");
+                return null;
+            }
             // If there is no args are passed, display help.
             // If args are passed and any it matched any of the strings in _helpArgs with a "-" then display help.
             // Otherwise, continue parsing.
@@ -206,7 +212,7 @@ namespace Azure.Functions.Cli
                     ? _args.Where(a => !a.StartsWith("-") || argsHelpIntersection.Contains(a.Replace("-", "").ToLowerInvariant()))
                     : _args;
             }
- 
+
             // We'll need to grab context arg: string, subcontext arg: string, action arg: string
             var contextStr = string.Empty;
             var subContextStr = string.Empty;
@@ -266,7 +272,7 @@ namespace Azure.Functions.Cli
             // We expect to find 1 and only 1 IAction that matches all 3 (context, subContext, action)
             var actionType = _actionAttributes
                 .Where(a => a.Attribute.Name.Equals(actionStr, StringComparison.OrdinalIgnoreCase) &&
-                            a.Attribute.Context == context && 
+                            a.Attribute.Context == context &&
                             a.Attribute.SubContext == subContext)
                 .SingleOrDefault();
 
