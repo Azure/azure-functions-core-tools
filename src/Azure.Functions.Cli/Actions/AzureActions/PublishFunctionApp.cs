@@ -172,6 +172,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var sas = await UploadZipToStorage(zip, azureAppSettings);
 
             azureAppSettings["WEBSITE_USE_ZIP"] = sas;
+            azureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
 
             var result = await _armManager.UpdateFunctionAppAppSettings(functionApp, azureAppSettings);
             ColoredConsole.WriteLine("Upload completed successfully.");
@@ -262,7 +263,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             await blobContainer.CreateIfNotExistsAsync();
 
             var releaseName = Guid.NewGuid().ToString();
-            var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), releaseName));
+            var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
             await blob.UploadFromStreamAsync(zip);
 
             var sasConstraints = new SharedAccessBlobPolicy();
