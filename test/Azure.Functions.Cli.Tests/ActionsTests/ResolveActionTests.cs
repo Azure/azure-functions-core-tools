@@ -44,25 +44,32 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("settings delete settingName", typeof(DeleteSettingAction))]
         [InlineData("settings list", typeof(ListSettingsAction))]
         [InlineData("init", typeof(InitAction))]
-        [InlineData("-v", typeof(HelpAction))]
-        [InlineData("-version", typeof(HelpAction))]
-        [InlineData("--version", typeof(HelpAction))]
+        [InlineData("-v", null)]
+        [InlineData("-version", null)]
+        [InlineData("--version", null)]
         [InlineData("", typeof(HelpAction))]
         [InlineData("help", typeof(HelpAction))]
         [InlineData("WrongName", typeof(HelpAction))]
         [InlineData("azure functionapp --help", typeof(HelpAction))]
         [InlineData("azure --help", typeof(HelpAction))]
         [InlineData("--help", typeof(HelpAction))]
-        public void ResolveCommandLineCorrectly(string args, Type type)
+        public void ResolveCommandLineCorrectly(string args, Type returnType)
         {
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
             FileSystemHelpers.Instance = fileSystem;
 
             var container = InitializeContainerForTests();
-            var app = new ConsoleApp(args.Split(' ').ToArray(), type.Assembly, container);
+            var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
             var result = app.Parse();
-            result.Should().BeOfType(type);
+            if (returnType == null)
+            {
+                result.Should().BeNull();
+            }
+            else
+            {
+                result.Should().BeOfType(returnType);
+            }
         }
 
         private IContainer InitializeContainerForTests()
