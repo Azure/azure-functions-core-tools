@@ -33,6 +33,11 @@ namespace Azure.Functions.Cli.Common
             return Instance.File.ReadAllText(path);
         }
 
+        public static void Copy(string source, string destination, bool overwrite = false)
+        {
+            Instance.File.Copy(source, destination, overwrite);
+        }
+
         public static async Task<string> ReadAllTextFromFileAsync(string path)
         {
             using (var fileStream = OpenFile(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))

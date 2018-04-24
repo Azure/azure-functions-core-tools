@@ -20,6 +20,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string RequirementsTxt = "requirements.txt";
         public const string FunctionJsonFileName = "function.json";
+        public const string DefaultVEnvName = "worker_env";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
         public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
@@ -41,6 +42,16 @@ namespace Azure.Functions.Cli.Common
             public const string ArmAudience = "https://management.core.windows.net/";
             public const string ArmDomain = "https://management.azure.com/";
             public const string AADClientId = "1950a258-227b-4e31-a9cf-717495945fc2";
+        }
+
+        public static class DockerImages
+        {
+            public const string LinuxPythonImageAmd64 = "microsoft/azure-functions-python3.6:dev-stretch";
+        }
+
+        public static class StaticResourcesNames
+        {
+            public const string PythonDockerBuild = "python_docker_build.sh";
         }
 
         public static IDictionary<string, ExtensionPackage> BindingPackageMap { get; } = new ReadOnlyDictionary<string, ExtensionPackage>(
@@ -112,6 +123,5 @@ namespace Azure.Functions.Cli.Common
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
                             Version =  "3.0.0-beta7"} }
                 });
-
     }
 }

@@ -6,6 +6,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public enum WorkerRuntime
     {
+        None,
         dotnet,
         node,
         python

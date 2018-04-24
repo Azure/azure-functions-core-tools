@@ -165,6 +165,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     await WriteFiles("Dockerfile", await StaticResources.DockerfilePython);
                 }
+                else if (workerRuntime == Helpers.WorkerRuntime.None)
+                {
+                    throw new CliException("Can't find WorkerRutime None");
+                }
             }
         }
 

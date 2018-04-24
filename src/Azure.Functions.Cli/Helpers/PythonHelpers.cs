@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -42,16 +45,18 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task PipFreeze()
+        private static async Task PipFreeze(string path = null)
         {
-            ColoredConsole.WriteLine("Generating requirements.txt");
             var sb = new StringBuilder();
             var exe = new Executable("pip", "freeze");
+            ColoredConsole.WriteLine($"Running {exe.Command}");
             var exitCode = await exe.RunAsync(l => sb.AppendLine(l));
+
+            var filePath = string.IsNullOrEmpty(path) ? Constants.RequirementsTxt : Path.Combine(path, Constants.RequirementsTxt);
 
             if (exitCode == 0)
             {
-                await FileSystemHelpers.WriteAllTextToFileAsync(Constants.RequirementsTxt, sb.ToString());
+                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, sb.ToString());
             }
             else
             {
@@ -99,6 +104,77 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new CliException($"Error running {exe.Command}");
             }
+        }
+
+        internal static Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot)
+        {
+            if (CommandChecker.CommandExists("docker"))
+            {
+                return InternalPreparePythonDeployment(files, functionAppRoot);
+            }
+            else
+            {
+                throw new CliException("Docker is required to publish python function apps");
+            }
+        }
+
+        private static async Task<Stream> InternalPreparePythonDeployment(IEnumerable<string> files, string functionAppRoot)
+        {
+            if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
+            {
+                ColoredConsole.WriteLine(WarningColor($"{Constants.RequirementsTxt} doesn't exist. Creating one"));
+                files = files.Append(Path.Combine(functionAppRoot, Constants.RequirementsTxt));
+            }
+            else
+            {
+                ColoredConsole.WriteLine($"Updating {Constants.RequirementsTxt}");
+            }
+
+            await PipFreeze(functionAppRoot);
+
+            var appContentPath = CopyToTemp(files, functionAppRoot);
+
+            await DockerHelpers.DockerPull(Constants.DockerImages.LinuxPythonImageAmd64);
+            var containerId = string.Empty;
+            try
+            {
+                containerId = await DockerHelpers.DockerRun(Constants.DockerImages.LinuxPythonImageAmd64);
+                await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/app");
+
+                var scriptFilePath = Path.GetTempFileName();
+                await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
+                await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
+                await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
+
+                var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
+                FileSystemHelpers.EnsureDirectory(tempDir);
+
+                await DockerHelpers.CopyFromContainer(containerId, $"/app.zip", tempDir);
+                return FileSystemHelpers.OpenFile(Path.Combine(tempDir, "app.zip"), FileMode.Open);
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(containerId))
+                {
+                    await DockerHelpers.KillContainer(containerId, ignoreError: true);
+                }
+            }
+        }
+
+        private static string CopyToTemp(IEnumerable<string> files, string rootPath)
+        {
+            var tmp = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", string.Empty));
+            FileSystemHelpers.EnsureDirectory(tmp);
+
+            foreach(var file in files)
+            {
+                var relativeFileName = file.Replace(rootPath, string.Empty).Trim(Path.DirectorySeparatorChar);
+                var relativeDirName = Path.GetDirectoryName(relativeFileName);
+
+                FileSystemHelpers.EnsureDirectory(Path.Combine(tmp, relativeDirName));
+                FileSystemHelpers.Copy(file, Path.Combine(tmp, relativeFileName));
+            }
+            return tmp;
         }
     }
 }

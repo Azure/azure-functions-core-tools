@@ -1,0 +1,9 @@
+﻿#! /bin/bash
+
+cd app
+python -m venv worker_env
+source worker_env/bin/activate
+pip install -r requirements.txt
+apt update
+apt install zip -y
+zip --symlinks -r /app.zip .

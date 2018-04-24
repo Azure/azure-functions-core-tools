@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli
 {
@@ -39,5 +40,7 @@ namespace Azure.Functions.Cli
         public static Task<string> LocalSettingsJson => GetValue("local.settings.json");
 
         public static Task<string> HostJson => GetValue("host.json");
+
+        public static Task<string> PythonDockerBuildScript => GetValue(Constants.StaticResourcesNames.PythonDockerBuild);
     }
 }

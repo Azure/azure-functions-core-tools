@@ -132,44 +132,48 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            var workerRuntimeEnum = string.IsNullOrEmpty(workerRuntime) ? WorkerRuntime.None : WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
 
-            if (!string.IsNullOrWhiteSpace(workerRuntime))
-            {
-                var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
-                if (worker == WorkerRuntime.python)
-                {
-                    if (!SkipWheelRestore)
-                    {
-                        await PythonHelpers.InstallPipWheel();
-                        await PythonHelpers.DownloadWheels();
-                    }
-                    else
-                    {
-                        ColoredConsole.WriteLine("Skipping wheels download");
-                    }
-                }
-            }
+            var zipStream = await GetAppZipFile(workerRuntimeEnum, functionAppRoot, ignoreParser, functionApp.IsLinux);
 
-            // if consumption linux, or --zip, run from zip
+            // if consumption Linux, or --zip, run from zip
             if (functionApp.IsDynamicLinux || RunFromZipDeploy)
             {
-                await PublishRunFromZip(functionApp, functionAppRoot, ignoreParser);
+                await PublishRunFromZip(functionApp, zipStream);
             }
             else
             {
-                await PublishZipDeploy(functionApp, functionAppRoot, ignoreParser);
+                await PublishZipDeploy(functionApp, zipStream);
             }
         }
 
-        private async Task PublishRunFromZip(Site functionApp, string functionAppRoot, GitIgnoreParser ignoreParser)
+        private async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, GitIgnoreParser ignoreParser, bool isLinux)
+        {
+            if (workerRuntime == WorkerRuntime.python)
+            {
+                if (isLinux)
+                {
+                    return await PythonHelpers.GetPythonDeploymentPackage(GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot);
+                }
+                else
+                {
+                    throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
+                }
+            }
+            else
+            {
+                return CreateZip(GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot);
+            }
+        }
+
+        private async Task PublishRunFromZip(Site functionApp, Stream zipFile)
         {
             ColoredConsole.WriteLine("Preparing archive...");
-            var zip = CreateZip(functionAppRoot, ignoreParser);
             var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
 
             ColoredConsole.WriteLine("Uploading content...");
             ValidateAppSettings(azureAppSettings);
-            var sas = await UploadZipToStorage(zip, azureAppSettings);
+            var sas = await UploadZipToStorage(zipFile, azureAppSettings);
 
             azureAppSettings["WEBSITE_USE_ZIP"] = sas;
             azureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
@@ -211,7 +215,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        public async Task PublishZipDeploy(Site functionApp, string functionAppRoot, GitIgnoreParser ignoreParser)
+        public async Task PublishZipDeploy(Site functionApp, Stream zipFile)
         {
             await RetryHelper.Retry(async () =>
             {
@@ -222,7 +226,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                     ColoredConsole.WriteLine("Creating archive for current directory...");
 
-                    request.Content = CreateStreamContentZip(functionAppRoot, ignoreParser);
+                    request.Content = CreateStreamContentZip(zipFile);
 
                     ColoredConsole.WriteLine("Uploading archive...");
                     var response = await client.SendAsync(request);
@@ -276,9 +280,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return blob.Uri + blobToken;
         }
 
-        private static IEnumerable<string> GetFiles(string path)
+        private static IEnumerable<string> GetLocalFiles(string path, GitIgnoreParser ignoreParser = null, bool returnIgnored = false)
         {
-            return FileSystemHelpers.GetFiles(path, new[] { ".git", ".vscode" }, new[] { ".funcignore", ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" });
+            var ignoredDirectories = new[] { ".git", ".vscode" };
+            var ignoredFiles = new[] { ".funcignore", ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" };
+
+            foreach (var file in FileSystemHelpers.GetFiles(path, ignoredDirectories, ignoredFiles))
+            {
+                if (preCondition(file))
+                {
+                    yield return file;
+                }
+            }
+
+            bool preCondition(string file)
+            {
+                var fileName = file.Replace(path, string.Empty).Trim(Path.DirectorySeparatorChar).Replace("\\", "/");
+                return (returnIgnored ? ignoreParser?.Denies(fileName) : ignoreParser?.Accepts(fileName)) ?? true;
+            }
         }
 
         private async Task InternalPublishLocalSettingsOnly()
@@ -300,12 +319,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            foreach (var file in GetFiles(Environment.CurrentDirectory).Select(f => f.Replace(Environment.CurrentDirectory, "").Trim(Path.DirectorySeparatorChar).Replace("\\", "/")))
+            foreach (var file in GetLocalFiles(Environment.CurrentDirectory, ignoreParser, returnIgnored: true))
             {
-                if (ignoreParser.Denies(file))
-                {
-                    ColoredConsole.WriteLine(file);
-                }
+                ColoredConsole.WriteLine(file);
             }
         }
 
@@ -317,12 +333,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            foreach (var file in GetFiles(Environment.CurrentDirectory).Select(f => f.Replace(Environment.CurrentDirectory, "").Trim(Path.DirectorySeparatorChar).Replace("\\", "/")))
+            foreach (var file in GetLocalFiles(Environment.CurrentDirectory))
             {
-                if (ignoreParser.Accepts(file))
-                {
-                    ColoredConsole.WriteLine(file);
-                }
+                ColoredConsole.WriteLine(file);
             }
         }
 
@@ -389,27 +402,23 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return result;
         }
 
-        private static Stream CreateZip(string path, GitIgnoreParser ignoreParser)
+        private static Stream CreateZip(IEnumerable<string> files, string rootPath)
         {
             var memoryStream = new MemoryStream();
             using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                foreach (var fileName in GetFiles(path))
+                foreach (var fileName in files)
                 {
-                    if (ignoreParser?.Accepts(fileName.Replace(path, "").Trim(Path.DirectorySeparatorChar).Replace("\\", "/")) ?? true)
-                    {
-                        zip.AddFile(fileName, fileName, path);
-                    }
+                    zip.AddFile(fileName, fileName, rootPath);
                 }
             }
             memoryStream.Seek(0, SeekOrigin.Begin);
             return memoryStream;
         }
 
-        private static StreamContent CreateStreamContentZip(string path, GitIgnoreParser ignoreParser)
+        private static StreamContent CreateStreamContentZip(Stream zipFile)
         {
-            var memoryStream = CreateZip(path, ignoreParser);
-            var content = new StreamContent(memoryStream);
+            var content = new StreamContent(zipFile);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
             return content;
         }
