@@ -97,12 +97,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(worker);
                     ColoredConsole.Write("Select a language: ");
-                    Language = SelectionMenuHelper
-                        .DisplaySelectionWizard(templates
+                    var displayList = templates
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct()
-                        );
+                            .ToArray();
+                    if (displayList.Length == 1)
+                    {
+                        Language = displayList.First();
+                    }
+                    else
+                    {
+                        Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
+                    }
                 }
             }
             else if (!string.IsNullOrWhiteSpace(Language))
@@ -132,6 +139,5 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 await _templatesManager.Deploy(functionName, template);
             }
         }
-
     }
 }
