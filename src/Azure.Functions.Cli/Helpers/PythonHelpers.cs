@@ -106,11 +106,11 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot)
         {
-            if (CommandChecker.CommandExists("docker"))
+            if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
             {
-                return InternalPreparePythonDeployment(files, functionAppRoot);
+                return await InternalPreparePythonDeployment(files, functionAppRoot);
             }
             else
             {
@@ -144,6 +144,7 @@ namespace Azure.Functions.Cli.Helpers
                 var scriptFilePath = Path.GetTempFileName();
                 await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
+                await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
 
                 var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));

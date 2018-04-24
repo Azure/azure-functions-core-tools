@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -25,6 +26,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             var docker = new Executable("docker", $"run -d {image}");
             var sb = new StringBuilder();
+            ColoredConsole.WriteLine($"Running {docker.Command}");
             var exitCode = await docker.RunAsync(l => sb.Append(l), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
             if (exitCode != 0)
             {
@@ -43,5 +45,17 @@ namespace Azure.Functions.Cli.Helpers
         public static Task CopyFromContainer(string containerId, string source, string target) => RunDockerCommand($"cp {containerId}:{source} {target}");
 
         public static Task KillContainer(string containerId, bool ignoreError = false) => RunDockerCommand($"kill {containerId}", ignoreError);
+
+        internal static async Task<bool> VerifyDockerAccess()
+        {
+            var docker = new Executable("docker", $"ps");
+            var sb = new StringBuilder();
+            var exitCode = await docker.RunAsync(l => sb.Append(l), e => sb.Append(e));
+            if (exitCode != 0 && sb.ToString().IndexOf("Got permission denied while trying to connect to the Docker daemon socket at unix", StringComparison.OrdinalIgnoreCase) != 0)
+            {
+                throw new CliException("Got permission denied trying to run docker. Make sure the user you are running the cli from is in docker group or is root");
+            }
+            return true;
+        }
     }
 }
