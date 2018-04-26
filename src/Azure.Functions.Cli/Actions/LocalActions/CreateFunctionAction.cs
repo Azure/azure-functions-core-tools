@@ -84,7 +84,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (string.IsNullOrWhiteSpace(workerRuntime))
                 {
                     ColoredConsole.Write("Select a language: ");
-                    Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Distinct());
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
 
                     _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, worker.ToString());

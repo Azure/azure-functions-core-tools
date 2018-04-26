@@ -122,15 +122,9 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
             {
-                ColoredConsole.WriteLine(WarningColor($"{Constants.RequirementsTxt} doesn't exist. Creating one"));
-                files = files.Append(Path.Combine(functionAppRoot, Constants.RequirementsTxt));
+                throw new CliException($"{Constants.RequirementsTxt} is not found. " +
+                $"{Constants.RequirementsTxt} is required for python function apps. Please make sure to generate one before publishing.");
             }
-            else
-            {
-                ColoredConsole.WriteLine($"Updating {Constants.RequirementsTxt}");
-            }
-
-            await PipFreeze(functionAppRoot);
 
             var appContentPath = CopyToTemp(files, functionAppRoot);
 
@@ -167,7 +161,7 @@ namespace Azure.Functions.Cli.Helpers
             var tmp = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", string.Empty));
             FileSystemHelpers.EnsureDirectory(tmp);
 
-            foreach(var file in files)
+            foreach (var file in files)
             {
                 var relativeFileName = file.Replace(rootPath, string.Empty).Trim(Path.DirectorySeparatorChar);
                 var relativeDirName = Path.GetDirectoryName(relativeFileName);

@@ -26,9 +26,10 @@ namespace Azure.Functions.Cli.Helpers
             .SelectMany(i => i)
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
 
-        public static string AvailableWorkersRuntimeString => string.Join(", ", availableWorkersRuntime.Keys.Select(s => s.ToString()));
+        public static string AvailableWorkersRuntimeString =>
+            string.Join(", ", availableWorkersRuntime.Keys.Where(k => k != WorkerRuntime.python).Select(s => s.ToString()));
 
-        public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys;
+        public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys.Where(k => k != WorkerRuntime.python);
 
         public static WorkerRuntime NormalizeWorkerRuntime(string workerRuntime)
         {

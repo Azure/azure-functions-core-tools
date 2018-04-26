@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>("worker-runtime")
                 .SetDefault(null)
                 .WithDescription($"Runtime framework for the functions. Options are: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}")
-                .Callback(w => WorkerRuntime= w);
+                .Callback(w => WorkerRuntime = w);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {

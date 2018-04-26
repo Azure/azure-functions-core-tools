@@ -48,10 +48,10 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static async Task<bool> VerifyDockerAccess()
         {
-            var docker = new Executable("docker", $"ps");
+            var docker = new Executable("docker", "ps");
             var sb = new StringBuilder();
-            var exitCode = await docker.RunAsync(l => sb.Append(l), e => sb.Append(e));
-            if (exitCode != 0 && sb.ToString().IndexOf("Got permission denied while trying to connect to the Docker daemon socket at unix", StringComparison.OrdinalIgnoreCase) != 0)
+            var exitCode = await docker.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
+            if (exitCode != 0 && sb.ToString().IndexOf("permission denied", StringComparison.OrdinalIgnoreCase) != 0)
             {
                 throw new CliException("Got permission denied trying to run docker. Make sure the user you are running the cli from is in docker group or is root");
             }
