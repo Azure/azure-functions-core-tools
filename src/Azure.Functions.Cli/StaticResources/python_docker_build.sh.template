@@ -1,9 +1,9 @@
 ﻿#! /bin/bash
 
 cd app
-python -m venv worker_env
-source worker_env/bin/activate
+python -m venv worker_venv
+source worker_venv/bin/activate
 pip install -r requirements.txt
-apt update
-apt install zip -y
+apt-get update
+apt-get install zip -y
 zip --symlinks -r /app.zip .
