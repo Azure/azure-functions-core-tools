@@ -67,6 +67,14 @@ namespace Azure.Functions.Cli.Common
             Instance.File.WriteAllBytes(path, bytes);
         }
 
+        public static async Task WriteToFile(string path, Stream stream)
+        {
+            using (var fileStream = OpenFile(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
+            {
+                await stream.CopyToAsync(fileStream);
+            }
+        }
+
         public static bool FileExists(string path)
         {
             return Instance.File.Exists(path);

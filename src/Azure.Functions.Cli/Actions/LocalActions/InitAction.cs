@@ -49,12 +49,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => InitSourceControl = !f);
 
             Parser
-                 .Setup<bool>("docker")
-                 .SetDefault(false)
-                 .WithDescription("Create a Dockerfile for the selected function app language.")
-                 .Callback(d => InitDocker = d);
-
-            Parser
                 .Setup<string>("worker-runtime")
                 .SetDefault(null)
                 .WithDescription($"Runtime framework for the functions. Options are: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}")

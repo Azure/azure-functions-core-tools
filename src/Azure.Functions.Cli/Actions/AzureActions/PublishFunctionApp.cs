@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
@@ -133,8 +134,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
             var workerRuntimeEnum = string.IsNullOrEmpty(workerRuntime) ? WorkerRuntime.None : WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
+            if (workerRuntimeEnum == WorkerRuntime.python && !functionApp.IsLinux)
+            {
+                throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
+            }
 
-            var zipStream = await GetAppZipFile(workerRuntimeEnum, functionAppRoot, ignoreParser, functionApp.IsLinux);
+            var zipStream = await PackAction.GetAppZipFile(workerRuntimeEnum, functionAppRoot, ignoreParser);
 
             // if consumption Linux, or --zip, run from zip
             if (functionApp.IsDynamicLinux || RunFromZipDeploy)
@@ -144,25 +149,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else
             {
                 await PublishZipDeploy(functionApp, zipStream);
-            }
-        }
-
-        private async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, GitIgnoreParser ignoreParser, bool isLinux)
-        {
-            if (workerRuntime == WorkerRuntime.python)
-            {
-                if (isLinux)
-                {
-                    return await PythonHelpers.GetPythonDeploymentPackage(GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot);
-                }
-                else
-                {
-                    throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
-                }
-            }
-            else
-            {
-                return CreateZip(GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot);
             }
         }
 
@@ -280,26 +266,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return blob.Uri + blobToken;
         }
 
-        private static IEnumerable<string> GetLocalFiles(string path, GitIgnoreParser ignoreParser = null, bool returnIgnored = false)
-        {
-            var ignoredDirectories = new[] { ".git", ".vscode" };
-            var ignoredFiles = new[] { ".funcignore", ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" };
-
-            foreach (var file in FileSystemHelpers.GetFiles(path, ignoredDirectories, ignoredFiles))
-            {
-                if (preCondition(file))
-                {
-                    yield return file;
-                }
-            }
-
-            bool preCondition(string file)
-            {
-                var fileName = file.Replace(path, string.Empty).Trim(Path.DirectorySeparatorChar).Replace("\\", "/");
-                return (returnIgnored ? ignoreParser?.Denies(fileName) : ignoreParser?.Accepts(fileName)) ?? true;
-            }
-        }
-
         private async Task InternalPublishLocalSettingsOnly()
         {
             ColoredConsole.WriteLine("Getting site publishing info...");
@@ -319,7 +285,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            foreach (var file in GetLocalFiles(Environment.CurrentDirectory, ignoreParser, returnIgnored: true))
+            foreach (var file in PackAction.GetLocalFiles(Environment.CurrentDirectory, ignoreParser, returnIgnored: true))
             {
                 ColoredConsole.WriteLine(file);
             }
@@ -333,7 +299,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            foreach (var file in GetLocalFiles(Environment.CurrentDirectory))
+            foreach (var file in PackAction.GetLocalFiles(Environment.CurrentDirectory))
             {
                 ColoredConsole.WriteLine(file);
             }
@@ -400,20 +366,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             return result;
-        }
-
-        private static Stream CreateZip(IEnumerable<string> files, string rootPath)
-        {
-            var memoryStream = new MemoryStream();
-            using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
-            {
-                foreach (var fileName in files)
-                {
-                    zip.AddFile(fileName, fileName, rootPath);
-                }
-            }
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            return memoryStream;
         }
 
         private static StreamContent CreateStreamContentZip(Stream zipFile)
