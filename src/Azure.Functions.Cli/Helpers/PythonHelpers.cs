@@ -133,7 +133,8 @@ namespace Azure.Functions.Cli.Helpers
             try
             {
                 containerId = await DockerHelpers.DockerRun(Constants.DockerImages.LinuxPythonImageAmd64);
-                await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/app");
+                await DockerHelpers.ExecInContainer(containerId, "mkdir -p /home/site/wwwroot/");
+                await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/home/site/wwwroot");
 
                 var scriptFilePath = Path.GetTempFileName();
                 await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
