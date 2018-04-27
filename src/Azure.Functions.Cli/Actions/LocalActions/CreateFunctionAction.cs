@@ -64,8 +64,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var templates = await _templatesManager.Templates;
-            templates = templates.Concat(_templatesManager.PythonTemplates);
-
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
 
             if (!string.IsNullOrWhiteSpace(workerRuntime) && !string.IsNullOrWhiteSpace(Language))

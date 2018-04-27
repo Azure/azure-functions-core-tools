@@ -7,6 +7,7 @@ using Colors.Net;
 using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
 using Newtonsoft.Json.Linq;
+using Azure.Functions.Cli.Actions.LocalActions;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -20,76 +21,10 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        public IEnumerable<Template> PythonTemplates
-        {
-            get
-            {
-                return new[]
-                {
-                    new Template
-                    {
-                        Files = new Dictionary<string, string>
-                        {
-                            { "main.py", @"import logging
-
-import azure.functions as func
-
-def main(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('Python HTTP trigger function processed a request.')
-
-    name = req.params.get('name')
-    if not name:
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            pass
-        else:
-            name = req_body.get('name')
-
-    if name:
-        return func.HttpResponse(f""Hello {name}!"")
-    else:
-        return func.HttpResponse(
-             ""Please pass a name on the query string or in the request body"",
-             status_code = 400
-)"}
-                        },
-                        Id = "python-func",
-                        Function = JsonConvert.DeserializeObject<JObject>(@"{
-  'scriptFile': 'main.py',
-  'bindings': [
-    {
-      'authLevel': 'anonymous',
-      'type': 'httpTrigger',
-      'direction': 'in',
-      'name': 'req'
-    },
-    {
-      'type': 'http',
-      'direction': 'out',
-      'name': '$return'
-    }
-  ]
-}"),
-                        Metadata = new TemplateMetadata
-                        {
-                            Language = "Python",
-                            DefaultFunctionName = "HttpTriggerPython",
-                            Name = "HttpTrigger"
-                        }
-                    }
-                };
-            }
-        }
-
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
-            using (var client = new HttpClient())
-            {
-                client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/");
-                var templatesResponse = await client.GetAsync("https://functionscdn.azureedge.net/public/templates.json");
-                return await templatesResponse.Content.ReadAsAsync<IEnumerable<Template>>();
-            }
+            var templatesJson = await StaticResources.TemplatesJson;
+            return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
         }
 
         public async Task Deploy(string Name, Template template)
@@ -125,6 +60,18 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             var functionJsonPath = Path.Combine(path, "function.json");
             ColoredConsole.WriteLine($"Writing {functionJsonPath}");
             await FileSystemHelpers.WriteAllTextToFileAsync(functionJsonPath, JsonConvert.SerializeObject(template.Function, Formatting.Indented));
+            if (template.Metadata.Extensions != null)
+            {
+                foreach (var extension in template.Metadata.Extensions)
+                {
+                    var installAction = new InstallExtensionAction
+                    {
+                        Package = extension.Id,
+                        Version = extension.Version
+                    };
+                    await installAction.RunAsync();
+                }
+            }
         }
     }
 }

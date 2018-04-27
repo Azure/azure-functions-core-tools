@@ -42,5 +42,7 @@ namespace Azure.Functions.Cli
         public static Task<string> HostJson => GetValue("host.json");
 
         public static Task<string> PythonDockerBuildScript => GetValue(Constants.StaticResourcesNames.PythonDockerBuild);
+
+        public static Task<string> TemplatesJson => GetValue("templates.json");
     }
 }

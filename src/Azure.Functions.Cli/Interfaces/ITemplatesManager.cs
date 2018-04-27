@@ -8,8 +8,6 @@ namespace Azure.Functions.Cli.Interfaces
     {
         Task<IEnumerable<Template>> Templates { get; }
 
-        IEnumerable<Template> PythonTemplates { get; }
-
         Task Deploy(string Name, Template template);
     }
 }

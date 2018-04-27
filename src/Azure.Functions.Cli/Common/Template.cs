@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Common
         public string Id { get; set; }
 
         [JsonProperty("function")]
-        public JObject  Function { get; set; }
+        public JObject Function { get; set; }
 
         [JsonProperty("metadata")]
         public TemplateMetadata Metadata { get; set; }
@@ -32,5 +32,17 @@ namespace Azure.Functions.Cli.Common
 
         [JsonProperty("userPrompt")]
         public IEnumerable<string> UserPrompt { get; set; }
+
+        [JsonProperty("extensions")]
+        public IEnumerable<FunctionExtension> Extensions { get; set; }
+    }
+
+    internal class FunctionExtension
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("version")]
+        public string Version { get; set; }
     }
 }

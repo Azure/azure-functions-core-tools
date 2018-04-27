@@ -43,6 +43,9 @@
     <EmbeddedResource Include="StaticResources\python_docker_build.sh.template">
       <LogicalName>$(AssemblyName).python_docker_build.sh</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\templates.json.template">
+      <LogicalName>$(AssemblyName).templates.json</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.1" />

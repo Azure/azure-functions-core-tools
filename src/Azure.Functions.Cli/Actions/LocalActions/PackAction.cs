@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var workerRuntimeEnum = string.IsNullOrEmpty(workerRuntime) ? WorkerRuntime.None : WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
 
             var zipStream = await GetAppZipFile(workerRuntimeEnum, functionAppRoot);
-            FileSystemHelpers.WriteToFile(outputPath, zipStream);
+            await FileSystemHelpers.WriteToFile(outputPath, zipStream);
         }
 
         public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, GitIgnoreParser ignoreParser = null)
