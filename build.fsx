@@ -78,6 +78,8 @@ Target "RestorePackages" (fun _ ->
         "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/"
         "--source"
         "https://www.myget.org/F/xunit/api/v3/index.json"
+        "--source"
+        "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/index.json"
     ]
     DotNetCli.Restore (fun p ->
         { p with
