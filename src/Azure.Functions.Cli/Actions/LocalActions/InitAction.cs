@@ -161,7 +161,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
                 else if (workerRuntime == Helpers.WorkerRuntime.None)
                 {
-                    throw new CliException("Can't find WorkerRutime None");
+                    throw new CliException("Can't find WorkerRuntime None");
                 }
             }
         }
