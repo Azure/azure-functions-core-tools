@@ -91,7 +91,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             var exe = new Executable("python", "--version");
             var sb = new StringBuilder();
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l));
+            var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
             if (exitCode == 0)
             {
                 var output = sb.ToString();
