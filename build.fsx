@@ -280,8 +280,8 @@ Target "DownloadTools" (fun _ ->
 Target "AddPythonWorker" (fun _ ->
     use webClient = new WebClient ()
     [
-        (Uri("https://raw.githubusercontent.com/Azure/azure-functions-python-worker/dev/python/worker.py"), toolsDir @@ "worker.py")
-        (Uri("https://raw.githubusercontent.com/Azure/azure-functions-python-worker/dev/python/worker.config.json"), toolsDir @@ "worker.config.json")
+        (Uri("https://raw.githubusercontent.com/Azure/azure-functions-python-worker/1.0.237-alpha/python/worker.py"), toolsDir @@ "worker.py")
+        (Uri("https://raw.githubusercontent.com/Azure/azure-functions-python-worker/1.0.237-alpha/python/worker.config.json"), toolsDir @@ "worker.config.json")
     ]
     |> Seq.iter webClient.DownloadFile
 
