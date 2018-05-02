@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Arm
                 if (catchException)
                 {
                     await Login();
-                    return await GetToken(tenantId, false);
+                    return await GetToken(_settings.CurrentTenant, false);
                 }
                 throw;
             }

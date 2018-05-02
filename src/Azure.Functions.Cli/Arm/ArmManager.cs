@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Arm
         {
             _settings = settings;
             _tokenManager = tokenManager;
-            _client = new ArmClient(tokenManager, settings.CurrentTenant, retryCount: 3);
+            _client = new ArmClient(tokenManager, settings, retryCount: 3);
         }
 
         public async Task<IEnumerable<Site>> GetFunctionAppsAsync()

@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Interfaces;
 using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Arm
@@ -11,14 +12,14 @@ namespace Azure.Functions.Cli.Arm
     {
         private readonly int _retryCount;
         private readonly IArmTokenManager _tokenManager;
-        private readonly string _currentTenant;
+        private readonly ISettings _settings;
         private readonly Random _random;
 
-        public ArmClient(IArmTokenManager tokenManager, string currentTenant, int retryCount)
+        public ArmClient(IArmTokenManager tokenManager, ISettings settings, int retryCount)
         {
             _retryCount = retryCount;
             _tokenManager = tokenManager;
-            _currentTenant = currentTenant;
+            _settings = settings;
             _random = new Random();
         }
 
@@ -74,7 +75,7 @@ namespace Azure.Functions.Cli.Arm
             using (var client = new HttpClient(new HttpClientHandler()))
             {
                 const string jsonContentType = "application/json";
-                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {await _tokenManager.GetToken(_currentTenant)}");
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {await _tokenManager.GetToken(_settings.CurrentTenant)}");
                 client.DefaultRequestHeaders.Add("User-Agent", "functions-cli/2.0");
                 client.DefaultRequestHeaders.Add("Accept", jsonContentType);
                 client.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
