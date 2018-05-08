@@ -647,6 +647,7 @@
     <Compile Include="ArmTests\ArmManagerTests.cs" />
     <Compile Include="ArmTests\AzureClientFactory.cs" />
     <Compile Include="ArmTests\SubscriptionArmManagerTests.cs" />
+    <Compile Include="ConsoleTraceWriteTests.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="ExtensionsTests\GenericExtensionsTests.cs" />
     <Compile Include="ExtensionsTests\ProcessExtensionsTests.cs" />

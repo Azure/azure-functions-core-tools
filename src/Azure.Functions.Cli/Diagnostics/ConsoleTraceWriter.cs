@@ -50,9 +50,12 @@ namespace Azure.Functions.Cli.Diagnostics
 
         private static IEnumerable<RichString> SplitAndApply(string message, Func<string, RichString> Color = null)
         {
-            foreach (var line in message.ToString().Split(new[] { Environment.NewLine }, StringSplitOptions.None))
+            if (!string.IsNullOrEmpty(message))
             {
-                yield return Color == null ? new RichString(line) : Color(line);
+                foreach (var line in message.ToString().Split(new[] { Environment.NewLine }, StringSplitOptions.None))
+                {
+                    yield return Color == null ? new RichString(line) : Color(line);
+                }
             }
         }
     }
