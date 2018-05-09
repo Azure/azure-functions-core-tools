@@ -245,25 +245,31 @@ Target "WaitForSigning" (fun _ ->
     }
 
     let signed = downloadFile toSignZipName DateTime.UtcNow |> Async.RunSynchronously
+    let paths = targetRuntimes |> List.map (fun runtime -> currentDirectory @@ buildDir @@ runtime)
+    let paths = [ buildDirNoRuntime ] @ paths
     match signed with
-    | Success file -> Unzip buildDirNoRuntime file
+    | Success file -> paths |> List.iter (fun path -> Unzip path file)
     | Failure e -> targetError e null |> ignore
 
     let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
     | Success file ->
-        Unzip buildDirNoRuntime file
-        MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x64.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
-        MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x86.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
-        MoveFileTo (buildDirNoRuntime @@ "e_sqlite3_winx64.dll", buildDirNoRuntime @@ "runtimes/win7-x64/native/e_sqlite3.dll")
-        MoveFileTo (buildDirNoRuntime @@ "e_sqlite3_winx86.dll", buildDirNoRuntime @@ "runtimes/win7-x86/native/e_sqlite3.dll")
-        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node48.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node")
-        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node")
-        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx64_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node")
+        paths
+        |> List.iter(fun path ->
+            Unzip path file
+            if Directory.Exists (path @@ "runtimes") then
+                MoveFileTo (path @@ "grpc_csharp_ext.x64.dll", path @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
+                MoveFileTo (path @@ "grpc_csharp_ext.x86.dll", path @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
+                MoveFileTo (path @@ "e_sqlite3_winx64.dll", path @@ "runtimes/win7-x64/native/e_sqlite3.dll")
+                MoveFileTo (path @@ "e_sqlite3_winx86.dll", path @@ "runtimes/win7-x86/native/e_sqlite3.dll")
 
-        MoveFileTo (buildDirNoRuntime @@ "nodejsWorker.js", buildDirNoRuntime @@ "workers/node/dist/src/nodejsWorker.js")
-        MoveFileTo (buildDirNoRuntime @@ "worker-bundle.js", buildDirNoRuntime @@ "workers/node/worker-bundle.js")
-        MoveFileTo (buildDirNoRuntime @@ "worker.py", buildDirNoRuntime @@ "workers/python/worker.py")
+            MoveFileTo (path @@ "grpc_node_winx86_node48.dll", path @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node")
+            MoveFileTo (path @@ "grpc_node_winx86_node57.dll", path @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node")
+            MoveFileTo (path @@ "grpc_node_winx64_node57.dll", path @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node")
+            MoveFileTo (path @@ "nodejsWorker.js", path @@ "workers/node/dist/src/nodejsWorker.js")
+
+            MoveFileTo (path @@ "worker-bundle.js", path @@ "workers/node/worker-bundle.js")
+            MoveFileTo (path @@ "worker.py", path @@ "workers/python/worker.py"))
     | Failure e -> targetError e null |> ignore
 )
 
