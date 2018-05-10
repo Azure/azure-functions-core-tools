@@ -249,7 +249,7 @@ Target "WaitForSigning" (fun _ ->
     let paths = [ buildDirNoRuntime ] @ paths
     match signed with
     | Success file -> paths |> List.iter (fun path -> Unzip path file)
-    | Failure e -> targetError e null |> ignore
+    | Failure e -> raise (new Exception(e))
 
     let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
@@ -270,7 +270,7 @@ Target "WaitForSigning" (fun _ ->
 
             MoveFileTo (path @@ "worker-bundle.js", path @@ "workers/node/worker-bundle.js")
             MoveFileTo (path @@ "worker.py", path @@ "workers/python/worker.py"))
-    | Failure e -> targetError e null |> ignore
+    | Failure e -> raise (new Exception(e))
 )
 
 Target "DownloadTools" (fun _ ->
