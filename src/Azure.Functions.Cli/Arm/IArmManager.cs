@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
@@ -24,5 +25,6 @@ namespace Azure.Functions.Cli.Arm
         Task<Dictionary<string, string>> GetFunctionAppAppSettings(Site functionApp);
         Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site functionApp, IDictionary<string, string> appSettings);
         Task<Dictionary<string, AppServiceConnectionString>> GetFunctionAppConnectionStrings(Site functionApp);
+        Task<HttpResponseMessage> SyncTriggers(Site functionApp);
     }
 }

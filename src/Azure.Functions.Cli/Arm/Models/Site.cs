@@ -36,8 +36,8 @@ namespace Azure.Functions.Cli.Arm.Models
         public bool IsLinux
             => Kind?.IndexOf("linux", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        public bool IsDynamicLinux
-            =>  IsLinux && Sku?.Equals("dynamic", StringComparison.OrdinalIgnoreCase) == true;
+        public bool IsDynamic
+            => Sku?.Equals("dynamic", StringComparison.OrdinalIgnoreCase) == true;
 
         public Site(string subscriptionId, string resourceGroupName, string name)
             : base(subscriptionId, resourceGroupName)

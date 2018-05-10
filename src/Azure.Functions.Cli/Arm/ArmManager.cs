@@ -141,5 +141,10 @@ namespace Azure.Functions.Cli.Arm
                 return null;
             }
         }
+
+        public Task<HttpResponseMessage> SyncTriggers(Site functionApp)
+        {
+            return _client.HttpInvoke(HttpMethod.Post, ArmUriTemplates.SyncTriggers.Bind(functionApp));
+        }
     }
 }

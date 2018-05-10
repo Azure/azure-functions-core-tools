@@ -125,7 +125,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
-            if (functionApp.IsLinux && !functionApp.IsDynamicLinux && RunFromZipDeploy)
+            if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromZipDeploy)
             {
                 ColoredConsole
                     .WriteLine(ErrorColor("--zip is not supported with dedicated linux apps."));
@@ -142,13 +142,45 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var zipStream = await PackAction.GetAppZipFile(workerRuntimeEnum, functionAppRoot, ignoreParser);
 
             // if consumption Linux, or --zip, run from zip
-            if (functionApp.IsDynamicLinux || RunFromZipDeploy)
+            if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
             {
                 await PublishRunFromZip(functionApp, zipStream);
             }
             else
             {
                 await PublishZipDeploy(functionApp, zipStream);
+            }
+
+            await SyncTriggers(functionApp);
+
+            if (PublishLocalSettings)
+            {
+                await PublishAppSettings(functionApp);
+            }
+        }
+
+        private async Task SyncTriggers(Site functionApp)
+        {
+            if (functionApp.IsDynamic)
+            {
+                ColoredConsole.WriteLine("Syncing triggers...");
+                HttpResponseMessage response = null;
+                if (functionApp.IsLinux)
+                {
+                    response = await _armManager.SyncTriggers(functionApp);
+                }
+                else
+                {
+                    using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                    {
+                        response = await client.PostAsync("api/functions/synctriggers", content: null);
+                    }
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
+                }
             }
         }
 
@@ -219,21 +251,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     if (!response.IsSuccessStatusCode)
                     {
                         throw new CliException($"Error uploading archive ({response.StatusCode}).");
-                    }
-
-                    response = await client.PostAsync("api/functions/synctriggers", content: null);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
-                    }
-
-                    if (PublishLocalSettings)
-                    {
-                        var isSuccessful = await PublishAppSettings(functionApp);
-                        if (!isSuccessful)
-                        {
-                            return;
-                        }
                     }
 
                     ColoredConsole.WriteLine("Upload completed successfully.");
