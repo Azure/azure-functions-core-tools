@@ -26,9 +26,11 @@
         "chalk": "^2.1.0",
         "command-exists": "^1.2.2",
         "glob": "^7.1.2",
+        "https-proxy-agent": "^2.2.1",
         "progress": "^2.0.0",
         "rimraf": "^2.6.1",
         "tmp": "^0.0.33",
-        "unzipper": "^0.8.9"
+        "unzipper": "^0.8.9",
+        "url": "^0.11.0"
     }
 }
