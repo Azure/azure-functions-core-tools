@@ -14,7 +14,7 @@ Publish
 /TestResults
 
 /tools/NuGet.exe
-/node_modules
+node_modules/
 
 *.ncrunchproject
 *.ncrunchsolution
