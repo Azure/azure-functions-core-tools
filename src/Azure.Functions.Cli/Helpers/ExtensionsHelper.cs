@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (String.IsNullOrEmpty(extensionsDir))
             {
-                extensionsDir = Path.Combine(Environment.CurrentDirectory, "functions-extensions");
+                extensionsDir = Environment.CurrentDirectory;
             }
 
             var extensionsProj = Path.Combine(extensionsDir, "extensions.csproj");
