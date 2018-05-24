@@ -56,8 +56,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public IDictionary<string, string> IConfigurationArguments { get; set; } = new Dictionary<string, string>()
         {
-            ["node:debug"] = Constants.NodeDebugPort.ToString(),
-            ["java:debug"] = Constants.JavaDebugPort.ToString(),
+            ["workers:node:debug"] = Constants.NodeDebugPort.ToString(),
+            ["workers:java:debug"] = Constants.JavaDebugPort.ToString(),
         };
 
         public StartHostAction(ISecretsManager secretsManager)
@@ -129,7 +129,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<IWebHost> BuildWebHost(WebHostSettings hostSettings, Uri baseAddress, X509Certificate2 certificate)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostSettings.ScriptPath, baseAddress);
-
+            settings.AddRange(IConfigurationArguments as IReadOnlyDictionary<string, string>);
             UpdateEnvironmentVariables(settings);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
@@ -146,15 +146,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 });
             }
 
-            var arguments = IConfigurationArguments.Select(pair => $"/workers:{pair.Key}={pair.Value}").ToArray();
-
             return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(baseAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
                 {
-                    configBuilder.AddEnvironmentVariables()
-                        .AddCommandLine(arguments);
+                    configBuilder.AddEnvironmentVariables();
                 })
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostSettings, CorsOrigins)))
                 .Build();
