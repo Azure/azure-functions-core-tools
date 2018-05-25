@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
@@ -54,15 +55,30 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public DebuggerType Debugger { get; set; }
 
-        public IDictionary<string, string> IConfigurationArguments { get; set; } = new Dictionary<string, string>()
-        {
-            ["workers:node:debug"] = Constants.NodeDebugPort.ToString(),
-            ["workers:java:debug"] = Constants.JavaDebugPort.ToString(),
-        };
+        public IDictionary<string, string> IConfigurationArguments { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager)
         {
             this._secretsManager = secretsManager;
+            IConfigurationArguments = InitializeConfigurationArguments();
+        }
+
+        private IDictionary<string, string> InitializeConfigurationArguments()
+        {
+            string nodeDebugKey = "workers:node:Debug";
+            string javaDebugKey = "workers:java:Debug";
+            
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                nodeDebugKey = nodeDebugKey.Replace(":", "__");
+                javaDebugKey = javaDebugKey.Replace(":", "__");
+            }
+        
+            return new Dictionary<string, string>()
+            {
+                [nodeDebugKey] = Constants.NodeDebugPort.ToString(),
+                [javaDebugKey] = Constants.JavaDebugPort.ToString(),
+            };
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
