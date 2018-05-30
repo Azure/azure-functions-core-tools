@@ -156,4 +156,4 @@ For questions on Azure Functions or the tools, you can ask questions here:
 - [Azure Functions MSDN Forum](https://social.msdn.microsoft.com/Forums/azure/en-US/home?forum=AzureFunctions)
 - [Azure-Functions tag on StackOverflow](http://stackoverflow.com/questions/tagged/azure-functions)
 
-File bugs at [Azure Functions Core Tools repo on GitHub](https://github.com/Azure/azure-functions-cli/issues).
+File bugs at [Azure Functions Core Tools repo on GitHub](https://github.com/Azure/azure-functions-core-tools/issues).
