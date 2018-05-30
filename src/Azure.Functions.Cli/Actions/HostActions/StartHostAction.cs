@@ -176,14 +176,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
             var secrets = _secretsManager.GetSecrets();
+            var environment = Environment
+                    .GetEnvironmentVariables()
+                    .Cast<DictionaryEntry>()
+                    .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
             var connectionStrings = _secretsManager.GetConnectionStrings();
+
             secrets.Add(Constants.WebsiteHostname, uri.Authority);
 
             // Add our connection strings
             secrets.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
             secrets.Add(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
 
-            await CheckNonOptionalSettings(secrets, scriptPath);
+            await CheckNonOptionalSettings(secrets.Union(environment), scriptPath);
 
             return secrets;
         }
