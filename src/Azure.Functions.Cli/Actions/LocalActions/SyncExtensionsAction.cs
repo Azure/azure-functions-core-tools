@@ -13,24 +13,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "sync", Context = Context.Extensions, HelpText = "Installs all extensions added to the function app.")]
     internal class SyncExtensionsAction : BaseAction
     {
-        public string Package { get; set; }
-        public string Version { get; set; }
-        public string ConfigPath { get; set; }
+        public string ConfigPath { get; set; } = string.Empty;
 
-        public string OutputPath { get; set; }
+        public string OutputPath { get; set; } = Path.Combine(".", "bin");
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
                 .Setup<string>('o', "output")
                 .WithDescription("Output path")
-                .SetDefault(Path.Combine(".", "bin"))
                 .Callback(o => OutputPath = Path.GetFullPath(o));
 
             Parser
                .Setup<string>('c', "configPath")
                .WithDescription("path of the directory containing extensions.csproj file")
-               .SetDefault(string.Empty)
                .Callback(s => ConfigPath = s);
             return Parser.Parse(args);
         }

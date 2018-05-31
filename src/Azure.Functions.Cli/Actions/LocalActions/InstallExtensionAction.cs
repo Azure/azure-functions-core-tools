@@ -12,42 +12,37 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "install", Context = Context.Extensions, HelpText = "Installs function extensions in a function app.")]
     internal class InstallExtensionAction : BaseAction
     {
-        public string Package { get; set; }
-        public string Version { get; set; }
-        public string OutputPath { get; set; }
-        public string Source { get; set; }
-        public string ConfigPath { get; set; }
+        public string Package { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
+        public string OutputPath { get; set; } = Path.Combine(".", "bin");
+        public string Source { get; set; } = string.Empty;
+        public string ConfigPath { get; set; } = string.Empty;
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
                 .Setup<string>('p', "package")
                 .WithDescription("Extension package")
-                .SetDefault(string.Empty)
                 .Callback(p => Package = p);
 
             Parser
                 .Setup<string>('v', "version")
                 .WithDescription("Extension version")
-                .SetDefault(string.Empty)
                 .Callback(v => Version = v);
 
             Parser
                 .Setup<string>('o', "output")
                 .WithDescription("Output path")
-                .SetDefault(Path.Combine(".", "bin"))
                 .Callback(o => OutputPath = Path.GetFullPath(o));
 
             Parser
                 .Setup<string>('s', "source")
                 .WithDescription("nuget feed source if other than nuget.org")
-                .SetDefault(string.Empty)
                 .Callback(s => Source = s);
 
             Parser
                .Setup<string>('c', "configPath")
                .WithDescription("path of the directory containing extensions.csproj file")
-               .SetDefault(string.Empty)
                .Callback(s => ConfigPath = s);
 
             return Parser.Parse(args);
