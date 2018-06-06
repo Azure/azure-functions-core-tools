@@ -253,8 +253,6 @@ Target "WaitForSigning" (fun _ ->
         Unzip buildDirNoRuntime file
         MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x64.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
         MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x86.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
-        MoveFileTo (buildDirNoRuntime @@ "e_sqlite3_winx64.dll", buildDirNoRuntime @@ "runtimes/win7-x64/native/e_sqlite3.dll")
-        MoveFileTo (buildDirNoRuntime @@ "e_sqlite3_winx86.dll", buildDirNoRuntime @@ "runtimes/win7-x86/native/e_sqlite3.dll")
         MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node48.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node")
         MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node")
         MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx64_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node")
