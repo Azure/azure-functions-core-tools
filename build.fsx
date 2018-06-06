@@ -73,6 +73,8 @@ Target "RestorePackages" (fun _ ->
         "--source"
         "https://www.myget.org/F/azure-appservice/api/v2"
         "--source"
+        "https://www.myget.org/F/azure-appservice-staging/api/v2"
+        "--source"
         "https://www.myget.org/F/fusemandistfeed/api/v2"
         "--source"
         "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/"
