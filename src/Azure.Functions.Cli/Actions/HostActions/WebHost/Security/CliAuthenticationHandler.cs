@@ -11,9 +11,9 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 
 namespace Azure.Functions.Cli.Actions.HostActions.WebHost.Security
 {
-    public class CliAuthenticationHandler : AuthenticationHandler<AuthenticationLevelOptions>
+    public class CliAuthenticationHandler<TOptions> : AuthenticationHandler<TOptions> where TOptions : AuthenticationSchemeOptions, new()
     {
-        public CliAuthenticationHandler(IOptionsMonitor<AuthenticationLevelOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock) 
+        public CliAuthenticationHandler(IOptionsMonitor<TOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock) 
             : base(options, logger, encoder, clock)
         {
         }
