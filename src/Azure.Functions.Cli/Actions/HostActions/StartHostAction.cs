@@ -24,6 +24,8 @@ using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
+using Microsoft.Azure.WebJobs.Script.WebHost.Security;
+using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -410,7 +412,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 services.AddAuthentication()
                     .AddScriptJwtBearer()
-                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { });
+                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
+                    .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
 
                 services.AddWebJobsScriptHostAuthorization();
 
