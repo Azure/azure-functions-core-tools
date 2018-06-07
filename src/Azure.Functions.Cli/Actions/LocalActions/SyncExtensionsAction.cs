@@ -36,41 +36,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (CommandChecker.CommandExists("dotnet"))
             {
                 var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(ConfigPath);
-                var runtimeId = GetRuntimeIdentifierParameter();
 
-                var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath} {runtimeId}");
+                var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath}");
                 await installExtensions.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
             }
             else
             {
                 ColoredConsole.Error.WriteLine(ErrorColor("Extensions command require dotnet on your path. Please make sure to install dotnet for your system from https://www.microsoft.com/net/download"));
             }
-        }
-
-        private static string GetRuntimeIdentifierParameter()
-        {
-            string os = null;
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                os = "win";
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                os = "osx";
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                os = "linux";
-            }
-            else
-            {
-                return string.Empty;
-            }
-
-            string arch = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
-
-            return $"-r {os}-{arch}";
         }
     }
 }
