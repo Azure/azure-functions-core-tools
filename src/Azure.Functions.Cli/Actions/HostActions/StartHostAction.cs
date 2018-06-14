@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private IDictionary<string, string> InitializeConfigurationArguments()
         {
-            string nodeDebugKey = "workers:node:Debug";
+            string nodeDebugKey = "languageWorkers:node:arguments";
             string javaDebugKey = "workers:java:Debug";
             
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -78,7 +78,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         
             return new Dictionary<string, string>()
             {
-                [nodeDebugKey] = Constants.NodeDebugPort.ToString(),
+                [nodeDebugKey] = $"--inspect={Constants.NodeDebugPort}",
                 [javaDebugKey] = Constants.JavaDebugPort.ToString(),
             };
         }
