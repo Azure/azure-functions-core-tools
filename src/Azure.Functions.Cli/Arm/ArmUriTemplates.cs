@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Arm
         public static readonly ArmUriTemplate GetSiteAppSettings = new ArmUriTemplate(Site.TemplateUrl + "/config/AppSettings/list", websitesApiVersion);
         public static readonly ArmUriTemplate PutSiteAppSettings = new ArmUriTemplate(Site.TemplateUrl + "/config/AppSettings", websitesApiVersion);
         public static readonly ArmUriTemplate GetSiteConnectionStrings = new ArmUriTemplate(Site.TemplateUrl + "/config/ConnectionStrings/list", websitesApiVersion);
-        public static readonly ArmUriTemplate SyncTriggers = new ArmUriTemplate(Site.TemplateUrl + "/syncfunctiontriggers", syncTriggersApiVersion);
+        public static readonly ArmUriTemplate SyncTriggers = new ArmUriTemplate(Site.TemplateUrl + "/hostruntime/admin/host/synctriggers", syncTriggersApiVersion);
 
         public static readonly ArmUriTemplate StorageRegister = new ArmUriTemplate($"{Subscription.TemplateUrl}/providers/Microsoft.Storage/register", storageApiVersion);
         public static readonly ArmUriTemplate StorageAccounts = new ArmUriTemplate($"{ResourceGroup.TemplateUrl}/providers/Microsoft.Storage/storageAccounts", storageApiVersion);
