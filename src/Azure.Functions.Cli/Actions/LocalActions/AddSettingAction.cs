@@ -54,7 +54,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (IsConnectionString)
             {
-                _secretsManager.SetConnectionString(Name, Value);
+                // TODO: Make provider name configurable
+                _secretsManager.SetConnectionString(Name, Value, Constants.DefaultSqlProviderName);
             }
             else
             {
