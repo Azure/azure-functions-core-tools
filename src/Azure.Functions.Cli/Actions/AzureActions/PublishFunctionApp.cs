@@ -218,7 +218,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing.");
             }
 
-            if (appSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING") && !Force)
+            if (appSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"))
             {
                 if (Force)
                 {
