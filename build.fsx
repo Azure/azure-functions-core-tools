@@ -180,16 +180,18 @@ Target "GenerateZipToSign" (fun _ ->
         "System.IO.Abstractions.dll"
         "grpc_csharp_ext.x64.dll"
         "grpc_csharp_ext.x86.dll"
-        "grpc_node_winx86_node48.dll"
         "grpc_node_winx86_node57.dll"
         "grpc_node_winx64_node57.dll"
+        "grpc_node_winx86_node64.dll"
+        "grpc_node_winx64_node64.dll"
     ]
 
     MoveFileTo (buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x64.dll", buildDirNoRuntime @@ "grpc_csharp_ext.x64.dll")
     MoveFileTo (buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x86.dll", buildDirNoRuntime @@ "grpc_csharp_ext.x86.dll")
-    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx86_node48.dll")
-    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx86_node57.dll")
-    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx64_node57.dll")
+    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32-unknown/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx86_node57.dll")
+    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64-unknown/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx64_node57.dll")
+    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v64-win32-ia32-unknown/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx86_node64.dll")
+    MoveFileTo (buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v64-win32-x64-unknown/grpc_node.node", buildDirNoRuntime @@ "grpc_node_winx64_node64.dll")
 
     !! (buildDirNoRuntime @@ "/**/*.dll")
     ++ (buildDirNoRuntime @@ "workers/node/worker-bundle.js")
@@ -253,9 +255,10 @@ Target "WaitForSigning" (fun _ ->
         Unzip buildDirNoRuntime file
         MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x64.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
         MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x86.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
-        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node48.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v48-win32-ia32/grpc_node.node")
-        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32/grpc_node.node")
-        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx64_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64/grpc_node.node")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32-unknown/grpc_node.node")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx64_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-x64-unknown/grpc_node.node")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node64.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v64-win32-ia32-unknown/grpc_node.node")
+        MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx64_node64.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v64-win32-x64-unknown/grpc_node.node")
 
         MoveFileTo (buildDirNoRuntime @@ "nodejsWorker.js", buildDirNoRuntime @@ "workers/node/dist/src/nodejsWorker.js")
         MoveFileTo (buildDirNoRuntime @@ "worker-bundle.js", buildDirNoRuntime @@ "workers/node/worker-bundle.js")
