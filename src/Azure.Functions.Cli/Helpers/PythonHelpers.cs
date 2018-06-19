@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class PythonHelpers
     {
-        private const string _pythonPackage = "git+https://github.com/Azure/azure-functions-python-worker.git@1.0.237-alpha#egg=azure";
+        private const string _pythonPackage = "git+https://github.com/Azure/azure-functions-python-worker.git@1.0.300-alpha#egg=azure-functions-python";
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
