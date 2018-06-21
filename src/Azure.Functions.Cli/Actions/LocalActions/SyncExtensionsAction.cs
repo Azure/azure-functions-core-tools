@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -13,9 +14,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "sync", Context = Context.Extensions, HelpText = "Installs all extensions added to the function app.")]
     internal class SyncExtensionsAction : BaseAction
     {
+        private readonly ISecretsManager _secretsManager;
+
         public string ConfigPath { get; set; } = string.Empty;
 
         public string OutputPath { get; set; } = Path.Combine(".", "bin");
+
+        public SyncExtensionsAction(ISecretsManager secretsManager)
+        {
+            _secretsManager = secretsManager;
+        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -35,7 +43,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (CommandChecker.CommandExists("dotnet"))
             {
-                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(ConfigPath);
+                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, ConfigPath);
 
                 var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath}");
                 await installExtensions.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));

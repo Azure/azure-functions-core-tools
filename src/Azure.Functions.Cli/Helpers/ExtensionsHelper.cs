@@ -8,13 +8,20 @@ using System.Threading.Tasks;
 using System.Linq;
 using Newtonsoft.Json;
 using Microsoft.Azure.WebJobs.Script.Description;
+using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Helpers
 {
     class ExtensionsHelper
     {
-        public static async Task<string> EnsureExtensionsProjectExistsAsync(string extensionsDir = null)
+        public static async Task<string> EnsureExtensionsProjectExistsAsync(ISecretsManager secretsManager, string extensionsDir = null)
         {
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
+            if (workerRuntime == WorkerRuntime.dotnet)
+            {
+                return DotnetHelpers.GetCsproj();
+            }
+
             if (String.IsNullOrEmpty(extensionsDir))
             {
                 extensionsDir = Environment.CurrentDirectory;

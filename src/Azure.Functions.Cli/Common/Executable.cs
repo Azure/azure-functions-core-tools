@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Extensions;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -30,6 +31,11 @@ namespace Azure.Functions.Cli.Common
 
         public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null)
         {
+            if (StaticSettings.IsDebug)
+            {
+                Colors.Net.ColoredConsole.WriteLine(VerboseColor($"> {Command}"));
+            }
+
             var processInfo = new ProcessStartInfo
             {
                 FileName = _exeName,

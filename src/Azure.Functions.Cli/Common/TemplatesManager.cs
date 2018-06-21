@@ -13,6 +13,13 @@ namespace Azure.Functions.Cli.Common
 {
     internal class TemplatesManager : ITemplatesManager
     {
+        private readonly ISecretsManager _secretsManager;
+
+        public TemplatesManager(ISecretsManager secretsManager)
+        {
+            _secretsManager = secretsManager;
+        }
+
         public Task<IEnumerable<Template>> Templates
         {
             get
@@ -64,7 +71,7 @@ namespace Azure.Functions.Cli.Common
             {
                 foreach (var extension in template.Metadata.Extensions)
                 {
-                    var installAction = new InstallExtensionAction
+                    var installAction = new InstallExtensionAction(_secretsManager)
                     {
                         Package = extension.Id,
                         Version = extension.Version

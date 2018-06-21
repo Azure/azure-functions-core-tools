@@ -27,6 +27,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string FolderName { get; set; } = string.Empty;
 
+        public bool Force { get; set; }
+
         internal readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore },
@@ -53,6 +55,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(null)
                 .WithDescription($"Runtime framework for the functions. Options are: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}")
                 .Callback(w => WorkerRuntime = w);
+
+            Parser
+                .Setup<bool>("force")
+                .WithDescription("Force initializing if there is a condition that prevents it")
+                .Callback(f => Force = f);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -89,9 +96,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(WorkerRuntime);
             }
 
-            await InitLanguageSpecificArtifacts(workerRuntime);
-            await WriteFiles();
-            await WriteLocalSettingsJson(workerRuntime);
+            if (workerRuntime == Helpers.WorkerRuntime.dotnet)
+            {
+                await DotnetHelpers.DeployDotnetProject(Path.GetFileName(Environment.CurrentDirectory), Force);
+            }
+            else
+            {
+                await InitLanguageSpecificArtifacts(workerRuntime);
+                await WriteFiles();
+                await WriteLocalSettingsJson(workerRuntime);
+            }
+
             await WriteExtensionsJson();
             await SetupSourceControl();
             await WriteDockerfile(workerRuntime);

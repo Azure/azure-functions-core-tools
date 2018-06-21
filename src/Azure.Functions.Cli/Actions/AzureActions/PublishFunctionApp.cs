@@ -98,6 +98,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             catch { }
 
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+            if (workerRuntime == WorkerRuntime.dotnet)
+            {
+                const string outputPath = "bin/publish";
+                await DotnetHelpers.BuildDotnetProject(outputPath);
+                Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+            }
+
             if (ListIncludedFiles)
             {
                 InternalListIncludedFiles(ignoreParser);

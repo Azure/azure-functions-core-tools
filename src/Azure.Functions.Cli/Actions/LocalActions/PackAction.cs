@@ -66,10 +66,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 throw new CliException($"Can't find {Path.Combine(functionAppRoot, ScriptConstants.HostMetadataFileName)}");
             }
 
-            var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
-            var workerRuntimeEnum = string.IsNullOrEmpty(workerRuntime) ? WorkerRuntime.None : WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
 
-            var zipStream = await GetAppZipFile(workerRuntimeEnum, functionAppRoot);
+            var zipStream = await GetAppZipFile(workerRuntime, functionAppRoot);
             await FileSystemHelpers.WriteToFile(outputPath, zipStream);
         }
 
@@ -84,6 +83,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (workerRuntime == WorkerRuntime.python)
             {
                 return await PythonHelpers.GetPythonDeploymentPackage(GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot);
+            }
+            else if (workerRuntime == WorkerRuntime.dotnet)
+            {
+                throw new CliException("Pack command doesn't work for dotnet functions");
             }
             else
             {

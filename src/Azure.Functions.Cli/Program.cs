@@ -19,16 +19,16 @@ namespace Azure.Functions.Cli
 
         private static void SetupGlobalExceptionHandler()
         {
-            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
-            {
-                if (e.IsTerminating)
-                {
-                    ColoredConsole.Error.WriteLine(ErrorColor(e.ExceptionObject.ToString()));
-                    ColoredConsole.Write("Press any to continue....");
-                    Console.ReadKey(true);
-                    Environment.Exit(ExitCodes.GeneralError);
-                }
-            };
+            // AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            // {
+            //     if (e.IsTerminating)
+            //     {
+            //         ColoredConsole.Error.WriteLine(ErrorColor(e.ExceptionObject.ToString()));
+            //         ColoredConsole.Write("Press any to continue....");
+            //         Console.ReadKey(true);
+            //         Environment.Exit(ExitCodes.GeneralError);
+            //     }
+            // };
         }
 
         private static void FirstTimeCliExperience()
