@@ -185,12 +185,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public override async Task RunAsync()
         {
-            PreRunConditions();
-            Utilities.PrintLogo();
-
-            var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
-
-            (var baseAddress, var certificate) = Setup();
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
             if (workerRuntime == WorkerRuntime.None)
             {
@@ -198,6 +192,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 $"Please run `func settings add {Constants.FunctionsWorkerRuntime} <option>`\n" +
                 $"Available options: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}");
             }
+
+            await PreRunConditions(workerRuntime);
+            Utilities.PrintLogo();
+
+            var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
+
+            (var baseAddress, var certificate) = Setup();
 
             IWebHost host = await BuildWebHost(settings, workerRuntime, baseAddress, certificate);
             var runTask = host.RunAsync();
@@ -215,11 +216,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private void PreRunConditions()
+        private async Task PreRunConditions(WorkerRuntime workerRuntime)
         {
-            if (_secretsManager.GetSecrets().Any(p => p.Key == Constants.FunctionsWorkerRuntime && p.Value == "Python"))
+            if (workerRuntime == WorkerRuntime.python)
             {
                 PythonHelpers.VerifyVirtualEnvironment();
+            }
+            else if (workerRuntime == WorkerRuntime.dotnet)
+            {
+                const string outputPath = "bin/output";
+                await DotnetHelpers.BuildDotnetProject(outputPath);
+                Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
             }
         }
 

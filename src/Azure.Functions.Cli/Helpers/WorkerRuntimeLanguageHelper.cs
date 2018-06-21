@@ -71,7 +71,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static void SetWorkerRuntime(ISecretsManager secretsManager, string language)
+        internal static WorkerRuntime SetWorkerRuntime(ISecretsManager secretsManager, string language)
         {
             var worker = NormalizeWorkerRuntime(language);
 
@@ -79,6 +79,8 @@ namespace Azure.Functions.Cli.Helpers
             ColoredConsole
                 .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
                 .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
+
+            return worker;
         }
     }
 }
