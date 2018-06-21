@@ -69,13 +69,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             string nodeDebugKey = "languageWorkers:node:arguments";
             string javaDebugKey = "workers:java:Debug";
-            
+
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 nodeDebugKey = nodeDebugKey.Replace(":", "__");
                 javaDebugKey = javaDebugKey.Replace(":", "__");
             }
-        
+
             return new Dictionary<string, string>()
             {
                 [nodeDebugKey] = $"--inspect={Constants.NodeDebugPort}",
@@ -383,7 +383,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             X509Certificate2 cert = UseHttps
                 ? SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
-            return (new Uri($"{protocol}://localhost:{Port}"), cert);
+            return (new Uri($"{protocol}://0.0.0.0:{Port}"), cert);
         }
 
         public class Startup : IStartup
