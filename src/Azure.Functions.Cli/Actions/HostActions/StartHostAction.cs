@@ -24,6 +24,7 @@ using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
+using Microsoft.Azure.WebJobs.Script.WebHost.Controllers;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
@@ -419,6 +420,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 services.AddSingleton<ILoggerProviderFactory, ConsoleLoggerProviderFactory>();
                 services.AddSingleton<WebHostSettings>(_hostSettings);
+                services.AddMvc()
+                    .AddApplicationPart(typeof(HostController).Assembly);
 
                 return services.AddWebJobsScriptHost(_builderContext.Configuration);
             }
