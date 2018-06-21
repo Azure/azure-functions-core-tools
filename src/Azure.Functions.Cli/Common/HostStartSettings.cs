@@ -2,7 +2,7 @@
 
 namespace Azure.Functions.Cli.Common
 {
-    internal class HostStartSettings
+    public class HostStartSettings
     {
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public int LocalHttpPort { get; set; }

@@ -3,7 +3,7 @@ using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Interfaces
 {
-    internal interface ISecretsManager
+    public interface ISecretsManager
     {
         IDictionary<string, string> GetSecrets();
         IEnumerable<ConnectionString> GetConnectionStrings();

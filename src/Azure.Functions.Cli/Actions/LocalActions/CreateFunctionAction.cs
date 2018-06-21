@@ -64,36 +64,29 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var templates = await _templatesManager.Templates;
-            var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
 
-            if (!string.IsNullOrWhiteSpace(workerRuntime) && !string.IsNullOrWhiteSpace(Language))
+            if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
             {
                 // validate
-                var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
                 var language = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
-                if (worker != language)
+                if (workerRuntime != language)
                 {
                     throw new CliException("Selected language doesn't match worker set in local.settings.json." +
-                        $"Selected worker is: {worker} and selected language is: {language}");
+                        $"Selected worker is: {workerRuntime} and selected language is: {language}");
                 }
             }
             else if (string.IsNullOrWhiteSpace(Language))
             {
-                if (string.IsNullOrWhiteSpace(workerRuntime))
+                if (workerRuntime == WorkerRuntime.None)
                 {
                     ColoredConsole.Write("Select a language: ");
                     Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
-                    var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
-
-                    _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, worker.ToString());
-                    ColoredConsole
-                        .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
-                        .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
+                    WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
                 else
                 {
-                    var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
-                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(worker);
+                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
                     ColoredConsole.Write("Select a language: ");
                     var displayList = templates
                             .Select(t => t.Metadata.Language)
@@ -112,11 +105,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (!string.IsNullOrWhiteSpace(Language))
             {
-                var worker = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
-                _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, worker.ToString());
-                ColoredConsole
-                    .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
-                    .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
+                WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
 
             ColoredConsole.Write("Select a template: ");

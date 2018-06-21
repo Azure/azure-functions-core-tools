@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -9,7 +13,8 @@ namespace Azure.Functions.Cli.Helpers
         None,
         dotnet,
         node,
-        python
+        python,
+        java
     }
 
     public static class WorkerRuntimeLanguageHelper
@@ -19,6 +24,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.node, new [] { "js", "javascript" } },
             { WorkerRuntime.python, new []  { "py" } },
+            { WorkerRuntime.java, new string[] { } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> normalizeMap = availableWorkersRuntime
@@ -50,6 +56,29 @@ namespace Azure.Functions.Cli.Helpers
         public static IEnumerable<string> LanguagesForWorker(WorkerRuntime worker)
         {
             return normalizeMap.Where(p => p.Value == worker).Select(p => p.Key);
+        }
+
+        public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager)
+        {
+            var setting = secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            try
+            {
+                return NormalizeWorkerRuntime(setting);
+            }
+            catch
+            {
+                return WorkerRuntime.None;
+            }
+        }
+
+        internal static void SetWorkerRuntime(ISecretsManager secretsManager, string language)
+        {
+            var worker = NormalizeWorkerRuntime(language);
+
+            secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, worker.ToString());
+            ColoredConsole
+                .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
+                .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
         }
     }
 }
