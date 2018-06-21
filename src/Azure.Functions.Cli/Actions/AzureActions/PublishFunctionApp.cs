@@ -193,7 +193,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ValidateAppSettings(azureAppSettings);
             var sas = await UploadZipToStorage(zipFile, azureAppSettings);
 
-            azureAppSettings["WEBSITE_USE_ZIP"] = sas;
             azureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
 
             var result = await _armManager.UpdateFunctionAppAppSettings(functionApp, azureAppSettings);
