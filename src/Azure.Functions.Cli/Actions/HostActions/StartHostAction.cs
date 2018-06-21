@@ -57,30 +57,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public DebuggerType Debugger { get; set; }
 
-        public IDictionary<string, string> IConfigurationArguments { get; set; }
+        public string LanguageWorkerSetting { get; set; }
+
 
         public StartHostAction(ISecretsManager secretsManager)
         {
             this._secretsManager = secretsManager;
-            IConfigurationArguments = InitializeConfigurationArguments();
-        }
-
-        private IDictionary<string, string> InitializeConfigurationArguments()
-        {
-            string nodeDebugKey = "languageWorkers:node:arguments";
-            string javaDebugKey = "workers:java:Debug";
-
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                nodeDebugKey = nodeDebugKey.Replace(":", "__");
-                javaDebugKey = javaDebugKey.Replace(":", "__");
-            }
-
-            return new Dictionary<string, string>()
-            {
-                [nodeDebugKey] = $"--inspect={Constants.NodeDebugPort}",
-                [javaDebugKey] = Constants.JavaDebugPort.ToString(),
-            };
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -128,26 +110,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(d => Debugger = d);
 
             Parser
-                .Setup<string>('w', "workers")
-                .WithDescription("Arguments to configure language workers, separated by ','. Example: --workers node:debug=<node-debug-port>,java:path=<path-to-worker-jar>")
-                .Callback(w =>
-                {
-                    foreach (var arg in w.Split(','))
-                    {
-                        var pair = arg.Split('=');
-                        var section = pair[0];
-                        var value = pair.Count() == 2 ? pair[1] : string.Empty;
-                        IConfigurationArguments[section] = value;
-                    }
-                });
+                .Setup<string>("language-worker")
+                .WithDescription("Arguments to configure the language worker.")
+                .Callback(w => LanguageWorkerSetting = w);
 
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(WebHostSettings hostSettings, Uri baseAddress, X509Certificate2 certificate)
+        private async Task<IWebHost> BuildWebHost(WebHostSettings hostSettings, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostSettings.ScriptPath, baseAddress);
-            settings.AddRange(IConfigurationArguments as IReadOnlyDictionary<string, string>);
+            settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(workerRuntime, LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
@@ -218,8 +191,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
 
             (var baseAddress, var certificate) = Setup();
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+            if (workerRuntime == WorkerRuntime.None)
+            {
+                throw new CliException("your worker runtime is not set. As of 2.0.1-beta.26 a worker runtime setting is required.\n" +
+                $"Please run `func settings add {Constants.FunctionsWorkerRuntime} <option>`\n" +
+                $"Available options: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}");
+            }
 
-            IWebHost host = await BuildWebHost(settings, baseAddress, certificate);
+            IWebHost host = await BuildWebHost(settings, workerRuntime, baseAddress, certificate);
             var runTask = host.RunAsync();
 
             var manager = host.Services.GetRequiredService<WebScriptHostManager>();

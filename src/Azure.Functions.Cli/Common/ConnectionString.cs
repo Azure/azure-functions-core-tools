@@ -1,7 +1,7 @@
 ﻿
 namespace Azure.Functions.Cli.Common
 {
-    internal class ConnectionString
+    public class ConnectionString
     {
         public string Value { get; set; }
 
