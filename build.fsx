@@ -1,5 +1,6 @@
 #r "packages/FAKE/tools/FakeLib.dll"
 #r "packages/WindowsAzure.Storage/lib/net40/Microsoft.WindowsAzure.Storage.dll"
+#r "packages/FSharp.Data/lib/net45/FSharp.Data.dll"
 #r "Microsoft.VisualBasic"
 
 open System
@@ -11,6 +12,8 @@ open Microsoft.WindowsAzure.Storage
 open Microsoft.WindowsAzure.Storage.Queue
 open Fake
 open Fake.AssemblyInfoFile
+open FSharp.Data
+open FSharp.Data.JsonExtensions
 
 type Result<'TSuccess,'TFailure> =
     | Success of 'TSuccess
@@ -298,12 +301,43 @@ Target "AddPythonWorker" (fun _ ->
     CopyFile (path @@ "worker.config.json") (toolsDir @@ "worker.config.json")
 )
 
+type feedType = JsonProvider<"https://functionscdn.azureedge.net/public/cli-feed-v3.json">
+
+Target "AddTemplatesNupkgs" (fun _ ->
+    let feed = feedType.Load("https://functionscdn.azureedge.net/public/cli-feed-v3.json")
+    let releaseId = (feed.Tags.V2.JsonValue.["release"]).AsString()
+    let release = feed.Releases.JsonValue.GetProperty(releaseId)
+    let itemTemplates = (release.["itemTemplates"]).AsString()
+    let projectTemplates = (release.["projectTemplates"]).AsString()
+
+    use webClient = new WebClient ()
+    [
+        (Uri(itemTemplates), toolsDir @@ "itemTemplates.nupkg")
+        (Uri(projectTemplates), toolsDir @@ "projectTemplates.nupkg")
+    ]
+    |> Seq.iter webClient.DownloadFile
+
+    targetRuntimes
+    |> List.iter (fun runtime ->
+        let path = currentDirectory @@ buildDir @@ runtime @@ "templates"
+        CreateDir path
+        CopyFile (path @@ "itemTemplates.nupkg") (toolsDir @@ "itemTemplates.nupkg")
+        CopyFile (path @@ "projectTemplates.nupkg") (toolsDir @@ "projectTemplates.nupkg")
+    )
+
+    let path = buildDirNoRuntime @@ "templates"
+    CreateDir path
+    CopyFile (path @@ "itemTemplates.nupkg") (toolsDir @@ "itemTemplates.nupkg")
+    CopyFile (path @@ "projectTemplates.nupkg") (toolsDir @@ "projectTemplates.nupkg")
+)
+
 Dependencies
 "Clean"
   ==> "DownloadTools"
   ==> "RestorePackages"
   ==> "Compile"
   ==> "AddPythonWorker"
+  ==> "AddTemplatesNupkgs"
   ==> "Test"
   =?> ("GenerateZipToSign", hasBuildParam "sign")
   =?> ("UploadZipToSign", hasBuildParam "sign")

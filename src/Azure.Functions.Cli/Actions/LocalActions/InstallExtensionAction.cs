@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -12,11 +13,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "install", Context = Context.Extensions, HelpText = "Installs function extensions in a function app.")]
     internal class InstallExtensionAction : BaseAction
     {
+        private readonly ISecretsManager _secretsManager;
+
         public string Package { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
         public string OutputPath { get; set; } = Path.Combine(".", "bin");
         public string Source { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
+
+        public InstallExtensionAction(ISecretsManager secretsManager)
+        {
+            _secretsManager = secretsManager;
+        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -52,12 +60,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (CommandChecker.CommandExists("dotnet"))
             {
+                var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
                 if (!string.IsNullOrEmpty(ConfigPath) && !FileSystemHelpers.DirectoryExists(ConfigPath))
                 {
                     throw new CliArgumentsException("Invalid config path, please verify directory exists");
                 }
 
-                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(ConfigPath);
+                var extensionsProj = workerRuntime == WorkerRuntime.dotnet
+                    ? DotnetHelpers.GetCsproj()
+                    : await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(ConfigPath);
 
                 if (string.IsNullOrEmpty(Package) && string.IsNullOrEmpty(Version))
                 {
