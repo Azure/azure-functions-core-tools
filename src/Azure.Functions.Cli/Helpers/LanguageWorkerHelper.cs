@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static IReadOnlyDictionary<string, string> GetWorkerConfiguration(WorkerRuntime workerRuntime, string value)
         {
-            if (_map.ContainsKey(workerRuntime))
+            if (_map.ContainsKey(workerRuntime) && !string.IsNullOrWhiteSpace(value))
             {
                 return new Dictionary<string, string>
                 {
