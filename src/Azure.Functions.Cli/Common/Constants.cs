@@ -121,6 +121,10 @@ namespace Azure.Functions.Cli.Common
                     { "cosmosdbtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
+                            Version =  "3.0.0-beta7"} },
+                    { "cosmosdb",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
                             Version =  "3.0.0-beta7"} }
                 });
     }
