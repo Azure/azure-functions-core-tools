@@ -17,8 +17,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly ISecretsManager _secretsManager;
 
         public string ConfigPath { get; set; } = string.Empty;
-
         public string OutputPath { get; set; } = Path.Combine(".", "bin");
+        public bool Csx { get; set; }
 
         public SyncExtensionsAction(ISecretsManager secretsManager)
         {
@@ -36,6 +36,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                .Setup<string>('c', "configPath")
                .WithDescription("path of the directory containing extensions.csproj file")
                .Callback(s => ConfigPath = s);
+
+            Parser
+                .Setup<bool>("csx")
+                .WithDescription("use old style csx dotnet functions")
+                .Callback(csx => Csx = csx);
+
             return Parser.Parse(args);
         }
 
@@ -43,7 +49,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (CommandChecker.CommandExists("dotnet"))
             {
-                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, ConfigPath);
+                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
 
                 var installExtensions = new Executable("dotnet", $"build {extensionsProj} -o {OutputPath}");
                 await installExtensions.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));

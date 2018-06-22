@@ -14,10 +14,10 @@ namespace Azure.Functions.Cli.Helpers
 {
     class ExtensionsHelper
     {
-        public static async Task<string> EnsureExtensionsProjectExistsAsync(ISecretsManager secretsManager, string extensionsDir = null)
+        public static async Task<string> EnsureExtensionsProjectExistsAsync(ISecretsManager secretsManager, bool csx, string extensionsDir = null)
         {
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
-            if (workerRuntime == WorkerRuntime.dotnet)
+            if (workerRuntime == WorkerRuntime.dotnet && !csx)
             {
                 return DotnetHelpers.GetCsproj();
             }

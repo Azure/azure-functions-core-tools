@@ -20,6 +20,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string OutputPath { get; set; } = "bin";
         public string Source { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
+        public bool Csx { get; set; }
 
         public InstallExtensionAction(ISecretsManager secretsManager)
         {
@@ -53,6 +54,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                .WithDescription("path of the directory containing extensions.csproj file")
                .Callback(s => ConfigPath = s);
 
+            Parser
+                .Setup<bool>("csx")
+                .WithDescription("use old style csx dotnet functions")
+                .Callback(csx => Csx = csx);
+
             return Parser.Parse(args);
         }
 
@@ -65,7 +71,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     throw new CliArgumentsException("Invalid config path, please verify directory exists");
                 }
 
-                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, ConfigPath);
+                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
 
                 if (string.IsNullOrEmpty(Package) && string.IsNullOrEmpty(Version))
                 {

@@ -23,6 +23,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Language { get; set; }
         public string TemplateName { get; set; }
         public string FunctionName { get; set; }
+        public bool Csx { get; set; }
 
         public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager)
         {
@@ -46,6 +47,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>('n', "name")
                 .WithDescription("Function name")
                 .Callback(n => FunctionName = n);
+
+            Parser
+                .Setup<bool>("csx")
+                .WithDescription("use old style csx dotnet functions")
+                .Callback(csx => Csx = csx);
             return Parser.Parse(args);
         }
 
@@ -85,7 +91,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
-                else if (workerRuntime != WorkerRuntime.dotnet)
+                else if (workerRuntime != WorkerRuntime.dotnet && !Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
                     ColoredConsole.Write("Select a language: ");
@@ -109,7 +115,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
 
-            if (workerRuntime == WorkerRuntime.dotnet)
+            if (workerRuntime == WorkerRuntime.dotnet && !Csx)
             {
                 ColoredConsole.Write("Select a template: ");
                 var templateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates());

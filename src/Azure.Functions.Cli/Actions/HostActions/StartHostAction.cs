@@ -60,6 +60,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string LanguageWorkerSetting { get; set; }
 
+        public bool Csx { get; set; }
+
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -114,6 +116,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Setup<string>("language-worker")
                 .WithDescription("Arguments to configure the language worker.")
                 .Callback(w => LanguageWorkerSetting = w);
+
+            Parser
+                .Setup<bool>("csx")
+                .WithDescription("use old style csx dotnet functions")
+                .Callback(csx => Csx = csx);
 
             return Parser.Parse(args);
         }
@@ -225,7 +232,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 PythonHelpers.VerifyVirtualEnvironment();
             }
-            else if (workerRuntime == WorkerRuntime.dotnet)
+            else if (workerRuntime == WorkerRuntime.dotnet && !Csx)
             {
                 const string outputPath = "bin/output";
                 await DotnetHelpers.BuildDotnetProject(outputPath);

@@ -37,6 +37,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool RunFromZipDeploy { get; private set; }
         public bool Force { get; set; }
         public bool SkipWheelRestore { get; set; }
+        public bool Csx { get; set; }
 
         public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
             : base(armManager)
@@ -81,6 +82,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("force")
                 .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
                 .Callback(f => Force = f);
+            Parser
+                .Setup<bool>("csx")
+                .WithDescription("use old style csx dotnet functions")
+                .Callback(csx => Csx = csx);
 
             return base.ParseArgs(args);
         }
@@ -99,7 +104,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             catch { }
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
-            if (workerRuntime == WorkerRuntime.dotnet)
+            if (workerRuntime == WorkerRuntime.dotnet && !Csx)
             {
                 const string outputPath = "bin/publish";
                 await DotnetHelpers.BuildDotnetProject(outputPath);

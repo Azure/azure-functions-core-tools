@@ -305,7 +305,7 @@ type feedType = JsonProvider<"https://functionscdn.azureedge.net/public/cli-feed
 
 Target "AddTemplatesNupkgs" (fun _ ->
     let feed = feedType.Load("https://functionscdn.azureedge.net/public/cli-feed-v3.json")
-    let releaseId = (feed.Tags.V2.JsonValue.["release"]).AsString()
+    let releaseId = (feed.Tags.V2Prerelease.JsonValue.["release"]).AsString()
     let release = feed.Releases.JsonValue.GetProperty(releaseId)
     let itemTemplates = (release.["itemTemplates"]).AsString()
     let projectTemplates = (release.["projectTemplates"]).AsString()
