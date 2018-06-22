@@ -61,6 +61,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Force initializing if there is a condition that prevents it")
                 .Callback(f => Force = f);
 
+            Parser
+                .Setup<bool>("docker")
+                .WithDescription("Create a Dockerfile based on the selected worker runtime")
+                .Callback(f => InitDocker = f);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -111,7 +116,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await SetupSourceControl();
             await WriteDockerfile(workerRuntime);
 
-            PostInit();
+            // PostInit();
         }
 
         private async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime)
