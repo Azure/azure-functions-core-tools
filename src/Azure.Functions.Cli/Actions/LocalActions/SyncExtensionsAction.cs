@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly ISecretsManager _secretsManager;
 
         public string ConfigPath { get; set; } = string.Empty;
-        public string OutputPath { get; set; } = Path.Combine(".", "bin");
+        public string OutputPath { get; set; } = Path.GetFullPath("bin");
         public bool Csx { get; set; }
 
         public SyncExtensionsAction(ISecretsManager secretsManager)

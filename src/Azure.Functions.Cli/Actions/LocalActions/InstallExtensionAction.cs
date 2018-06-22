@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string Package { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
-        public string OutputPath { get; set; } = "bin";
+        public string OutputPath { get; set; } = Path.GetFullPath("bin");
         public string Source { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
         public bool Csx { get; set; }
