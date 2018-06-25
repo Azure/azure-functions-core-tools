@@ -275,7 +275,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
                         ? hostRoutePrefix
                         : $"{hostRoutePrefix}/";
-                    var url = $"{baseUri.ToString()}{hostRoutePrefix}{httpRoute}";
+                    var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
                     ColoredConsole
                         .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(url)}")
                         .WriteLine();
