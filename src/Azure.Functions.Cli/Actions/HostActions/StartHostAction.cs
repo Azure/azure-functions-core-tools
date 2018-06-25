@@ -60,7 +60,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string LanguageWorkerSetting { get; set; }
 
-        public bool Csx { get; set; }
+        public bool Build { get; set; }
 
 
         public StartHostAction(ISecretsManager secretsManager)
@@ -118,9 +118,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(w => LanguageWorkerSetting = w);
 
             Parser
-                .Setup<bool>("csx")
-                .WithDescription("use old style csx dotnet functions")
-                .Callback(csx => Csx = csx);
+                .Setup<bool>("build")
+                .WithDescription("Build current project before running. For dotnet projects only. Default is to detect.")
+                .Callback(b => Build = b);
 
             return Parser.Parse(args);
         }
@@ -198,9 +198,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
             if (workerRuntime == WorkerRuntime.None)
             {
-                throw new CliException("your worker runtime is not set. As of 2.0.1-beta.26 a worker runtime setting is required.\n" +
-                $"Please run `func settings add {Constants.FunctionsWorkerRuntime} <option>`\n" +
-                $"Available options: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}");
+                ColoredConsole.WriteLine(WarningColor("your worker runtime is not set. As of 2.0.1-beta.26 a worker runtime setting is required."))
+                    .WriteLine(WarningColor($"Please run `{AdditionalInfoColor($"func settings add {Constants.FunctionsWorkerRuntime} <option>")}` or add {Constants.FunctionsWorkerRuntime} to your local.settings.json"))
+                    .WriteLine(WarningColor($"Available options: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}"));
             }
 
             await PreRunConditions(workerRuntime);
@@ -232,7 +232,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 PythonHelpers.VerifyVirtualEnvironment();
             }
-            else if (workerRuntime == WorkerRuntime.dotnet && !Csx)
+            else if (workerRuntime == WorkerRuntime.dotnet && Build)
             {
                 const string outputPath = "bin/output";
                 await DotnetHelpers.BuildDotnetProject(outputPath);
