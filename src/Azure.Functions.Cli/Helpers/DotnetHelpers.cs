@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Helpers
             await TemplateOperation(async () =>
             {
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? "--StorageConnectionStringValue \"UseDevelopmentStorage=true\""
+                    ? "--StorageConnectionStringValue \"UseDevelopmentStorage=true\" --AzureFunctionsVersion V2"
                     : string.Empty;
                 var exe = new Executable("dotnet", $"new azureFunctionsProjectTemplates --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
@@ -136,7 +136,7 @@ namespace Azure.Functions.Cli.Helpers
             foreach (var nupkg in FileSystemHelpers.GetFiles(templatesLocation, null, null, "*.nupkg"))
             {
                 var exe = new Executable("dotnet", $"new --{action} {nupkg}");
-                await exe.RunAsync();
+                await exe.RunAsync(_ => { }, _ => { });
             }
         }
     }
