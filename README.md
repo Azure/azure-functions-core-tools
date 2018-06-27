@@ -58,36 +58,29 @@ brew install azure-functions-core-tools
 
 #### Ubuntu/Debian
 
-1. Register the Microsoft Product key as trusted
+1. Set up package feed
+##### Ubuntu 18.04
 
 ```bash
-curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
-sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
+wget -q https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
 ```
 
-2. Set up package feed
 ##### Ubuntu 17.10
 
 ```bash
-sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-artful-prod artful main" > /etc/apt/sources.list.d/dotnetdev.list'
-sudo apt-get update
-```
-
-##### Ubuntu 17.04
-
-```bash
-sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-zesty-prod zesty main" > /etc/apt/sources.list.d/dotnetdev.list'
-sudo apt-get update
+wget -q https://packages.microsoft.com/config/ubuntu/17.10/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
 ```
 
 ##### Ubuntu 16.04 / Linux Mint 18
 
 ```bash
-sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-xenial-prod xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
-sudo apt-get update
+wget -q https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
 ```
 
-3. Install
+2. Install
 
 ```bash
 sudo apt-get install azure-functions-core-tools
