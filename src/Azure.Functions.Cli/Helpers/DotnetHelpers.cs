@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (!CommandChecker.CommandExists("dotnet"))
             {
-                throw new CliException("dotnet sdk is required for dotnet based functions. Please install https://microsoft.com/dotnet");
+                throw new CliException("dotnet sdk is required for dotnet based functions. Please install https://microsoft.com/net");
             }
         }
 
