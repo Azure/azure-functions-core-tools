@@ -48,6 +48,12 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\..\tools\python\packapp.py">
+      <Link>tools\python\packapp.py</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.2" />
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />

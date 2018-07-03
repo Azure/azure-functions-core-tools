@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -12,7 +13,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class PythonHelpers
     {
-        private const string _pythonPackage = "git+https://github.com/Azure/azure-functions-python-worker.git@1.0.300-alpha#egg=azure-functions-python";
+        private static readonly string[] _workerPackages = new[] { "azure-functions", "azure-functions-worker" };
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
@@ -20,7 +21,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             VerifyVirtualEnvironment();
             await VerifyVersion();
-            await InstallPipWheel();
+            // await InstallPipWheel();
             await InstallPythonAzureFunctionPackage();
             await PipFreeze();
         }
@@ -35,13 +36,16 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task InstallPythonAzureFunctionPackage()
         {
-            ColoredConsole.WriteLine("Installing azure-functions (dev) package");
-            var exe = new Executable("pip", $"install -e \"{_pythonPackage}\"");
-            var sb = new StringBuilder();
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
-            if (exitCode != 0)
+            foreach (var package in _workerPackages)
             {
-                throw new CliException($"Error installing azure package \n{sb.ToString()}");
+                ColoredConsole.WriteLine("Installing azure-functions package");
+                var exe = new Executable("pip", $"install \"{package}\"");
+                var sb = new StringBuilder();
+                var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
+                if (exitCode != 0)
+                {
+                    throw new CliException($"Error installing azure package \n{sb.ToString()}");
+                }
             }
         }
 
@@ -106,19 +110,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot)
-        {
-            if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
-            {
-                return await InternalPreparePythonDeployment(files, functionAppRoot);
-            }
-            else
-            {
-                throw new CliException("Docker is required to publish python function apps");
-            }
-        }
-
-        private static async Task<Stream> InternalPreparePythonDeployment(IEnumerable<string> files, string functionAppRoot)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps)
         {
             if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
             {
@@ -126,6 +118,65 @@ namespace Azure.Functions.Cli.Helpers
                 $"{Constants.RequirementsTxt} is required for python function apps. Please make sure to generate one before publishing.");
             }
 
+            if (buildNativeDeps)
+            {
+                if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
+                {
+                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot);
+                }
+                else
+                {
+                    throw new CliException("Docker is required to build native dependencies for python function apps");
+                }
+            }
+            else
+            {
+                return await InternalPreparePythonDeployment(files, functionAppRoot);
+            }
+        }
+
+        private static async Task<Stream> InternalPreparePythonDeployment(IEnumerable<string> files, string functionAppRoot)
+        {
+            var packagesPath = await RestorePythonRequirements(functionAppRoot);
+            return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesPath)), functionAppRoot);
+        }
+
+        private static async Task<string> RestorePythonRequirements(string functionAppRoot)
+        {
+            var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
+            FileSystemHelpers.EnsureDirectory(packagesLocation);
+
+            var requirementsTxt = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
+
+            await InstallDislib();
+
+            var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp.py");
+            var exe = new Executable("python", $"{packApp} --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} {functionAppRoot}");
+            var sbErrors = new StringBuilder();
+            var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
+
+            if (exitCode != 0)
+            {
+                throw new CliException("There was an error restoring dependencies." + sbErrors.ToString());
+            }
+
+            return packagesLocation;
+        }
+
+        private static async Task InstallDislib()
+        {
+            var exe = new Executable("pip", "install -U git+https://github.com/vsajip/distlib.git@15dba58a827f56195b0fa0afe80a8925a92e8bf5");
+            var sbErrors = new StringBuilder();
+            var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
+
+            if (exitCode != 0)
+            {
+                throw new CliException("There was an error installing dislib." + sbErrors.ToString());
+            }
+        }
+
+        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot)
+        {
             var appContentPath = CopyToTemp(files, functionAppRoot);
 
             await DockerHelpers.DockerPull(Constants.DockerImages.LinuxPythonImageAmd64);

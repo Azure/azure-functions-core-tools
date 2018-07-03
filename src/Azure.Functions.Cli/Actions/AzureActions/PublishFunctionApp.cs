@@ -36,8 +36,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool ListIncludedFiles { get; set; }
         public bool RunFromZipDeploy { get; private set; }
         public bool Force { get; set; }
-        public bool SkipWheelRestore { get; set; }
         public bool Csx { get; set; }
+        public bool BuildNativeDeps { get; set; }
 
         public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
             : base(armManager)
@@ -74,10 +74,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("Publish in Run-From-Zip package. Requires the app to have AzureWebJobsStorage setting defined.")
                 .Callback(f => RunFromZipDeploy = f);
             Parser
-                .Setup<bool>("skip-wheel-restore")
+                .Setup<bool>("build-native-deps")
                 .SetDefault(false)
                 .WithDescription("Skips generating .wheels folder when publishing python function apps.")
-                .Callback(f => SkipWheelRestore = f);
+                .Callback(f => BuildNativeDeps = f);
             Parser
                 .Setup<bool>("force")
                 .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
@@ -152,7 +152,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            var zipStream = await PackAction.GetAppZipFile(workerRuntimeEnum, functionAppRoot, ignoreParser);
+            var zipStream = await ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ignoreParser);
 
             // if consumption Linux, or --zip, run from zip
             if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
@@ -203,7 +203,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
 
             ColoredConsole.WriteLine("Uploading content...");
-            ValidateAppSettings(azureAppSettings);
+            ValidateAppSettings(azureAppSettings, functionApp);
             var sas = await UploadZipToStorage(zipFile, azureAppSettings);
 
             azureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
@@ -223,9 +223,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private void ValidateAppSettings(Dictionary<string, string> appSettings)
+        private void ValidateAppSettings(Dictionary<string, string> appSettings, Site functionApp)
         {
-            if (!appSettings.ContainsKey("AzureWebJobsStorage"))
+            if (!appSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic)
             {
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing.");
             }
@@ -314,7 +314,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            foreach (var file in PackAction.GetLocalFiles(Environment.CurrentDirectory, ignoreParser, returnIgnored: true))
+            foreach (var file in FileSystemHelpers.GetLocalFiles(Environment.CurrentDirectory, ignoreParser, returnIgnored: true))
             {
                 ColoredConsole.WriteLine(file);
             }
@@ -328,7 +328,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            foreach (var file in PackAction.GetLocalFiles(Environment.CurrentDirectory))
+            foreach (var file in FileSystemHelpers.GetLocalFiles(Environment.CurrentDirectory))
             {
                 ColoredConsole.WriteLine(file);
             }

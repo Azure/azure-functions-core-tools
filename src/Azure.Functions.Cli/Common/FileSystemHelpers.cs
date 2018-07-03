@@ -104,6 +104,26 @@ namespace Azure.Functions.Cli.Common
             DeleteFileSystemInfo(Instance.DirectoryInfo.FromDirectoryName(path), ignoreErrors);
         }
 
+        public static IEnumerable<string> GetLocalFiles(string path, GitIgnoreParser ignoreParser = null, bool returnIgnored = false)
+        {
+            var ignoredDirectories = new[] { ".git", ".vscode" };
+            var ignoredFiles = new[] { ".funcignore", ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" };
+
+            foreach (var file in FileSystemHelpers.GetFiles(path, ignoredDirectories, ignoredFiles))
+            {
+                if (preCondition(file))
+                {
+                    yield return file;
+                }
+            }
+
+            bool preCondition(string file)
+            {
+                var fileName = file.Replace(path, string.Empty).Trim(Path.DirectorySeparatorChar).Replace("\\", "/");
+                return (returnIgnored ? ignoreParser?.Denies(fileName) : ignoreParser?.Accepts(fileName)) ?? true;
+            }
+        }
+
         internal static IEnumerable<string> GetFiles(string directoryPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> excludedFiles = null, string searchPattern = "*")
         {
             foreach (var file in Instance.Directory.GetFiles(directoryPath, searchPattern, SearchOption.TopDirectoryOnly))
