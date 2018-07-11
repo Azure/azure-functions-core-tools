@@ -91,7 +91,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
-                else if (workerRuntime != WorkerRuntime.dotnet && !Csx)
+                else if (workerRuntime != WorkerRuntime.dotnet || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
                     ColoredConsole.Write("Select a language: ");

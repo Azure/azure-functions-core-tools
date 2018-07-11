@@ -29,6 +29,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Force { get; set; }
 
+        public bool Csx { get; set; }
+
         internal readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore },
@@ -66,6 +68,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Create a Dockerfile based on the selected worker runtime")
                 .Callback(f => InitDocker = f);
 
+            Parser
+                .Setup<bool>("csx")
+                .WithDescription("use old style csx dotnet functions")
+                .Callback(f => Csx = f);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -90,7 +97,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             WorkerRuntime workerRuntime;
 
-            if (string.IsNullOrEmpty(WorkerRuntime))
+            if (Csx)
+            {
+                workerRuntime = Helpers.WorkerRuntime.dotnet;
+            }
+            else if (string.IsNullOrEmpty(WorkerRuntime))
             {
                 ColoredConsole.Write("Select a worker runtime: ");
                 workerRuntime = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.AvailableWorkersList);
@@ -101,7 +112,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(WorkerRuntime);
             }
 
-            if (workerRuntime == Helpers.WorkerRuntime.dotnet)
+            if (workerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
             {
                 await DotnetHelpers.DeployDotnetProject(Path.GetFileName(Environment.CurrentDirectory), Force);
             }
