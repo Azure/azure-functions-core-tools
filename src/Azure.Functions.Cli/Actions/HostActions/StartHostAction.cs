@@ -119,7 +119,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<bool>("build")
-                .WithDescription("Build current project before running. For dotnet projects only. Default is to detect.")
+                .WithDescription("Build current project before running. For dotnet projects only. Default is to false.")
                 .Callback(b => Build = b);
 
             return Parser.Parse(args);
