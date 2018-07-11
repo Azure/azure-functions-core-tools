@@ -208,20 +208,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
 
-            (var baseAddress, var certificate) = Setup();
+            (var listenUri, var baseUri, var certificate) = Setup();
 
-            IWebHost host = await BuildWebHost(settings, workerRuntime, baseAddress, certificate);
+            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate);
             var runTask = host.RunAsync();
 
             var manager = host.Services.GetRequiredService<WebScriptHostManager>();
             await manager.DelayUntilHostReady();
 
-            ColoredConsole.WriteLine($"Listening on {baseAddress}");
+            ColoredConsole.WriteLine($"Listening on {listenUri}");
             ColoredConsole.WriteLine("Hit CTRL-C to exit...");
 
-            DisplayHttpFunctionsInfo(manager, baseAddress);
+            DisplayHttpFunctionsInfo(manager, baseUri);
             DisplayDisabledFunctions(manager);
-            await SetupDebuggerAsync(baseAddress);
+            await SetupDebuggerAsync(baseUri);
 
             await runTask;
         }
@@ -375,13 +375,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private (Uri, X509Certificate2) Setup()
+        private (Uri listenUri, Uri baseUri, X509Certificate2 cert) Setup()
         {
             var protocol = UseHttps ? "https" : "http";
             X509Certificate2 cert = UseHttps
                 ? SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
-            return (new Uri($"{protocol}://0.0.0.0:{Port}"), cert);
+            return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
 
         public class Startup : IStartup
