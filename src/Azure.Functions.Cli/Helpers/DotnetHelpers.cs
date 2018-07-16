@@ -136,7 +136,7 @@ namespace Azure.Functions.Cli.Helpers
             foreach (var nupkg in FileSystemHelpers.GetFiles(templatesLocation, null, null, "*.nupkg"))
             {
                 var exe = new Executable("dotnet", $"new --{action} {nupkg}");
-                await exe.RunAsync(_ => { }, _ => { });
+                await exe.RunAsync();
             }
         }
     }

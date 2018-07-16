@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Common
 
         public string Command => $"{_exeName} {_arguments}";
 
-        public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null)
+        public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null, TimeSpan? timeout = null)
         {
             if (StaticSettings.IsDebug)
             {
@@ -42,9 +42,9 @@ namespace Azure.Functions.Cli.Common
                 Arguments = _arguments,
                 CreateNoWindow = !_visibleProcess,
                 UseShellExecute = _shareConsole,
-                RedirectStandardError = _streamOutput,
+                RedirectStandardError = _streamOutput && errorCallback != null,
                 RedirectStandardInput = _streamOutput,
-                RedirectStandardOutput = _streamOutput,
+                RedirectStandardOutput = _streamOutput && outputCallback != null,
                 WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
             };
 
@@ -78,7 +78,24 @@ namespace Azure.Functions.Cli.Common
                 }
                 process.EnableRaisingEvents = true;
             }
-            return await process.WaitForExitAsync();
+            var exitCodeTask = process.WaitForExitAsync();
+
+            if (timeout == null)
+            {
+                return await exitCodeTask;
+            }
+            else
+            {
+                await Task.WhenAny(exitCodeTask, Task.Delay(timeout.Value));
+                if (!exitCodeTask.IsCompleted)
+                {
+                    throw new Exception("Process didn't exit within specified timeout");
+                }
+                else
+                {
+                    return await exitCodeTask;
+                }
+            }
         }
     }
 }
