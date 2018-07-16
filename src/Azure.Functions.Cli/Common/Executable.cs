@@ -29,7 +29,9 @@ namespace Azure.Functions.Cli.Common
 
         public string Command => $"{_exeName} {_arguments}";
 
-        public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null)
+        public Process Process { get; private set; }
+
+        public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null, TimeSpan? timeout = null)
         {
             if (StaticSettings.IsDebug)
             {
@@ -42,17 +44,15 @@ namespace Azure.Functions.Cli.Common
                 Arguments = _arguments,
                 CreateNoWindow = !_visibleProcess,
                 UseShellExecute = _shareConsole,
-                RedirectStandardError = _streamOutput,
+                RedirectStandardError = _streamOutput && errorCallback != null,
                 RedirectStandardInput = _streamOutput,
-                RedirectStandardOutput = _streamOutput,
+                RedirectStandardOutput = _streamOutput && outputCallback != null,
                 WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
             };
 
-            Process process = null;
-
             try
             {
-                process = Process.Start(processInfo);
+                Process = Process.Start(processInfo);
             }
             catch (Win32Exception ex)
             {
@@ -67,18 +67,35 @@ namespace Azure.Functions.Cli.Common
             {
                 if (outputCallback != null)
                 {
-                    process.OutputDataReceived += (s, e) => outputCallback(e.Data);
-                    process.BeginOutputReadLine();
+                    Process.OutputDataReceived += (s, e) => outputCallback(e.Data);
+                    Process.BeginOutputReadLine();
                 }
 
                 if (errorCallback != null)
                 {
-                    process.ErrorDataReceived += (s, e) => errorCallback(e.Data);
-                    process.BeginErrorReadLine();
+                    Process.ErrorDataReceived += (s, e) => errorCallback(e.Data);
+                    Process.BeginErrorReadLine();
                 }
-                process.EnableRaisingEvents = true;
+                Process.EnableRaisingEvents = true;
             }
-            return await process.WaitForExitAsync();
+            var exitCodeTask = Process.WaitForExitAsync();
+
+            if (timeout == null)
+            {
+                return await exitCodeTask;
+            }
+            else
+            {
+                await Task.WhenAny(exitCodeTask, Task.Delay(timeout.Value));
+                if (!exitCodeTask.IsCompleted)
+                {
+                    throw new Exception("Process didn't exit within specified timeout");
+                }
+                else
+                {
+                    return await exitCodeTask;
+                }
+            }
         }
     }
 }

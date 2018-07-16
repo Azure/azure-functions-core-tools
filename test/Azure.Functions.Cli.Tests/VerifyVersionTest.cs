@@ -45,6 +45,8 @@ namespace Azure.Functions.Cli.Tests
         private static async Task<string> GetLatestBetaVersion()
         {
             var github = new GitHubClient(new ProductHeaderValue("azure-functions-core-tools"));
+            var tokenAuth = new Credentials(Environment.GetEnvironmentVariable("GITHUB_TOKEN"));
+            github.Credentials = tokenAuth;
             var repo = await github.Repository.Get("Azure", "azure-functions-core-tools");
             var release = await github.Repository.Release.GetAll(repo.Id);
             return release.FirstOrDefault(r => r.Name.Contains("beta"))?.Name;

@@ -110,6 +110,8 @@ Target "Compile" (fun _ ->
 )
 
 Target "Test" (fun _ ->
+    let path = (currentDirectory @@ buildDir) + "win-x86\\func.exe"
+    System.Environment.SetEnvironmentVariable ("FUNC_PATH", path)
     DotNetCli.Test (fun p ->
         { p with Project = testProjectPath @@ "Azure.Functions.Cli.Tests.csproj" })
 )
