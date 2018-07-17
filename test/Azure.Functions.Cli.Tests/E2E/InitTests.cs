@@ -165,7 +165,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                    "Initialized empty Git repository"
                 }
             }, _output);
         }

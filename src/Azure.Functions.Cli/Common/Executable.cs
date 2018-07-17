@@ -29,6 +29,8 @@ namespace Azure.Functions.Cli.Common
 
         public string Command => $"{_exeName} {_arguments}";
 
+        public Process Process { get; private set; }
+
         public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null, TimeSpan? timeout = null)
         {
             if (StaticSettings.IsDebug)
@@ -48,11 +50,9 @@ namespace Azure.Functions.Cli.Common
                 WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
             };
 
-            Process process = null;
-
             try
             {
-                process = Process.Start(processInfo);
+                Process = Process.Start(processInfo);
             }
             catch (Win32Exception ex)
             {
@@ -67,18 +67,18 @@ namespace Azure.Functions.Cli.Common
             {
                 if (outputCallback != null)
                 {
-                    process.OutputDataReceived += (s, e) => outputCallback(e.Data);
-                    process.BeginOutputReadLine();
+                    Process.OutputDataReceived += (s, e) => outputCallback(e.Data);
+                    Process.BeginOutputReadLine();
                 }
 
                 if (errorCallback != null)
                 {
-                    process.ErrorDataReceived += (s, e) => errorCallback(e.Data);
-                    process.BeginErrorReadLine();
+                    Process.ErrorDataReceived += (s, e) => errorCallback(e.Data);
+                    Process.BeginErrorReadLine();
                 }
-                process.EnableRaisingEvents = true;
+                Process.EnableRaisingEvents = true;
             }
-            var exitCodeTask = process.WaitForExitAsync();
+            var exitCodeTask = Process.WaitForExitAsync();
 
             if (timeout == null)
             {

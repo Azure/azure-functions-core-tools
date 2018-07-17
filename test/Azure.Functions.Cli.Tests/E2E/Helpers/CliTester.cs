@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     var command = runConfiguration.Commands[i];
                     var exe = new Executable(_func, command, workingDirectory: workingDir);
-                    output.WriteLine($"Running: >{exe.Command}");
+                    output.WriteLine($"Running: > {exe.Command}");
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
                         var exitCode = await exe.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e), timeout: runConfiguration.CommandTimeout);
@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     else
                     {
                         var exitCodeTask = exe.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
-                        await runConfiguration.Test.Invoke();
+                        await runConfiguration.Test.Invoke(workingDir, exe.Process);
                         await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout));
                         exitCodeTask.IsCompleted
                             .Should().BeTrue(because: "Expected process to exit after calling Test() and within timeout, but it didn't");
@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
                 if (runConfiguration.ExpectExit && runConfiguration.Test != null)
                 {
-                    await runConfiguration.Test.Invoke();
+                    await runConfiguration.Test.Invoke(workingDir, null);
                 }
 
                 AssertExitError(runConfiguration, exitError);

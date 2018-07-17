@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
@@ -15,7 +16,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         public string[] ErrorContains { get; set; } = Array.Empty<string>();
         public string[] OutputDoesntContain { get; set; } = Array.Empty<string>();
         public string[] ErrorDoesntContain { get; set; } = Array.Empty<string>();
-        public Func<Task> Test { get; set; }
+        public Func<string, Process, Task> Test { get; set; }
         public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(10);
         public string CommandsStr => $"{string.Join(", ", Commands)}";
     }
