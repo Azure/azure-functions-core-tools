@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using FluentAssertions;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
@@ -56,9 +57,17 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         var exitCodeTask = exe.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
                         await runConfiguration.Test.Invoke(workingDir, exe.Process);
                         await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout));
-                        exitCodeTask.IsCompleted
-                            .Should().BeTrue(because: "Expected process to exit after calling Test() and within timeout, but it didn't");
-                        exitError &= (await exitCodeTask) != 1;
+                        if (!exitCodeTask.IsCompleted)
+                        {
+                            exe.Process.Kill();
+                            output.WriteLine($"Stdout: {stdout.ToString()}");
+                            output.WriteLine($"Stderr: {stderr.ToString()}");
+                            throw new Exception("Expected process to exit after calling Test() and within timeout, but it didn't.");
+                        }
+                        else
+                        {
+                            exitError &= (await exitCodeTask) != 1;
+                        }
                     }
 
                     output.WriteLine($"Stdout: {stdout.ToString()}");
