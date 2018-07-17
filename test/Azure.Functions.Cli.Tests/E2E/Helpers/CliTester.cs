@@ -49,12 +49,12 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     output.WriteLine($"Running: > {exe.Command}");
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
-                        var exitCode = await exe.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e), timeout: runConfiguration.CommandTimeout);
+                        var exitCode = await exe.RunAsync(logStd, logErr, timeout: runConfiguration.CommandTimeout);
                         exitError &= exitCode != 1;
                     }
                     else
                     {
-                        var exitCodeTask = exe.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
+                        var exitCodeTask = exe.RunAsync(logStd, logErr);
                         try
                         {
                             await runConfiguration.Test.Invoke(workingDir, exe.Process);
@@ -65,8 +65,6 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                             if (!exitCodeTask.IsCompleted)
                             {
                                 exe.Process.Kill();
-                                output.WriteLine($"Stdout: {stdout.ToString()}");
-                                output.WriteLine($"Stderr: {stderr.ToString()}");
                                 throw new Exception("Expected process to exit after calling Test() and within timeout, but it didn't.");
                             }
                             else
@@ -75,9 +73,6 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                             }
                         }
                     }
-
-                    output.WriteLine($"Stdout: {stdout.ToString()}");
-                    output.WriteLine($"Stderr: {stderr.ToString()}");
                 }
 
                 if (runConfiguration.ExpectExit && runConfiguration.Test != null)
@@ -91,6 +86,18 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 AssertDirectories(runConfiguration, workingDir);
                 AssertOutputContent(runConfiguration, stdout);
                 AssertErrorContent(runConfiguration, stderr);
+
+                void logStd(string line)
+                {
+                    stdout.AppendLine(line);
+                    output.WriteLine($"stdout: {line}");
+                }
+
+                void logErr(string line)
+                {
+                    stderr.AppendLine(line);
+                    output.WriteLine($"stderr: {line}");
+                }
             }
         }
 
