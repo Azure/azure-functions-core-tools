@@ -137,6 +137,10 @@ First, make sure you init a Docker file.
 ```bash
 func init --docker
 ```
+### Prerequisites
+
+* [Docker](https://docs.docker.com/install/)
+* [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 
 ### Deploy a function to Kubernetes
 
