@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(3));
+                    await Task.Delay(TimeSpan.FromSeconds(10));
 
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                     {
