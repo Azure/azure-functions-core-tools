@@ -127,6 +127,35 @@ sudo zypper install azure-functions-core-tools
 
 **NOTE**: If you're running the v2 on Windows, Linux, or Mac, make sure to [enable the `beta` runtime](https://docs.microsoft.com/en-us/azure/azure-functions/functions-versions#target-the-version-20-runtime) in function app settings, otherwise you may not see the same results as running locally.
 
+## Getting Started on Kubernetes
+
+Using the Core Tools, you can easily run Azure Functions on 1.7+ Kubernetes clusters.
+The Core Tools will build and push a Docker image of the function to a given registry and create corresponding Kubernetes objects including a Deployment, Service and Horizontal Pod Autoscaler.
+
+First, make sure you init a Docker file.
+
+```bash
+func init --docker
+```
+
+### Deploy a function to Kubernetes
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server>
+```
+
+### Deploy a function with a minimum of 3 instances and a maximum of 10
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --min 3 --max 10
+```
+
+### Provide a kubeconfig file
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --config /mypath/config
+```
+
 ## Known Issues:
 
 `func extensions` command require the `dotnet` cli to be installed and on your path. This requirement is tracked [here](https://github.com/Azure/azure-functions-core-tools/issues/367). You can install .NET Core for your platform from https://www.microsoft.com/net/download/

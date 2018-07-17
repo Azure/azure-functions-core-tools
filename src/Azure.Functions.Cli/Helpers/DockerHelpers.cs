@@ -21,6 +21,8 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         public static Task DockerPull(string image) => RunDockerCommand($"pull {image}");
+        public static Task DockerPush(string image) => RunDockerCommand($"push {image}");
+        public static Task DockerBuild(string tag, string dir) => RunDockerCommand($"build -t {tag} {dir}");
 
         public static async Task<string> DockerRun(string image)
         {
