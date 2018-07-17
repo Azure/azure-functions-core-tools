@@ -55,18 +55,24 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     else
                     {
                         var exitCodeTask = exe.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
-                        await runConfiguration.Test.Invoke(workingDir, exe.Process);
-                        await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout));
-                        if (!exitCodeTask.IsCompleted)
+                        try
                         {
-                            exe.Process.Kill();
-                            output.WriteLine($"Stdout: {stdout.ToString()}");
-                            output.WriteLine($"Stderr: {stderr.ToString()}");
-                            throw new Exception("Expected process to exit after calling Test() and within timeout, but it didn't.");
+                            await runConfiguration.Test.Invoke(workingDir, exe.Process);
                         }
-                        else
+                        finally
                         {
-                            exitError &= (await exitCodeTask) != 1;
+                            await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout));
+                            if (!exitCodeTask.IsCompleted)
+                            {
+                                exe.Process.Kill();
+                                output.WriteLine($"Stdout: {stdout.ToString()}");
+                                output.WriteLine($"Stderr: {stderr.ToString()}");
+                                throw new Exception("Expected process to exit after calling Test() and within timeout, but it didn't.");
+                            }
+                            else
+                            {
+                                exitError &= (await exitCodeTask) != 1;
+                            }
                         }
                     }
 

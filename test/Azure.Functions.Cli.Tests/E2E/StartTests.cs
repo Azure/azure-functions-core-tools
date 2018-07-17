@@ -30,15 +30,21 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(3));
-
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                    try
                     {
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        response.EnsureSuccessStatusCode();
-                        var result = await response.Content.ReadAsStringAsync();
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        {
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            response.EnsureSuccessStatusCode();
+                            var result = await response.Content.ReadAsStringAsync();
+                            result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
+                        }
+                    }
+                    finally
+                    {
                         p.Kill();
-                        result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
                     }
                 },
             }, _output);
@@ -59,14 +65,19 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Test = async (workingDir, p) =>
                 {
                     await Task.Delay(TimeSpan.FromSeconds(15));
-
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    try
                     {
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        response.EnsureSuccessStatusCode();
-                        var result = await response.Content.ReadAsStringAsync();
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                        {
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            response.EnsureSuccessStatusCode();
+                            var result = await response.Content.ReadAsStringAsync();
+                            result.Should().Be("Hello, Test", because: "response from default function should be 'Hello, {name}'");
+                        }
+                    }
+                    finally
+                    {
                         p.Kill();
-                        result.Should().Be("Hello, Test", because: "response from default function should be 'Hello, {name}'");
                     }
                 },
             }, _output);
