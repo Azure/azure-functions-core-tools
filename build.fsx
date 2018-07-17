@@ -183,7 +183,6 @@ Target "GenerateZipToSign" (fun _ ->
         "SQLitePCLRaw.provider.e_sqlite3.dll"
         "StackExchange.Redis.StrongName.dll"
         "System.IO.Abstractions.dll"
-        "YamlDotNet.dll"
         "grpc_csharp_ext.x64.dll"
         "grpc_csharp_ext.x86.dll"
         "grpc_node_winx86_node57.dll"
