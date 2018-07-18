@@ -2,7 +2,7 @@
 using FluentAssertions;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Tests.Unit
 {
     /// <summary>
     /// This is a C# reimplementation of https://github.com/codemix/gitignore-parser

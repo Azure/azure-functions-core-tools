@@ -3,7 +3,7 @@ using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Tests.Unit
 {
     public class CommandCheckerFacts
     {

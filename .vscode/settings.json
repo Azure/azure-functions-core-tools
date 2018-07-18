@@ -1,0 +1,3 @@
+{
+    "dotnet-test-explorer.testProjectPath": "${workspaceRoot}/test/Azure.Functions.Cli.Tests"
+}

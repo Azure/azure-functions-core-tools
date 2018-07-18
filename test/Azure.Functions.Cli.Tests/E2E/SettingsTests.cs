@@ -59,19 +59,24 @@ namespace Azure.Functions.Cli.Tests.E2E
                                 "\"IsEncrypted\": true",
                                 "\"testKey\":"
                             },
-                            ContentNotContains = new[]
-                            {
-                                "valueValue"
-                            }
+                            ContentNotContains = new[] { "valueValue" }
                         }
                     }
                 },
                 new RunConfiguration
                 {
-                    Commands = new[]
-                    {
-                        "settings decrypt"
-                    },
+                    Commands = new[] { "settings list" },
+                    OutputContains = new[] { "testKey" },
+                    OutputDoesntContain = new[] { "valueValue" }
+                },
+                new RunConfiguration
+                {
+                    Commands = new[] { "settings list -a "},
+                    OutputContains = new[] { "testKey", "valueValue" }
+                },
+                new RunConfiguration
+                {
+                    Commands = new[] { "settings decrypt" },
                     CheckFiles = new[]
                     {
                         new FileResult
@@ -82,6 +87,18 @@ namespace Azure.Functions.Cli.Tests.E2E
                                 "\"IsEncrypted\": false",
                                 "\"testKey\": \"valueValue\""
                             }
+                        }
+                    }
+                },
+                new RunConfiguration
+                {
+                    Commands = new[] { "settings remove testKey" },
+                    CheckFiles = new[]
+                    {
+                        new FileResult
+                        {
+                            Name = "local.settings.json",
+                            ContentNotContains = new[] { "valueValue", "testKey" }
                         }
                     }
                 }
