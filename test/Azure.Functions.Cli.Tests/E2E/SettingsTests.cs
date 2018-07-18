@@ -11,14 +11,15 @@ namespace Azure.Functions.Cli.Tests.E2E
     {
         public SettingsTests(ITestOutputHelper output) : base(output) { }
 
+        [Fact]
         public Task add_setting_plain_text()
         {
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "func init . --worker-runtime node --no-source-control",
-                    "func settings add testKey valueValue"
+                    "init . --worker-runtime node --no-source-control",
+                    "settings add testKey valueValue"
                 },
                 CheckFiles = new[]
                 {
@@ -28,13 +29,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[]
                         {
                             "\"IsEncrypted\": false",
-                            "\"testKey\": \"valueValye\","
+                            "\"testKey\": \"valueValue\""
                         }
                     }
                 }
             }, _output);
         }
 
+        [Fact]
         public Task add_setting_encrypted()
         {
             return CliTester.Run(new RunConfiguration[]
@@ -43,9 +45,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "func init . --worker-runtime node --no-source-control",
-                        "func settings encrypt",
-                        "func settings add testKey valueValue"
+                        "init . --worker-runtime node --no-source-control",
+                        "settings encrypt",
+                        "settings add testKey valueValue"
                     },
                     CheckFiles = new[]
                     {
@@ -68,7 +70,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "func settings decrypt"
+                        "settings decrypt"
                     },
                     CheckFiles = new[]
                     {
@@ -78,7 +80,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             ContentContains = new[]
                             {
                                 "\"IsEncrypted\": false",
-                                "\"testKey\": \"valueValye\","
+                                "\"testKey\": \"valueValue\""
                             }
                         }
                     }
