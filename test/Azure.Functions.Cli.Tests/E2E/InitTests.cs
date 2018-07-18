@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { $"init . --worker-runtime {workerRuntime}" },
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} --no-source-control" },
                 CheckFiles = new FileResult[]
                 {
                     new FileResult
@@ -40,8 +40,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                    "Initialized empty Git repository"
-                }
+                },
+                OutputDoesntContain = new[] { "Initialized empty Git repository" }
             }, _output);
         }
 
@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init . --worker-runtime python" },
+                Commands = new[] { "init . --worker-runtime python --no-source-control" },
                 HasStandardError = true,
                 ErrorContains = new[]
                 {
@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet" },
+                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet --no-source-control" },
                 OutputContains = new[]
                 {
                     "The template \"Azure Functions\" was created successfully."
@@ -117,7 +117,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     new DirectoryResult { Name = ".git", Exists = false }
                 },
-                OutputDoesntContain = new[] { "Initialized empty Git repository" }
             }, _output);
         }
 
