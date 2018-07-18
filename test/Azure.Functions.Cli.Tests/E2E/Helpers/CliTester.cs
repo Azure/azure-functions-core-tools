@@ -152,11 +152,19 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                             .Should()
                             .Be(fileResult.ContentIs, because: $"File ({fileResult.Name}) content should match ContentIs");
                     }
-                    else
+
+                    if (fileResult.ContentContains.Any())
                     {
                         fileContent
                             .Should()
                             .ContainAll(fileResult.ContentContains, because: $"File ({fileResult.Name}) content should contain all in ContentContains");
+                    }
+
+                    if (fileResult.ContentNotContains.Any())
+                    {
+                        fileContent
+                            .Should()
+                            .NotContainAny(fileResult.ContentNotContains, because: $"File ({fileResult.Name}) contains text from the noContain list");
                     }
                 }
             }
