@@ -68,6 +68,9 @@ namespace Azure.Functions.Cli
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();
 
+            builder.RegisterType<DurableManager>()
+                .AsSelf();
+
             return builder.Build();
         }
     }
