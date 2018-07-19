@@ -127,7 +127,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { $"init . --worker-runtime {workerRuntime} --docker" },
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} --no-source-control --docker" },
                 CheckFiles = new[]
                 {
                     new FileResult
@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init . --worker-runtime dotnet --csx" },
+                Commands = new[] { "init . --worker-runtime dotnet --no-source-control --csx" },
                 CheckFiles = new FileResult[]
                 {
                     new FileResult
