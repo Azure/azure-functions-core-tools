@@ -160,6 +160,23 @@ func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --config /mypath/config
 ```
 
+### Deploying Azure Functions with Virtual-Kubelet
+
+Azure Functions running on Kubernetes can take advantage of true serverless containers model by getting deployed to different providers of [Virtual Kubelet](https://github.com/virtual-kubelet/virtual-kubelet), such as Azure Container Instances.<br>
+
+Functions deployed to Kubernetes already contain all the tolerations needed to be schedulable to Virtual Kubelet nodes.
+All you need to do is to set up VKubelet on your Kubernetes cluster:
+
+* [Install VKubelet with ACI](https://github.com/virtual-kubelet/virtual-kubelet/tree/master/providers/azure)
+
+* [Install VKubelet with ACI on AKS](https://docs.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-install-connector)
+
+*Important note:*
+Virtual Kubelet does not currently allow for Kubernetes Services to route external traffic to pods.
+This means that HTTP triggered functions will not receive traffic running on a VKubelet provider (including ACI).
+
+A good usage scenario for using functions with VKubelet would be with event triggered / time triggered functions that do not rely on external HTTP traffic.
+
 ## Known Issues:
 
 `func extensions` command require the `dotnet` cli to be installed and on your path. This requirement is tracked [here](https://github.com/Azure/azure-functions-core-tools/issues/367). You can install .NET Core for your platform from https://www.microsoft.com/net/download/
