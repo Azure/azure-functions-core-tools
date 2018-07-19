@@ -87,13 +87,14 @@ namespace Azure.Functions.Cli.Common
             else
             {
                 await Task.WhenAny(exitCodeTask, Task.Delay(timeout.Value));
-                if (!exitCodeTask.IsCompleted)
+                if (exitCodeTask.IsCompleted)
                 {
-                    throw new Exception("Process didn't exit within specified timeout");
+                    return exitCodeTask.Result;
                 }
                 else
                 {
-                    return await exitCodeTask;
+                    Process.Kill();
+                    throw new Exception("Process didn't exit within specified timeout");
                 }
             }
         }

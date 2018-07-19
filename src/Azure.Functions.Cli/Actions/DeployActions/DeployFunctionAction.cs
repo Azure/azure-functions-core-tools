@@ -89,6 +89,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
+            if (!CommandChecker.CommandExists("kubectl"))
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor($"kubectl is required for deploying to kubernetes. Please make sure to install kubectl and try again."));
+                return;
+            }
+
             var dockerFilePath = Path.Combine(Environment.CurrentDirectory, "Dockerfile");
 
             if (!FileSystemHelpers.FileExists(dockerFilePath))
