@@ -36,10 +36,12 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
         private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output)
         {
+            var stdout = new StringBuilder();
+            var stderr = new StringBuilder();
             foreach (var runConfiguration in runConfigurations)
             {
-                var stdout = new StringBuilder();
-                var stderr = new StringBuilder();
+                stdout.Clear();
+                stderr.Clear();
                 var exitError = false;
 
                 for (var i = 0; i < runConfiguration.Commands.Length; i++)
@@ -87,32 +89,32 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 AssertOutputContent(runConfiguration, stdout);
                 AssertErrorContent(runConfiguration, stderr);
 
-                void logStd(string line)
+            }
+            void logStd(string line)
+            {
+                try
                 {
-                    try
-                    {
-                        stdout.AppendLine(line);
-                        output.WriteLine($"stdout: {line}");
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e);
-                        Console.WriteLine(runConfiguration.CommandsStr);
-                    }
+                    stdout.AppendLine(line);
+                    output.WriteLine($"stdout: {line}");
                 }
-
-                void logErr(string line)
+                catch (Exception e)
                 {
-                    try
-                    {
-                        stderr.AppendLine(line);
-                        output.WriteLine($"stderr: {line}");
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e);
-                        Console.WriteLine(runConfiguration.CommandsStr);
-                    }
+                    Console.WriteLine(e);
+                    Console.WriteLine(runConfiguration.CommandsStr);
+                }
+            }
+
+            void logErr(string line)
+            {
+                try
+                {
+                    stderr.AppendLine(line);
+                    output.WriteLine($"stderr: {line}");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    Console.WriteLine(runConfiguration.CommandsStr);
                 }
             }
         }
