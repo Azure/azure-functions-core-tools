@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                             }
                             else
                             {
-                                exitError &= (await exitCodeTask) != 1;
+                                exitError &= exitCodeTask.Result != 1;
                             }
                         }
                     }

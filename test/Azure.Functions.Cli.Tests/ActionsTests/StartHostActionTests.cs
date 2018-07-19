@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
-    public class StartHostActionTests
+    public class StartHostActionTests : IDisposable
     {
         [SkippableFact]
         public async Task CheckNonOptionalSettingsThrowsOnMissingAzureWebJobsStorage()
@@ -112,6 +112,11 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             }
 
             return fileSystem;
+        }
+
+        public void Dispose()
+        {
+            FileSystemHelpers.Instance = null;
         }
     }
 }
