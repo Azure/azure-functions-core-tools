@@ -100,7 +100,8 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 catch (Exception e)
                 {
                     Console.WriteLine(e);
-                    Console.WriteLine(runConfiguration.CommandsStr);
+                    foreach (var run in runConfigurations)
+                        Console.WriteLine(run.CommandsStr);
                 }
             }
 
@@ -114,7 +115,8 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 catch (Exception e)
                 {
                     Console.WriteLine(e);
-                    Console.WriteLine(runConfiguration.CommandsStr);
+                    foreach (var run in runConfigurations)
+                        Console.WriteLine(run.CommandsStr);
                 }
             }
         }
