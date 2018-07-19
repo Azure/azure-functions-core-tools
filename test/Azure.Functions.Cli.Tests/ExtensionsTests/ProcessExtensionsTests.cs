@@ -9,6 +9,8 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
 {
     public class ProcessExtensionsTests
     {
+        private volatile bool calledContinueWith = false;
+
         [SkippableFact]
         public async Task WaitForExitTest()
         {
@@ -18,7 +20,6 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
             Process process = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Process.Start("cmd")
                 : Process.Start("sh");
-            var calledContinueWith = false;
 
             process.WaitForExitAsync().ContinueWith(_ =>
             {
@@ -26,7 +27,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
             }).Ignore();
 
             process.Kill();
-            for (var i = 0; !calledContinueWith && i < 5; i++)
+            for (var i = 0; !calledContinueWith && i < 10; i++)
             {
                 await Task.Delay(200);
             }
