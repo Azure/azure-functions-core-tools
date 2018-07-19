@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.IO;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -8,6 +9,7 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using KubeClient;
 using KubeClient.Models;
+using Azure.Functions.Cli.Actions.DeployActions.Platforms.Models;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 {
@@ -56,7 +58,15 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             ColoredConsole.WriteLine("Deploying function to Kubernetes...");
 
             var deployment = GetDeployment(deploymentName, image, cpu, memory, port, nameSpace, min);
-            await client.DeploymentsV1Beta1().Create(deployment);
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(deployment,
+                            Newtonsoft.Json.Formatting.None,
+                            new Newtonsoft.Json.JsonSerializerSettings
+                            {
+                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                            });
+
+            File.WriteAllText("deployment.json", json);
+            KubernetesHelper.RunKubectl($"apply -f deployment.json");
 
             ColoredConsole.WriteLine("Deployment successful");
 
@@ -67,7 +77,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 // we can safely ignore the error here
                 await client.ServicesV1().Create(service);
             }
-            catch {}
+            catch { }
 
             await TryRemoveAutoscaler(deploymentName, nameSpace);
             await CreateAutoscaler(deploymentName, nameSpace, min, max);
@@ -88,6 +98,8 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 }
             }
 
+            File.Delete("deployment.json");
+
             ColoredConsole.WriteLine("");
 
             ColoredConsole.WriteLine("Function deployed successfully!");
@@ -105,9 +117,9 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
             if (!string.IsNullOrEmpty(configFile))
             {
-                cmd+= $" --kubeconfig {configFile}";
+                cmd += $" --kubeconfig {configFile}";
             }
-            
+
             await KubernetesHelper.RunKubectl(cmd);
         }
 
@@ -140,57 +152,66 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             };
         }
 
-        private DeploymentV1Beta1 GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min)
+        private Deployment GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min)
         {
-            var deployment = new DeploymentV1Beta1();
-            var metadata = new ObjectMetaV1();
-            metadata.Namespace = nameSpace;
+            var deployment = new Deployment();
+            deployment.apiVersion = "apps/v1beta1";
+            deployment.kind = "Deployment";
 
-            var labels = new System.Collections.Generic.Dictionary<string, string>();
-            labels.Add("app", name);
+            var metadata = new Metadata();
+            metadata.@namespace = nameSpace;
+            metadata.name = name;
+            metadata.labels = new Labels();
+            metadata.labels.app = name;
 
-            metadata.Labels = labels;
+            deployment.metadata = metadata;
+            deployment.spec = new Spec();
+            deployment.spec.replicas = min;
+            deployment.spec.selector = new Selector();
 
-            deployment.Metadata = metadata;
-            deployment.Metadata.Name = name;
+            deployment.spec.selector.matchLabels = new MatchLabels();
+            deployment.spec.selector.matchLabels.app = name;
 
-            deployment.Spec = new DeploymentSpecV1Beta1();
-            deployment.Spec.Replicas = min;
-            deployment.Spec.Selector = new LabelSelectorV1();
-            deployment.Spec.Selector.MatchLabels = labels;
-            deployment.Spec.ProgressDeadlineSeconds = 60;
+            deployment.spec.template = new Models.Template();
+            deployment.spec.template.metadata = new Metadata();
+            deployment.spec.template.metadata.labels = new Labels();
+            deployment.spec.template.metadata.labels.app = name;
 
-            deployment.Spec.Template = new PodTemplateSpecV1();
-            deployment.Spec.Template.Metadata = new ObjectMetaV1();
-            deployment.Spec.Template.Metadata.Labels = labels;
-
-            deployment.Spec.Template.Spec = new PodSpecV1();
-            deployment.Spec.Template.Spec.Containers = new List<ContainerV1>();
-
-            deployment.Spec.Template.Spec.Containers.Add(new ContainerV1()
+            deployment.spec.template.spec = new TemplateSpec();
+            deployment.spec.template.spec.containers = new List<Container>();
+            deployment.spec.template.spec.containers.Add(new Container()
             {
-                Name = name,
-                Image = image,
-                Resources = new ResourceRequirementsV1()
+                name = name,
+                image = image,
+                resources = new Resources()
                 {
-                    Requests = new Dictionary<string, string>()
+                    requests = new Requests()
                     {
-                        {"cpu", cpu.ToString()},
-                        {"memory", $"{memory}Mi"}
+                        cpu = cpu.ToString(),
+                        memory = $"{memory}Mi"
                     }
                 }
             });
 
             if (!string.IsNullOrEmpty(port))
             {
-                deployment.Spec.Template.Spec.Containers[0].Ports = new List<ContainerPortV1>()
+                deployment.spec.template.spec.containers[0].ports = new List<Port>()
                 {
-                        new ContainerPortV1()
-                        {
-                            ContainerPort = int.Parse(port)
-                        }
+                    new Port()
+                    {
+                        containerPort = int.Parse(port)
+                    }
                 };
             }
+
+            deployment.spec.template.spec.tolerations = new List<Toleration>()
+            {
+                new Toleration()
+                {
+                    key = "azure.com/aci",
+                    effect = "NoSchedule"
+                }
+            };
 
             return deployment;
         }
