@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Azure.Functions.Cli.Actions.LocalActions.Platforms;
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms

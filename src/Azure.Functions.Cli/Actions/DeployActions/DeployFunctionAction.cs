@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.DeployActions.Platforms;
-using Azure.Functions.Cli.Actions.LocalActions.Platforms;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
