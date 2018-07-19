@@ -89,14 +89,28 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
                 void logStd(string line)
                 {
-                    stdout.AppendLine(line);
-                    output.WriteLine($"stdout: {line}");
+                    try
+                    {
+                        stdout.AppendLine(line);
+                        output.WriteLine($"stdout: {line}");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                    }
                 }
 
                 void logErr(string line)
                 {
-                    stderr.AppendLine(line);
-                    output.WriteLine($"stderr: {line}");
+                    try
+                    {
+                        stderr.AppendLine(line);
+                        output.WriteLine($"stderr: {line}");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                    }
                 }
             }
         }
