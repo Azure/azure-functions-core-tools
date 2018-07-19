@@ -14,7 +14,7 @@ using FluentAssertions;
 using NSubstitute;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests.ActionsTests.Unit
+namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public class StartHostActionTests
     {

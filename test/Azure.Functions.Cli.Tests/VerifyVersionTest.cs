@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Tests
         {
             var thisRelease = Constants.CliDisplayVersion;
             var latestBetaReleased = await GetLatestBetaVersion();
-            var npmPackageJsonVersion = GetNpmVersion();
+            var npmPackageJsonVersion = await GetNpmVersion();
 
             if (npmPackageJsonVersion != null)
             {
@@ -45,18 +45,14 @@ namespace Azure.Functions.Cli.Tests
         private static async Task<string> GetLatestBetaVersion()
         {
             var github = new GitHubClient(new ProductHeaderValue("azure-functions-core-tools"));
-            var githubToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
-            if (!string.IsNullOrEmpty(githubToken))
-            {
-                var tokenAuth = new Credentials(githubToken);
-                github.Credentials = tokenAuth;
-            }
+            var tokenAuth = new Credentials(Environment.GetEnvironmentVariable("GITHUB_TOKEN"));
+            github.Credentials = tokenAuth;
             var repo = await github.Repository.Get("Azure", "azure-functions-core-tools");
             var release = await github.Repository.Release.GetAll(repo.Id);
             return release.FirstOrDefault(r => r.Name.Contains("beta"))?.Name;
         }
 
-        private static string GetNpmVersion()
+        private static async Task<string> GetNpmVersion()
         {
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPVEYOR_BUILD_NUMBER")))
             {
@@ -66,7 +62,7 @@ namespace Azure.Functions.Cli.Tests
             var path = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? @"C:\azure-functions-cli\src\Azure.Functions.Cli\npm\package.json"
                 : "/home/appveyor/projects/azure-functions-core-tools/src/Azure.Functions.Cli/npm/package.json";
-
+            
             var jObject = JsonConvert.DeserializeObject<JObject>(File.ReadAllText(path));
             return jObject["version"]?.ToString() ?? string.Empty;
         }

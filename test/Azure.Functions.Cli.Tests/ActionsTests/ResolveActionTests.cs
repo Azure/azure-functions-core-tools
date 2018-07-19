@@ -13,7 +13,7 @@ using NSubstitute;
 using Xunit;
 using System.IO.Abstractions;
 
-namespace Azure.Functions.Cli.Tests.ActionsTests.Unit
+namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public class ResolveActionTests
     {

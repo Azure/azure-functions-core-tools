@@ -2,7 +2,7 @@
 using System.IO;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.Tests.ActionsTests.Unit
+namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public abstract class ActionTestsBase : IDisposable
     {

@@ -7,7 +7,7 @@ using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.Tests.ActionsTests.Unit
+namespace Azure.Functions.Cli.Tests.ActionsTests
 {
     public class LoginActionTests : ActionTestsBase
     {
@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests.Unit
             var action = new LoginAction(armManagerMock.Object, settingsMock.Object, armTokenManager.Object);
             var username = Guid.NewGuid().ToString();
             var password = Guid.NewGuid().ToString();
-            var args = new[] { "-u", username, "-w", password };
+            var args = new [] { "-u", username , "-w", password };
 
             // Test
             action.ParseArgs(args);

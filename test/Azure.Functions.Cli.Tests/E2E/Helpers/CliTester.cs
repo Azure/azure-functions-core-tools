@@ -134,12 +134,11 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         {
             foreach (var fileResult in runConfiguration.CheckFiles)
             {
-                var fileResultName = fileResult.Name.Replace("{currentDirName}", Path.GetFileName(path));
-                var filePath = Path.Combine(path, fileResultName);
+                var filePath = Path.Combine(path, fileResult.Name);
                 if (!fileResult.Exists)
                 {
                     File.Exists(filePath)
-                        .Should().BeFalse(because: $"File {fileResultName} should not exist.");
+                        .Should().BeFalse(because: $"File {fileResult.Name} should not exist.");
                 }
                 else
                 {
@@ -151,21 +150,21 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     {
                         fileContent
                             .Should()
-                            .Be(fileResult.ContentIs, because: $"File ({fileResultName}) content should match ContentIs");
+                            .Be(fileResult.ContentIs, because: $"File ({fileResult.Name}) content should match ContentIs");
                     }
 
                     if (fileResult.ContentContains.Any())
                     {
                         fileContent
                             .Should()
-                            .ContainAll(fileResult.ContentContains, because: $"File ({fileResultName}) content should contain all in ContentContains");
+                            .ContainAll(fileResult.ContentContains, because: $"File ({fileResult.Name}) content should contain all in ContentContains");
                     }
 
                     if (fileResult.ContentNotContains.Any())
                     {
                         fileContent
                             .Should()
-                            .NotContainAny(fileResult.ContentNotContains, because: $"File ({fileResultName}) contains text from the noContain list");
+                            .NotContainAny(fileResult.ContentNotContains, because: $"File ({fileResult.Name}) contains text from the noContain list");
                     }
                 }
             }
