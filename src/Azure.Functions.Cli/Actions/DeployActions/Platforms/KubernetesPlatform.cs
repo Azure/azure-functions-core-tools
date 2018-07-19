@@ -9,7 +9,7 @@ using Colors.Net;
 using KubeClient;
 using KubeClient.Models;
 
-namespace Azure.Functions.Cli.Actions.LocalActions.Platforms
+namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 {
     public class KubernetesPlatform : IHostingPlatform
     {
