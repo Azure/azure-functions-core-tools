@@ -7,22 +7,21 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
 {
     public static class CliTester
     {
         private static string _func = System.Environment.GetEnvironmentVariable("FUNC_PATH");
-        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output) => Run(new[] { runConfiguration }, output);
+        public static Task Run(RunConfiguration runConfiguration) => Run(new[] { runConfiguration });
 
-        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output)
+        public static async Task Run(RunConfiguration[] runConfigurations)
         {
             var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
             Directory.CreateDirectory(tempDir);
             try
             {
-                await InternalRun(tempDir, runConfigurations, output);
+                await InternalRun(tempDir, runConfigurations);
             }
             finally
             {
@@ -34,7 +33,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output)
+        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations)
         {
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
@@ -48,7 +47,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     var command = runConfiguration.Commands[i];
                     var exe = new Executable(_func, command, workingDirectory: workingDir);
-                    output.WriteLine($"Running: > {exe.Command}");
+                    Console.WriteLine($"Running: > {exe.Command}");
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
                         var exitCode = await exe.RunAsync(logStd, logErr, timeout: runConfiguration.CommandTimeout);
@@ -91,32 +90,14 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
             void logStd(string line)
             {
-                try
-                {
-                    stdout.AppendLine(line);
-                    output.WriteLine($"stdout: {line}");
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                    foreach (var run in runConfigurations)
-                        Console.WriteLine(run.CommandsStr);
-                }
+                stdout.AppendLine(line);
+                Console.WriteLine($"stdout: {line}");
             }
 
             void logErr(string line)
             {
-                try
-                {
-                    stderr.AppendLine(line);
-                    output.WriteLine($"stderr: {line}");
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                    foreach (var run in runConfigurations)
-                        Console.WriteLine(run.CommandsStr);
-                }
+                stderr.AppendLine(line);
+                Console.WriteLine($"stderr: {line}");
             }
         }
 

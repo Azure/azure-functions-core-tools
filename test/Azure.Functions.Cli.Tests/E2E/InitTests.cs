@@ -6,14 +6,11 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
-    public class InitTests : BaseE2ETest
+    public class InitTests
     {
-        public InitTests(ITestOutputHelper output) : base(output) { }
-
         [Theory]
         [InlineData("node")]
         [InlineData("java")]
@@ -42,7 +39,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
                 OutputDoesntContain = new[] { "Initialized empty Git repository" }
-            }, _output);
+            });
         }
 
         [Fact]
@@ -56,7 +53,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "For Python function apps, you have to be running in a venv."
                 }
-            }, _output);
+            });
         }
 
         [Fact]
@@ -89,7 +86,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 }
-            }, _output);
+            });
         }
 
         [Fact]
@@ -104,7 +101,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     $"Worker runtime '{unknownWorkerRuntime}' is not a valid option."
                 }
-            }, _output);
+            });
         }
 
         [Fact]
@@ -117,7 +114,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     new DirectoryResult { Name = ".git", Exists = false }
                 },
-            }, _output);
+            });
         }
 
         [Theory]
@@ -137,7 +134,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
-            }, _output);
+            });
         }
 
         [Fact]
@@ -165,7 +162,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 }
-            }, _output);
+            });
         }
     }
 }
