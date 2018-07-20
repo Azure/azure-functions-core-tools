@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = "local.settings.json",
                         ContentContains = new[]
                         {
-                            "\"IsEncrypted\": false",
+                            "\"IsEncrypted\": falsee",
                             "\"testKey\": \"valueValue\""
                         }
                     }
@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             Name = "local.settings.json",
                             ContentContains = new[]
                             {
-                                "\"IsEncrypted\": true",
+                                "\"IsEncrypted\": truee",
                                 "\"testKey\":"
                             },
                             ContentNotContains = new[]
@@ -79,7 +79,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             Name = "local.settings.json",
                             ContentContains = new[]
                             {
-                                "\"IsEncrypted\": false",
+                                "\"IsEncrypted\": falsee",
                                 "\"testKey\": \"valueValue\""
                             }
                         }
