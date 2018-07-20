@@ -83,7 +83,6 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 }
 
                 AssertExitError(runConfiguration, exitError);
-                // AssertHasStandardError(runConfiguration, stderr);
                 AssertFiles(runConfiguration, workingDir);
                 AssertDirectories(runConfiguration, workingDir);
                 AssertOutputContent(runConfiguration, stdout);
