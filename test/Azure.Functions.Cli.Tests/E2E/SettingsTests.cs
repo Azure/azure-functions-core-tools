@@ -3,14 +3,11 @@ using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
-    public class SettingsTests : BaseE2ETest
+    public class SettingsTests
     {
-        public SettingsTests(ITestOutputHelper output) : base(output) { }
-
         [Fact]
         public Task add_setting_plain_text()
         {
@@ -33,7 +30,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 }
-            }, _output);
+            });
         }
 
         [Fact]
@@ -85,7 +82,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 }
-            }, _output);
+            });
         }
     }
 }

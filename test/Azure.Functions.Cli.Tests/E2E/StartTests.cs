@@ -2,20 +2,17 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
-using Xunit;
-using Xunit.Abstractions;
-using System.Net.Http;
 using FluentAssertions;
+using Xunit;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
-    public class StartTests : BaseE2ETest
+    public class StartTests
     {
-        public StartTests(ITestOutputHelper output) : base(output) { }
-
         [Fact]
         public Task start_nodejs()
         {
@@ -23,7 +20,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime node",
+                    "init . --worker-runtime node --no-source-control",
                     "new --template \"Http trigger\" --name HttpTrigger",
                     "start"
                 },
@@ -40,7 +37,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
                     }
                 },
-            }, _output);
+            });
         }
 
         [Fact]
@@ -66,7 +63,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test", because: "response from default function should be 'Hello, {name}'");
                     }
                 },
-            }, _output);
+            });
         }
     }
 }
