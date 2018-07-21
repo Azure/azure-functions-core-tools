@@ -48,7 +48,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     var command = runConfiguration.Commands[i];
                     var exe = new Executable(_func, command, workingDirectory: workingDir);
-                    Console.WriteLine($"Running: > {exe.Command}");
+                    logStd($"Running: > {exe.Command}");
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
                         var exitCode = await exe.RunAsync(logStd, logErr, timeout: runConfiguration.CommandTimeout);
