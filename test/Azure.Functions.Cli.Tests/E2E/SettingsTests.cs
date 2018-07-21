@@ -3,15 +3,18 @@ using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
-    public class SettingsTests
+    public class SettingsTests : BaseE2ETest
     {
+        public SettingsTests(ITestOutputHelper output) : base(output) { }
+
         [Fact]
-        public Task add_setting_plain_text()
+        public async Task add_setting_plain_text()
         {
-            return CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
@@ -30,13 +33,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 }
-            });
+            }, _output);
         }
 
         [Fact]
-        public Task add_setting_encrypted()
+        public async Task add_setting_encrypted()
         {
-            return CliTester.Run(new RunConfiguration[]
+            await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
                 {
@@ -82,7 +85,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 }
-            });
+            }, _output);
         }
     }
 }

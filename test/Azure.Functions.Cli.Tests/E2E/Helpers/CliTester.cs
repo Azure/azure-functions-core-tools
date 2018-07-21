@@ -7,21 +7,22 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
 {
     public static class CliTester
     {
         private static string _func = System.Environment.GetEnvironmentVariable("FUNC_PATH");
-        public static Task Run(RunConfiguration runConfiguration) => Run(new[] { runConfiguration });
+        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null) => Run(new[] { runConfiguration }, output);
 
-        public static async Task Run(RunConfiguration[] runConfigurations)
+        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null)
         {
             var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
             Directory.CreateDirectory(tempDir);
             try
             {
-                await InternalRun(tempDir, runConfigurations);
+                await InternalRun(tempDir, runConfigurations, output);
             }
             finally
             {
@@ -33,7 +34,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations)
+        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output)
         {
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
@@ -90,14 +91,22 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
             void logStd(string line)
             {
-                stdout.AppendLine(line);
-                Console.WriteLine($"stdout: {line}");
+                try
+                {
+                    stdout.AppendLine(line);
+                    output.WriteLine($"stdout: {line}");
+                }
+                catch { }
             }
 
             void logErr(string line)
             {
-                stderr.AppendLine(line);
-                Console.WriteLine($"stderr: {line}");
+                try
+                {
+                    stderr.AppendLine(line);
+                    output.WriteLine($"stderr: {line}");
+                }
+                catch { }
             }
         }
 
