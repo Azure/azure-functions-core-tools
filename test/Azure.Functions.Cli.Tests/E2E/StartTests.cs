@@ -17,9 +17,9 @@ namespace Azure.Functions.Cli.Tests.E2E
         public StartTests(ITestOutputHelper output) : base(output) { }
 
         [Fact]
-        public Task start_nodejs()
+        public async Task start_nodejs()
         {
-            return CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
@@ -44,9 +44,9 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public Task start_dotnet_csharp()
+        public async Task start_dotnet_csharp()
         {
-            return CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
