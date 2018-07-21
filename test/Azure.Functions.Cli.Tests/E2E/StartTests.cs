@@ -8,11 +8,14 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using FluentAssertions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
-    public class StartTests
+    public class StartTests : BaseE2ETest
     {
+        public StartTests(ITestOutputHelper output) : base(output) { }
+
         [Fact]
         public Task start_nodejs()
         {
@@ -37,7 +40,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
                     }
                 },
-            });
+            }, _output);
         }
 
         [Fact]
@@ -64,7 +67,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test", because: "response from default function should be 'Hello, {name}'");
                     }
                 },
-            });
+            }, _output);
         }
     }
 }
