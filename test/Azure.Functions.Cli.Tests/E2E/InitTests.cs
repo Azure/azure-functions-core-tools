@@ -65,10 +65,6 @@ namespace Azure.Functions.Cli.Tests.E2E
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] { "init dotnet-funcs --worker-runtime dotnet --no-source-control" },
-                OutputContains = new[]
-                {
-                    "The template \"Azure Functions\" was created successfully."
-                },
                 CheckFiles = new[]
                 {
                     new FileResult

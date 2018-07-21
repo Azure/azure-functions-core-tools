@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Helpers
                     ? "--StorageConnectionStringValue \"UseDevelopmentStorage=true\" --AzureFunctionsVersion V2"
                     : string.Empty;
                 var exe = new Executable("dotnet", $"new azureFunctionsProjectTemplates --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
-                var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+                var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
                     throw new CliException("Error creating project template");
@@ -43,7 +43,7 @@ namespace Azure.Functions.Cli.Helpers
             await TemplateOperation(async () =>
             {
                 var exe = new Executable("dotnet", $"new {templateName} --name {functionName} --namespace {namespaceStr}");
-                var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+                var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
                     throw new CliException("Error creating function");

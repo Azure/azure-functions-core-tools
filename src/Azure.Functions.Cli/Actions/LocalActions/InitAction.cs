@@ -47,10 +47,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
-                .Setup<bool>('n', "no-source-control")
+                .Setup<bool>("source-control")
                 .SetDefault(false)
-                .WithDescription("Skip running git init. Default is false.")
-                .Callback(f => InitSourceControl = !f);
+                .WithDescription("Run git init. Default is false.")
+                .Callback(f => InitSourceControl = f);
 
             Parser
                 .Setup<string>("worker-runtime")
@@ -60,7 +60,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<bool>("force")
-                .WithDescription("Force initializing if there is a condition that prevents it")
+                .WithDescription("Force initializing")
                 .Callback(f => Force = f);
 
             Parser
@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<bool>("csx")
-                .WithDescription("use old style csx dotnet functions")
+                .WithDescription("use csx dotnet functions")
                 .Callback(f => Csx = f);
 
             if (args.Any() && !args.First().StartsWith("-"))
@@ -126,8 +126,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteExtensionsJson();
             await SetupSourceControl();
             await WriteDockerfile(workerRuntime);
-
-            // PostInit();
         }
 
         private async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime)
@@ -143,35 +141,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntime.ToString());
             await WriteFiles("local.settings.json", localSettingsJsonContent);
-        }
-
-        private void PostInit()
-        {
-            if (InitDocker)
-            {
-                ColoredConsole
-                    .WriteLine()
-                    .WriteLine(Yellow("Next Steps:"));
-            }
-
-            if (InitDocker)
-            {
-                ColoredConsole
-                    .Write(Green("Run> "))
-                    .WriteLine(DarkCyan("docker build -t <image name> ."));
-
-                ColoredConsole
-                    .WriteLine("to build a docker image with your functions")
-                    .WriteLine();
-
-                ColoredConsole
-                    .Write(Green("Run> "))
-                    .WriteLine(DarkCyan("docker run -p 8080:80 -it <image name>"));
-
-                ColoredConsole
-                    .WriteLine("To run the container then trigger your function on port 8080.")
-                    .WriteLine();
-            }
         }
 
         private async Task WriteDockerfile(WorkerRuntime workerRuntime)

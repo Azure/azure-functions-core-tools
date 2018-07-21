@@ -44,9 +44,9 @@ namespace Azure.Functions.Cli.Common
                 Arguments = _arguments,
                 CreateNoWindow = !_visibleProcess,
                 UseShellExecute = _shareConsole,
-                RedirectStandardError = _streamOutput && errorCallback != null,
+                RedirectStandardError = _streamOutput,
                 RedirectStandardInput = _streamOutput,
-                RedirectStandardOutput = _streamOutput && outputCallback != null,
+                RedirectStandardOutput = _streamOutput,
                 WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
             };
 
@@ -65,17 +65,23 @@ namespace Azure.Functions.Cli.Common
 
             if (_streamOutput)
             {
-                if (outputCallback != null)
+                Process.OutputDataReceived += (s, e) =>
                 {
-                    Process.OutputDataReceived += (s, e) => outputCallback(e.Data);
-                    Process.BeginOutputReadLine();
-                }
+                    if (outputCallback != null)
+                    {
+                        outputCallback(e.Data);
+                    }
+                };
+                Process.BeginOutputReadLine();
 
-                if (errorCallback != null)
+                Process.ErrorDataReceived += (s, e) =>
                 {
-                    Process.ErrorDataReceived += (s, e) => errorCallback(e.Data);
-                    Process.BeginErrorReadLine();
-                }
+                    if (errorCallback != null)
+                    {
+                        errorCallback(e.Data);
+                    }
+                };
+                Process.BeginErrorReadLine();
                 Process.EnableRaisingEvents = true;
             }
             var exitCodeTask = Process.WaitForExitAsync();
