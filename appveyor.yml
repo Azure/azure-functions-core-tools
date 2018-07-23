@@ -9,12 +9,8 @@ build_script:
 artifacts:
 - path: deploy\Azure.Functions.*.zip
   name: Release
-- path: deployx86\Azure.Functions.*.zip
+- path: deploy\Azure.Functions.*.sha2
   name: Release
-- path: deployx64\Azure.Functions.*.zip
-  name: Release
-- path: dist\test\*.html
-  name: Test
 
 deploy:
 - provider: AzureBlob
