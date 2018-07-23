@@ -6,6 +6,7 @@
 open System
 open System.IO
 open System.Net
+open System.Security.Cryptography
 open System.Threading.Tasks
 
 open Microsoft.WindowsAzure.Storage
@@ -134,6 +135,17 @@ Target "Zip" (fun _ ->
     !! (buildDirNoRuntime @@ @"/**/*.*")
         |> (fun f -> List.fold (--) f excludedFiles)
         |> Zip buildDirNoRuntime (deployDir @@ "Azure.Functions.Cli.no-runtime." + npmVersion + ".zip")
+
+    let getSha2 filePath =
+        File.ReadAllBytes (filePath)
+        |> (new SHA256Managed()).ComputeHash
+        |> BitConverter.ToString
+        |> fun x -> x.Replace("-", String.Empty)
+
+    Directory.GetFiles (deployDir)
+    |> Array.iter (fun file ->
+        let sha2 = getSha2 file
+        File.WriteAllText (file + ".sha2", sha2))
 )
 
 type SigningInfo =
