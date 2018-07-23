@@ -121,16 +121,19 @@ let excludedFiles = [
     "/**/*.xml"
 ]
 
+type NpmPackage = JsonProvider<"src/Azure.Functions.Cli/npm/package.json">
+
 Target "Zip" (fun _ ->
+    let npmVersion = NpmPackage.GetSample().Version
     targetRuntimes
     |> List.iter (fun runtime ->
         !! (buildDir @@ runtime @@ @"/**/*.*")
             |> (fun f -> List.fold (--) f excludedFiles)
-            |> Zip (buildDir @@ runtime) (deployDir @@ ("Azure.Functions.Cli." + runtime + ".zip")))
+            |> Zip (buildDir @@ runtime) (deployDir @@ ("Azure.Functions.Cli." + runtime + "." + npmVersion + ".zip")))
 
     !! (buildDirNoRuntime @@ @"/**/*.*")
         |> (fun f -> List.fold (--) f excludedFiles)
-        |> Zip buildDirNoRuntime (deployDir @@ "Azure.Functions.Cli.no-runtime.zip")
+        |> Zip buildDirNoRuntime (deployDir @@ "Azure.Functions.Cli.no-runtime." + npmVersion + ".zip")
 )
 
 type SigningInfo =
