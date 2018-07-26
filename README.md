@@ -154,6 +154,12 @@ func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --min 3 --max 10
 ```
 
+### Get function logs
+
+```
+func logs --name myfunction --platform kubernetes
+```
+
 ### Provide a kubeconfig file
 
 ```bash
