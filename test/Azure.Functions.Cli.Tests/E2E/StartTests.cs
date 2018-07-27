@@ -44,6 +44,31 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task start_nodejs_with_inspect()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "new --template \"Http trigger\" --name HttpTrigger",
+                    "start --language-worker -- \"--inspect=5050\""
+                },
+                ExpectExit = false,
+                OutputContains = new[]
+                {
+                    "Debugger listening on ws://127.0.0.1:5050"
+                },
+                Test = async (_, p) =>
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(15));
+                    p.Kill();
+                },
+            }, _output);
+
+        }
+
+        [Fact]
         public async Task start_dotnet_csharp()
         {
             await CliTester.Run(new RunConfiguration
