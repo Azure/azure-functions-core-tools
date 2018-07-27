@@ -24,11 +24,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private Dictionary<string, Func<string, Task>> logsHandlersMap = new Dictionary<string, Func<string, Task>>();
         private const string KUBERNETES_DEFAULT_NAMESPACE = "azure-functions";
 
-        private readonly ITemplatesManager _templatesManager;
-
-        public GetLogsAction(ITemplatesManager templatesManager)
+        public GetLogsAction()
         {
-            _templatesManager = templatesManager;
             LoadLogHandlers();
         }
 
