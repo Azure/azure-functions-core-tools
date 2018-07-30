@@ -103,7 +103,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            var image = $"{Registry}/{Name}-azurefunc";
+            var image = $"{Registry}/{Name}";
 
             ColoredConsole.WriteLine("Building Docker image...");
             await DockerHelpers.DockerBuild(image, Environment.CurrentDirectory);
