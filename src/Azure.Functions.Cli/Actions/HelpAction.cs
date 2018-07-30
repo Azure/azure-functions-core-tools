@@ -144,9 +144,8 @@ namespace Azure.Functions.Cli.Actions
                 .Where(c => c != Context.None)
                 .Distinct()
                 .OrderBy(c => c.ToLowerCaseString());
+            Utilities.PrintVersion();
             ColoredConsole
-                .WriteLine($"Azure Functions Core Tools ({Constants.CliDisplayVersion})")
-                .WriteLine($"Function Runtime Version: {ScriptHost.Version}")
                 .WriteLine("Usage: func [context] [context] <action> [-/--options]")
                 .WriteLine();
             DisplayContextsHelp(contexts);

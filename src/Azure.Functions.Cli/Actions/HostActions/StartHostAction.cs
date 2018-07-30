@@ -205,6 +205,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             await PreRunConditions(workerRuntime);
             Utilities.PrintLogo();
+            Utilities.PrintVersion();
 
             var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
 

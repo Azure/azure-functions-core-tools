@@ -1,5 +1,7 @@
-﻿using Colors.Net;
+﻿using Azure.Functions.Cli.Common;
+using Colors.Net;
 using Colors.Net.StringColorExtensions;
+using Microsoft.Azure.WebJobs.Script;
 
 namespace Azure.Functions.Cli
 {
@@ -21,6 +23,13 @@ namespace Azure.Functions.Cli
                 {AlternateLogoColor("%")}"
                 .Replace("@", "@".DarkCyan().ToString()))
                 .WriteLine();
+        }
+
+        internal static void PrintVersion()
+        {
+            ColoredConsole
+                .WriteLine($"Azure Functions Core Tools ({Constants.CliDisplayVersion})")
+                .WriteLine($"Function Runtime Version: {ScriptHost.Version}");
         }
 
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)
