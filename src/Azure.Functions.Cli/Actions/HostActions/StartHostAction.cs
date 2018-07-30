@@ -271,10 +271,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     httpRoute = httpRoute ?? function.Name;
                     var extensions = hostManager.Instance.ScriptConfig.HostConfig.GetService<IExtensionRegistry>();
                     var httpConfig = extensions.GetExtensions<IExtensionConfigProvider>().OfType<HttpExtensionConfiguration>().Single();
-                    var hostRoutePrefix = httpConfig.RoutePrefix ?? "api/";
-                    hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
-                        ? hostRoutePrefix
-                        : $"{hostRoutePrefix}/";
+
+                    string hostRoutePrefix = "";
+                    if (!function.Metadata.IsProxy)
+                    {
+                        hostRoutePrefix = httpConfig.RoutePrefix ?? "api/";
+                        hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
+                            ? hostRoutePrefix
+                            : $"{hostRoutePrefix}/";                        
+                    }
                     var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
                     ColoredConsole
                         .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(url)}")
