@@ -12,18 +12,9 @@ using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
-    // The name is the [action] part on the command line
-    // Context and SubContext are also defined here if you need them.
-    // You can also alias commands by having multiple [Action] attributes
-    // For example if you want to also have `func durable show` to be an alias for this command
-    // you can just add
-    // [Action(Name = "show", Context = Context.Durable, HelpText = "")]
-    [Action(Name = "raise-event", Context = Context.Durable, HelpText = "Raises an event to the instance of a specified orchestrator function")]
+    [Action(Name = "raise-event", Context = Context.Durable, HelpText = "Raises an event to a specified orchestration instance")]
     class DurableRaiseEvent : BaseAction
     {
-        // I usually have actions define their properties public like this
-        // That way actions can instantiate and run each others if needed
-        // Some actions already do that, like extensions install, calling extensions sync after words
         public string Version { get; set; }
 
         public string Instance { get; set; }
@@ -35,16 +26,11 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         private readonly ISecretsManager _secretsManager;
         private readonly DurableManager durableManager;
-        //private readonly DurableOrchestrationClientBase _client;
-        //public readonly IOrchestrationServiceClient serviceClient;
 
-        // The constructor supports DI for objects defined here https://github.com/Azure/azure-functions-core-tools/blob/master/src/Azure.Functions.Cli/Program.cs#L44
-        //public DurableStartNew(DurableOrchestrationClientBase client)
         public DurableRaiseEvent(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
             durableManager = new DurableManager(secretsManager);
-            //_client = client;
         }
 
 
@@ -53,15 +39,14 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             var parser = new FluentCommandLineParser();
             parser
                 .Setup<string>("version")
-                .WithDescription("This shows up in the help next to the version option.")
+                .WithDescription("This shows up in the help next to the version option")
                 .SetDefault(string.Empty)
-                // This is a call back with the value you can use it however you like
                 .Callback(v => Version = v);
 
             parser
                 .Setup<string>("instance")
-                .WithDescription("This specifies the instanceId of a new orchestration")
-                .SetDefault(Guid.NewGuid().ToString("N"))
+                .WithDescription("This specifies the id of an orchestration")
+                .SetDefault(null)
                 .Callback(i => Instance = i);
 
             parser
@@ -69,6 +54,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                  .WithDescription("This specifies the name of an event to raise")
                  .SetDefault($"Event_{(Guid.NewGuid().ToString("N"))}")
                  .Callback(n => EventName = n);
+
             parser
                 .Setup<string>("event-data")
                 .WithDescription("This is the data to be passed wtih an event")
@@ -80,7 +66,6 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-
             await durableManager.RaiseEvent(Instance, EventName, EventData);
         }
     }
