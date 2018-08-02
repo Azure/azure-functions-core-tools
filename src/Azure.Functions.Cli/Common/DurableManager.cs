@@ -24,6 +24,11 @@ namespace Azure.Functions.Cli.Common
 
             var connectionString = secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)).Value;
 
+            if(connectionString == null)
+            {
+                throw CliException("Unable to access connection string.");
+            }
+
             var settings = new AzureStorageOrchestrationServiceSettings
             {
                 TaskHubName = "DurableFunctionsHub",
