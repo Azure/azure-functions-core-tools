@@ -40,11 +40,11 @@ namespace Azure.Functions.Cli.Common
             var status = await client.GetOrchestrationStateAsync(instanceId, false);
             if (status != null)
             {
-                ColoredConsole.WriteLine(Yellow($"Started {status[0].Name} with new instance {status[0].OrchestrationInstance} at {status[0].CreatedTime}"));
+                ColoredConsole.WriteLine(Yellow($"Started {status[0].Name} with new instance {status[0].OrchestrationInstance.InstanceId} at {status[0].CreatedTime}."));
             }
             else
             {
-                ColoredConsole.WriteLine(Red($"Could not start new instance {instanceId}"));
+                new CliException($"Could not start new instance {instanceId}.");
             }
         }
 
@@ -110,7 +110,8 @@ namespace Azure.Functions.Cli.Common
                     .WriteLine(Yellow($"LastUpdatedTime: {status.LastUpdatedTime}"))
                     .WriteLine(Yellow($"Input: {status.Input}"))
                     .WriteLine(Yellow($"Output: {status.Output}"))
-                    .WriteLine(Yellow($"Status: {status.OrchestrationStatus}"));
+                    .WriteLine(Yellow($"Status: {status.OrchestrationStatus}"))
+                    .WriteLine();
             }
         }
 
