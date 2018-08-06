@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Common
 
             if(connectionString == null)
             {
-                throw CliException("Unable to access connection string.");
+                throw new CliException("Unable to access connection string.");
             }
 
             var settings = new AzureStorageOrchestrationServiceSettings
