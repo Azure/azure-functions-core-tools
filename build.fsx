@@ -11,8 +11,13 @@ open System.Threading.Tasks
 
 open Microsoft.WindowsAzure.Storage
 open Microsoft.WindowsAzure.Storage.Queue
-open Fake
-open Fake.AssemblyInfoFile
+
+open Fake.Core
+open Fake.Core.TargetOperators
+open Fake.DotNet
+open Fake.IO
+open Fake.IO.FileSystemOperators
+open Fake.IO.Globbing.Operators
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 
@@ -31,6 +36,7 @@ let MoveFileTo (source, destination) =
     File.Move (source, destination)
 
 let env = Environment.GetEnvironmentVariable
+let currentDirectory  = Environment.CurrentDirectory
 let connectionString =
     "DefaultEndpointsProtocol=https;AccountName=" + (env "FILES_ACCOUNT_NAME") + ";AccountKey=" + (env "FILES_ACCOUNT_KEY")
 let projectPath = "./src/Azure.Functions.Cli/"
@@ -44,7 +50,7 @@ let packagesDir = "./packages/"
 let toolsDir = "./tools/"
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
-let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
+let version = Environment.environVarOrDefault "APPVEYOR_BUILD_VERSION" "1.0.0.0"
 let toSignZipName = version + ".zip"
 let toSignThirdPartyName = version + "-thridparty.zip"
 let toSignZipPath = deployDir @@ toSignZipName
@@ -53,24 +59,24 @@ let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
 let targetRuntimes = ["win-x86"; "win-x64"; "osx-x64"; "linux-x64"]
 
-Target "Clean" (fun _ ->
+Target.create "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
-    CleanDirs [buildDir; testDir; downloadDir; deployDir]
+    Shell.cleanDirs [buildDir; testDir; downloadDir; deployDir]
 )
 
-Target "SetVersion" (fun _ ->
-    CreateCSharpAssemblyInfo "./src/Azure.Functions.Cli/Properties/AssemblyInfo.cs"
-        [Attribute.Title "Azure Functions Cli"
-         Attribute.Description ""
-         Attribute.Guid "6608738c-3bdb-47f5-bc62-66a8bdf9d884"
-         Attribute.Product "Azure.Functions.Cli"
-         Attribute.Version version
-         Attribute.FileVersion version
-         Attribute.InternalsVisibleTo "Azure.Functions.Cli.Tests"
-         Attribute.InternalsVisibleTo "DynamicProxyGenAssembly2"]
+Target.create "SetVersion" (fun _ ->
+    AssemblyInfoFile.createCSharp "./src/Azure.Functions.Cli/Properties/AssemblyInfo.cs"
+        [AssemblyInfo.Title "Azure Functions Cli"
+         AssemblyInfo.Description ""
+         AssemblyInfo.Guid "6608738c-3bdb-47f5-bc62-66a8bdf9d884"
+         AssemblyInfo.Product "Azure.Functions.Cli"
+         AssemblyInfo.Version version
+         AssemblyInfo.FileVersion version
+         AssemblyInfo.InternalsVisibleTo "Azure.Functions.Cli.Tests"
+         AssemblyInfo.InternalsVisibleTo "DynamicProxyGenAssembly2"]
 )
 
-Target "RestorePackages" (fun _ ->
+Target.create "RestorePackages" (fun _ ->
     let additionalArgs = [
         "--source"
         "https://www.nuget.org/api/v2/"
@@ -87,34 +93,35 @@ Target "RestorePackages" (fun _ ->
         "--source"
         "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/index.json"
     ]
-    DotNetCli.Restore (fun p ->
-        { p with
-            Project = projectPath @@ "Azure.Functions.Cli.csproj"
-            AdditionalArgs = additionalArgs })
+    DotNet.restore 
+        (fun p -> DotNet.Options.withAdditionalArgs additionalArgs p) 
+        (projectPath @@ "Azure.Functions.Cli.csproj")
+        
 )
 
-Target "Compile" (fun _ ->
+Target.create "Compile" (fun _ ->
     targetRuntimes
     |> List.iter (fun runtime ->
-        DotNetCli.Publish (fun p ->
-            { p with
-                Project = projectPath @@ "Azure.Functions.Cli.csproj"
-                Output = currentDirectory @@ buildDir @@ runtime
-                Configuration = "release"
-                Runtime = runtime }))
+        DotNet.publish 
+            (fun p -> 
+                {p with 
+                    OutputPath = (currentDirectory @@ buildDir @@ runtime) |> Some
+                    Configuration = DotNet.BuildConfiguration.Release
+                    Runtime = runtime |> Some})
+            (projectPath @@ "Azure.Functions.Cli.csproj"))        
 
-    DotNetCli.Publish (fun p ->
-        { p with
-            Project = projectPath @@ "Azure.Functions.Cli.csproj"
-            Output = currentDirectory @@ buildDirNoRuntime
-            Configuration = "release"})
+    DotNet.publish 
+        (fun p -> 
+            {p with
+                OutputPath = (currentDirectory @@ buildDirNoRuntime) |> Some
+                Configuration = DotNet.BuildConfiguration.Release })
+        (projectPath @@ "Azure.Functions.Cli.csproj")    
 )
 
-Target "Test" (fun _ ->
+Target.create "Test" (fun _ ->
     let path = (currentDirectory @@ buildDir) + "win-x86\\func.exe"
     System.Environment.SetEnvironmentVariable ("FUNC_PATH", path)
-    DotNetCli.Test (fun p ->
-        { p with Project = testProjectPath @@ "Azure.Functions.Cli.Tests.csproj" })
+    DotNet.test id (testProjectPath @@ "Azure.Functions.Cli.Tests.csproj")
 )
 
 let excludedFiles = [
@@ -124,17 +131,17 @@ let excludedFiles = [
 
 type NpmPackage = JsonProvider<"src/Azure.Functions.Cli/npm/package.json">
 
-Target "Zip" (fun _ ->
+Target.create "Zip" (fun _ ->
     let npmVersion = NpmPackage.GetSample().Version
     targetRuntimes
     |> List.iter (fun runtime ->
         !! (buildDir @@ runtime @@ @"/**/*.*")
             |> (fun f -> List.fold (--) f excludedFiles)
-            |> Zip (buildDir @@ runtime) (deployDir @@ ("Azure.Functions.Cli." + runtime + "." + npmVersion + ".zip")))
+            |> Zip.zip (buildDir @@ runtime) (deployDir @@ ("Azure.Functions.Cli." + runtime + "." + npmVersion + ".zip")))
 
     !! (buildDirNoRuntime @@ @"/**/*.*")
         |> (fun f -> List.fold (--) f excludedFiles)
-        |> Zip buildDirNoRuntime (deployDir @@ "Azure.Functions.Cli.no-runtime." + npmVersion + ".zip")
+        |> Zip.zip buildDirNoRuntime (deployDir @@ "Azure.Functions.Cli.no-runtime." + npmVersion + ".zip")
 
     let getSha2 filePath =
         File.ReadAllBytes (filePath)
@@ -160,7 +167,7 @@ type SigningInfo =
       ``File Version``: string;
       ``Machine Type``: string; }
 
-Target "GenerateZipToSign" (fun _ ->
+Target.create "GenerateZipToSign" (fun _ ->
     let firstParty = [
         "func.exe"
         "func.dll"
@@ -220,18 +227,18 @@ Target "GenerateZipToSign" (fun _ ->
     ++ (buildDirNoRuntime @@ "workers/node/dist/src/nodejsWorker.js")
     ++ (buildDirNoRuntime @@ "workers/python/worker.py")
         |> Seq.filter (fun f -> firstParty |> List.contains (f |> Path.GetFileName))
-        |> CreateZip buildDirNoRuntime toSignZipPath String.Empty 7 true
+        |> Zip.createZip buildDirNoRuntime toSignZipPath String.Empty 7 true
 
     !! (buildDirNoRuntime @@ "/**/*.dll")
         |> Seq.filter (fun f -> thirdParty |> List.contains (f |> Path.GetFileName))
-        |> CreateZip buildDirNoRuntime toSignThridPartyPath String.Empty 7 true
+        |> Zip.createZip buildDirNoRuntime toSignThridPartyPath String.Empty 7 true
 )
 
 let storageAccount = lazy CloudStorageAccount.Parse connectionString
 let blobClient = lazy storageAccount.Value.CreateCloudBlobClient ()
 let queueClient = lazy storageAccount.Value.CreateCloudQueueClient ()
 
-Target "UploadZipToSign" (fun _ ->
+Target.create "UploadZipToSign" (fun _ ->
     let container = blobClient.Value.GetContainerReference "azure-functions-cli"
     container.CreateIfNotExists () |> ignore
     let blobRef = container.GetBlockBlobReference toSignZipName
@@ -242,7 +249,7 @@ Target "UploadZipToSign" (fun _ ->
 
 )
 
-Target  "EnqueueSignMessage" (fun _ ->
+Target.create  "EnqueueSignMessage" (fun _ ->
     let queue = queueClient.Value.GetQueueReference "signing-jobs"
     let message = CloudQueueMessage ("SignAuthenticode;azure-functions-cli;" + toSignZipName)
     queue.AddMessage message
@@ -251,7 +258,7 @@ Target  "EnqueueSignMessage" (fun _ ->
     queue.AddMessage message
 )
 
-Target "WaitForSigning" (fun _ ->
+Target.create "WaitForSigning" (fun _ ->
     let rec downloadFile fileName (startTime: DateTime) = async {
         let container = blobClient.Value.GetContainerReference "azure-functions-cli-signed"
         container.CreateIfNotExists () |> ignore
@@ -268,13 +275,13 @@ Target "WaitForSigning" (fun _ ->
 
     let signed = downloadFile toSignZipName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
-    | Success file -> Unzip buildDirNoRuntime file
-    | Failure e -> targetError e null |> ignore
+    | Success file -> Zip.unzip buildDirNoRuntime file
+    | Failure e -> failwith e // todo targetError is not present in FAKE 5
 
     let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
     match signed with
     | Success file ->
-        Unzip buildDirNoRuntime file
+        Zip.unzip buildDirNoRuntime file
         MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x64.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x64.dll")
         MoveFileTo (buildDirNoRuntime @@ "grpc_csharp_ext.x86.dll", buildDirNoRuntime @@ "runtimes/win/native/grpc_csharp_ext.x86.dll")
         MoveFileTo (buildDirNoRuntime @@ "grpc_node_winx86_node57.dll", buildDirNoRuntime @@ "workers/node/grpc/src/node/extension_binary/node-v57-win32-ia32-unknown/grpc_node.node")
@@ -285,10 +292,10 @@ Target "WaitForSigning" (fun _ ->
         MoveFileTo (buildDirNoRuntime @@ "nodejsWorker.js", buildDirNoRuntime @@ "workers/node/dist/src/nodejsWorker.js")
         MoveFileTo (buildDirNoRuntime @@ "worker-bundle.js", buildDirNoRuntime @@ "workers/node/worker-bundle.js")
         MoveFileTo (buildDirNoRuntime @@ "worker.py", buildDirNoRuntime @@ "workers/python/worker.py")
-    | Failure e -> targetError e null |> ignore
+    | Failure e -> failwith e // todo targetError is not present in FAKE 5
 )
 
-Target "DownloadTools" (fun _ ->
+Target.create "DownloadTools" (fun _ ->
     if File.Exists sigCheckExe then
         printfn "%s" "Skipping downloading sigcheck.exe since it's already there"
     else
@@ -298,7 +305,7 @@ Target "DownloadTools" (fun _ ->
         |> webClient.DownloadFile
 )
 
-Target "AddPythonWorker" (fun _ ->
+Target.create "AddPythonWorker" (fun _ ->
     use webClient = new WebClient ()
     [
         (Uri("https://raw.githubusercontent.com/Azure/azure-functions-python-worker/1.0.300-alpha/python/worker.py"), toolsDir @@ "worker.py")
@@ -309,20 +316,20 @@ Target "AddPythonWorker" (fun _ ->
     targetRuntimes
     |> List.iter (fun runtime ->
         let path = currentDirectory @@ buildDir @@ runtime @@ "workers" @@ "python"
-        CreateDir path
-        CopyFile (path @@ "worker.py") (toolsDir @@ "worker.py")
-        CopyFile (path @@ "worker.config.json") (toolsDir @@ "worker.config.json")
+        Shell.mkdir path
+        Shell.cp (toolsDir @@ "worker.py") (path @@ "worker.py")
+        Shell.cp (toolsDir @@ "worker.config.json") (path @@ "worker.config.json")
     )
 
     let path = buildDirNoRuntime @@ "workers" @@ "python"
-    CreateDir path
-    CopyFile (path @@ "worker.py") (toolsDir @@ "worker.py")
-    CopyFile (path @@ "worker.config.json") (toolsDir @@ "worker.config.json")
+    Shell.mkdir path
+    Shell.cp (toolsDir @@ "worker.py") (path @@ "worker.py")
+    Shell.cp (toolsDir @@ "worker.config.json") (path @@ "worker.config.json")
 )
 
 type feedType = JsonProvider<"https://functionscdn.azureedge.net/public/cli-feed-v3.json">
 
-Target "AddTemplatesNupkgs" (fun _ ->
+Target.create "AddTemplatesNupkgs" (fun _ ->
     let feed = feedType.Load("https://functionscdn.azureedge.net/public/cli-feed-v3.json")
     let releaseId = (feed.Tags.V2Prerelease.JsonValue.["release"]).AsString()
     let release = feed.Releases.JsonValue.GetProperty(releaseId)
@@ -342,18 +349,18 @@ Target "AddTemplatesNupkgs" (fun _ ->
     targetRuntimes
     |> List.iter (fun runtime ->
         let path = currentDirectory @@ buildDir @@ runtime @@ "templates"
-        CreateDir path
-        CopyFile (path @@ "itemTemplates.nupkg") (toolsDir @@ "itemTemplates.nupkg")
-        CopyFile (path @@ "projectTemplates.nupkg") (toolsDir @@ "projectTemplates.nupkg")
+        Shell.mkdir path
+        Shell.cp (toolsDir @@ "itemTemplates.nupkg") (path @@ "itemTemplates.nupkg")
+        Shell.cp (toolsDir @@ "projectTemplates.nupkg") (path @@ "projectTemplates.nupkg")
     )
 
     let path = buildDirNoRuntime @@ "templates"
-    CreateDir path
-    CopyFile (path @@ "itemTemplates.nupkg") (toolsDir @@ "itemTemplates.nupkg")
-    CopyFile (path @@ "projectTemplates.nupkg") (toolsDir @@ "projectTemplates.nupkg")
+    Shell.mkdir path
+    Shell.cp (toolsDir @@ "itemTemplates.nupkg") (path @@ "itemTemplates.nupkg")
+    Shell.cp (toolsDir @@ "projectTemplates.nupkg") (path @@ "projectTemplates.nupkg")
 )
 
-Dependencies
+// *** Define Dependencies ***
 "Clean"
   ==> "DownloadTools"
   ==> "RestorePackages"
@@ -361,11 +368,11 @@ Dependencies
   ==> "AddPythonWorker"
   ==> "AddTemplatesNupkgs"
   ==> "Test"
-  =?> ("GenerateZipToSign", hasBuildParam "sign")
-  =?> ("UploadZipToSign", hasBuildParam "sign")
-  =?> ("EnqueueSignMessage", hasBuildParam "sign")
-  =?> ("WaitForSigning", hasBuildParam "sign")
+  =?> ("GenerateZipToSign", Environment.hasEnvironVar "sign")
+  =?> ("UploadZipToSign", Environment.hasEnvironVar "sign")
+  =?> ("EnqueueSignMessage", Environment.hasEnvironVar "sign")
+  =?> ("WaitForSigning", Environment.hasEnvironVar "sign")
   ==> "Zip"
 
 // start build
-RunTargetOrDefault "Zip"
+Target.runOrDefault "Zip"
