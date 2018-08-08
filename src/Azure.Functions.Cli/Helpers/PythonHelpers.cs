@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             VerifyVirtualEnvironment();
             await VerifyVersion();
-            // await InstallPipWheel();
+            await InstallPipWheel();
             await InstallPythonAzureFunctionPackage();
             await PipFreeze();
         }
@@ -31,21 +31,6 @@ namespace Azure.Functions.Cli.Helpers
             if (!InVirtualEnvironment)
             {
                 throw new CliException("For Python function apps, you have to be running in a venv. Please create and activate a Python 3.6 venv and run this command again.");
-            }
-        }
-
-        private static async Task InstallPythonAzureFunctionPackage()
-        {
-            foreach (var package in _workerPackages)
-            {
-                ColoredConsole.WriteLine("Installing azure-functions package");
-                var exe = new Executable("pip", $"install \"{package}\"");
-                var sb = new StringBuilder();
-                var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
-                if (exitCode != 0)
-                {
-                    throw new CliException($"Error installing azure package \n{sb.ToString()}");
-                }
             }
         }
 
@@ -68,27 +53,23 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task InstallPipWheel()
+        private static Task InstallPythonAzureFunctionPackage() => PipInstallPackages(_workerPackages);
+
+        private static Task InstallPipWheel() => PipInstallPackage("wheel");
+
+        private static Task PipInstallPackages(IEnumerable<string> packageNames) => Task.WhenAll(packageNames.Select(PipInstallPackage));
+
+        private static async Task PipInstallPackage(string packageName)
         {
-            ColoredConsole.WriteLine("Installing wheel package");
-            var exe = new Executable("pip", "install wheel");
+            ColoredConsole.WriteLine($"Installing {packageName} package");
+            var exe = new Executable("pip", $"install {packageName}");
             var sb = new StringBuilder();
             var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
             if (exitCode != 0)
             {
                 throw new CliException($"Error running '{exe.Command}'. {sb.ToString()}");
             }
-        }
 
-        public static async Task DownloadWheels()
-        {
-            ColoredConsole.WriteLine("Downloading wheels from requirements.txt to .wheels dir");
-            var exe = new Executable("pip", "wheel --wheel-dir=.wheels -r requirements.txt");
-            var exitCode = await exe.RunAsync(l => ColoredConsole.WriteLine(l), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-            if (exitCode != 0)
-            {
-                throw new CliException($"Error running '{exe.Command}'.");
-            }
         }
 
         private static async Task VerifyVersion()
