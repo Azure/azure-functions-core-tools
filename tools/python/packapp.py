@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import zipfile
 
 import distlib.scripts
 import distlib.wheel
@@ -160,7 +159,7 @@ def build_independent_wheel(name, version, args, dest):
         if pip.returncode != 0:
             return False
 
-        wheel_re = _wheel_file_pattern.format(namever=f'{name}-{version}')
+        wheel_re = _wheel_file_pattern.format(namever=f'{name}-[^-]*')
 
         for filename in os.listdir(td):
             m = re.match(wheel_re, filename, re.VERBOSE)
@@ -179,8 +178,7 @@ def build_independent_wheel(name, version, args, dest):
 
 
 def build_binary_wheel(name, version, args, dest):
-    if args.platform != 'linux':
-        die('packapp can only build binary dependencies for Linux targets')
+    die('binary dependencies without wheels are not supported')
 
 
 def parse_args(argv):
@@ -189,7 +187,9 @@ def parse_args(argv):
     parser.add_argument('--python-version', type=str)
     parser.add_argument('--no-deps', default=False, action='store_true')
     parser.add_argument('--packages-dir-name', type=str,
-                        help='folder to save packages in. Default: .python_packages')
+                        default='.python_packages',
+                        help='folder to save packages in. '
+                             'Default: .python_packages')
     parser.add_argument('path', type=str,
                         help='Path to a function app to pack.')
 
@@ -199,9 +199,6 @@ def parse_args(argv):
 
     if not args.python_version:
         die('missing required argument: --python-version')
-
-    if not args.packages_dir_name:
-        args.packages_dir_name = '.python_packages'
 
     return args
 
