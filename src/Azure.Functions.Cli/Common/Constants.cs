@@ -106,19 +106,19 @@ namespace Azure.Functions.Cli.Common
                     { "activitytrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.2.2-beta3"} },
+                            Version =  "1.5.0"} },
                     { "orchestrationtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.2.2-beta3"} },
+                            Version =  "1.5.0"} },
                     { "orchestrationclient",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.2.2-beta3"} },
+                            Version =  "1.5.0"} },
                     { "eventgridtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventGrid",
-                            Version =  "2.0.0-beta1"} },
+                            Version =  "2.0.0-beta2"} },
                     { "cosmosdbtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
