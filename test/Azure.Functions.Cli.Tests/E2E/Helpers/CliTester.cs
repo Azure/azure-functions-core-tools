@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 {
     public static class CliTester
     {
-        private static string _func = System.Environment.GetEnvironmentVariable("FUNC_PATH");
+        private static string _func = @"C:\Program Files\dotnet\dotnet.exe";//System.Environment.GetEnvironmentVariable("FUNC_PATH");
         public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null) => Run(new[] { runConfiguration }, output);
 
         public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null)
