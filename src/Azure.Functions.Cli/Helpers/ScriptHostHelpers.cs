@@ -8,6 +8,8 @@ using Azure.Functions.Cli.Diagnostics;
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Description;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -24,14 +26,22 @@ namespace Azure.Functions.Cli.Helpers
         public static FunctionMetadata GetFunctionMetadata(string functionName)
         {
             var functionErrors = new Dictionary<string, Collection<string>>();
-            var functions = ScriptHost.ReadFunctionsMetadata(Directory.EnumerateDirectories(Environment.CurrentDirectory), new ColoredConsoleLogger(LogCategories.Startup, (cat, level) => level >= Microsoft.Extensions.Logging.LogLevel.Information), functionErrors);
-            var function = functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+            var scriptHostOptions = new ScriptJobHostOptions
+            {
+                RootScriptPath = Environment.CurrentDirectory
+            };
+
+            var loggerFactory = new LoggerFactory();
+            loggerFactory.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
+
+            var metadataManager = new FunctionMetadataManager(new OptionsWrapper<ScriptJobHostOptions>(scriptHostOptions), loggerFactory);
+            var function = metadataManager.Functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
             if (function == null)
             {
-                var error = functionErrors
+                var error = metadataManager.Errors
                     .FirstOrDefault(f => f.Key.Equals(functionName, StringComparison.OrdinalIgnoreCase))
                     .Value
-                    ?.Aggregate(string.Empty, (a, b) => string.Join(Environment.NewLine, a, b));
+                    .Aggregate(string.Empty, (a, b) => string.Join(Environment.NewLine, a, b));
                 throw new FunctionNotFoundException($"Unable to get metadata for function {functionName}. Error: {error}");
             }
             else

@@ -29,6 +29,8 @@ using Microsoft.Azure.WebJobs.Script.WebHost.Security;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -125,9 +127,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(WebHostSettings hostSettings, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate)
+        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate)
         {
-            IDictionary<string, string> settings = await GetConfigurationSettings(hostSettings.ScriptPath, baseAddress);
+            IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(workerRuntime, LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
 
@@ -152,7 +154,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     configBuilder.AddEnvironmentVariables();
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostSettings, CorsOrigins)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins)))
                 .Build();
         }
 
@@ -214,14 +216,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate);
             var runTask = host.RunAsync();
 
-            var manager = host.Services.GetRequiredService<WebScriptHostManager>();
-            await manager.DelayUntilHostReady();
+            var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
+
+            await hostService.DelayUntilHostReady();
 
             ColoredConsole.WriteLine($"Listening on {listenUri}");
             ColoredConsole.WriteLine("Hit CTRL-C to exit...");
 
-            DisplayHttpFunctionsInfo(manager, baseUri);
-            DisplayDisabledFunctions(manager);
+            var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
+            var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
+            DisplayHttpFunctionsInfo(scriptHost, httpOptions.Value, baseUri);
+            DisplayDisabledFunctions(scriptHost);
             await SetupDebuggerAsync(baseUri);
 
             await runTask;
@@ -241,22 +246,22 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private void DisplayDisabledFunctions(WebScriptHostManager hostManager)
+        private void DisplayDisabledFunctions(IScriptJobHost scriptHost)
         {
-            if (hostManager != null)
+            if (scriptHost != null)
             {
-                foreach (var function in hostManager.Instance.Functions.Where(f => f.Metadata.IsDisabled))
+                foreach (var function in scriptHost.Functions.Where(f => f.Metadata.IsDisabled))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
                 }
             }
         }
 
-        private void DisplayHttpFunctionsInfo(WebScriptHostManager hostManager, Uri baseUri)
+        private void DisplayHttpFunctionsInfo(IScriptJobHost scriptHost, HttpOptions httpOptions, Uri baseUri)
         {
-            if (hostManager != null)
+            if (scriptHost != null)
             {
-                var httpFunctions = hostManager.Instance.Functions.Where(f => f.Metadata.IsHttpFunction());
+                var httpFunctions = scriptHost.Functions.Where(f => f.Metadata.IsHttpFunction());
                 if (httpFunctions.Any())
                 {
                     ColoredConsole
@@ -270,13 +275,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     var binding = function.Metadata.Bindings.FirstOrDefault(b => b.Type != null && b.Type.Equals("httpTrigger", StringComparison.OrdinalIgnoreCase));
                     var httpRoute = binding?.Raw?.GetValue("route", StringComparison.OrdinalIgnoreCase)?.ToString();
                     httpRoute = httpRoute ?? function.Name;
-                    var extensions = hostManager.Instance.ScriptConfig.HostConfig.GetService<IExtensionRegistry>();
-                    var httpConfig = extensions.GetExtensions<IExtensionConfigProvider>().OfType<HttpExtensionConfiguration>().Single();
-
+                    
                     string hostRoutePrefix = "";
                     if (!function.Metadata.IsProxy)
                     {
-                        hostRoutePrefix = httpConfig.RoutePrefix ?? "api/";
+                        hostRoutePrefix = httpOptions.RoutePrefix ?? "api/";
                         hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
                             ? hostRoutePrefix
                             : $"{hostRoutePrefix}/";                        
@@ -393,13 +396,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public class Startup : IStartup
         {
             private readonly WebHostBuilderContext _builderContext;
-            private readonly WebHostSettings _hostSettings;
+            private readonly ScriptApplicationHostOptions _hostOptions;
             private readonly string[] _corsOrigins;
 
-            public Startup(WebHostBuilderContext builderContext, WebHostSettings hostSettings, string corsOrigins)
+            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins)
             {
                 _builderContext = builderContext;
-                _hostSettings = hostSettings;
+                _hostOptions = hostOptions;
 
                 if (!string.IsNullOrEmpty(corsOrigins))
                 {
@@ -421,12 +424,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 services.AddWebJobsScriptHostAuthorization();
 
-                services.AddSingleton<ILoggerProviderFactory, ConsoleLoggerProviderFactory>();
-                services.AddSingleton<WebHostSettings>(_hostSettings);
+                services.AddSingleton<IOptions<ScriptApplicationHostOptions>>(new OptionsWrapper<ScriptApplicationHostOptions>(_hostOptions));
                 services.AddMvc()
                     .AddApplicationPart(typeof(HostController).Assembly);
 
-                return services.AddWebJobsScriptHost(_builderContext.Configuration);
+                services.AddWebJobsScriptHost(_builderContext.Configuration);
+
+                services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
+
+                return services.BuildServiceProvider();
             }
 
             public void Configure(IApplicationBuilder app)
