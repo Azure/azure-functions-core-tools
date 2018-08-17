@@ -118,33 +118,34 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (workerRuntime == WorkerRuntime.dotnet && !Csx)
             {
                 ColoredConsole.Write("Select a template: ");
-                var templateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates());
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates());
                 ColoredConsole.Write("Function name: ");
-                var functionName = FunctionName ?? Console.ReadLine();
-                ColoredConsole.WriteLine(functionName);
+                FunctionName = FunctionName ?? Console.ReadLine();
+                ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(templateName, functionName, namespaceStr);
+                await DotnetHelpers.DeployDotnetFunction(TemplateName, FunctionName, namespaceStr);
             }
             else
             {
                 ColoredConsole.Write("Select a template: ");
-                var name = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
-                ColoredConsole.WriteLine(TitleColor(name));
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+                ColoredConsole.WriteLine(TitleColor(TemplateName));
 
-                var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase));
+                var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(TemplateName, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase));
 
                 if (template == null)
                 {
-                    ColoredConsole.Error.WriteLine(ErrorColor($"Can't find template \"{name}\" in \"{Language}\""));
+                    ColoredConsole.Error.WriteLine(ErrorColor($"Can't find template \"{TemplateName}\" in \"{Language}\""));
                 }
                 else
                 {
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
-                    var functionName = FunctionName ?? Console.ReadLine();
-                    functionName = string.IsNullOrEmpty(functionName) ? template.Metadata.DefaultFunctionName : functionName;
-                    await _templatesManager.Deploy(functionName, template);
+                    FunctionName = FunctionName ?? Console.ReadLine();
+                    FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
+                    await _templatesManager.Deploy(FunctionName, template);
                 }
             }
+            ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
         }
     }
 }
