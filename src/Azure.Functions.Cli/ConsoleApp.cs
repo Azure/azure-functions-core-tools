@@ -69,6 +69,8 @@ namespace Azure.Functions.Cli
                     ColoredConsole.Write("Press any to continue....");
                     Console.ReadKey(true);
                 }
+
+                Environment.Exit(ExitCodes.GeneralError);
             }
         }
 
