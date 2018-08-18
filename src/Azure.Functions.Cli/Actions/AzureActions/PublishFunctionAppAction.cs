@@ -23,7 +23,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "publish", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Publish the current directory contents to an Azure Function App. Locally deleted files are not removed from destination.")]
-    internal class PublishFunctionApp : BaseFunctionAppAction
+    internal class PublishFunctionAppAction : BaseFunctionAppAction
     {
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
@@ -36,10 +36,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool ListIncludedFiles { get; set; }
         public bool RunFromZipDeploy { get; private set; }
         public bool Force { get; set; }
+        public bool Ignore { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
 
-        public PublishFunctionApp(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
+        public PublishFunctionAppAction(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
             : base(armManager)
         {
             _settings = settings;
@@ -86,6 +87,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("csx")
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
+            Parser
+                .Setup<bool>("ignore")
+                .Callback(f => Ignore = f);
 
             return base.ParseArgs(args);
         }
@@ -93,6 +97,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public override async Task RunAsync()
         {
             GitIgnoreParser ignoreParser = null;
+            var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             try
             {
                 var path = Path.Combine(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
@@ -104,6 +109,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             catch { }
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
             if (workerRuntime == WorkerRuntime.dotnet && !Csx)
             {
                 const string outputPath = "bin/publish";
@@ -123,26 +129,109 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 if (PublishLocalSettingsOnly)
                 {
-                    await InternalPublishLocalSettingsOnly();
+                    await PublishLocalAppSettings(functionApp, additionalAppSettings);
                 }
                 else
                 {
-                    await InternalPublishFunctionApp(ignoreParser);
+                    await PublishFunctionApp(functionApp, ignoreParser, additionalAppSettings);
                 }
             }
         }
 
-        private async Task InternalPublishFunctionApp(GitIgnoreParser ignoreParser)
+        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
+        {
+            var result = new Dictionary<string, string>();
+            var appSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
+
+            // Check version
+            if (!functionApp.IsLinux)
+            {
+                if (appSettings.TryGetValue(Constants.FunctionsExtensionVersion, out string version))
+                {
+                    // v2 can be either "~2", "beta", or an exact match like "2.0.11961-alpha"
+                    if (!version.Equals("~2") &&
+                        !version.StartsWith("2.0") &&
+                        !version.Equals("beta", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (Force)
+                        {
+                            result.Add(Constants.FunctionsExtensionVersion, "~2");
+                        }
+                        else
+                        {
+                            throw new CliException("You're trying to publish to a v1 function app from v2 tooling.\n" +
+                            "You can pass --force to force update the app to v2, or downgrade to v1 tooling for publishing");
+                        }
+                    }
+                }
+            }
+
+            if (appSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out string workerRuntimeStr))
+            {
+                var resolution = $"You can pass --ignore to skip this check, or --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
+                try
+                {
+                    var azureWorkerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeStr);
+                    if (azureWorkerRuntime != workerRuntime && !Ignore && !Force)
+                    {
+                        if (Ignore)
+                        {
+                            ColoredConsole.WriteLine(WarningColor($"Ignoring mismatched '{Constants.FunctionsWorkerRuntime}' because --ignore was passed"));
+                        }
+                        else if (Force)
+                        {
+                            ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
+                            result[Constants.FunctionsWorkerRuntime] = workerRuntime.ToString();
+                        }
+                        else
+                        {
+                            throw new CliException($"Your Azure Function App has '{Constants.FunctionsWorkerRuntime}' set to '{azureWorkerRuntime}' while your local project is set to '{workerRuntime}'.\n"
+                                + resolution);
+                        }
+                    }
+                }
+                catch (ArgumentException) when (Force)
+                {
+                    result[Constants.FunctionsWorkerRuntime] = workerRuntime.ToString();
+                }
+                catch (ArgumentException) when (!Force && !Ignore)
+                {
+                    throw new CliException($"Your app has an unknown {Constants.FunctionsWorkerRuntime} defined '{workerRuntimeStr}'. Only {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString} are supported.\n" +
+                        resolution);
+                }
+            }
+
+            if (!appSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic)
+            {
+                throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
+            }
+
+            if (functionApp.IsLinux &&
+                functionApp.IsDynamic &&
+                appSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"))
+            {
+                if (Force)
+                {
+                    result.Add("WEBSITE_CONTENTSHARE", null);
+                    result.Add("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", null);
+                }
+                else
+                {
+                    throw new CliException("Your app is configured with Azure Files for editing from Azure Portal.\nTo force publish use --force. This will remove Azure Files from your app.");
+                }
+            }
+
+            return result;
+        }
+
+        private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings)
         {
             ColoredConsole.WriteLine("Getting site publishing info...");
-            var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
             if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromZipDeploy)
             {
-                ColoredConsole
-                    .WriteLine(ErrorColor("--zip is not supported with dedicated linux apps."));
-                return;
+                throw new CliException("--zip is not supported with dedicated linux apps.");
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
@@ -164,12 +253,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishZipDeploy(functionApp, zipStream);
             }
 
-            await SyncTriggers(functionApp);
-
             if (PublishLocalSettings)
             {
-                await PublishAppSettings(functionApp);
+                await PublishLocalAppSettings(functionApp, additionalAppSettings);
             }
+            else if (additionalAppSettings.Any())
+            {
+                await PublishAppSettings(functionApp, new Dictionary<string, string>(), additionalAppSettings);
+            }
+
+            await SyncTriggers(functionApp);
         }
 
         private async Task SyncTriggers(Site functionApp)
@@ -203,7 +296,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
 
             ColoredConsole.WriteLine("Uploading content...");
-            ValidateAppSettings(azureAppSettings, functionApp);
             var sas = await UploadZipToStorage(zipFile, azureAppSettings);
 
             azureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
@@ -223,27 +315,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private void ValidateAppSettings(Dictionary<string, string> appSettings, Site functionApp)
-        {
-            if (!appSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic)
-            {
-                throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing.");
-            }
 
-            if (appSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"))
-            {
-                if (Force)
-                {
-                    ColoredConsole.WriteLine(WarningColor($"Removing Azure Files from '{FunctionAppName}' because --force was passed"));
-                    appSettings.Remove("WEBSITE_CONTENTSHARE");
-                    appSettings.Remove("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING");
-                }
-                else
-                {
-                    throw new CliException("Your app is configured with Azure Files for editing from Azure Portal.\nTo force publish use --force. This will remove Azure Files from your app.");
-                }
-            }
-        }
 
         public async Task PublishZipDeploy(Site functionApp, Stream zipFile)
         {
@@ -295,17 +367,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return blob.Uri + blobToken;
         }
 
-        private async Task InternalPublishLocalSettingsOnly()
-        {
-            ColoredConsole.WriteLine("Getting site publishing info...");
-            var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
-            var isSuccessful = await PublishAppSettings(functionApp);
-            if (!isSuccessful)
-            {
-                return;
-            }
-        }
-
         private static void InternalListIgnoredFiles(GitIgnoreParser ignoreParser)
         {
             if (ignoreParser == null)
@@ -334,11 +395,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task<bool> PublishAppSettings(Site functionApp)
+        private async Task<bool> PublishLocalAppSettings(Site functionApp, IDictionary<string, string> additionalAppSettings)
+        {
+            var localAppSettings = _secretsManager.GetSecrets();
+            return await PublishAppSettings(functionApp, localAppSettings, additionalAppSettings);
+        }
+
+        private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
             var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
-            var localAppSettings = _secretsManager.GetSecrets();
-            var appSettings = MergeAppSettings(azureAppSettings, localAppSettings);
+            var appSettings = MergeAppSettings(azureAppSettings, local, additional);
             var result = await _armManager.UpdateFunctionAppAppSettings(functionApp, appSettings);
             if (!result.IsSuccessful)
             {
@@ -351,9 +417,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return true;
         }
 
-        private IDictionary<string, string> MergeAppSettings(IDictionary<string, string> azure, IDictionary<string, string> local)
+        private IDictionary<string, string> MergeAppSettings(IDictionary<string, string> azure, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
             var result = new Dictionary<string, string>(azure);
+
             foreach (var pair in local)
             {
                 if (result.ContainsKeyCaseInsensitive(pair.Key) &&
@@ -394,6 +461,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
+            foreach (var pair in additional)
+            {
+                if (!string.IsNullOrEmpty(pair.Value))
+                {
+                    result[pair.Key] = pair.Value;
+                }
+                else if (result.ContainsKey(pair.Key))
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Removing '{pair.Key}' from '{FunctionAppName}'"));
+                    result.Remove(pair.Key);
+                }
+            }
             return result;
         }
 

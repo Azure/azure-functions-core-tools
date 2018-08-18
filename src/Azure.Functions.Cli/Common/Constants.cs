@@ -22,6 +22,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionJsonFileName = "function.json";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
+        public const string FunctionsExtensionVersion = "FUNCTIONS_EXTENSION_VERSION";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
         public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
