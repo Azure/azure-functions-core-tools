@@ -262,32 +262,36 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishAppSettings(functionApp, new Dictionary<string, string>(), additionalAppSettings);
             }
 
+            await Task.Delay(TimeSpan.FromSeconds(5));
             await SyncTriggers(functionApp);
         }
 
         private async Task SyncTriggers(Site functionApp)
         {
-            if (functionApp.IsDynamic)
+            await RetryHelper.Retry(async () =>
             {
-                ColoredConsole.WriteLine("Syncing triggers...");
-                HttpResponseMessage response = null;
-                if (functionApp.IsLinux)
+                if (functionApp.IsDynamic)
                 {
-                    response = await _armManager.SyncTriggers(functionApp);
-                }
-                else
-                {
-                    using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                    ColoredConsole.WriteLine("Syncing triggers...");
+                    HttpResponseMessage response = null;
+                    if (functionApp.IsLinux)
                     {
-                        response = await client.PostAsync("api/functions/synctriggers", content: null);
+                        response = await _armManager.SyncTriggers(functionApp);
+                    }
+                    else
+                    {
+                        using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                        {
+                            response = await client.PostAsync("api/functions/synctriggers", content: null);
+                        }
+                    }
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
                     }
                 }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
-                }
-            }
+            }, retryCount: 5);
         }
 
         private async Task PublishRunFromZip(Site functionApp, Stream zipFile)

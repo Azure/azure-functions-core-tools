@@ -7,7 +7,10 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class RetryHelper
     {
-        public static async Task Retry(Func<Task> func, int retryCount)
+        public static Task Retry(Func<Task> func, int retryCount, bool displayError = false)
+            => Retry(func, retryCount, TimeSpan.FromSeconds(1), displayError);
+
+        public static async Task Retry(Func<Task> func, int retryCount, TimeSpan retryDelay, bool displayError = false)
         {
             var totalRetries = retryCount;
             while (true)
@@ -24,10 +27,13 @@ namespace Azure.Functions.Cli.Helpers
                         throw e;
                     }
                     retryCount--;
-                    ColoredConsole.Error.WriteLine(ErrorColor(e.Message));
-                    ColoredConsole.Error.WriteLine(ErrorColor($"Retry: {totalRetries - retryCount} of {totalRetries}"));
+                    if (displayError)
+                    {
+                        ColoredConsole.Error.WriteLine(ErrorColor(e.Message));
+                        ColoredConsole.Error.WriteLine(ErrorColor($"Retry: {totalRetries - retryCount} of {totalRetries}"));
+                    }
                 }
-                await Task.Delay(1000);
+                await Task.Delay(retryDelay);
             }
         }
     }
