@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Helpers
                     FileSystemHelpers.DeleteDirectorySafe(outputPath);
                 }
 
-                var exe = new Executable("dotnet", $"publish --output {outputPath}");
+                var exe = new Executable("dotnet", $"build --output {outputPath}");
                 var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e));
                 if (exitCode != 0)
                 {
