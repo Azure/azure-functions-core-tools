@@ -96,20 +96,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            GitIgnoreParser ignoreParser = null;
+            // Get function app
             var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
-            try
-            {
-                var path = Path.Combine(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
-                if (FileSystemHelpers.FileExists(path))
-                {
-                    ignoreParser = new GitIgnoreParser(FileSystemHelpers.ReadAllTextFromFile(path));
-                }
-            }
-            catch { }
 
+            // Get the GitIgnoreParser from the functionApp root
+            var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
+            var ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
+
+            // Get the WorkerRuntime
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+
+            // Check for any additional conditions or app settings that need to change
+            // before starting any of the publish activity.
             var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
+
             if (workerRuntime == WorkerRuntime.dotnet && !Csx)
             {
                 const string outputPath = "bin/publish";
