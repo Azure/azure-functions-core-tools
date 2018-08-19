@@ -17,50 +17,32 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "list-functions", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "List functions in a given function app on azure.")]
     internal class ListFunctionsActions : BaseFunctionAppAction
     {
-        private readonly ISettings _settings;
-        private readonly IArmTokenManager _tokenManager;
-
-        public ListFunctionsActions(IArmManager armManager, ISettings settings, IArmTokenManager tokenManager) : base(armManager)
-        {
-            _settings = settings;
-            _tokenManager = tokenManager;
-        }
-
         public override async Task RunAsync()
         {
-            var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
             if (functionApp != null)
             {
-                await RetryHelper.Retry(async () =>
+                var functions = await AzureHelper.GetFunctions(functionApp, AccessToken);
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri($"https://{functionApp.ScmUri}") })
+
+                    ColoredConsole.WriteLine(TitleColor($"Functions in {FunctionAppName}:"));
+                    foreach (var function in functions)
                     {
-                        var token = await _tokenManager.GetToken(_settings.CurrentTenant);
-                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                        var trigger = function
+                            .Config?["bindings"]
+                            ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
+                            ?["type"];
 
-                        var response = await client.GetAsync(new Uri("api/functions", UriKind.Relative));
+                        trigger = trigger ?? "No Trigger Found";
 
-                        if (!response.IsSuccessStatusCode)
+                        ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
+                        if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
                         {
-                            throw new CliException($"Error trying to retrieve list of functions ({response.StatusCode}).");
+                            ColoredConsole.WriteLine($"        Invoke url: {VerboseColor(function.InvokeUrlTemplate)}");
                         }
-
-                        var functions = await response.Content.ReadAsAsync<IEnumerable<FunctionInfo>>();
-
-                        ColoredConsole.WriteLine(TitleColor($"Functions in {FunctionAppName}:"));
-                        foreach (var function in functions)
-                        {
-                            var trigger = function
-                                .Config?["bindings"]
-                                ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
-                                ?["type"];
-
-                            trigger = trigger ?? "No Trigger Found";
-
-                            ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
-                        }
+                        ColoredConsole.WriteLine();
                     }
-                }, 2);
+                }
             }
             else
             {

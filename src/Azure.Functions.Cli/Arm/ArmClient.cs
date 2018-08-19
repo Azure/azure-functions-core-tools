@@ -3,46 +3,43 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Newtonsoft.Json;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Arm
 {
-    internal class ArmClient
+    public static class ArmClient
     {
-        private readonly int _retryCount;
-        private readonly IArmTokenManager _tokenManager;
-        private readonly ISettings _settings;
-        private readonly Random _random;
+        private static readonly Random _random;
 
-        public ArmClient(IArmTokenManager tokenManager, ISettings settings, int retryCount)
+        static ArmClient()
         {
-            _retryCount = retryCount;
-            _tokenManager = tokenManager;
-            _settings = settings;
             _random = new Random();
         }
 
-        public Task<HttpResponseMessage> HttpInvoke(HttpMethod method, Uri uri, object objectPayload = null)
+        public static Task<HttpResponseMessage> HttpInvoke(HttpMethod method, Uri uri, string accessToken, object objectPayload = null, int retryCount = 3)
         {
-            return HttpInvoke(method.Method, uri, objectPayload);
+            return HttpInvoke(method.Method, uri, accessToken, objectPayload, retryCount);
         }
 
-        public async Task<HttpResponseMessage> HttpInvoke(string method, Uri uri, object objectPayload = null)
+        public static async Task<HttpResponseMessage> HttpInvoke(string method, Uri uri, string accessToken, object objectPayload = null, int retryCount = 3)
         {
             var socketTrials = 10;
-            var retries = this._retryCount;
+            var retries = retryCount;
             while (true)
             {
                 try
                 {
-                    var response = await HttpInvoke(uri, method, objectPayload);
+                    var response = await HttpInvoke(uri, method, accessToken, objectPayload);
 
-                    if (!response.IsSuccessStatusCode && this._retryCount > 0)
+                    if (!response.IsSuccessStatusCode && retryCount > 0)
                     {
                         while (retries > 0)
                         {
-                            response = await HttpInvoke(uri, method, objectPayload);
+                            response = await HttpInvoke(uri, method, accessToken, objectPayload);
                             if (response.IsSuccessStatusCode)
                             {
                                 return response;
@@ -69,18 +66,23 @@ namespace Azure.Functions.Cli.Arm
             }
         }
 
-        private async Task<HttpResponseMessage> HttpInvoke(Uri uri, string verb, object objectPayload)
+        private static async Task<HttpResponseMessage> HttpInvoke(Uri uri, string verb, string accessToken, object objectPayload)
         {
             var payload = JsonConvert.SerializeObject(objectPayload);
             using (var client = new HttpClient(new HttpClientHandler()))
             {
                 const string jsonContentType = "application/json";
-                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {await _tokenManager.GetToken(_settings.CurrentTenant)}");
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
                 client.DefaultRequestHeaders.Add("User-Agent", "functions-cli/2.0");
                 client.DefaultRequestHeaders.Add("Accept", jsonContentType);
                 client.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
 
                 HttpResponseMessage response = null;
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"{verb.ToUpper()} {uri.ToString()}"));
+                }
+
                 if (String.Equals(verb, "get", StringComparison.OrdinalIgnoreCase))
                 {
                     response = await client.GetAsync(uri).ConfigureAwait(false);

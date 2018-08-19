@@ -1,6 +1,6 @@
-﻿namespace Azure.Functions.Cli.Arm.Models
+namespace Azure.Functions.Cli.Arm.Models
 {
-    internal class ArmWrapper<T>
+    public class ArmGenericResource
     {
         public string id { get; set; }
 
@@ -8,10 +8,8 @@
 
         public string type { get; set; }
 
-        public string location { get; set; }
-
         public string kind { get; set; }
 
-        public T properties { get; set; }
+        public string location { get; set; }
     }
 }

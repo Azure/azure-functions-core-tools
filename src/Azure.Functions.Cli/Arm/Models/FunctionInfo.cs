@@ -29,6 +29,9 @@ namespace Azure.Functions.Cli.Arm.Models
         [JsonProperty(PropertyName = "href")]
         public Uri Href { get; set; }
 
+        [JsonProperty(PropertyName = "invoke_url_template")]
+        public string InvokeUrlTemplate { get; set; }
+
         [JsonProperty(PropertyName = "config")]
         public JObject Config { get; set; }
 

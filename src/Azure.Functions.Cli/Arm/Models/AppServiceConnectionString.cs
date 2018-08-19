@@ -1,13 +1,9 @@
-﻿using Newtonsoft.Json;
-
-namespace Azure.Functions.Cli.Arm.Models
+﻿namespace Azure.Functions.Cli.Arm.Models
 {
-    internal class AppServiceConnectionString
+    public class AppServiceConnectionString
     {
-        [JsonProperty("value")]
-        public string Value { get; set; }
+        public string value { get; set; }
 
-        [JsonProperty("type")]
-        public int Type { get; set; }
+        public int type { get; set; }
     }
 }

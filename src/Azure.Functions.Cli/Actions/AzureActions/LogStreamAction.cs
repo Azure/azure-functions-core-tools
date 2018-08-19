@@ -7,19 +7,16 @@ using System.Text;
 using System.Threading.Tasks;
 using Colors.Net;
 using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Show interactive streaming logs for an Azure-hosted Function App")]
     class LogStreamAction : BaseFunctionAppAction
     {
-        public LogStreamAction(IArmManager armManager)
-            : base(armManager)
-        { }
-
         public override async Task RunAsync()
         {
-            var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
             var basicHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{functionApp.PublishingUserName}:{functionApp.PublishingPassword}"));
 
             using (var client = new HttpClient())

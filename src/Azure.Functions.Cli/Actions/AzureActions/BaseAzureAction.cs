@@ -1,14 +1,122 @@
-﻿using Azure.Functions.Cli.Arm;
+﻿using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using Azure.Functions.Cli.Arm;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Interfaces;
+using Fclp;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    abstract class BaseAzureAction : BaseAction
+    abstract class BaseAzureAction : BaseAction, IInitializableAction
     {
-        protected readonly IArmManager _armManager;
+        public string AccessToken { get; set; }
+        public bool ReadStdin { get; set; }
 
-        protected BaseAzureAction(IArmManager armManager)
+        public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            _armManager = armManager;
+            Parser
+                .Setup<string>("access-token")
+                .WithDescription("Access token to use for performing authenticated azure actions")
+                .Callback(t => AccessToken = t);
+            Parser
+                .Setup<bool>("access-token-stdin")
+                .WithDescription("Read access token from stdin e.g: az account get-access-token | func ... --access-token-stdin")
+                .Callback(f => ReadStdin = f);
+
+            return base.ParseArgs(args);
+        }
+
+        public async Task Initialize()
+        {
+            if (!string.IsNullOrEmpty(AccessToken))
+            {
+                return;
+            }
+            else if (ReadStdin && System.Console.In != null)
+            {
+                var accessToken = System.Console.In.ReadToEnd().Trim(' ', '\n', '\r', '"');
+                if (accessToken.StartsWith("{"))
+                {
+                    var json = JsonConvert.DeserializeObject<JObject>(accessToken);
+                    AccessToken = json["accessToken"].ToString();
+                }
+                else
+                {
+                    AccessToken = accessToken;
+                }
+                if (string.IsNullOrEmpty(AccessToken))
+                {
+                    throw new CliException("Unable to set access token from stdin.");
+                }
+            }
+            else if (ReadStdin && System.Console.In == null)
+            {
+                throw new CliException("Stdin unavailable");
+            }
+            else
+            {
+                AccessToken = await GetAccessToken();
+            }
+        }
+
+        private async Task<string> GetAccessToken()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
+                RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return await AzureCliGetToken();
+            }
+            else
+            {
+                try
+                {
+                    return await AzureCliGetToken();
+                }
+                catch (FileNotFoundException)
+                {
+                    try
+                    {
+                        return await AzurePowershellGetToken();
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        throw new CliException("Cannot get accessToken from az cli or Azure powershell. Please make sure to have either one installed.");
+                    }
+                }
+            }
+        }
+
+        private async Task<string> AzureCliGetToken()
+        {
+            if (CommandChecker.CommandExists("az"))
+            {
+                var az = new Executable("az", "account get-access-token --query \"accessToken\"");
+                var stdout = new StringBuilder();
+                var stderr = new StringBuilder();
+                var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
+                if (exitCode != 0)
+                {
+                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r'));
+                }
+                else
+                {
+                    return stdout.ToString().Trim(' ', '\n', '\r', '"');
+                }
+            }
+            else
+            {
+                throw new FileNotFoundException("Cannot find az cli. Please make sure to install az cli.");
+            }
+        }
+
+        private Task<string> AzurePowershellGetToken()
+        {
+            throw new FileNotFoundException("Cannot find powershell");
         }
     }
 }

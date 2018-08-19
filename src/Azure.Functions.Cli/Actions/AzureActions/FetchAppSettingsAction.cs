@@ -4,6 +4,7 @@ using Colors.Net;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -13,20 +14,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         private ISecretsManager _secretsManager;
 
-        public FetchAppSettingsAction(IArmManager armManager, ISecretsManager secretsManager)
-            : base(armManager)
+        public FetchAppSettingsAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
         }
 
         public override async Task RunAsync()
         {
-            var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
             if (functionApp != null)
             {
                 ColoredConsole.WriteLine(TitleColor("App Settings:"));
-                var appSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
-                foreach (var pair in appSettings)
+                foreach (var pair in functionApp.AzureAppSettings)
                 {
                     ColoredConsole.WriteLine($"Loading {pair.Key} = *****");
                     _secretsManager.SetSecret(pair.Key, pair.Value);
@@ -35,11 +34,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 ColoredConsole.WriteLine();
 
                 ColoredConsole.WriteLine(TitleColor("Connection Strings:"));
-                var connectionStrings = await _armManager.GetFunctionAppConnectionStrings(functionApp);
-                foreach (var connectionString in connectionStrings)
+                foreach (var connectionString in functionApp.ConnectionStrings)
                 {
                     ColoredConsole.WriteLine($"Loading {connectionString.Key} = *****");
-                    _secretsManager.SetConnectionString(connectionString.Key, connectionString.Value.Value);
+                    _secretsManager.SetConnectionString(connectionString.Key, connectionString.Value.value);
                 }
 
             }

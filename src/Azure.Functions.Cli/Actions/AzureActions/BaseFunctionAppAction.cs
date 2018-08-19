@@ -9,9 +9,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         public string FunctionAppName { get; set; }
 
-        public BaseFunctionAppAction(IArmManager armManager) : base(armManager)
-        { }
-
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             if (args.Any() && !args.First().StartsWith("-"))

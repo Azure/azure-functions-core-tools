@@ -53,12 +53,6 @@ namespace Azure.Functions.Cli
                 .SingleInstance()
                 .ExternallyOwned();
 
-            builder.RegisterType<ArmTokenManager>()
-                .As<IArmTokenManager>();
-
-            builder.RegisterType<ArmManager>()
-                .As<IArmManager>();
-
             builder.RegisterType<ProcessManager>()
                 .As<IProcessManager>();
 

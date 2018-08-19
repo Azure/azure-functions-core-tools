@@ -18,21 +18,21 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
     public class ResolveActionTests
     {
         [Theory]
-        [InlineData("azure functionapp enable-git-repo appName", typeof(EnableGitRepoAction))]
+        [InlineData("azure functionapp enable-git-repo appName", typeof(DeprecatedAzureActions))]
         [InlineData("azure functionapp fetch-app-settings appName", typeof(FetchAppSettingsAction))]
         [InlineData("azure functionapp fetch appName", typeof(FetchAppSettingsAction))]
-        [InlineData("azure get-publish-username", typeof(GetPublishUserNameAction))]
-        [InlineData("azure account list", typeof(ListAzureAccountsAction))]
-        [InlineData("azure subscriptions list", typeof(ListAzureAccountsAction))]
-        [InlineData("azure functionapp list", typeof(ListFunctionAppsAction))]
-        [InlineData("azure storage list", typeof(ListStorageAction))]
-        [InlineData("azure login", typeof(LoginAction))]
-        [InlineData("azure logout", typeof(LogoutAction))]
+        [InlineData("azure get-publish-username", typeof(DeprecatedAzureActions))]
+        [InlineData("azure account list", typeof(DeprecatedAzureActions))]
+        [InlineData("azure subscriptions list", typeof(DeprecatedAzureActions))]
+        [InlineData("azure functionapp list", typeof(DeprecatedAzureActions))]
+        [InlineData("azure storage list", typeof(DeprecatedAzureActions))]
+        [InlineData("azure login", typeof(DeprecatedAzureActions))]
+        [InlineData("azure logout", typeof(DeprecatedAzureActions))]
         [InlineData("azure functionapp logstream appName", typeof(LogStreamAction))]
-        [InlineData("azure portal appName", typeof(PortalAction))]
-        [InlineData("azure account set accountName", typeof(SetAzureAccountAction))]
-        [InlineData("azure set-publish-password userName", typeof(SetPublishPasswordAction))]
-        [InlineData("azure set-publish-username userName", typeof(SetPublishPasswordAction))]
+        [InlineData("azure portal appName", typeof(DeprecatedAzureActions))]
+        [InlineData("azure account set accountName", typeof(DeprecatedAzureActions))]
+        [InlineData("azure set-publish-password userName", typeof(DeprecatedAzureActions))]
+        [InlineData("azure set-publish-username userName", typeof(DeprecatedAzureActions))]
         [InlineData("host start", typeof(StartHostAction))]
         [InlineData("settings add settingName", typeof(AddSettingAction))]
         [InlineData("azure storage fetch-connection-string storageName", typeof(AddStorageAccountSettingAction))]
@@ -82,12 +82,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             builder.Register(_ => new PersistentSettings())
                 .As<ISettings>()
                 .SingleInstance();
-
-            builder.RegisterType<ArmTokenManager>()
-                .As<IArmTokenManager>();
-
-            builder.RegisterType<ArmManager>()
-                .As<IArmManager>();
 
             builder.RegisterType<ProcessManager>()
                 .As<IProcessManager>();

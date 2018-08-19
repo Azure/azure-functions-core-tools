@@ -1,13 +1,9 @@
-﻿using Newtonsoft.Json;
-
-namespace Azure.Functions.Cli.Arm.Models
+﻿namespace Azure.Functions.Cli.Arm.Models
 {
     internal class ArmWebsitePublishingCredentials
     {
-        [JsonProperty("publishingUserName")]
-        public string PublishingUserName { get; set; }
+        public string publishingUserName { get; set; }
 
-        [JsonProperty("publishingPassword")]
-        public string PublishingPassword { get; set; }
+        public string publishingPassword { get; set; }
     }
 }

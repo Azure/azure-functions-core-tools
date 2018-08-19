@@ -1,19 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace Azure.Functions.Cli.Arm.Models
 {
-    internal class Site : BaseResource
+    public class Site
     {
-        private string _csmIdTemplate = "/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Web/sites/{2}";
-
-        public override string ArmId
-        {
-            get
-            {
-                return string.Format(CultureInfo.InvariantCulture, _csmIdTemplate, SubscriptionId, ResourceGroupName, SiteName);
-            }
-        }
+        public string SiteId { get; private set; }
 
         public string SiteName { get; private set; }
 
@@ -33,16 +26,19 @@ namespace Azure.Functions.Cli.Arm.Models
 
         public string Sku { get; set; }
 
+        public IDictionary<string, string> AzureAppSettings { get; set; }
+
+        public IDictionary<string, AppServiceConnectionString> ConnectionStrings { get; set; }
+
         public bool IsLinux
             => Kind?.IndexOf("linux", StringComparison.OrdinalIgnoreCase) >= 0;
 
         public bool IsDynamic
             => Sku?.Equals("dynamic", StringComparison.OrdinalIgnoreCase) == true;
 
-        public Site(string subscriptionId, string resourceGroupName, string name)
-            : base(subscriptionId, resourceGroupName)
+        public Site(string siteId)
         {
-            this.SiteName = name;
+            SiteId = siteId;
         }
     }
 }

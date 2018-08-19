@@ -64,6 +64,5 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.0.0-beta3-10073" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.0-beta2-11996" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-    <PackageReference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" Version="3.16.0" />
   </ItemGroup>
 </Project>

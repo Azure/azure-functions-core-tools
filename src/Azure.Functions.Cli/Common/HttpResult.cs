@@ -2,7 +2,7 @@
 
 namespace Azure.Functions.Cli.Common
 {
-    internal class HttpResult<TSuccessResult, TErrorResult> 
+    public class HttpResult<TSuccessResult, TErrorResult>
     {
         public TSuccessResult SuccessResult { get; private set; }
         public TErrorResult ErrorResult { get; private set; }

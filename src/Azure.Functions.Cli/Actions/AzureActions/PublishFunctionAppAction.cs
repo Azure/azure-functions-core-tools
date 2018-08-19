@@ -27,7 +27,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
-        private readonly IArmTokenManager _tokenManager;
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
@@ -40,12 +39,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
 
-        public PublishFunctionAppAction(IArmManager armManager, ISettings settings, ISecretsManager secretsManager, IArmTokenManager tokenManager)
-            : base(armManager)
+        public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
             _settings = settings;
             _secretsManager = secretsManager;
-            _tokenManager = tokenManager;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -97,7 +94,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public override async Task RunAsync()
         {
             // Get function app
-            var functionApp = await _armManager.GetFunctionAppAsync(FunctionAppName);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
 
             // Get the GitIgnoreParser from the functionApp root
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
@@ -141,12 +138,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
         {
             var result = new Dictionary<string, string>();
-            var appSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
 
             // Check version
             if (!functionApp.IsLinux)
             {
-                if (appSettings.TryGetValue(Constants.FunctionsExtensionVersion, out string version))
+                if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsExtensionVersion, out string version))
                 {
                     // v2 can be either "~2", "beta", or an exact match like "2.0.11961-alpha"
                     if (!version.Equals("~2") &&
@@ -166,7 +162,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (appSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out string workerRuntimeStr))
+            if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out string workerRuntimeStr))
             {
                 var resolution = $"You can pass --ignore to skip this check, or --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
                 try
@@ -201,14 +197,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (!appSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic)
+            if (!functionApp.AzureAppSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic)
             {
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
             }
 
             if (functionApp.IsLinux &&
                 functionApp.IsDynamic &&
-                appSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"))
+                functionApp.AzureAppSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"))
             {
                 if (Force)
                 {
@@ -276,11 +272,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     HttpResponseMessage response = null;
                     if (functionApp.IsLinux)
                     {
-                        response = await _armManager.SyncTriggers(functionApp);
+                        response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
                     }
                     else
                     {
-                        using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                        using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
                         {
                             response = await client.PostAsync("api/functions/synctriggers", content: null);
                         }
@@ -297,14 +293,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task PublishRunFromZip(Site functionApp, Stream zipFile)
         {
             ColoredConsole.WriteLine("Preparing archive...");
-            var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
 
             ColoredConsole.WriteLine("Uploading content...");
-            var sas = await UploadZipToStorage(zipFile, azureAppSettings);
+            var sas = await UploadZipToStorage(zipFile, functionApp.AzureAppSettings);
 
-            azureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
+            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
 
-            var result = await _armManager.UpdateFunctionAppAppSettings(functionApp, azureAppSettings);
+            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
             ColoredConsole.WriteLine("Upload completed successfully.");
             if (!result.IsSuccessful)
             {
@@ -325,7 +320,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             await RetryHelper.Retry(async () =>
             {
-                using (var client = await GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
                 using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri("api/zipdeploy", UriKind.Relative)))
                 {
                     request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
@@ -346,7 +341,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        private async Task<string> UploadZipToStorage(Stream zip, Dictionary<string, string> appSettings)
+        private async Task<string> UploadZipToStorage(Stream zip, IDictionary<string, string> appSettings)
         {
             const string containerName = "function-releases";
             const string blobNameFormat = "{0}-{1}.zip";
@@ -407,9 +402,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
-            var azureAppSettings = await _armManager.GetFunctionAppAppSettings(functionApp);
-            var appSettings = MergeAppSettings(azureAppSettings, local, additional);
-            var result = await _armManager.UpdateFunctionAppAppSettings(functionApp, appSettings);
+            functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
+            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
             if (!result.IsSuccessful)
             {
                 ColoredConsole
@@ -487,7 +481,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return content;
         }
 
-        private async Task<HttpClient> GetRemoteZipClient(Uri url)
+        private HttpClient GetRemoteZipClient(Uri url)
         {
             var client = new HttpClient
             {
@@ -495,8 +489,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 MaxResponseContentBufferSize = 30 * 1024 * 1024,
                 Timeout = Timeout.InfiniteTimeSpan
             };
-            var token = await _tokenManager.GetToken(_settings.CurrentTenant);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
             return client;
         }
     }

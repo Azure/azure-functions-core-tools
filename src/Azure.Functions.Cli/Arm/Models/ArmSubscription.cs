@@ -1,13 +1,9 @@
-﻿using Newtonsoft.Json;
-
-namespace Azure.Functions.Cli.Arm.Models
+﻿namespace Azure.Functions.Cli.Arm.Models
 {
     internal class ArmSubscription
     {
-        [JsonProperty(PropertyName = "subscriptionId")]
-        public string SubscriptionId { get; set; }
+        public string subscriptionId { get; set; }
 
-        [JsonProperty(PropertyName = "displayName")]
-        public string DisplayName { get; set; }
+        public string displayName { get; set; }
     }
 }
