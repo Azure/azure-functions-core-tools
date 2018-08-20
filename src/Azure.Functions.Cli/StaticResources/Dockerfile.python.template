@@ -1,6 +1,4 @@
-FROM microsoft/azure-functions-python3.6:2.0
-
-# ENV host:logger:consoleLoggingMode=always
+FROM mcr.microsoft.com/azure-functions/python:2.0
 
 COPY . /home/site/wwwroot
 

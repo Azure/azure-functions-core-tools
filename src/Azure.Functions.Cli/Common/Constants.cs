@@ -48,7 +48,7 @@ namespace Azure.Functions.Cli.Common
 
         public static class DockerImages
         {
-            public const string LinuxPythonImageAmd64 = "microsoft/azure-functions-python3.6";
+            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0";
         }
 
         public static class StaticResourcesNames

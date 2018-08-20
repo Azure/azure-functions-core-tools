@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime node --no-source-control",
+                    "init . --worker-runtime node",
                     "settings add testKey valueValue"
                 },
                 CheckFiles = new[]
@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime node --no-source-control",
+                        "init . --worker-runtime node",
                         "settings encrypt",
                         "settings add testKey valueValue"
                     },

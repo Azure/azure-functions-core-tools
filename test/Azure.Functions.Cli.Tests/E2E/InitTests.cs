@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { $"init . --worker-runtime {workerRuntime} --no-source-control" },
+                Commands = new[] { $"init . --worker-runtime {workerRuntime}" },
                 CheckFiles = new FileResult[]
                 {
                     new FileResult
@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init . --worker-runtime python --no-source-control" },
+                Commands = new[] { "init . --worker-runtime python" },
                 HasStandardError = true,
                 ErrorContains = new[]
                 {
@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet --no-source-control" },
+                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet" },
                 CheckFiles = new[]
                 {
                     new FileResult
@@ -108,7 +108,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init . --no-source-control --worker-runtime node" },
+                Commands = new[] { "init . --worker-runtime node" },
                 CheckDirectories = new[]
                 {
                     new DirectoryResult { Name = ".git", Exists = false }
@@ -123,13 +123,13 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { $"init . --worker-runtime {workerRuntime} --no-source-control --docker" },
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} --docker" },
                 CheckFiles = new[]
                 {
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { "FROM microsoft/azure-functions-", workerRuntime, "2.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:2.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -141,7 +141,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init . --worker-runtime dotnet --no-source-control --csx" },
+                Commands = new[] { "init . --worker-runtime dotnet --csx" },
                 CheckFiles = new FileResult[]
                 {
                     new FileResult

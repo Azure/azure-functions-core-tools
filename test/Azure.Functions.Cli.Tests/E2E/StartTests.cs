@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime node --no-source-control",
+                    "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
                     "start"
                 },
