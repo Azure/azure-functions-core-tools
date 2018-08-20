@@ -29,7 +29,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("azure login", typeof(DeprecatedAzureActions))]
         [InlineData("azure logout", typeof(DeprecatedAzureActions))]
         [InlineData("azure functionapp logstream appName", typeof(LogStreamAction))]
-        [InlineData("azure portal appName", typeof(DeprecatedAzureActions))]
         [InlineData("azure account set accountName", typeof(DeprecatedAzureActions))]
         [InlineData("azure set-publish-password userName", typeof(DeprecatedAzureActions))]
         [InlineData("azure set-publish-username userName", typeof(DeprecatedAzureActions))]
