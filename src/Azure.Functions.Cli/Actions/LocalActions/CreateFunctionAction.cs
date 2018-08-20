@@ -123,7 +123,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName, FunctionName, namespaceStr);
+                await DotnetHelpers.DeployDotnetFunction(TemplateName, Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr));
             }
             else
             {
