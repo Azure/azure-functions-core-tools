@@ -73,21 +73,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                try
-                {
-                    return await AzureCliGetToken();
-                }
-                catch (FileNotFoundException)
-                {
-                    try
-                    {
-                        return await AzurePowershellGetToken();
-                    }
-                    catch (FileNotFoundException)
-                    {
-                        throw new CliException("Cannot get accessToken from az cli or Azure powershell. Please make sure to have either one installed.");
-                    }
-                }
+                return await AzureCliGetToken();
             }
         }
 
@@ -95,7 +81,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             if (CommandChecker.CommandExists("az"))
             {
-                var az = new Executable("az", "account get-access-token --query \"accessToken\"");
+                var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? new Executable("cmd", "/c az account get-access-token --query 'accessToken'")
+                    : new Executable("az", "account get-access-token --query 'accessToken'");
+
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
                 var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
@@ -112,11 +101,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 throw new FileNotFoundException("Cannot find az cli. Please make sure to install az cli.");
             }
-        }
-
-        private Task<string> AzurePowershellGetToken()
-        {
-            throw new FileNotFoundException("Cannot find powershell");
         }
     }
 }
