@@ -25,5 +25,30 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public async Task create_template_function_sanitization_dotnet()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init 12n.ew-file$ --worker-runtime dotnet",
+                    "new --prefix 12n.ew-file$ --template HttpTrigger --name 12@n.other-file$"
+                },
+                CheckFiles =  new[]
+                {
+                    new FileResult
+                    {
+                        Name = "12n.ew-file$/_12_n_other_file_.cs",
+                        ContentContains = new[]
+                        {
+                            "namespace _12n.ew_file_",
+                            "public static class _12_n_other_file_"
+                        }
+                    }
+                }
+            }, _output);
+        }
     }
 }

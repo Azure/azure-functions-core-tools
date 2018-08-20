@@ -2,6 +2,9 @@
 using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Script;
+using System;
+using System.Linq;
+using System.Text;
 
 namespace Azure.Functions.Cli
 {
@@ -46,6 +49,39 @@ namespace Azure.Functions.Cli
             {
                 return str.Substring(0, str.Length / 2).Yellow() + str.Substring(str.Length / 2).DarkYellow();
             }
+        }
+
+        internal static string SanitizeNameSpace(string nameSpace)
+        {
+            return SanitizeLiteral(nameSpace, allowed : ".");
+        }
+
+        internal static string SanitizeClassName(string className)
+        {
+            return SanitizeLiteral(className);
+        }
+
+        internal static string SanitizeLiteral(string unsanitized, string allowed = "")
+        {
+            if (string.IsNullOrEmpty(unsanitized))
+            {
+                return unsanitized;
+            }
+            var sanitized = !char.IsLetter(unsanitized[0]) && !new[] { '_', '@' }.Contains(unsanitized[0]) 
+                ? new StringBuilder("_" + unsanitized.Substring(0, 1)) 
+                : new StringBuilder(unsanitized.Substring(0,1));
+            foreach (char character in unsanitized.Substring(1))
+            {
+                if (!char.IsLetterOrDigit(character) && !(allowed.Contains(character)))
+                {
+                    sanitized.Append('_');
+                }
+                else
+                {
+                    sanitized.Append(character);
+                }
+            }
+            return sanitized.ToString();
         }
     }
 }
