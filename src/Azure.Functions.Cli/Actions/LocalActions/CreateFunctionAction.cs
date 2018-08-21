@@ -128,10 +128,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 ColoredConsole.Write("Select a template: ");
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+                var templateLanguage = WorkerRuntimeLanguageHelper.GetTemplateLanguageFromWorker(workerRuntime);
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
-                var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(TemplateName, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase));
+                var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(TemplateName, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
 
                 if (template == null)
                 {
