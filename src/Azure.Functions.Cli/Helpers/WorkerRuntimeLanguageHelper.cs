@@ -32,6 +32,13 @@ namespace Azure.Functions.Cli.Helpers
             .SelectMany(i => i)
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
 
+        private static readonly IDictionary<WorkerRuntime, string> workerToLanguageMap = new Dictionary<WorkerRuntime, string>
+        {
+            { WorkerRuntime.dotnet, "c#" },
+            { WorkerRuntime.node, "javascript" },
+            { WorkerRuntime.python, "python" }
+        };
+
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", availableWorkersRuntime.Keys.Where(k => k != WorkerRuntime.python).Select(s => s.ToString()));
 
@@ -81,6 +88,15 @@ namespace Azure.Functions.Cli.Helpers
                 .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
 
             return worker;
+        }
+
+        public static string GetTemplateLanguageFromWorker(WorkerRuntime worker)
+        {
+            if (!workerToLanguageMap.ContainsKey(worker))
+            {
+                throw new ArgumentException($"Worker runtime '{worker}' is not a valid worker for a template.");
+            }
+            return workerToLanguageMap[worker];
         }
     }
 }
