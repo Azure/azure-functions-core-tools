@@ -56,6 +56,8 @@ namespace Azure.Functions.Cli.Common
             public const string PythonDockerBuild = "python_docker_build.sh";
         }
 
+        public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.0-beta7" };
+
         public static IDictionary<string, ExtensionPackage> BindingPackageMap { get; } = new ReadOnlyDictionary<string, ExtensionPackage>(
                 new Dictionary<string, ExtensionPackage> {
 

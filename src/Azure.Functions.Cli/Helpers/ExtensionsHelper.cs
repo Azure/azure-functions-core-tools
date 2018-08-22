@@ -62,6 +62,9 @@ namespace Azure.Functions.Cli.Helpers
                     packages.TryAdd(package.Name, package);
                 }
             }
+
+            packages.Add("ExtensionsMetadataGeneratorPackage", Constants.ExtensionsMetadataGeneratorPackage);
+
             return packages.Values;
         }
     }
