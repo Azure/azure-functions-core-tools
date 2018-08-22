@@ -83,5 +83,10 @@ namespace Azure.Functions.Cli
             }
             return sanitized.ToString();
         }
+
+        internal static bool EqualsIgnoreCaseAndSpace(string str, string another)
+        {
+            return str.Replace(" ", string.Empty).Equals(another.Replace(" ", string.Empty), StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

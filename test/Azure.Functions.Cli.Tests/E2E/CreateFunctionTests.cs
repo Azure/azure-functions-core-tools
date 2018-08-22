@@ -67,5 +67,39 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public async Task create_template_function_js_no_space_name()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "new --language js --template httptrigger --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_template_function_dotnet_space_name()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet",
+                    "new --template \"http trigger\" --name testfunc2"
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc2\" was created successfully from the \"http trigger\" template."
+                }
+            }, _output);
+        }
     }
 }

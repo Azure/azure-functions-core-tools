@@ -123,7 +123,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName, Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr));
+                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr));
             }
             else
             {
@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
-                var template = templates.FirstOrDefault(t => t.Metadata.Name.Equals(TemplateName, StringComparison.OrdinalIgnoreCase) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                var template = templates.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
 
                 if (template == null)
                 {
