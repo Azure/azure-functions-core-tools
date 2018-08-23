@@ -94,5 +94,49 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
             }, _output);
         }
+
+        [Fact]
+        public async Task start_displays_error_on_invalid_function_json()
+        {
+            var functionName = "HttpTriggerJS";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime node",
+                        $"new --template \"Http Trigger\" --name {functionName}",
+                    },
+                    Test = async (workingDir, _) =>
+                    {
+                        var filePath = Path.Combine(workingDir, functionName, "function.json");
+                        var functionJson = await File.ReadAllTextAsync(filePath);
+                        functionJson = functionJson.Replace("\"type\": \"http\"", "\"type\": \"http2\"");
+                        await File.WriteAllTextAsync(filePath, functionJson);
+                    }
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new []
+                    {
+                        "The following 1 functions are in error",
+                        "The binding type(s) 'http2' are not registered"
+                    },
+                    Test = async (_, p) =>
+                    {
+                        // give the host time to load functions and print any errors
+                        await Task.Delay(TimeSpan.FromSeconds(5));
+                        p.Kill();
+                    }
+                }
+            }, _output);
+        }
     }
 }
