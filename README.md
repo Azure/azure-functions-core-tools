@@ -1,9 +1,9 @@
 ﻿![Azure Functions Logo](https://raw.githubusercontent.com/Azure/azure-functions-cli/master/src/Azure.Functions.Cli/npm/assets/azure-functions-logo-color-raster.png)
 
-|Branch|Windows|Linux
-|---|---|---|
-|master|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/master?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/master)| [![Build status](https://ci.appveyor.com/api/projects/status/m950ifgopq49l7gw?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-core-tools)|
-|v1.x|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/v1.x?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/v1.x)| `N/A`|
+|Branch|Windows|
+|---|---|
+|master|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/master?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/master)|
+|v1.x|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/v1.x?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/v1.x)|
 
 # Azure Functions Core Tools
 
