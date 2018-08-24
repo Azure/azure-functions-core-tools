@@ -424,11 +424,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 services.AddWebJobsScriptHostAuthorization();
 
-                services.AddSingleton<IOptions<ScriptApplicationHostOptions>>(new OptionsWrapper<ScriptApplicationHostOptions>(_hostOptions));
                 services.AddMvc()
                     .AddApplicationPart(typeof(HostController).Assembly);
 
                 services.AddWebJobsScriptHost(_builderContext.Configuration);
+
+                services.Configure<ScriptApplicationHostOptions>(o =>
+                {
+                    o.ScriptPath = _hostOptions.ScriptPath;
+                    o.LogPath = _hostOptions.LogPath;
+                    o.IsSelfHost = _hostOptions.IsSelfHost;
+                    o.SecretsPath = _hostOptions.SecretsPath;
+                });
 
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
 
