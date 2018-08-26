@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Diagnostics;
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Description;
+using Microsoft.Azure.WebJobs.Script.Rpc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -32,9 +33,9 @@ namespace Azure.Functions.Cli.Helpers
             };
 
             var loggerFactory = new LoggerFactory();
+            var languageWorkerOptions = new LanguageWorkerOptions { };
             loggerFactory.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
-
-            var metadataManager = new FunctionMetadataManager(new OptionsWrapper<ScriptJobHostOptions>(scriptHostOptions), loggerFactory);
+            var metadataManager = new FunctionMetadataManager(new OptionsWrapper<ScriptJobHostOptions>(scriptHostOptions), new OptionsWrapper<LanguageWorkerOptions>(languageWorkerOptions), loggerFactory);
             var function = metadataManager.Functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
             if (function == null)
             {
