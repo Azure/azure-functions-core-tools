@@ -60,8 +60,7 @@ namespace Azure.Functions.Cli.Common
 
         public static IDictionary<string, ExtensionPackage> BindingPackageMap { get; } = new ReadOnlyDictionary<string, ExtensionPackage>(
                 new Dictionary<string, ExtensionPackage> {
-
-                    { "blobTrigger",
+                    { "blobtrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
                         Version =  "3.0.0-beta7-11414" }
@@ -76,7 +75,7 @@ namespace Azure.Functions.Cli.Common
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
                         Version =  "3.0.0-beta7-11414" }
                     },
-                    { "queueTrigger",
+                    { "queuetrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
                         Version =  "3.0.0-beta7-11414" }
