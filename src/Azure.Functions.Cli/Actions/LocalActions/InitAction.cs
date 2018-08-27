@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -140,6 +141,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntime.ToString());
+
+            var storageConnectionStringValue = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? Constants.StorageEmulatorConnectionString
+                : string.Empty;
+
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.StorageEmulatorConnectionString}}}", storageConnectionStringValue);
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 

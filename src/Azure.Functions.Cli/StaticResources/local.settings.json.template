@@ -2,6 +2,6 @@
   "IsEncrypted": false,
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "{FUNCTIONS_WORKER_RUNTIME}",
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true"
+    "AzureWebJobsStorage": "{AzureWebJobsStorage}"
   }
 }

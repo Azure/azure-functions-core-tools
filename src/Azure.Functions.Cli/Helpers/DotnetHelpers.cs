@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Helpers
             await TemplateOperation(async () =>
             {
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? "--StorageConnectionStringValue \"UseDevelopmentStorage=true\" --AzureFunctionsVersion V2"
+                    ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\" --AzureFunctionsVersion V2"
                     : string.Empty;
                 var exe = new Executable("dotnet", $"new azureFunctionsProjectTemplates --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
