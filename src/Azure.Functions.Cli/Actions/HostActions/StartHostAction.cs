@@ -244,6 +244,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 await DotnetHelpers.BuildDotnetProject(outputPath);
                 Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
             }
+
+            if (!NetworkHelpers.IsPortAvailable(Port))
+            {
+                throw new CliException($"Port {Port} is unavailable. Close the porcess using that port, or specify another port using --port [-p].");
+            }
         }
 
         private void DisplayDisabledFunctions(IScriptJobHost scriptHost)
@@ -275,14 +280,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     var binding = function.Metadata.Bindings.FirstOrDefault(b => b.Type != null && b.Type.Equals("httpTrigger", StringComparison.OrdinalIgnoreCase));
                     var httpRoute = binding?.Raw?.GetValue("route", StringComparison.OrdinalIgnoreCase)?.ToString();
                     httpRoute = httpRoute ?? function.Name;
-                    
+
                     string hostRoutePrefix = "";
                     if (!function.Metadata.IsProxy)
                     {
                         hostRoutePrefix = httpOptions.RoutePrefix ?? "api/";
                         hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
                             ? hostRoutePrefix
-                            : $"{hostRoutePrefix}/";                        
+                            : $"{hostRoutePrefix}/";
                     }
                     var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
                     ColoredConsole
