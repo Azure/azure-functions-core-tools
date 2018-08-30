@@ -146,7 +146,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 ? Constants.StorageEmulatorConnectionString
                 : string.Empty;
 
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.StorageEmulatorConnectionString}}}", storageConnectionStringValue);
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", storageConnectionStringValue);
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 

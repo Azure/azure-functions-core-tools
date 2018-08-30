@@ -16,7 +16,6 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Theory]
         [InlineData("node")]
-        [InlineData("java")]
         public Task init_with_worker_runtime(string workerRuntime)
         {
             return CliTester.Run(new RunConfiguration
