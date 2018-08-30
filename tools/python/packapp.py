@@ -31,6 +31,23 @@ def die(msg):
     sys.exit(1)
 
 
+def run(cmd, *, verbose=False, **kwargs):
+    if verbose:
+        stdout = stderr = None
+    else:
+        stdout = stderr = subprocess.PIPE
+
+    print(' '.join(cmd))
+    return subprocess.run(cmd, stdout=stdout, stderr=stderr, **kwargs)
+
+
+def run_or_die(cmd, *, verbose=False, **kwargs):
+    try:
+        run(cmd, verbose=verbose, check=True, **kwargs)
+    except subprocess.CalledProcessError as e:
+        die(f'{cmd} failed with exit code {e.returncode}')
+
+
 def main(argv=sys.argv[1:]):
     args = parse_args(argv)
     if not args.no_deps:
@@ -51,9 +68,9 @@ def find_and_build_deps(args):
     # without actually installing them.  Use straight `pip download`
     # for that.
     with tempfile.TemporaryDirectory(prefix='azureworker') as td:
-        subprocess.run([
+        run_or_die([
             'pip', 'download', '-r', str(req_txt), '--dest', td
-        ], check=True)
+        ], verbose=args.verbose)
 
         files = os.listdir(td)
 
@@ -139,7 +156,7 @@ def ensure_wheel(name, version, args, dest):
         f'{name}=={version}'
     ]
 
-    pip = subprocess.run(cmd)
+    pip = run(cmd)
     if pip.returncode != 0:
         # No wheel for this package for this platform or Python version.
         if not build_independent_wheel(name, version, args, dest):
@@ -155,7 +172,7 @@ def build_independent_wheel(name, version, args, dest):
         ]
 
         # First, try to build it as an independent wheel.
-        pip = subprocess.run(cmd)
+        pip = run(cmd)
         if pip.returncode != 0:
             return False
 
@@ -178,11 +195,14 @@ def build_independent_wheel(name, version, args, dest):
 
 
 def build_binary_wheel(name, version, args, dest):
-    die('binary dependencies without wheels are not supported')
+    die(f'cannot install {name}-{version} dependency: binary dependencies '
+        f'without wheels are not supported.  Use the --build-native-deps'
+        f'to try building the binary dependencies using a Docker container.')
 
 
 def parse_args(argv):
     parser = argparse.ArgumentParser()
+    parser.add_argument('--verbose', default=False, action='store_true')
     parser.add_argument('--platform', type=str)
     parser.add_argument('--python-version', type=str)
     parser.add_argument('--no-deps', default=False, action='store_true')
