@@ -86,6 +86,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(csx => Csx = csx);
             Parser
                 .Setup<bool>("ignore")
+                .WithDescription(string.Empty)
                 .Callback(f => Ignore = f);
 
             return base.ParseArgs(args);
