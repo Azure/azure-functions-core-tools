@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, string additionalPackages)
         {
             if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
             {
@@ -111,7 +111,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
                 {
-                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot);
+                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages);
                 }
                 else
                 {
@@ -164,7 +164,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot)
+        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages)
         {
             var appContentPath = CopyToTemp(files, functionAppRoot);
 
@@ -178,6 +178,14 @@ namespace Azure.Functions.Cli.Helpers
 
                 var scriptFilePath = Path.GetTempFileName();
                 await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
+                await DockerHelpers.DockerPs();
+                if (!string.IsNullOrWhiteSpace(additionalPackages))
+                {
+                    await Task.Delay(4000);
+                    await DockerHelpers.ExecInContainer(containerId, $"apt-get update");
+                    await DockerHelpers.DockerPs();
+                    await DockerHelpers.ExecInContainer(containerId, $"apt-get install -y {additionalPackages}");
+                }
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
@@ -190,9 +198,10 @@ namespace Azure.Functions.Cli.Helpers
             }
             finally
             {
+                await DockerHelpers.DockerPs();
                 if (!string.IsNullOrEmpty(containerId))
                 {
-                    await DockerHelpers.KillContainer(containerId, ignoreError: true);
+                    // await DockerHelpers.KillContainer(containerId, ignoreError: true);
                 }
             }
         }

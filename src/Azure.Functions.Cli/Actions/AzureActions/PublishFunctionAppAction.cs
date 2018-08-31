@@ -38,6 +38,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool Ignore { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
+        public string AdditionalPackages { get; set; } = string.Empty;
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -76,6 +77,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .SetDefault(false)
                 .WithDescription("Skips generating .wheels folder when publishing python function apps.")
                 .Callback(f => BuildNativeDeps = f);
+            Parser
+                .Setup<string>("additional-packages")
+                .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
+                .Callback(p => AdditionalPackages = p);
             Parser
                 .Setup<bool>("force")
                 .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
@@ -238,7 +243,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            var zipStream = await ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ignoreParser);
+            var zipStream = await ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ignoreParser, AdditionalPackages);
 
             // if consumption Linux, or --zip, run from zip
             if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
