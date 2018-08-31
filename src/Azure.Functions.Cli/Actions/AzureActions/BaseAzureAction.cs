@@ -66,15 +66,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task<string> GetAccessToken()
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
-                RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                return await AzureCliGetToken();
-            }
-            else
-            {
-                return await AzureCliGetToken();
-            }
+            return await AzureCliGetToken();
         }
 
         private async Task<string> AzureCliGetToken()
