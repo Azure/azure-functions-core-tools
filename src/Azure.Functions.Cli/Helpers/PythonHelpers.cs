@@ -79,6 +79,14 @@ namespace Azure.Functions.Cli.Helpers
             var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
             if (exitCode == 0)
             {
+                var trials = 0;
+                // this delay to make sure the output
+                while (string.IsNullOrWhiteSpace(sb.ToString()) && trials < 5)
+                {
+                    trials++;
+                    await Task.Delay(TimeSpan.FromMilliseconds(200));
+                }
+
                 var output = sb.ToString();
                 if (output.IndexOf("3.6") == -1)
                 {
