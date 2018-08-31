@@ -1,5 +1,8 @@
 ﻿#! /bin/bash
 
+# Exit on errors
+set -e
+
 cd /home/site/wwwroot
 if [ -d worker_venv ]; then
     rm -rf worker_venv

@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string FolderName { get; set; } = string.Empty;
         public string OutputPath { get; set; }
         public bool BuildNativeDeps { get; set; }
+        public string AdditionalPackages { get; set; } = string.Empty;
 
         public PackAction(ISecretsManager secretsManager)
         {
@@ -38,6 +39,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(false)
                 .WithDescription("Skips generating .wheels folder when publishing python function apps.")
                 .Callback(f => BuildNativeDeps = f);
+            Parser
+                .Setup<string>("additional-packages")
+                .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
+                .Callback(p => AdditionalPackages = p);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -74,7 +79,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
 
-            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps);
+            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, additionalPackages: AdditionalPackages);
             await FileSystemHelpers.WriteToFile(outputPath, zipStream);
         }
     }

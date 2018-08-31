@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, GitIgnoreParser ignoreParser = null)
+        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Helpers
 
             if (workerRuntime == WorkerRuntime.python)
             {
-                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps);
+                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, additionalPackages);
             }
             else if (workerRuntime == WorkerRuntime.dotnet)
             {
