@@ -196,7 +196,7 @@ def build_independent_wheel(name, version, args, dest):
 
 def build_binary_wheel(name, version, args, dest):
     die(f'cannot install {name}-{version} dependency: binary dependencies '
-        f'without wheels are not supported.  Use the --build-native-deps'
+        f'without wheels are not supported.  Use the --build-native-deps option '
         f'to try building the binary dependencies using a Docker container.')
 
 
