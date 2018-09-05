@@ -272,6 +272,11 @@ namespace Azure.Functions.Cli.Actions
                 var helpSwitch = string.Format($"    {{0, {-longestName}}} ", stringBuilder.ToString().DarkGray());
                 var helpSwitchLength = helpSwitch.Length - 2; // helpSwitch contains 2 formatting characters.
                 var helpText = option.Description;
+                if (string.IsNullOrWhiteSpace(helpText))
+                {
+                    continue;
+                }
+
                 if (helpSwitchLength + helpText.Length < SafeConsole.BufferWidth || helpSwitchLength > SafeConsole.BufferWidth)
                 {
                     ColoredConsole.WriteLine($"{helpSwitch}{helpText}");

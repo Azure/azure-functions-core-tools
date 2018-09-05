@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.Helpers
             };
         }
 
-        public static async Task BuildDotnetProject(string outputPath)
+        public static async Task BuildDotnetProject(string outputPath, string dotnetCliParams)
         {
             EnsureDotnet();
             var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Helpers
                     FileSystemHelpers.DeleteDirectorySafe(outputPath);
                 }
 
-                var exe = new Executable("dotnet", $"build --output {outputPath}");
+                var exe = new Executable("dotnet", $"build --output {outputPath} {dotnetCliParams}");
                 var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e));
                 if (exitCode != 0)
                 {

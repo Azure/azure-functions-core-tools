@@ -241,7 +241,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             else if (workerRuntime == WorkerRuntime.dotnet && Build)
             {
                 const string outputPath = "bin/output";
-                await DotnetHelpers.BuildDotnetProject(outputPath);
+                await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty);
                 Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
             }
 

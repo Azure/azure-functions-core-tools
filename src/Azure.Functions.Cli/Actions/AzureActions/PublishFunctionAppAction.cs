@@ -35,10 +35,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool ListIncludedFiles { get; set; }
         public bool RunFromZipDeploy { get; private set; }
         public bool Force { get; set; }
-        public bool Ignore { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
+        public bool NoBuild { get; set; }
+        public string DotnetCliParameters { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -90,9 +91,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
             Parser
-                .Setup<bool>("ignore")
-                .WithDescription(string.Empty)
-                .Callback(f => Ignore = f);
+                .Setup<bool>("no-build")
+                .WithDescription("Skip building dotnet functions")
+                .Callback(f => NoBuild = f);
+            Parser
+                .Setup<string>("dotnet-cli-params")
+                .WithDescription("When publishing dotnet functions, the core tools calls 'dotnet build --output bin/publish'. Any parameters passed to this will be appended to the command line.")
+                .Callback(s => DotnetCliParameters = s);
 
             return base.ParseArgs(args);
         }
@@ -113,10 +118,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // before starting any of the publish activity.
             var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
 
-            if (workerRuntime == WorkerRuntime.dotnet && !Csx)
+            if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild)
             {
                 const string outputPath = "bin/publish";
-                await DotnetHelpers.BuildDotnetProject(outputPath);
+                await DotnetHelpers.BuildDotnetProject(outputPath, DotnetCliParameters);
                 Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
             }
 
@@ -170,17 +175,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out string workerRuntimeStr))
             {
-                var resolution = $"You can pass --ignore to skip this check, or --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
+                var resolution = $"You can pass --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
                 try
                 {
                     var azureWorkerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeStr);
-                    if (azureWorkerRuntime != workerRuntime && !Ignore && !Force)
+                    if (azureWorkerRuntime != workerRuntime)
                     {
-                        if (Ignore)
-                        {
-                            ColoredConsole.WriteLine(WarningColor($"Ignoring mismatched '{Constants.FunctionsWorkerRuntime}' because --ignore was passed"));
-                        }
-                        else if (Force)
+                        if (Force)
                         {
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
                             result[Constants.FunctionsWorkerRuntime] = workerRuntime.ToString();
@@ -196,7 +197,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     result[Constants.FunctionsWorkerRuntime] = workerRuntime.ToString();
                 }
-                catch (ArgumentException) when (!Force && !Ignore)
+                catch (ArgumentException) when (!Force)
                 {
                     throw new CliException($"Your app has an unknown {Constants.FunctionsWorkerRuntime} defined '{workerRuntimeStr}'. Only {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString} are supported.\n" +
                         resolution);
