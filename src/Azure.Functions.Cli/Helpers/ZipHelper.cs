@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, GitIgnoreParser ignoreParser = null, string additionalPackages = null)
+        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, additionalPackages);
             }
-            else if (workerRuntime == WorkerRuntime.dotnet)
+            else if (workerRuntime == WorkerRuntime.dotnet && !ignoreDotNetCheck)
             {
                 throw new CliException("Pack command doesn't work for dotnet functions");
             }
