@@ -244,16 +244,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            var zipStream = await ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // if consumption Linux, or --zip, run from zip
             if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
             {
-                await PublishRunFromZip(functionApp, zipStream);
+                await PublishRunFromZip(functionApp, await zipStreamFactory());
             }
             else
             {
-                await PublishZipDeploy(functionApp, zipStream);
+                await PublishZipDeploy(functionApp, zipStreamFactory);
             }
 
             if (PublishLocalSettings)
@@ -323,7 +323,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
 
 
-        public async Task PublishZipDeploy(Site functionApp, Stream zipFile)
+        public async Task PublishZipDeploy(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             await RetryHelper.Retry(async () =>
             {
@@ -334,7 +334,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                     ColoredConsole.WriteLine("Creating archive for current directory...");
 
-                    request.Content = CreateStreamContentZip(zipFile);
+                    request.Content = CreateStreamContentZip(await zipFileFactory());
 
                     ColoredConsole.WriteLine("Uploading archive...");
                     var response = await client.SendAsync(request);
