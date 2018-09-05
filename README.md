@@ -86,40 +86,6 @@ sudo dpkg -i packages-microsoft-prod.deb
 sudo apt-get install azure-functions-core-tools
 ```
 
-#### Fedora/CentOS/Red Hat/openSUSE
-
-1. Register the Microsoft signature key
-
-```bash
-sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-```
-
-2. Set up package feed
-##### yum
-
-```bash
-sudo sh -c 'echo -e "[packages-microsoft-com-prod]\nname=packages-microsoft-com-prod \nbaseurl=https://packages.microsoft.com/yumrepos/microsoft-rhel7.3-prod\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/dotnetdev.repo'
-```
-
-##### zypper
-
-```bash
-sudo sh -c 'echo -e "[packages-microsoft-com-prod]\nname=packages-microsoft-com-prod \nbaseurl=https://packages.microsoft.com/yumrepos/microsoft-rhel7.3-prod\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/zypp/repos.d/dotnetdev.repo'
-```
-
-3. Install
-##### yum
-
-```bash
-sudo yum install azure-functions-core-tools
-```
-
-##### zypper
-
-```bash
-sudo zypper install azure-functions-core-tools
-```
-
 [Code and test Azure Functions locally](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)
 
 **NOTE**: npm can be used on all platforms. On unix platforms, you may need to specify `--unsafe-perm` if you are running npm with sudo. That's due to npm behavior of post install script.
