@@ -9,6 +9,7 @@ using Azure.Functions.Cli.NativeMethods;
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -69,7 +70,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static X509Certificate2 GetOrCreateCertificate(string certPath, string certPassword)
+        internal static async Task<X509Certificate2> GetOrCreateCertificate(string certPath, string certPassword)
         {
             if (!string.IsNullOrEmpty(certPath) && !string.IsNullOrEmpty(certPassword))
             {
@@ -77,6 +78,10 @@ namespace Azure.Functions.Cli.Helpers
                     ? File.ReadAllText(certPassword).Trim()
                     : certPassword;
                 return new X509Certificate2(certPath, certPassword);
+            }
+            else if (CommandChecker.CommandExists("openssl"))
+            {
+                return await CreateCertificateOpenSSL();
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -108,6 +113,33 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             throw new CliException("Auto cert generation is currently not working on the .NET Core build.");
+        }
+
+        internal static async Task<X509Certificate2> CreateCertificateOpenSSL()
+        {
+            const string DEFAULT_PASSWORD = "localcert";
+
+            var certFileNames = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName().Replace(".", String.Empty));
+            var output = new StringBuilder();
+
+            ColoredConsole.WriteLine("Generating a self signed certificate using openssl");
+            var opensslKey = new Executable("openssl", $"req -new -x509 -newkey rsa:2048 -nodes -keyout {certFileNames}localhost.key -out {certFileNames}localhost.cer -days 365 -subj /CN=localhost");
+            var exitCode = await opensslKey.RunAsync(o => output.AppendLine(o), e => output.AppendLine(e));
+            if (exitCode != 0)
+            {
+                ColoredConsole.Error.WriteLine(output.ToString());
+                throw new CliException($"Could not create a key pair required for an openssl certificate.");
+            }
+
+            Executable openssl_cert = new Executable("openssl", $"pkcs12 -export -out {certFileNames}certificate.pfx -inkey {certFileNames}localhost.key -in {certFileNames}localhost.cer -passout pass:{DEFAULT_PASSWORD}");
+            exitCode = await openssl_cert.RunAsync(o => output.AppendLine(o), e => output.AppendLine(e));
+            if (exitCode != 0)
+            {
+                ColoredConsole.Error.WriteLine(output.ToString());
+                throw new CliException($"Could not create a Certificate using openssl.");
+            }
+
+            return new X509Certificate2($"{certFileNames}certificate.pfx", DEFAULT_PASSWORD);
         }
     }
 }

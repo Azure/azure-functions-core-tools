@@ -211,7 +211,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
 
-            (var listenUri, var baseUri, var certificate) = Setup();
+            (var listenUri, var baseUri, var certificate) = await Setup();
 
             IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate);
             var runTask = host.RunAsync();
@@ -389,11 +389,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private (Uri listenUri, Uri baseUri, X509Certificate2 cert) Setup()
+        private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert)> Setup()
         {
             var protocol = UseHttps ? "https" : "http";
             X509Certificate2 cert = UseHttps
-                ? SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
+                ? await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
