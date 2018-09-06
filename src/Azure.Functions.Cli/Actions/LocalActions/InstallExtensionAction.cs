@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
                 else
                 {
-                    throw new CliArgumentsException("Must specify extension package name and verison",
+                    throw new CliArgumentsException("Must specify extension package name and version",
                     new CliArgument { Name = nameof(Package), Description = "Extension package name" },
                     new CliArgument { Name = nameof(Version), Description = "Extension package version" }
                     );
