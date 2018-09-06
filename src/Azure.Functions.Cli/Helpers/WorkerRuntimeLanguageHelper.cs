@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.node, new [] { "js", "javascript" } },
             { WorkerRuntime.python, new []  { "py" } },
+            { WorkerRuntime.java, new string[] { } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> normalizeMap = availableWorkersRuntime
