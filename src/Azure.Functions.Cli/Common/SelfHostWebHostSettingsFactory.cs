@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Common
             {
                 IsSelfHost = true,
                 ScriptPath = scriptPath,
-                LogPath = Path.Combine(Path.GetTempPath(), @"LogFiles\Application\Functions"),
+                LogPath = Path.Combine(Path.GetTempPath(), "LogFiles", "Application", "Functions"),
                 SecretsPath = Path.Combine(Path.GetTempPath(), "secrets", "functions", "secrets")
             };
         }
