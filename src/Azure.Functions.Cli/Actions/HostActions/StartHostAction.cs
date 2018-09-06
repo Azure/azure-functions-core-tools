@@ -247,7 +247,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (!NetworkHelpers.IsPortAvailable(Port))
             {
-                throw new CliException($"Port {Port} is unavailable. Close the porcess using that port, or specify another port using --port [-p].");
+                throw new CliException($"Port {Port} is unavailable. Close the process using that port, or specify another port using --port [-p].");
             }
         }
 
