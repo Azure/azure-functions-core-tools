@@ -14,7 +14,8 @@ namespace Azure.Functions.Cli.Helpers
         dotnet,
         node,
         python,
-        java
+        java,
+        powershell
     }
 
     public static class WorkerRuntimeLanguageHelper
@@ -24,7 +25,8 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.node, new [] { "js", "javascript" } },
             { WorkerRuntime.python, new []  { "py" } },
-            { WorkerRuntime.java, new string[] { } }
+            { WorkerRuntime.java, new string[] { } },
+            { WorkerRuntime.powershell, new [] { "pwsh" } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> normalizeMap = availableWorkersRuntime
@@ -36,7 +38,8 @@ namespace Azure.Functions.Cli.Helpers
         {
             { WorkerRuntime.dotnet, "c#" },
             { WorkerRuntime.node, "javascript" },
-            { WorkerRuntime.python, "python" }
+            { WorkerRuntime.python, "python" },
+            { WorkerRuntime.powershell, "powershell" }
         };
 
         public static string AvailableWorkersRuntimeString =>
