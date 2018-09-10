@@ -22,27 +22,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
             if (functionApp != null)
             {
-                var functions = await AzureHelper.GetFunctions(functionApp, AccessToken);
-                {
-
-                    ColoredConsole.WriteLine(TitleColor($"Functions in {FunctionAppName}:"));
-                    foreach (var function in functions)
-                    {
-                        var trigger = function
-                            .Config?["bindings"]
-                            ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
-                            ?["type"];
-
-                        trigger = trigger ?? "No Trigger Found";
-
-                        ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
-                        if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
-                        {
-                            ColoredConsole.WriteLine($"        Invoke url: {VerboseColor(function.InvokeUrlTemplate)}");
-                        }
-                        ColoredConsole.WriteLine();
-                    }
-                }
+                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken);
             }
             else
             {

@@ -267,6 +267,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             await Task.Delay(TimeSpan.FromSeconds(5));
             await SyncTriggers(functionApp);
+            await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken);
         }
 
         private async Task SyncTriggers(Site functionApp)
