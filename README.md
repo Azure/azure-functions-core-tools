@@ -83,6 +83,7 @@ sudo dpkg -i packages-microsoft-prod.deb
 2. Install
 
 ```bash
+sudo apt-get update
 sudo apt-get install azure-functions-core-tools
 ```
 
