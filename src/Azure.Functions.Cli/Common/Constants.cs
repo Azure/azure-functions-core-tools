@@ -65,69 +65,69 @@ namespace Azure.Functions.Cli.Common
                     { "blobtrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0-beta8" }
+                        Version =  "3.0.0-rc1" }
                     },
                     { "blob",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0-beta8" }
+                        Version =  "3.0.0-rc1" }
                     },
                     { "queue",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0-beta8" }
+                        Version =  "3.0.0-rc1" }
                     },
                     { "queuetrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0-beta8" }
+                        Version =  "3.0.0-rc1" }
                     },
                     { "servicebustrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.ServiceBus",
-                        Version =  "3.0.0-beta8" }
+                        Version =  "3.0.0-rc1" }
                     },
                     { "servicebus",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.ServiceBus",
-                        Version =  "3.0.0-beta8" }
+                        Version =  "3.0.0-rc1" }
                     },
                     { "eventhubtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventHubs",
-                            Version =  "3.0.0-beta8"} },
+                            Version =  "3.0.0-rc1"} },
                     { "eventhub",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventHubs",
-                            Version =  "3.0.0-beta8"} },
+                            Version =  "3.0.0-rc1"} },
                     { "sendgrid",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.SendGrid",
-                            Version =  "3.0.0-beta8" } },
+                            Version =  "3.0.0-rc1" } },
                     { "token",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
-                            Version =  "1.0.0-beta3"} },
+                            Version =  "1.0.0-beta5"} },
                      { "excel",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
-                            Version =  "1.0.0-beta3"} },
+                            Version =  "1.0.0-beta5"} },
                     { "outlook",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
-                            Version =  "1.0.0-beta3"} },
+                            Version =  "1.0.0-beta5"} },
                     { "graphwebhooksubscription",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
-                            Version =  "1.0.0-beta3"} },
+                            Version =  "1.0.0-beta5"} },
                     { "onedrive",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
-                            Version =  "1.0.0-beta3"} },
+                            Version =  "1.0.0-beta5"} },
                     { "graphwebhooktrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
-                            Version =  "1.0.0-beta3"} },
+                            Version =  "1.0.0-beta5"} },
                     { "activitytrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
@@ -143,15 +143,15 @@ namespace Azure.Functions.Cli.Common
                     { "eventgridtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventGrid",
-                            Version =  "2.0.0-beta3"} },
+                            Version =  "2.0.0-rc1"} },
                     { "cosmosdbtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
-                            Version =  "3.0.1-beta1"} },
+                            Version =  "3.0.1-rc1"} },
                     { "cosmosdb",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
-                            Version =  "3.0.1-beta1"} }
+                            Version =  "3.0.1-rc1"} }
                 });
     }
 }
