@@ -65,6 +65,7 @@ namespace Azure.Functions.Cli.Helpers
                 "ServiceBusQueueTrigger",
                 "ServiceBusTopicTrigger",
                 "EventGridTrigger",
+                "CosmosDBTrigger",
                 "IotHubTrigger",
             };
         }

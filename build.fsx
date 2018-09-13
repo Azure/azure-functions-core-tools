@@ -329,8 +329,8 @@ Target "AddTemplatesNupkgs" (fun _ ->
     let itemTemplates = (release.["itemTemplates"]).AsString()
     let projectTemplates = (release.["projectTemplates"]).AsString()
 
-    let itemTemplates = "https://www.myget.org/F/azure-appservice/api/v2/package/Azure.Functions.Templates/2.0.0-rc1-10248"
-    let projectTemplates = "https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.AzureFunctions.ProjectTemplates/2.0.0-rc1-10248"
+    let itemTemplates = "https://www.myget.org/F/azure-appservice/api/v2/package/Azure.Functions.Templates/2.0.0-rc1-10259"
+    let projectTemplates = "https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.AzureFunctions.ProjectTemplates/2.0.0-rc1-10259"
 
     use webClient = new WebClient ()
     [
