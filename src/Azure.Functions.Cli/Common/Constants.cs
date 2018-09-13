@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.Common
             public const string PythonDockerBuild = "python_docker_build.sh";
         }
 
-        public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.0" };
+        public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.1" };
 
         public static IDictionary<string, ExtensionPackage> BindingPackageMap { get; } = new ReadOnlyDictionary<string, ExtensionPackage>(
                 new Dictionary<string, ExtensionPackage> {
@@ -84,12 +84,12 @@ namespace Azure.Functions.Cli.Common
                     },
                     { "servicebustrigger",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.ServiceBus",
+                        Name = "Microsoft.Azure.WebJobs.Extensions.ServiceBus",
                         Version =  "3.0.0-rc1" }
                     },
                     { "servicebus",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.ServiceBus",
+                        Name = "Microsoft.Azure.WebJobs.Extensions.ServiceBus",
                         Version =  "3.0.0-rc1" }
                     },
                     { "eventhubtrigger",
@@ -131,15 +131,15 @@ namespace Azure.Functions.Cli.Common
                     { "activitytrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.6.0"} },
+                            Version =  "1.6.1"} },
                     { "orchestrationtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.6.0"} },
+                            Version =  "1.6.1"} },
                     { "orchestrationclient",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.6.0"} },
+                            Version =  "1.6.1"} },
                     { "eventgridtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventGrid",
