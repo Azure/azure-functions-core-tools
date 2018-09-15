@@ -71,7 +71,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     throw new CliArgumentsException("Invalid config path, please verify directory exists");
                 }
 
-                var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
+                var extensionsProj = ExtensionsHelper.GetExtensionsProjectPath(_secretsManager, Csx, ConfigPath);
+                if (FileSystemHelpers.FileExists(extensionsProj))
+                {
+                    FileSystemHelpers.FileDelete(extensionsProj);
+                }
+
+                extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
 
                 if (string.IsNullOrEmpty(Package) && string.IsNullOrEmpty(Version))
                 {
