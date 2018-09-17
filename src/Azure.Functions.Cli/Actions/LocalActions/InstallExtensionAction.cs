@@ -29,76 +29,76 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            Parser
+            this.Parser
                 .Setup<string>('p', "package")
                 .WithDescription("Extension package")
-                .Callback(p => Package = p);
+                .Callback(p => this.Package = p);
 
-            Parser
+            this.Parser
                 .Setup<string>('v', "version")
                 .WithDescription("Extension version")
-                .Callback(v => Version = v);
+                .Callback(v => this.Version = v);
 
-            Parser
+            this.Parser
                 .Setup<string>('o', "output")
                 .WithDescription("Output path")
-                .Callback(o => OutputPath = Path.GetFullPath(o));
+                .Callback(o => this.OutputPath = Path.GetFullPath(o));
 
-            Parser
+            this.Parser
                 .Setup<string>('s', "source")
                 .WithDescription("nuget feed source if other than nuget.org")
-                .Callback(s => Source = s);
+                .Callback(s => this.Source = s);
 
-            Parser
+            this.Parser
                .Setup<string>('c', "configPath")
                .WithDescription("path of the directory containing extensions.csproj file")
-               .Callback(s => ConfigPath = s);
+               .Callback(s => this.ConfigPath = s);
 
-            Parser
+            this.Parser
                 .Setup<bool>("csx")
                 .WithDescription("use old style csx dotnet functions")
-                .Callback(csx => Csx = csx);
+                .Callback(csx => this.Csx = csx);
 
-            return Parser.Parse(args);
+            return this.Parser.Parse(args);
         }
 
         public async override Task RunAsync()
         {
             if (CommandChecker.CommandExists("dotnet"))
             {
-                if (!string.IsNullOrEmpty(ConfigPath) && !FileSystemHelpers.DirectoryExists(ConfigPath))
+                if (!string.IsNullOrEmpty(this.ConfigPath) && !FileSystemHelpers.DirectoryExists(this.ConfigPath))
                 {
                     throw new CliArgumentsException("Invalid config path, please verify directory exists");
                 }
 
-                var extensionsProj = ExtensionsHelper.GetExtensionsProjectPath(_secretsManager, Csx, ConfigPath);
+                var extensionsProj = ExtensionsHelper.GetExtensionsProjectPath(_secretsManager, this.Csx, this.ConfigPath);
                 if (FileSystemHelpers.FileExists(extensionsProj))
                 {
                     FileSystemHelpers.FileDelete(extensionsProj);
                 }
 
-                extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
+                extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, this.Csx, this.ConfigPath);
 
-                if (string.IsNullOrEmpty(Package) && string.IsNullOrEmpty(Version))
+                if (string.IsNullOrEmpty(this.Package) && string.IsNullOrEmpty(this.Version))
                 {
                     foreach (var extensionPackage in ExtensionsHelper.GetExtensionPackages())
                     {
                         await AddPackage(extensionsProj, extensionPackage.Name, extensionPackage.Version);
                     }
                 }
-                else if (!string.IsNullOrEmpty(Package) && !string.IsNullOrEmpty(Version))
+                else if (!string.IsNullOrEmpty(this.Package) && !string.IsNullOrEmpty(this.Version))
                 {
-                    await AddPackage(extensionsProj, Package, Version);
+                    await AddPackage(extensionsProj, this.Package, this.Version);
                 }
                 else
                 {
                     throw new CliArgumentsException("Must specify extension package name and version",
-                    new CliArgument { Name = nameof(Package), Description = "Extension package name" },
-                    new CliArgument { Name = nameof(Version), Description = "Extension package version" }
+                    new CliArgument { Name = nameof(this.Package), Description = "Extension package name" },
+                    new CliArgument { Name = nameof(this.Version), Description = "Extension package version" }
                     );
                 }
 
-                var syncAction = new SyncExtensionsAction(_secretsManager)
+                SyncExtensionsAction syncAction = new SyncExtensionsAction(_secretsManager)
                 {
                     OutputPath = OutputPath,
                     ConfigPath = ConfigPath
@@ -112,15 +112,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private async Task AddPackage(string extensionsProj, string pacakgeName, string version)
+        private async Task AddPackage(string extensionsProj, string packageName, string version)
         {
-            var args = $"add {extensionsProj} package {pacakgeName} --version {version}";
-            if (!string.IsNullOrEmpty(Source))
+            var args = $"add \"{extensionsProj}\" package {packageName} --version {version}";
+            if (!string.IsNullOrEmpty(this.Source))
             {
-                args += $" --source {Source}";
+                args += $" --source {this.Source}";
             }
 
-            var addPackage = new Executable("dotnet", args);
+            Executable addPackage = new Executable("dotnet", args);
             await addPackage.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
         }
     }
