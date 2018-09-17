@@ -11,18 +11,36 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Arm.Models;
 using System.Net.Http.Headers;
+using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "list-functions", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "List functions in a given function app on azure.")]
     internal class ListFunctionsActions : BaseFunctionAppAction
     {
+        public bool ShowKeys { get; set; }
+
+        public override ICommandLineParserResult ParseArgs(string[] args)
+        {
+            Parser
+                .Setup<bool>("show-keys")
+                .WithDescription("Shows function links with their keys.")
+                .SetDefault(false)
+                .Callback(s => ShowKeys = s);
+
+            return base.ParseArgs(args);
+        }
+
         public override async Task RunAsync()
         {
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
             if (functionApp != null)
             {
-                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken);
+                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ShowKeys);
+                if (!ShowKeys)
+                {
+                    ColoredConsole.WriteLine("Use --show-keys to retrieve the Http-triggered URLs with appropriate keys in them");
+                }
             }
             else
             {

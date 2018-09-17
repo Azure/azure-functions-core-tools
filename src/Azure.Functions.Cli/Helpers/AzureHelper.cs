@@ -236,37 +236,34 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task PrintFunctionsInfo(Site functionApp, string accessToken)
+        public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, bool showKeys)
         {
             var functions = await GetFunctions(functionApp, accessToken);
+            ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
+            foreach (var function in functions)
             {
+                var trigger = function
+                    .Config?["bindings"]
+                    ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
+                    ?["type"];
 
-                ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
-                foreach (var function in functions)
+                trigger = trigger ?? "No Trigger Found";
+
+                ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
+                if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
                 {
-                    var trigger = function
-                        .Config?["bindings"]
-                        ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
-                        ?["type"];
-
-                    trigger = trigger ?? "No Trigger Found";
-
-                    ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
-                    if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
+                    // If there's a key available and the key is requested, add it to the url
+                    var key = showKeys? await GetFunctionKey(function.Href.AbsoluteUri, functionApp.ScmUri, accessToken) : null;
+                    if (!string.IsNullOrEmpty(key))
                     {
-                        // If there's a key available, add it to the url
-                        var key = await GetFunctionKey(function.Href.AbsoluteUri, functionApp.ScmUri, accessToken);
-                        if (!string.IsNullOrEmpty(key))
-                        {
-                            ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");
-                        }
-                        else
-                        {
-                            ColoredConsole.WriteLine($"        Invoke url: {VerboseColor(function.InvokeUrlTemplate)}");
-                        }
+                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");
                     }
-                    ColoredConsole.WriteLine();
+                    else
+                    {
+                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor(function.InvokeUrlTemplate)}");
+                    }
                 }
+                ColoredConsole.WriteLine();
             }
         }
     }
