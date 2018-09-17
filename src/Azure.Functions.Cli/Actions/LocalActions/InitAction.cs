@@ -115,7 +115,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (workerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
             {
-                await DotnetHelpers.DeployDotnetProject(Path.GetFileName(Environment.CurrentDirectory), Force);
+                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory)), Force);
             }
             else
             {

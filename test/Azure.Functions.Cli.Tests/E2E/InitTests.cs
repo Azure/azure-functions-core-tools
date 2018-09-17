@@ -163,5 +163,18 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public Task init_app_with_spaces()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init \"functions project\" --worker-runtime dotnet",
+                    "new --prefix \"functions project\" --template BlobTrigger --name testfunc"
+                }
+            });
+        }
     }
 }
