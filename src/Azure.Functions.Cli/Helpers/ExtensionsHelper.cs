@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     class ExtensionsHelper
     {
-        public static string GetExtensionsProjectPath(ISecretsManager secretsManager, bool csx, string extensionsDir = null)
+        public static async Task<string> EnsureExtensionsProjectExistsAsync(ISecretsManager secretsManager, bool csx, string extensionsDir = null)
         {
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
             if (workerRuntime == WorkerRuntime.dotnet && !csx)
@@ -22,18 +22,12 @@ namespace Azure.Functions.Cli.Helpers
                 return DotnetHelpers.GetCsproj();
             }
 
-            return Path.Combine(extensionsDir, "extensions.csproj");
-        }
-
-        public static async Task<string> EnsureExtensionsProjectExistsAsync(ISecretsManager secretsManager, bool csx, string extensionsDir = null)
-        {
             if (String.IsNullOrEmpty(extensionsDir))
             {
                 extensionsDir = Environment.CurrentDirectory;
             }
 
-            var extensionsProj = GetExtensionsProjectPath(secretsManager, csx, extensionsDir);
-
+            var extensionsProj = Path.Combine(extensionsDir, "extensions.csproj");
             if (!FileSystemHelpers.FileExists(extensionsProj))
             {
                 FileSystemHelpers.EnsureDirectory(extensionsDir);
