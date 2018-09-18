@@ -52,6 +52,8 @@ let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
 let targetRuntimes = ["win-x86"; "win-x64"; "osx-x64"; "linux-x64"]
+let distLibZip = "distlib-15dba58a827f56195b0fa0afe80a8925a92e8bf5.zip"
+let distLibVersion = "distlib-15dba58a827f56195b0fa0afe80a8925a92e8bf5"
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
@@ -298,6 +300,30 @@ Target "DownloadTools" (fun _ ->
         |> webClient.DownloadFile
 )
 
+Target "DownloadDistlibTools" (fun _ ->
+
+    printfn "%s" "Downloading distlib"
+    ServicePointManager.SecurityProtocol <- SecurityProtocolType.Tls12;
+    use webClient = new WebClient ()
+    let zipPath = toolsDir @@ distLibZip
+    (Uri ("https://github.com/vsajip/distlib/archive/15dba58a827f56195b0fa0afe80a8925a92e8bf5.zip"), zipPath)
+    |> webClient.DownloadFile
+    Unzip toolsDir zipPath
+
+    targetRuntimes
+    |> List.iter (fun runtime ->
+        let packappPath = currentDirectory @@ buildDir @@ runtime @@ "tools" @@ "python" @@ "packapp"
+        let distlibpath = packappPath @@ "distlib"
+        CreateDir packappPath
+        CreateDir distlibpath
+        let distlibUnzippedPath = toolsDir @@ distLibVersion @@ "distlib"
+        CopyDir distlibpath distlibUnzippedPath (fun _ -> true)
+    )
+    let distlibmain = toolsDir @@ distLibVersion
+    DeleteDir distlibmain
+    DeleteFile zipPath
+)
+
 Target "AddPythonWorker" (fun _ ->
     use webClient = new WebClient ()
     [
@@ -356,6 +382,7 @@ Target "AddTemplatesNupkgs" (fun _ ->
 Dependencies
 "Clean"
   ==> "DownloadTools"
+  ==> "DownloadDistlibTools"
   ==> "RestorePackages"
   ==> "Compile"
   ==> "AddPythonWorker"
