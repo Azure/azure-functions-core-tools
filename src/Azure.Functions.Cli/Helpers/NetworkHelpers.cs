@@ -9,17 +9,25 @@ namespace Azure.Functions.Cli.Helpers
         // If the race condition does occur, it'll fail later on in the binding step
         public static bool IsPortAvailable(int port)
         {
-            var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
-            var tcpConnInfoArray = ipGlobalProperties.GetActiveTcpConnections();
+            try {
+                var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+                var tcpConnInfoArray = ipGlobalProperties.GetActiveTcpConnections();
 
-            foreach (var tcpi in tcpConnInfoArray)
-            {
-                if (tcpi.LocalEndPoint.Port == port)
+                foreach (var tcpi in tcpConnInfoArray)
                 {
-                    return false;
+                    if (tcpi.LocalEndPoint.Port == port)
+                    {
+                        return false;
+                    }
                 }
+                return true;
+            } catch (System.Exception exp) {
+                // There are a number of reasons we can end up here...
+                // The main one being running under WSL and this bug https://github.com/dotnet/corefx/issues/30909
+
+                // Only realistic option is to assume port is free
+                return true;
             }
-            return true;
         }
     }
 }
