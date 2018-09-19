@@ -173,7 +173,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init \"functions project\" --worker-runtime dotnet",
                     "new --prefix \"functions project\" --template BlobTrigger --name testfunc"
-                }
+                },
+                CommandTimeout = new TimeSpan(0, 1, 0)
             });
         }
     }

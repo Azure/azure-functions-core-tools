@@ -20,6 +20,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         {
             var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
             Directory.CreateDirectory(tempDir);
+            File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "NuGet.Config"), Path.Combine(tempDir, "NuGet.Config"));
             try
             {
                 await InternalRun(tempDir, runConfigurations, output);
