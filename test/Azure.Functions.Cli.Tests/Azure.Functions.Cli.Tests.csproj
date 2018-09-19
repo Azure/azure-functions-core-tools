@@ -33,6 +33,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\.nuget\NuGet.Config" Link="NuGet.Config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Azure.Functions.Cli\Azure.Functions.Cli.csproj" />
   </ItemGroup>
 </Project>
