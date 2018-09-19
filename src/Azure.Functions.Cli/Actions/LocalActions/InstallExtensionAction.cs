@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Source { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
         public bool Csx { get; set; }
+        public bool Force { get; set; } = false;
 
         public InstallExtensionAction(ISecretsManager secretsManager)
         {
@@ -59,6 +60,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
 
+            Parser
+                .Setup<bool>('f', "force")
+                .WithDescription("update extensions version when running 'func extensions install'")
+                .Callback(force => Force = force);
+
             return Parser.Parse(args);
         }
 
@@ -75,9 +81,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (string.IsNullOrEmpty(Package) && string.IsNullOrEmpty(Version))
                 {
+                    var project = ProjectHelpers.GetProject(extensionsProj);
                     foreach (var extensionPackage in ExtensionsHelper.GetExtensionPackages())
                     {
-                        await AddPackage(extensionsProj, extensionPackage.Name, extensionPackage.Version);
+                        // Only add / update package referece if it does not exist or forced update is enabled
+                        if (!ProjectHelpers.PackageReferenceExists(project, extensionPackage.Name) || Force)
+                        {
+                            await AddPackage(extensionsProj, extensionPackage.Name, extensionPackage.Version);
+                        }
                     }
                 }
                 else if (!string.IsNullOrEmpty(Package) && !string.IsNullOrEmpty(Version))

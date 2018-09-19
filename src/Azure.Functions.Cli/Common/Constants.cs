@@ -25,6 +25,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsExtensionVersion = "FUNCTIONS_EXTENSION_VERSION";
         public const string StorageEmulatorConnectionString = "UseDevelopmentStorage=true";
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
+        public const string PackageReferenceElementName = "PackageReference";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
         public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
