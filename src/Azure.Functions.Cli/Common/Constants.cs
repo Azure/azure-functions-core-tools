@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Common
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
         public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
 
-        public static string CliDisplayVersion => $"{Constants.CliVersion}.{Constants.CliBetaRevision}";
+        public static string CliDisplayVersion => CliVersion + ((CliBetaRevision == "0") ? string.Empty : $"-beta.{CliBetaRevision}");
 
 
         public static class Errors
