@@ -28,9 +28,8 @@ namespace Azure.Functions.Cli.Common
         public const string PackageReferenceElementName = "PackageReference";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
-        public static string CliBetaRevision => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.MinorRevision.ToString();
 
-        public static string CliDisplayVersion => CliVersion + ((CliBetaRevision == "0") ? string.Empty : $"-beta.{CliBetaRevision}");
+        public static string CliDisplayVersion => CliVersion;
 
 
         public static class Errors
