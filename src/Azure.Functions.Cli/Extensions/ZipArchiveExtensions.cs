@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Extensions
     {
         public static void AddFile(this ZipArchive archive, string fileName, string zippedName, string zipRoot)
         {
-            using (var stream = File.Open(fileName, FileMode.Open))
+            using (var stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
                 archive.AddFile(zippedName, zipRoot, stream);
             }
