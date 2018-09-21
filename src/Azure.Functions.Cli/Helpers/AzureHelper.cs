@@ -33,6 +33,20 @@ namespace Azure.Functions.Cli.Helpers
                 }),
                 accessToken);
 
+                // If we haven't found the functionapp, and there is a next page, keep going
+                while (!functionApps.value.Any() && !string.IsNullOrEmpty(functionApps.nextLink))
+                {
+                    try
+                    {
+                        functionApps = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(HttpMethod.Get, new Uri(functionApps.nextLink), accessToken);
+                    }
+                    catch (Exception)
+                    {
+                        // If we can't go to the next page for some reason, just move on for now
+                        break;
+                    }
+                }
+
                 if (functionApps.value.Any())
                 {
                     var app = new Site(functionApps.value.First().id);
