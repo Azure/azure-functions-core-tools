@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
 
@@ -78,8 +79,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
-
+            if (FileSystemHelpers.FileExists(outputPath))
+            {
+                ColoredConsole.WriteLine($"Deleting the old package {outputPath}");
+                try
+                {
+                    FileSystemHelpers.FileDelete(outputPath);
+                }
+                catch (Exception)
+                {
+                    throw new CliException($"Could not delete {outputPath}");
+                }
+            }
             var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, additionalPackages: AdditionalPackages);
+            ColoredConsole.WriteLine($"Creating a new package {outputPath}");
             await FileSystemHelpers.WriteToFile(outputPath, zipStream);
         }
     }
