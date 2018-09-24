@@ -4,7 +4,15 @@
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>
-    <Version>2.0.4</Version>
+
+    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
+    <MajorMinorProductVersion>2.1</MajorMinorProductVersion>
+    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
+    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
+    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
+    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
+    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash)</InformationalVersion>
+
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>

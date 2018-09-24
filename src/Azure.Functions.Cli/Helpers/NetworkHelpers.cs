@@ -1,3 +1,4 @@
+using System;
 using System.Net.NetworkInformation;
 
 namespace Azure.Functions.Cli.Helpers
@@ -9,7 +10,8 @@ namespace Azure.Functions.Cli.Helpers
         // If the race condition does occur, it'll fail later on in the binding step
         public static bool IsPortAvailable(int port)
         {
-            try {
+            try
+            {
                 var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
                 var tcpConnInfoArray = ipGlobalProperties.GetActiveTcpConnections();
 
@@ -21,7 +23,9 @@ namespace Azure.Functions.Cli.Helpers
                     }
                 }
                 return true;
-            } catch (System.Exception exp) {
+            }
+            catch (Exception)
+            {
                 // There are a number of reasons we can end up here...
                 // The main one being running under WSL and this bug https://github.com/dotnet/corefx/issues/30909
 
