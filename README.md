@@ -24,25 +24,25 @@ Both v1 and v2 of the runtime can be installed on Windows.
 To install v1 with npm:
 
 ```bash
-npm i -g azure-functions-core-tools
+npm i -g azure-functions-core-tools@1
 ```
 
 To install v1 with chocolatey:
 
 ```bash
-choco install azure-functions-core-tools
+choco install azure-functions-core-tools --version 1.0.15 
 ```
 
 To install v2 with npm:
 
 ```bash
-npm i -g azure-functions-core-tools@core --unsafe-perm true
+npm i -g azure-functions-core-tools --unsafe-perm true
 ```
 
 To install v2 with chocolatey:
 
 ```bash
-choco install azure-functions-core-tools --pre
+choco install azure-functions-core-tools
 ```
 
 ### Mac
