@@ -21,7 +21,5 @@ node_modules/
 nCrunchTemp*
 
 .fake/
-build/
-deploy/
-dist/
+artifacts/
 /src/Azure.Functions.Cli/Properties/launchSettings.json
