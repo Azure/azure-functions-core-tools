@@ -31,7 +31,6 @@ namespace Azure.Functions.Cli.Common
 
         public static string CliDisplayVersion => CliVersion;
 
-
         public static class Errors
         {
             public const string NoRunningInstances = "No running instances";

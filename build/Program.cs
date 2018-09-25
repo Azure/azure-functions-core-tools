@@ -1,6 +1,6 @@
 ﻿using System.IO;
-using Build.CommandsSdk;
-using Build.Extensions;
+using System.Net;
+using static Build.BuildSteps;
 
 namespace Build
 {
@@ -8,16 +8,16 @@ namespace Build
     {
         static void Main(string[] args)
         {
-            new StandardCommands()
-                .Clean()
-                .RestorePackages()
-                .DotnetPublish()
-                .AddDistLib()
-                .AddPythonWorker()
-                .AddTemplatesNupkg()
-                .Test()
-                .Zip()
-                .Run();
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
+            Clean();
+            RestorePackages();
+            DotnetPublish();
+            AddDistLib();
+            AddPythonWorker();
+            AddTemplatesNupkgs();
+            Test();
+            Zip();
         }
     }
 }
