@@ -27,11 +27,14 @@ namespace Build
 
         public static readonly string TestProjectFile = Path.Combine(TestProjectPath, "Azure.Functions.Cli.Test.csproj");
 
-        public static readonly string[] TargetRuntimes = new[] { "win-x86", "win-x86", "linux-x64", "osx-x64" };
+        public static readonly string[] TargetRuntimes = new[] { "win-x86", "win-x64", "linux-x64", "osx-x64" };
 
         public const string DistLibVersion = "distlib-15dba58a827f56195b0fa0afe80a8925a92e8bf5";
 
         public const string DistLibUrl = "https://github.com/vsajip/distlib/archive/15dba58a827f56195b0fa0afe80a8925a92e8bf5.zip";
+
+        public const string PythonWorkerUrl = "";
+        public const string Pu
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
     }

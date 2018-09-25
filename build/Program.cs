@@ -13,10 +13,10 @@ namespace Build
                 .RestorePackages()
                 .DotnetPublish()
                 .AddDistLib()
-                // .AddPythonWorker()
-                // .AddTemplatesNupkg()
-                // .Test()
-                // .Zip()
+                .AddPythonWorker()
+                .AddTemplatesNupkg()
+                .Test()
+                .Zip()
                 .Run();
         }
     }

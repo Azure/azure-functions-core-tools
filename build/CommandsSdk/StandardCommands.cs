@@ -16,6 +16,15 @@ namespace Build.CommandsSdk
             return this;
         }
 
+        public ICommands AddSteps<T>(IEnumerable<T> collection, Action<T> run, bool stopOnError = true, string name = null)
+        {
+            foreach (var i in collection)
+            {
+                script.Add((new ActionStep<T>(run, i, name), stopOnError));
+            }
+            return this;
+        }
+
         public ICommands Call(string program, string args, int tries = 1, bool stopOnError = true)
         {
             script.Add((new CmdStep(program, args, tries), stopOnError));
@@ -25,12 +34,6 @@ namespace Build.CommandsSdk
         public ICommands ChangeDirectory(string directory)
         {
             script.Add((new ChangeDirectoryStep(directory), true));
-            return this;
-        }
-
-        public ICommands Copy(string source, string destination)
-        {
-            script.Add((new CopyStep(source, destination), true));
             return this;
         }
 

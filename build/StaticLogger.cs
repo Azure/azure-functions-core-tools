@@ -11,21 +11,24 @@ namespace Build
 
         public static void WriteLine(string message)
         {
-            lock(_lock)
+            lock (_lock)
             {
                 message = $"[{DateTimeOffset.UtcNow}] {message}";
                 Console.WriteLine(message);
-               _sb.AppendLine(Cut(message));
+                _sb.AppendLine(Cut(message));
             }
         }
 
         public static void WriteErrorLine(string message)
         {
-            lock(_lock)
+            if (!string.IsNullOrWhiteSpace(message))
             {
-                message = $"[{DateTimeOffset.UtcNow}] ERROR: {message}";
-                Console.Error.WriteLine(message);
-                _sb.AppendLine(Cut(message));
+                lock (_lock)
+                {
+                    message = $"[{DateTimeOffset.UtcNow}] ERROR: {message}";
+                    Console.Error.WriteLine(message);
+                    _sb.AppendLine(Cut(message));
+                }
             }
         }
 

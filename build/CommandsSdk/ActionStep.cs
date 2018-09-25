@@ -6,7 +6,6 @@ namespace Build.CommandsSdk
     {
         private readonly Action _run;
         private readonly string _name;
-
         public ActionStep(Action run, string name)
         {
             this._run = run;
@@ -17,9 +16,9 @@ namespace Build.CommandsSdk
         {
             try
             {
-                StaticLogger.WriteLine($"Starting step: {this._name}");
+                StaticLogger.WriteLine($"========> {this._name}");
                 this._run();
-                StaticLogger.WriteLine($"Finished step: {this._name}");
+                StaticLogger.WriteLine($"<======== {this._name}");
                 return RunOutcome.Succeeded;
             }
             catch (Exception e)
@@ -27,6 +26,15 @@ namespace Build.CommandsSdk
                 StaticLogger.WriteErrorLine($"Error in step: {this._name}, error: {e.ToString()}");
                 return RunOutcome.Failed;
             }
+        }
+
+    }
+
+    public class ActionStep<T> : ActionStep
+    {
+        public ActionStep(Action<T> run, T param, string name)
+            : base(() => { run(param); }, name)
+        {
         }
     }
 }

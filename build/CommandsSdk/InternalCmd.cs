@@ -24,7 +24,7 @@ namespace Build.CommandsSdk
 
         public int Run(Action<string> outputCallback = null, Action<string> errorCallback = null)
         {
-            StaticLogger.WriteLine("In Run for " + _exeName + " " + _arguments);
+            StaticLogger.WriteLine("> " + _exeName + " " + _arguments);
             var processInfo = new ProcessStartInfo
             {
                 FileName = _exeName,
@@ -68,7 +68,7 @@ namespace Build.CommandsSdk
                 process.EnableRaisingEvents = true;
             }
             process.WaitForExit();
-            StaticLogger.WriteLine("Done with " + _exeName + " " + _arguments + ", with exitCode: " + process.ExitCode);
+            StaticLogger.WriteLine("\"" + _exeName + "\" exitCode: " + process.ExitCode);
             return process.ExitCode;
         }
     }
