@@ -160,22 +160,25 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
-            var secrets = _secretsManager.GetSecrets();
+            var settings = _secretsManager.GetSecrets();
+            settings.Add(Constants.WebsiteHostname, uri.Authority);
+
+            // Add our connection strings
+            var connectionStrings = _secretsManager.GetConnectionStrings();
+            settings.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
+            settings.Add(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
+
             var environment = Environment
                     .GetEnvironmentVariables()
                     .Cast<DictionaryEntry>()
                     .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
-            var connectionStrings = _secretsManager.GetConnectionStrings();
+            await CheckNonOptionalSettings(settings.Union(environment), scriptPath);
 
-            secrets.Add(Constants.WebsiteHostname, uri.Authority);
+            // when running locally in CLI we want the host to run in debug mode
+            // which optimizes host responsiveness
+            settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
 
-            // Add our connection strings
-            secrets.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
-            secrets.Add(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
-
-            await CheckNonOptionalSettings(secrets.Union(environment), scriptPath);
-
-            return secrets;
+            return settings;
         }
 
         private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
