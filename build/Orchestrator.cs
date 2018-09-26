@@ -6,8 +6,7 @@ namespace Build
 {
     public class Orchestrator
     {
-        public static Orchestrator StartWith(string targetToRun, Action target, string name = null, bool skip = false)
-            => new Orchestrator(targetToRun).ThenDo(target, name, skip);
+        public static Orchestrator CreateForTarget(string targetToRun) => new Orchestrator(targetToRun);
 
         private Node head = null;
         private Node tail = null;
@@ -18,7 +17,7 @@ namespace Build
             this.targetToRun = targetToRun;
         }
 
-        public Orchestrator ThenDo(Action target, string name = null, bool skip = false)
+        public Orchestrator Then(Action target, string name = null, bool skip = false)
         {
             var node = new Node
             {
@@ -30,7 +29,7 @@ namespace Build
             if (head == null)
             {
                 head = node;
-                tail = head;
+                tail = node;
             }
             else
             {
@@ -44,13 +43,13 @@ namespace Build
 
         public void Run()
         {
-            var tmp = tail;
-            var end = head;
+            var start = head;
+            var end = tail;
             while (end != null &&
                    !string.IsNullOrWhiteSpace(targetToRun) &&
                    !end.Name.Equals(targetToRun))
             {
-                end = end.Next;
+                end = end.Previous;
             }
 
             if (end == null)
@@ -59,22 +58,38 @@ namespace Build
                 return;
             }
 
-            PrintTargetsToRun(tmp, end);
+            PrintTargetsToRun(start, end);
 
-            while (tmp != null)
+            while (start != null)
             {
-                if (!tmp.Skip)
+                if (!start.Skip)
                 {
-                    ColoredConsole.WriteLine($"Running Target {tmp.Name}".Cyan());
-                    tmp.Target();
+                    ColoredConsole.WriteLine($"Running Target {start.Name}".Cyan());
+                    start.Target();
                 }
-                if (tmp == end)
+
+                if (start == end)
                 {
                     break;
                 }
 
-                tmp = tmp.Previous;
+                start = start.Next;
             }
+        }
+
+        private void PrintTargetsToRun(Node start, Node end)
+        {
+            while (start != null)
+            {
+                ColoredConsole.Write($"{start.Name} ==> ".Magenta());
+                if (start == end)
+                {
+                    break;
+                }
+
+                start = start.Next;
+            }
+            ColoredConsole.WriteLine("DONE".Magenta());
         }
 
         class Node

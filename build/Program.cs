@@ -11,14 +11,15 @@ namespace Build
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Orchestrator
-                .StartWith(args.FirstOrDefault(), Zip)
-                .DependsOn(Test)
-                .DependsOn(AddTemplatesNupkgs)
-                .DependsOn(AddPythonWorker)
-                .DependsOn(AddDistLib)
-                .DependsOn(DotnetPublish)
-                .DependsOn(RestorePackages)
-                .DependsOn(Clean)
+                .CreateForTarget(args.FirstOrDefault() ?? "Zip")
+                .Then(Clean)
+                .Then(RestorePackages)
+                .Then(DotnetPublish)
+                .Then(AddDistLib)
+                .Then(AddPythonWorker)
+                .Then(AddTemplatesNupkgs)
+                .Then(Test)
+                .Then(Zip)
                 .Run();
         }
     }

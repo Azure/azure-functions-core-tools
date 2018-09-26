@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using Colors.Net;
 using Colors.Net.StringColorExtensions;
 
@@ -21,6 +22,20 @@ namespace Build
             {
                 throw new Exception($"{program} Exit Code == {exitcode}");
             }
+        }
+
+        public static string GetOutput(string program, string arguments)
+        {
+            var exe = new InternalExe(program, arguments);
+            var sb = new StringBuilder();
+            var exitCode = exe.Run(o => sb.AppendLine(o?.Trim()), e => ColoredConsole.Error.WriteLine(e.Red()));
+
+            if (exitCode != 0)
+            {
+                throw new Exception($"{program} exit code == {exitCode}");
+            }
+
+            return sb.ToString().Trim(new[] { ' ', '\r', '\n' });
         }
 
         class InternalExe
@@ -73,7 +88,13 @@ namespace Build
                 {
                     if (outputCallback != null)
                     {
-                        process.OutputDataReceived += (s, e) => outputCallback(e.Data);
+                        process.OutputDataReceived += (s, e) =>
+                        {
+                            if (e.Data != null)
+                            {
+                                outputCallback(e.Data);
+                            }
+                        };
                         process.BeginOutputReadLine();
                     }
 

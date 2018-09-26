@@ -112,7 +112,7 @@ namespace Build
 
         public static void Zip()
         {
-            var version = "";//GetCurrentVersion();
+            var version = GetCurrentVersion();
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var path = Path.Combine(Settings.OutputDir, runtime);
@@ -129,6 +129,14 @@ namespace Build
                     var sha1 = new SHA256Managed();
                     return BitConverter.ToString(sha1.ComputeHash(fileStream));
                 }
+            }
+
+            string GetCurrentVersion()
+            {
+                var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
+                    : Path.Combine(Settings.OutputDir, "linux-x64", "func");
+                return Shell.GetOutput(funcPath, "--version");
             }
         }
     }
