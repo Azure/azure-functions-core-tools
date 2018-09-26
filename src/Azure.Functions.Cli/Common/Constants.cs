@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Common
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
-        public static string CliDisplayVersion => CliVersion;
+        public static string CliDetailedVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
         public static class Errors
         {
