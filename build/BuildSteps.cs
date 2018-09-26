@@ -112,7 +112,7 @@ namespace Build
 
         public static void Zip()
         {
-            var version = "SOME_VERSION";
+            var version = "";//GetCurrentVersion();
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var path = Path.Combine(Settings.OutputDir, runtime);
