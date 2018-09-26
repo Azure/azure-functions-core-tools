@@ -87,6 +87,39 @@ sudo apt-get update
 sudo apt-get install azure-functions-core-tools
 ```
 
+#### Other Linux Distributions
+
+1. Download latest release
+
+Download the latest release for your platform from [here](https://github.com/Azure/azure-functions-core-tools/releases).
+
+2. Unzip release zip
+
+Using your preferred tool, unzip the downloaded release. To unzip into an `azure-functions-cli` directory using the `unzip` tool, run this command from the directory containing the downloaded release zip:
+
+```bash
+unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip
+```
+
+3. Make the `func` command executable
+
+Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary executable. Assuming you used the instructions above to unzip:
+
+```bash
+cd azure-functions-cli
+chmod +x func
+./func
+```
+
+4. Optionally add `func` to your `$PATH`
+
+To execute the `func` command without specifying the full path to the binary, add its directory to your `$PATH` environment variable. Assuming you're still following along from above:
+
+```bash
+export PATH=`pwd`:$PATH
+func
+```
+
 [Code and test Azure Functions locally](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)
 
 **NOTE**: npm can be used on all platforms. On unix platforms, you may need to specify `--unsafe-perm` if you are running npm with sudo. That's due to npm behavior of post install script.
