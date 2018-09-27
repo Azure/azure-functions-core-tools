@@ -40,7 +40,7 @@ namespace Build
             {
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
-                                    $"/p:BuildVersion=\"{Settings.BuildNumber}\" " +
+                                    $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     $"-o {outputPath} -c Release -r {runtime}");
             }
