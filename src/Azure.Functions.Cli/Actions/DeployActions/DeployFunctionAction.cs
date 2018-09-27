@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string FolderName { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
 
-        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes" };
+        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes","aci" };
         private readonly ITemplatesManager _templatesManager;
 
         public DeployAction(ITemplatesManager templatesManager)
