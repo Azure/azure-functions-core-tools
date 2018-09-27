@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli
         internal static void PrintVersion()
         {
             ColoredConsole
-                .WriteLine($"Azure Functions Core Tools ({Constants.CliDisplayVersion})")
+                .WriteLine($"Azure Functions Core Tools ({Constants.CliDetailedVersion})")
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}");
         }
 
@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli
 
         internal static string SanitizeNameSpace(string nameSpace)
         {
-            return SanitizeLiteral(nameSpace, allowed : ".");
+            return SanitizeLiteral(nameSpace, allowed: ".");
         }
 
         internal static string SanitizeClassName(string className)
@@ -67,9 +67,9 @@ namespace Azure.Functions.Cli
             {
                 return unsanitized;
             }
-            var sanitized = !char.IsLetter(unsanitized[0]) && !new[] { '_', '@' }.Contains(unsanitized[0]) 
-                ? new StringBuilder("_" + unsanitized.Substring(0, 1)) 
-                : new StringBuilder(unsanitized.Substring(0,1));
+            var sanitized = !char.IsLetter(unsanitized[0]) && !new[] { '_', '@' }.Contains(unsanitized[0])
+                ? new StringBuilder("_" + unsanitized.Substring(0, 1))
+                : new StringBuilder(unsanitized.Substring(0, 1));
             foreach (char character in unsanitized.Substring(1))
             {
                 if (!char.IsLetterOrDigit(character) && !(allowed.Contains(character)))
