@@ -1,6 +1,4 @@
-﻿using System.IO;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using static Build.BuildSteps;
 
 namespace Build
@@ -10,8 +8,9 @@ namespace Build
         static void Main(string[] args)
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
             Orchestrator
-                .CreateForTarget(args.FirstOrDefault() ?? "Zip")
+                .CreateForTarget(args)
                 .Then(Clean)
                 .Then(RestorePackages)
                 .Then(DotnetPublish)
@@ -20,6 +19,7 @@ namespace Build
                 .Then(AddTemplatesNupkgs)
                 .Then(Test)
                 .Then(Zip)
+                .Then(UploadToStorage)
                 .Run();
         }
     }

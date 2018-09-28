@@ -1,3 +1,7 @@
+using Colors.Net;
+using Colors.Net.StringColorExtensions;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -130,13 +134,51 @@ namespace Build
                     return BitConverter.ToString(sha1.ComputeHash(fileStream));
                 }
             }
+        }
+        private static string GetCurrentVersion()
+        {
+            var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
+                : Path.Combine(Settings.OutputDir, "linux-x64", "func");
+            return Shell.GetOutput(funcPath, "--version");
+        }
 
-            string GetCurrentVersion()
+        public static void UploadToStorage()
+        {
+            if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
             {
-                var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
-                    : Path.Combine(Settings.OutputDir, "linux-x64", "func");
-                return Shell.GetOutput(funcPath, "--version");
+                var version = new Version(GetCurrentVersion());
+                var storageAccount = CloudStorageAccount.Parse(Settings.BuildArtifactsStorage);
+                var blobClient = storageAccount.CreateCloudBlobClient();
+                var container = blobClient.GetContainerReference("builds");
+                container.CreateIfNotExistsAsync().Wait();
+
+                container.SetPermissionsAsync(new BlobContainerPermissions
+                {
+                    PublicAccess = BlobContainerPublicAccessType.Blob
+                });
+
+                foreach (var file in Directory.GetFiles(Settings.OutputDir, "Azure.Functions.Cli.*", SearchOption.TopDirectoryOnly))
+                {
+                    var fileName = Path.GetFileName(file);
+                    ColoredConsole.Write($"Uploading {fileName}...");
+
+                    var versionedBlob = container.GetBlockBlobReference($"{version.ToString()}/{fileName}");
+                    var latestBlob = container.GetBlockBlobReference($"{version.Major}/latest/{fileName.Replace($".{version.ToString()}", string.Empty)}");
+                    versionedBlob.UploadFromFileAsync(file).Wait();
+                    latestBlob.StartCopyAsync(versionedBlob).Wait();
+
+                    ColoredConsole.WriteLine("Done");
+                }
+
+                var latestVersionBlob = container.GetBlockBlobReference($"{version.Major}/latest/version.txt");
+                latestVersionBlob.UploadTextAsync(version.ToString()).Wait();
+            }
+            else
+            {
+                var error = $"{nameof(Settings.BuildArtifactsStorage)} is null or empty. Can't run {nameof(UploadToStorage)} target";
+                ColoredConsole.Error.WriteLine(error.Red());
+                throw new Exception(error);
             }
         }
     }

@@ -6,25 +6,26 @@ namespace Build
 {
     public class Orchestrator
     {
-        public static Orchestrator CreateForTarget(string targetToRun) => new Orchestrator(targetToRun);
+        public static Orchestrator CreateForTarget(string[] args) => new Orchestrator(new OrchestratorParser(args));
 
         private Node head = null;
         private Node tail = null;
-        private string targetToRun;
+        private OrchestratorParser parser;
 
-        private Orchestrator(string targetToRun)
+        private Orchestrator(OrchestratorParser parser)
         {
-            this.targetToRun = targetToRun;
+            this.parser = parser;
         }
 
-        public Orchestrator Then(Action target, string name = null, bool skip = false)
+        public Orchestrator Then(Action target, string name = null, bool? skip = null)
         {
             var node = new Node
             {
                 Target = target,
                 Name = name ?? target.Method.Name,
-                Skip = skip
             };
+
+            node.Skip = skip ?? parser.ShouldSkip(node.Name);
 
             if (head == null)
             {
@@ -46,8 +47,8 @@ namespace Build
             var start = head;
             var end = tail;
             while (end != null &&
-                   !string.IsNullOrWhiteSpace(targetToRun) &&
-                   !end.Name.Equals(targetToRun))
+                   !string.IsNullOrWhiteSpace(parser.TargetToRun) &&
+                   !end.Name.Equals(parser.TargetToRun, StringComparison.OrdinalIgnoreCase))
             {
                 end = end.Previous;
             }
