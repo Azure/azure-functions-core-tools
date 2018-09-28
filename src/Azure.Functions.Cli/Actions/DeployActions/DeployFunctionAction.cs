@@ -25,6 +25,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public int MaxInstances { get; set; } = 1000;
         public string FolderName { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
+        //ACI parameters
+        public string ResourceGroupName { get; set; }
+        public string ContainerGroupName { get; set; }
+        public string SubscriptionId { get; set; }
+        public string Location { get; set; }
+        public int Port { get; set; }
+        public string ContainerName { get; set; }
+        public string ImageName { get; set; }
+        public int ContainerMemory { get; set; }
+        public int ContainerCPU { get; set; }
+        public string OsType { get; set; } = "Linux";
 
         public List<string> Platforms { get; set; } = new List<string>() { "kubernetes","aci" };
         private readonly ITemplatesManager _templatesManager;
@@ -65,6 +76,56 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>("config")
                 .WithDescription("[Optional] Config file")
                 .Callback(t => ConfigPath = t);
+
+            Parser
+                .Setup<string>("resourcegroupname")
+                .WithDescription("[Optional] Resource Group Name")
+                .Callback(t => ResourceGroupName = t);
+
+            Parser
+                .Setup<string>("containergroupname")
+                .WithDescription("[Optional] Container Group Name")
+                .Callback(t => ContainerGroupName = t);
+
+            Parser
+           .Setup<string>("subscriptionid")
+           .WithDescription("[Optional] Subscription Id")
+           .Callback(t => SubscriptionId = t);
+
+            Parser
+              .Setup<string>("location")
+              .WithDescription("[Optional] location")
+              .Callback(t => Location = t);
+
+            Parser
+              .Setup<int>("port")
+              .WithDescription("[Optional] Port number")
+              .Callback(t => Port = t);
+
+            Parser
+              .Setup<string>("containername")
+              .WithDescription("[Optional] Container Name")
+              .Callback(t => ContainerName = t);
+
+            Parser
+              .Setup<string>("imagename")
+              .WithDescription("[Optional] Container Image name")
+              .Callback(t => ImageName = t);
+
+            Parser
+              .Setup<int>("containermemory")
+              .WithDescription("[Optional] Container GB memory")
+              .Callback(t => ContainerMemory = t);
+
+            Parser
+              .Setup<int>("containercpu")
+              .WithDescription("[Optional] Container CPU number")
+              .Callback(t => ContainerCPU = t);
+
+            Parser
+              .Setup<string>("ostype")
+              .WithDescription("[Optional] Container memory")
+              .Callback(t => OsType= t);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -119,7 +180,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances);
+            if (typeof(KubernetesPlatform) == platform.GetType())
+            {
+                await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances);
+            }
+            else
+            {
+                await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances, ResourceGroupName, ContainerGroupName, SubscriptionId, 
+                    Location, Port, ContainerName, ImageName, ContainerMemory, ContainerCPU, OsType);
+            }
+            
         }
     }
 }

@@ -220,5 +220,10 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         {
             await KubernetesHelper.RunKubectl($"create ns {name}");
         }
+
+        public Task DeployContainerizedFunction(string functionName, string image, int min, int max, string resourceGroupName, string containerGroupName, string subscriptionId, string location, int port, string containerName, string imageName,double containerMemory, double containerCPU, string osType = "Linux")
+        {
+            throw new NotImplementedException("One parameter is not suported by Kubernetes. Use --platform aci.");
+        }
     }
 }

@@ -36,20 +36,22 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             return token;
         }
 
-        public async Task DeployContainerizedFunction(string functionName, string image, int min, int max)
+    //    public async Task DeployContainerizedFunction(string functionName, string image, int min, int max)
+        public async Task DeployContainerizedFunction(string functionName, string image, int min, int max, string resourceGroupName, string containerGroupName, string subscriptionId, string location, int port, string containerName, string imageName, double containerMemory, double containerCPU, string osType = "Linux")
         {
-            await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max);
+            await Deploy(functionName,image,min,max,resourceGroupName,containerGroupName,subscriptionId,location,port,containerName,imageName,containerMemory,containerCPU ,osType);
         }
 
-        private async Task Deploy(string functionName, string image, string fUNCTIONS_NAMESPACE, int min, int max)
+        private async Task Deploy(string functionName, string image, int min, int max, string resourceGroupName, string containerGroupName, string subscriptionId, string location, int port, string containerName, string imageName, double containerMemory, double containerCPU, string osType = "Linux")
         {
             ColoredConsole.WriteLine("Deploying function to ACI ...");
-            var ResourceGroupName = "AzureFunctions-WestUS";
-            var ContainerGroupName = "ContainerGroupName1";
+            var ResourceGroupName = resourceGroupName;
+            var ContainerGroupName = containerGroupName;
             var token = await GetToken();
+            
             client = new ContainerInstanceManagementClient(new TokenCredentials(token))
             {
-                SubscriptionId = "SUBSCRIPTION-ID"
+                SubscriptionId = subscriptionId
             };
 
             try
@@ -57,30 +59,29 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 var containers = await client.ContainerGroups.ListByResourceGroupAsync(ResourceGroupName);
                 var container = containers.Where(c => c.Name == ContainerGroupName).FirstOrDefault();
 
-
                 if (container == null || container.IpAddress == null || container.IpAddress.Ip == null)
                 {
                     ColoredConsole.WriteLine("Container not found ...");
-
+                    
                     var spec = new ContainerGroup
                     {
-                        Location = "East US",
-                        OsType = "Linux",
+                        Location = location,
+                        OsType = osType,
                         RestartPolicy = "Always",
                         IpAddress = new IpAddress
                         {
-                            Ports = new[] { new Port(25565) }
+                            Ports = new[] { new Port(port)}
                         },
                         Containers = new[]{
                         new Container
                         {
-                            Name = "minecraft",
-                            Image = "openhack/minecraft-server",
-                            Ports = new []{ new ContainerPort(25565) },
-                            EnvironmentVariables = new []{ new EnvironmentVariable("EULA","TRUE") },
+                            Name = containerName,
+                            Image = image,
+                            Ports = new []{ new ContainerPort(port) },
+                            //EnvironmentVariables = new []{ new EnvironmentVariable("EULA","TRUE") },
                             Resources = new ResourceRequirements
                             {
-                                Requests = new ResourceRequests(memoryInGB: 4, cpu: 2)
+                                Requests = new ResourceRequests(memoryInGB: containerMemory, cpu: containerCPU)
                             }
                         }
                         }
@@ -99,6 +100,11 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 Console.ReadLine();
             }
 
+        }
+
+        public Task DeployContainerizedFunction(string functionName, string image, int min, int max)
+        {
+            throw new NotImplementedException("This operation is not supported by ACI. Use --platform kubernetes");
         }
     }
 
