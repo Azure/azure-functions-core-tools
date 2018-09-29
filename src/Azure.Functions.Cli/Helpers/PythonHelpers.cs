@@ -137,9 +137,8 @@ namespace Azure.Functions.Cli.Helpers
 
             var requirementsTxt = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
 
-            await InstallDislib();
+            var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
 
-            var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp.py");
             var exe = new Executable("python", $"{packApp} --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} {functionAppRoot}");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
@@ -150,18 +149,6 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return packagesLocation;
-        }
-
-        private static async Task InstallDislib()
-        {
-            var exe = new Executable("pip", "install -U git+https://github.com/vsajip/distlib.git@15dba58a827f56195b0fa0afe80a8925a92e8bf5");
-            var sbErrors = new StringBuilder();
-            var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
-
-            if (exitCode != 0)
-            {
-                throw new CliException("There was an error installing dislib." + sbErrors.ToString());
-            }
         }
 
         private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages)

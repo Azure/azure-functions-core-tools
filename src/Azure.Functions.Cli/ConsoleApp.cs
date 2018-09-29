@@ -176,7 +176,7 @@ namespace Azure.Functions.Cli
         {
             if (_args.Length == 1 && _versionArgs.Any(va => _args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
             {
-                ColoredConsole.WriteLine($"{Constants.CliDisplayVersion}");
+                ColoredConsole.WriteLine($"{Constants.CliVersion}");
                 return null;
             }
             // If there is no args are passed, display help.

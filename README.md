@@ -24,25 +24,25 @@ Both v1 and v2 of the runtime can be installed on Windows.
 To install v1 with npm:
 
 ```bash
-npm i -g azure-functions-core-tools
+npm i -g azure-functions-core-tools@1
 ```
 
 To install v1 with chocolatey:
 
 ```bash
-choco install azure-functions-core-tools
+choco install azure-functions-core-tools --version 1.0.15 
 ```
 
 To install v2 with npm:
 
 ```bash
-npm i -g azure-functions-core-tools@core --unsafe-perm true
+npm i -g azure-functions-core-tools --unsafe-perm true
 ```
 
 To install v2 with chocolatey:
 
 ```bash
-choco install azure-functions-core-tools --pre
+choco install azure-functions-core-tools
 ```
 
 ### Mac
@@ -83,7 +83,41 @@ sudo dpkg -i packages-microsoft-prod.deb
 2. Install
 
 ```bash
+sudo apt-get update
 sudo apt-get install azure-functions-core-tools
+```
+
+#### Other Linux Distributions
+
+1. Download latest release
+
+Download the latest release for your platform from [here](https://github.com/Azure/azure-functions-core-tools/releases).
+
+2. Unzip release zip
+
+Using your preferred tool, unzip the downloaded release. To unzip into an `azure-functions-cli` directory using the `unzip` tool, run this command from the directory containing the downloaded release zip:
+
+```bash
+unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip
+```
+
+3. Make the `func` command executable
+
+Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary executable. Assuming you used the instructions above to unzip:
+
+```bash
+cd azure-functions-cli
+chmod +x func
+./func
+```
+
+4. Optionally add `func` to your `$PATH`
+
+To execute the `func` command without specifying the full path to the binary, add its directory to your `$PATH` environment variable. Assuming you're still following along from above:
+
+```bash
+export PATH=`pwd`:$PATH
+func
 ```
 
 [Code and test Azure Functions locally](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)

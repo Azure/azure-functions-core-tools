@@ -85,6 +85,11 @@ namespace Azure.Functions.Cli.Common
             return Instance.Directory.Exists(path);
         }
 
+        public static void FileDelete(string path)
+        {
+            Instance.File.Delete(path);
+        }
+
         public static void CreateDirectory(string path)
         {
             Instance.Directory.CreateDirectory(path);

@@ -33,6 +33,20 @@ namespace Azure.Functions.Cli.Helpers
                 }),
                 accessToken);
 
+                // If we haven't found the functionapp, and there is a next page, keep going
+                while (!functionApps.value.Any() && !string.IsNullOrEmpty(functionApps.nextLink))
+                {
+                    try
+                    {
+                        functionApps = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(HttpMethod.Get, new Uri(functionApps.nextLink), accessToken);
+                    }
+                    catch (Exception)
+                    {
+                        // If we can't go to the next page for some reason, just move on for now
+                        break;
+                    }
+                }
+
                 if (functionApps.value.Any())
                 {
                     var app = new Site(functionApps.value.First().id);
@@ -48,6 +62,29 @@ namespace Azure.Functions.Cli.Helpers
         {
             var url = new Uri($"{ArmUriTemplates.ArmUrl}{functionApp.SiteId}/hostruntime/admin/functions?api-version={ArmUriTemplates.WebsitesApiVersion}");
             return ArmHttpAsync<IEnumerable<FunctionInfo>>(HttpMethod.Get, url, accessToken);
+        }
+
+        internal static async Task<string> GetFunctionKey(string functionAdminUrl, string functionScmUri, string accessToken)
+        {
+            // If anything goes wrong anywhere, simply return null and let the caller take care of it.
+            if (string.IsNullOrEmpty(functionAdminUrl) || string.IsNullOrEmpty(functionScmUri) || string.IsNullOrEmpty(accessToken))
+            {
+                return null;
+            }
+            var scmUrl = new Uri($"https://{functionScmUri}/api/functions/admin/token");
+            var url = new Uri($"{functionAdminUrl}/keys");
+            var key = "";
+            try
+            {
+                var token = await ArmHttpAsync<string>(HttpMethod.Get, scmUrl, accessToken);
+                var keysJson = await ArmHttpAsync<JToken>(HttpMethod.Get, url, token);
+                key = (string)(keysJson["keys"] as JArray).First()["value"];
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+            return key;
         }
 
         private static async Task<Site> LoadFunctionApp(Site site, string accessToken)
@@ -175,6 +212,7 @@ namespace Azure.Functions.Cli.Helpers
             site.Location = armSite.location;
             site.Kind = armSite.kind;
             site.Sku = armSite.properties.sku;
+            site.SiteName = armSite.name;
             return site;
         }
 
@@ -209,6 +247,37 @@ namespace Azure.Functions.Cli.Helpers
                 return string.IsNullOrEmpty(errorMessage)
                     ? new HttpResult<Dictionary<string, string>, string>(null, result)
                     : new HttpResult<Dictionary<string, string>, string>(null, errorMessage);
+            }
+        }
+
+        public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, bool showKeys)
+        {
+            var functions = await GetFunctions(functionApp, accessToken);
+            ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
+            foreach (var function in functions)
+            {
+                var trigger = function
+                    .Config?["bindings"]
+                    ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
+                    ?["type"];
+
+                trigger = trigger ?? "No Trigger Found";
+
+                ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
+                if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
+                {
+                    // If there's a key available and the key is requested, add it to the url
+                    var key = showKeys? await GetFunctionKey(function.Href.AbsoluteUri, functionApp.ScmUri, accessToken) : null;
+                    if (!string.IsNullOrEmpty(key))
+                    {
+                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor(function.InvokeUrlTemplate)}");
+                    }
+                }
+                ColoredConsole.WriteLine();
             }
         }
     }
