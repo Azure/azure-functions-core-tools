@@ -11,6 +11,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.node, "languageWorkers:node:arguments" },
             { WorkerRuntime.python, "languageWorkers:python:arguments" },
             { WorkerRuntime.java, "languageWorkers:java:arguments" },
+            { WorkerRuntime.powershell, "languageWorkers:powershell:arguments" },
             { WorkerRuntime.dotnet, string.Empty },
             { WorkerRuntime.None, string.Empty }
         }
