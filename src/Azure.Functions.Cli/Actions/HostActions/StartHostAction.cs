@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
@@ -19,8 +18,6 @@ using Fclp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.Azure.WebJobs.Host;
-using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
@@ -67,7 +64,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public StartHostAction(ISecretsManager secretsManager)
         {
-            this._secretsManager = secretsManager;
+            _secretsManager = secretsManager;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -153,6 +150,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .ConfigureAppConfiguration(configBuilder =>
                 {
                     configBuilder.AddEnvironmentVariables();
+                })
+                .ConfigureLogging(loggingBuilder =>
+                {
+                    loggingBuilder.ClearProviders();
+                    loggingBuilder.AddDefaultWebJobsFilters();
+                    loggingBuilder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
                 })
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins)))
                 .Build();
@@ -445,6 +448,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     o.SecretsPath = _hostOptions.SecretsPath;
                 });
 
+                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
 
                 return services.BuildServiceProvider();
