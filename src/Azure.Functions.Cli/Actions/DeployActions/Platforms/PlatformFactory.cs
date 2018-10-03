@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 case "kubernetes":
                     return new KubernetesPlatform(configFile);
                 case "aci":                    
-                    return new ACIPlatform(configFile);
+                    return new ACIPlatform();
                 default:
                     return null;
             }

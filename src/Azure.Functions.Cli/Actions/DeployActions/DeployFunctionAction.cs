@@ -26,13 +26,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string FolderName { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
         //ACI parameters
+        //   --platform aci --name myfunction --registry odaibert --resourcegroupname FunctionsACI 
+        //   --containergroupname FunctionsACI --subscriptionid cabe3525-a754-4bf7-9af4-1a9746604527 
+        //   --location eastus 
+        //   --port 80 --containername demofunctionsaci --containermemory 1 --containercpu 2 --ostype linux
         public string ResourceGroupName { get; set; }
         public string ContainerGroupName { get; set; }
         public string SubscriptionId { get; set; }
         public string Location { get; set; }
         public int Port { get; set; }
         public string ContainerName { get; set; }
-        public string ImageName { get; set; }
+        //public string ImageName { get; set; }
         public int ContainerMemory { get; set; }
         public int ContainerCPU { get; set; }
         public string OsType { get; set; } = "Linux";
@@ -108,11 +112,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
               .Callback(t => ContainerName = t);
 
             Parser
-              .Setup<string>("imagename")
-              .WithDescription("[Optional] Container Image name")
-              .Callback(t => ImageName = t);
-
-            Parser
               .Setup<int>("containermemory")
               .WithDescription("[Optional] Container GB memory")
               .Callback(t => ContainerMemory = t);
@@ -186,8 +185,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances, ResourceGroupName, ContainerGroupName, SubscriptionId, 
-                    Location, Port, ContainerName, ImageName, ContainerMemory, ContainerCPU, OsType);
+                await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances,
+                    ResourceGroupName, ContainerGroupName, SubscriptionId, 
+                    Location, Port, ContainerMemory, ContainerCPU, OsType);
             }
             
         }
