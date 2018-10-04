@@ -287,6 +287,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     var httpRoute = binding?.Raw?.GetValue("route", StringComparison.OrdinalIgnoreCase)?.ToString();
                     httpRoute = httpRoute ?? function.Name;
 
+                    string[] methods = null;
+                    var methodsRaw = binding?.Raw?.GetValue("methods", StringComparison.OrdinalIgnoreCase)?.ToString();
+                    if (string.IsNullOrEmpty(methodsRaw) == false)
+                    {
+                        methods = methodsRaw.Split(',');
+                    }
+
                     string hostRoutePrefix = "";
                     if (!function.Metadata.IsProxy)
                     {
@@ -295,12 +302,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
                             ? hostRoutePrefix
                             : $"{hostRoutePrefix}/";
                     }
+
+                    var functionMethods = methods != null ? $"{CleanAndFormatHttpMethods(string.Join(",", methods))}" : null;
                     var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
                     ColoredConsole
-                        .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(url)}")
+                        .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(functionMethods)} {Green(url)}")
                         .WriteLine();
                 }
             }
+        }
+
+        private string CleanAndFormatHttpMethods(string httpMethods)
+        {
+            return httpMethods.Replace(Environment.NewLine, string.Empty).Replace(" ", string.Empty)
+                .Replace("\"", string.Empty).ToUpperInvariant();
         }
 
         private async Task SetupDebuggerAsync(Uri baseUri)
