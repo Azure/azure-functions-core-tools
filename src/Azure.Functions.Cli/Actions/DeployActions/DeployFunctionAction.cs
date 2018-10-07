@@ -110,6 +110,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
+            if (!string.IsNullOrEmpty(ServiceType) && !ServiceTypes.Contains(ServiceType))
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor($"serviceType {ServiceType} is not supported. Valid options are: {String.Join(",", ServiceTypes)}"));
+                return;
+            }
+
             var image = $"{Registry}/{Name.SanitizeImageName()}";
 
             if (!string.IsNullOrEmpty(ServiceType) && !ServiceTypes.Contains(ServiceType))
