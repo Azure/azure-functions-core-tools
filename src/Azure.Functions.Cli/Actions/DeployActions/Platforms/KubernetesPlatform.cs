@@ -1,27 +1,29 @@
-using System;
-using System.Linq;
-using System.IO;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Actions.DeployActions.Platforms.Models;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using KubeClient;
 using KubeClient.Models;
-using Azure.Functions.Cli.Actions.DeployActions.Platforms.Models;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 {
     public class KubernetesPlatform : IHostingPlatform
     {
-        private string configFile = string.Empty;
+        private readonly string configFile = string.Empty;
         private const string FUNCTIONS_NAMESPACE = "azure-functions";
+        private const string SERVICETYPE_LOADBALANCER = "LoadBalancer";
+        private const double DEFAULT_CPU = 0.1;
+        private const int DEFAULT_MEMORY = 128;
+        private const string DEFAULT_PORT = "80";
         private static KubeApiClient client;
 
-        public async Task DeployContainerizedFunction(string functionName, string image, int min, int max)
+        public async Task DeployContainerizedFunction(string functionName, string image, int min, int max, string serviceType)
         {
-            await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max);
+            await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max, serviceType);
         }
 
         public KubernetesPlatform(string configFile)
@@ -43,10 +45,11 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         private async Task DeleteDeploymentIfExists(string name, string nameSpace)
         {
+            ColoredConsole.WriteLine("Delete current deployment");
             await client.DeploymentsV1Beta1().Delete(name, nameSpace);
         }
 
-        private async Task Deploy(string name, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80")
+        private async Task Deploy(string name, string image, string nameSpace, int min, int max, string serviceType, double cpu = DEFAULT_CPU, int memory = DEFAULT_MEMORY, string port = DEFAULT_PORT)
         {
             await CreateNamespace(nameSpace);
             client.DefaultNamespace = nameSpace;
@@ -66,11 +69,11 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                             });
 
             File.WriteAllText("deployment.json", json);
-            KubernetesHelper.RunKubectl($"apply -f deployment.json");
+            await KubernetesHelper.RunKubectl($"apply -f deployment.json", true);
 
             ColoredConsole.WriteLine("Deployment successful");
 
-            var service = GetService(deploymentName, nameSpace, port);
+            var service = GetService(deploymentName, nameSpace, serviceType, port);
 
             try
             {
@@ -82,28 +85,31 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             await TryRemoveAutoscaler(deploymentName, nameSpace);
             await CreateAutoscaler(deploymentName, nameSpace, min, max);
 
-            var externalIP = "";
-
-            ColoredConsole.WriteLine("Waiting for External IP...");
-
-            while (string.IsNullOrEmpty(externalIP))
+            if (serviceType == SERVICETYPE_LOADBALANCER)
             {
-                var svc = await client.ServicesV1().Get($"{deploymentName}-service", nameSpace);
-                if (svc != null)
+                var externalIP = "";
+
+                ColoredConsole.WriteLine("Waiting for External IP...");
+
+                while (string.IsNullOrEmpty(externalIP))
                 {
-                    if (svc.Status.LoadBalancer.Ingress.Count > 0)
+                    var svc = await client.ServicesV1().Get($"{deploymentName}-service", nameSpace);
+                    if (svc != null)
                     {
-                        externalIP = svc.Status.LoadBalancer.Ingress[0].Ip;
+                        if (svc.Status.LoadBalancer.Ingress.Count > 0)
+                        {
+                            externalIP = svc.Status.LoadBalancer.Ingress[0].Ip;
+                        }
                     }
                 }
+
+                ColoredConsole.WriteLine($"Function IP: {externalIP}");
             }
 
             File.Delete("deployment.json");
 
             ColoredConsole.WriteLine("");
-
             ColoredConsole.WriteLine("Function deployed successfully!");
-            ColoredConsole.WriteLine($"Function IP: {externalIP}");
         }
 
         private async Task TryRemoveAutoscaler(string deploymentName, string nameSpace)
@@ -123,7 +129,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             await KubernetesHelper.RunKubectl(cmd);
         }
 
-        private ServiceV1 GetService(string name, string nameSpace, string port = "80")
+        private ServiceV1 GetService(string name, string nameSpace, string serviceType, string port = DEFAULT_PORT)
         {
             return new ServiceV1()
             {
@@ -147,38 +153,52 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                             Port = int.Parse(port)
                         }
                     },
-                    Type = "LoadBalancer"
+                    Type = serviceType ?? SERVICETYPE_LOADBALANCER
                 }
             };
         }
 
         private Deployment GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min)
         {
-            var deployment = new Deployment();
-            deployment.apiVersion = "apps/v1beta1";
-            deployment.kind = "Deployment";
+            var deployment = new Deployment
+            {
+                apiVersion = "apps/v1beta1",
+                kind = "Deployment"
+            };
 
-            var metadata = new Metadata();
-            metadata.@namespace = nameSpace;
-            metadata.name = name;
-            metadata.labels = new Labels();
+            var metadata = new Metadata
+            {
+                @namespace = nameSpace,
+                name = name,
+                labels = new Labels()
+            };
             metadata.labels.app = name;
 
             deployment.metadata = metadata;
-            deployment.spec = new Spec();
-            deployment.spec.replicas = min;
-            deployment.spec.selector = new Selector();
+            deployment.spec = new Spec
+            {
+                replicas = min,
+                selector = new Selector()
+            };
 
-            deployment.spec.selector.matchLabels = new MatchLabels();
-            deployment.spec.selector.matchLabels.app = name;
+            deployment.spec.selector.matchLabels = new MatchLabels
+            {
+                app = name
+            };
 
-            deployment.spec.template = new Models.Template();
-            deployment.spec.template.metadata = new Metadata();
-            deployment.spec.template.metadata.labels = new Labels();
-            deployment.spec.template.metadata.labels.app = name;
+            deployment.spec.template = new Template
+            {
+                metadata = new Metadata()
+            };
+            deployment.spec.template.metadata.labels = new Labels
+            {
+                app = name
+            };
 
-            deployment.spec.template.spec = new TemplateSpec();
-            deployment.spec.template.spec.containers = new List<Container>();
+            deployment.spec.template.spec = new TemplateSpec
+            {
+                containers = new List<Container>()
+            };
             deployment.spec.template.spec.containers.Add(new Container()
             {
                 name = name,
@@ -187,7 +207,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 {
                     requests = new Requests()
                     {
-                        cpu = cpu.ToString(),
+                        cpu = cpu.ToString(CultureInfo.GetCultureInfo("en-US")),
                         memory = $"{memory}Mi"
                     }
                 }
@@ -218,6 +238,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         private async Task CreateNamespace(string name)
         {
+            ColoredConsole.WriteLine($"Create namespace : {name}");
             await KubernetesHelper.RunKubectl($"create ns {name}");
         }
     }
