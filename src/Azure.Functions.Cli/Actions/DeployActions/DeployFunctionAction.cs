@@ -1,17 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.DeployActions.Platforms;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using Microsoft.Azure.WebJobs.Script;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -25,8 +23,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public int MaxInstances { get; set; } = 1000;
         public string FolderName { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
+        public string ServiceType { get; set; } = string.Empty;
 
         public List<string> Platforms { get; set; } = new List<string>() { "kubernetes" };
+        public List<string> ServiceTypes { get; set; } = new List<string>() { "ClusterIP", "NodePort", "LoadBalancer" };
+
         private readonly ITemplatesManager _templatesManager;
 
         public DeployAction(ITemplatesManager templatesManager)
@@ -43,7 +44,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("platform")
-                .WithDescription("Hosting platform for the function app. Valid options: " + String.Join(",", Platforms))
+                .WithDescription("Hosting platform for the function app. Valid options: " + string.Join(",", Platforms))
                 .Callback(t => Platform = t).Required();
 
             Parser
@@ -65,6 +66,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>("config")
                 .WithDescription("[Optional] Config file")
                 .Callback(t => ConfigPath = t);
+
+            Parser
+                .Setup<string>("serviceType")
+                .WithDescription("[Optional] Kubernetes Service Type.  Valid options: " + string.Join(",", ServiceTypes))
+                .Callback(t => ServiceType = t);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -103,6 +109,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
+            if (!string.IsNullOrEmpty(ServiceType) && !ServiceTypes.Contains(ServiceType))
+            {
+                ColoredConsole.Error.WriteLine(ErrorColor($"serviceType {ServiceType} is not supported. Valid options are: {String.Join(",", ServiceTypes)}"));
+                return;
+            }
+
             var image = $"{Registry}/{Name}";
 
             ColoredConsole.WriteLine("Building Docker image...");
@@ -119,7 +131,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances);
+            await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances, ServiceType);
         }
     }
 }
