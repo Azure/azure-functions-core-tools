@@ -121,10 +121,25 @@ namespace Build
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var path = Path.Combine(Settings.OutputDir, runtime);
-                var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
 
+                var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
+                ColoredConsole.WriteLine($"Creating {zipPath}");
                 ZipFile.CreateFromDirectory(path, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
-                File.WriteAllText($"{zipPath}.sha2", ComputeSha256(zipPath));
+
+                var shaPath = $"{zipPath}.sha2";
+                ColoredConsole.WriteLine($"Creating {shaPath}");
+                File.WriteAllText(shaPath, ComputeSha256(zipPath));
+
+                try
+                {
+                    Directory.Delete(path, recursive: true);
+                }
+                catch
+                {
+                    ColoredConsole.Error.WriteLine($"Error deleting {path}");
+                }
+
+                ColoredConsole.WriteLine();
             }
 
             string ComputeSha256(string file)
