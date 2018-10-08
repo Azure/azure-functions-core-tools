@@ -30,7 +30,7 @@ namespace Build
 
         public static readonly string TestProjectFile = Path.Combine(TestProjectPath, "Azure.Functions.Cli.Tests.csproj");
 
-        public static readonly string[] TargetRuntimes = new[] { "win-x86", "win-x64", "linux-x64", "osx-x64" };
+        public static readonly string[] TargetRuntimes = new[] { "win-x86", "win-x64", "linux-x64", "osx-x64", "no-runtime" };
 
         public const string DistLibVersion = "distlib-15dba58a827f56195b0fa0afe80a8925a92e8bf5";
 

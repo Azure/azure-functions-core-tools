@@ -46,7 +46,8 @@ namespace Build
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
-                                    $"-o {outputPath} -c Release -r {runtime}");
+                                    $"-o {outputPath} -c Release " +
+                                    (runtime.Equals("no-runtime", StringComparison.OrdinalIgnoreCase) ? string.Empty : " -r {runtime}"));
             }
         }
 
