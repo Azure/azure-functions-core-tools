@@ -47,7 +47,7 @@ namespace Build
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     $"-o {outputPath} -c Release " +
-                                    (runtime.Equals("no-runtime", StringComparison.OrdinalIgnoreCase) ? string.Empty : " -r {runtime}"));
+                                    (runtime.Equals("no-runtime", StringComparison.OrdinalIgnoreCase) ? string.Empty : $" -r {runtime}"));
             }
         }
 
