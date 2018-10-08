@@ -46,9 +46,9 @@ namespace Build
 
         public static readonly string ProjectTemplates = $"https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.AzureFunctions.ProjectTemplates/{ProjectTemplatesVersion}";
 
-        public static string BuildNumber => config("9999", "APPVEYOR_BUILD_NUMBER");
+        public static string BuildNumber => config(null, "Build.BuildId") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
 
-        public static string CommitId => config("N/A", "APPVEYOR_REPO_COMMIT");
+        public static string CommitId => config(null, "Build.SourceVersion") ?? config("N /A", "APPVEYOR_REPO_COMMIT");
 
         public static string BuildArtifactsStorage => config(null);
     }

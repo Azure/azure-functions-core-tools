@@ -117,7 +117,7 @@ namespace Build
 
         public static void Zip()
         {
-            var version = GetCurrentVersion();
+            var version = CurrentVersion;
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var path = Path.Combine(Settings.OutputDir, runtime);
@@ -151,19 +151,29 @@ namespace Build
                 }
             }
         }
-        private static string GetCurrentVersion()
+
+        private static string _version;
+        private static string CurrentVersion
         {
-            var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
-                : Path.Combine(Settings.OutputDir, "linux-x64", "func");
-            return Shell.GetOutput(funcPath, "--version");
+            get
+            {
+                if (string.IsNullOrEmpty(_version))
+                {
+                    var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                        ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
+                        : Path.Combine(Settings.OutputDir, "linux-x64", "func");
+
+                    _version = Shell.GetOutput(funcPath, "--version");
+                }
+                return _version;
+            }
         }
 
         public static void UploadToStorage()
         {
             if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
             {
-                var version = new Version(GetCurrentVersion());
+                var version = new Version(CurrentVersion);
                 var storageAccount = CloudStorageAccount.Parse(Settings.BuildArtifactsStorage);
                 var blobClient = storageAccount.CreateCloudBlobClient();
                 var container = blobClient.GetContainerReference("builds");
