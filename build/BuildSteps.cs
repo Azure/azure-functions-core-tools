@@ -123,7 +123,7 @@ namespace Build
                 var path = Path.Combine(Settings.OutputDir, runtime);
                 var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
 
-                ZipFile.CreateFromDirectory(path, zipPath);
+                ZipFile.CreateFromDirectory(path, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
                 File.WriteAllText($"{zipPath}.sha2", ComputeSha256(zipPath));
             }
 
