@@ -183,6 +183,29 @@ This means that HTTP triggered functions will not receive traffic running on a V
 
 A good usage scenario for using functions with VKubelet would be with event triggered / time triggered functions that do not rely on external HTTP traffic.
 
+## Getting Started on Azure Container Instance - ACI
+
+Using the Core Tools, you can easily run Azure Functions on Azure Container Instance.
+The Core Tools will build and push a Docker image of the function to a given registry and create corresponding Azure Container Instance objects including a Deployment.
+
+First, make sure you init a Docker file.
+
+```bash
+func init --docker
+```
+### Prerequisites
+
+* [Docker](https://docs.docker.com/install/)
+
+### Deploy a function to Azure Container Instance
+
+```bash
+func deploy --platform aci --name myfunction --registry <docker-hub-id or registry-server>
+--resourcegroupname <azure-resource-group> --containergroupname <aci-group-name> --subscriptionid <subscription-id> 
+--location <location> --port <port> --containermemory <memory-in-gb> --containercpu <container-cpu> --ostype <linux | windows>
+```
+
+
 ## Known Issues:
 
 `func extensions` command require the `dotnet` cli to be installed and on your path. This requirement is tracked [here](https://github.com/Azure/azure-functions-core-tools/issues/367). You can install .NET Core for your platform from https://www.microsoft.com/net/download/
