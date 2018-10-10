@@ -34,7 +34,10 @@ namespace Azure.Functions.Cli
         Templates,
 
         [Description("Commands for installing extensions")]
-        Extensions
+        Extensions,
+
+        [Description("Commands for setting up and using authentication tools")]
+        Auth
     }
 
     internal static class ContextEnumExtensions

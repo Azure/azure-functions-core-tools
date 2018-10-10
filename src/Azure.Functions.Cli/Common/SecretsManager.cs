@@ -28,6 +28,21 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
+        public static string MiddlewareAuthSettingsFilePath
+        {
+            get
+            {
+                var authFile = "local.middleware.json";
+                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, new List<string>
+                {
+                    ScriptConstants.HostMetadataFileName,
+                    authFile,
+                });
+                var authFilePath = Path.Combine(rootPath, authFile);
+                return authFilePath;
+            }
+        }
+
         public static string AppSettingsFileName
         {
             get
@@ -36,10 +51,24 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
+        public static string MiddlewareAuthSettingsFileName
+        {
+            get
+            {
+                return Path.GetFileName(MiddlewareAuthSettingsFilePath);
+            }
+        }
+
         public IDictionary<string, string> GetSecrets()
         {
             var appSettingsFile = new AppSettingsFile(AppSettingsFilePath);
             return appSettingsFile.GetValues();
+        }
+
+        public IDictionary<string, string> GetMiddlewareAuthSettings()
+        {
+            var authSettingsFile = new AuthSettingsFile(MiddlewareAuthSettingsFilePath);
+            return authSettingsFile.GetValues();
         }
 
         public IEnumerable<ConnectionString> GetConnectionStrings()

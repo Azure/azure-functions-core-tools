@@ -88,5 +88,12 @@ namespace Azure.Functions.Cli
         {
             return str.Replace(" ", string.Empty).Equals(another.Replace(" ", string.Empty), StringComparison.OrdinalIgnoreCase);
         }
+
+        public static Uri SetPort(this Uri uri, int newPort)
+        {
+            var builder = new UriBuilder(uri);
+            builder.Port = newPort;
+            return builder.Uri;
+        }
     }
 }

@@ -62,6 +62,9 @@ namespace Azure.Functions.Cli
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();
 
+            builder.RegisterType<AuthManager>()
+                .As<IAuthManager>();
+
             return builder.Build();
         }
     }

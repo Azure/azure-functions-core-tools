@@ -7,8 +7,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -430,7 +428,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             foreach (var pair in local)
             {
                 if (result.ContainsKeyCaseInsensitive(pair.Key) &&
-                    !result.GetValueCaseInsensitive(pair.Key).Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(result.GetValueCaseInsensitive(pair.Key), pair.Value, StringComparison.OrdinalIgnoreCase))
                 {
                     ColoredConsole.WriteLine($"App setting {pair.Key} is different between azure and {SecretsManager.AppSettingsFileName}");
                     if (OverwriteSettings)

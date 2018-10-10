@@ -95,6 +95,7 @@ namespace Azure.Functions.Cli.Helpers
                 LoadSitePublishingCredentialsAsync(site, accessToken),
                 LoadSiteConfigAsync(site, accessToken),
                 LoadAppSettings(site, accessToken),
+                LoadAuthSettings(site, accessToken),
                 LoadConnectionStrings(site, accessToken)
             }
             //.IgnoreFailures()
@@ -115,6 +116,14 @@ namespace Azure.Functions.Cli.Helpers
             var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AppSettings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, string>>>(HttpMethod.Post, url, accessToken);
             site.AzureAppSettings = armResponse.properties;
+            return site;
+        }
+
+        private async static Task<Site> LoadAuthSettings(Site site, string accessToken)
+        {
+            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AuthSettings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, string>>>(HttpMethod.Post, url, accessToken);
+            site.AzureAuthSettings = armResponse.properties;
             return site;
         }
 
@@ -234,6 +243,26 @@ namespace Azure.Functions.Cli.Helpers
         {
             var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAppSettings });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadAsAsync<ArmWrapper<Dictionary<string, string>>>();
+                return new HttpResult<Dictionary<string, string>, string>(result.properties);
+            }
+            else
+            {
+                var result = await response.Content.ReadAsStringAsync();
+                var parsedResult = JsonConvert.DeserializeObject<JObject>(result);
+                var errorMessage = parsedResult["Message"].ToString();
+                return string.IsNullOrEmpty(errorMessage)
+                    ? new HttpResult<Dictionary<string, string>, string>(null, result)
+                    : new HttpResult<Dictionary<string, string>, string>(null, errorMessage);
+            }
+        }
+
+        public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAuthSettings(Site site, string accessToken)
+        {
+            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/authsettings?api-version={_storageApiVersion}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAuthSettings });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadAsAsync<ArmWrapper<Dictionary<string, string>>>();

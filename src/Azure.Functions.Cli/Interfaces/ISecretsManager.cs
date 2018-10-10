@@ -14,5 +14,6 @@ namespace Azure.Functions.Cli.Interfaces
         void DeleteSecret(string name);
         void DeleteConnectionString(string name);
         HostStartSettings GetHostStartSettings();
+        IDictionary<string, string> GetMiddlewareAuthSettings();
     }
 }

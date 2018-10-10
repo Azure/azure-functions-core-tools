@@ -28,6 +28,8 @@ namespace Azure.Functions.Cli.Arm.Models
 
         public IDictionary<string, string> AzureAppSettings { get; set; }
 
+        public IDictionary<string, string> AzureAuthSettings { get; set; }
+
         public IDictionary<string, AppServiceConnectionString> ConnectionStrings { get; set; }
 
         public bool IsLinux

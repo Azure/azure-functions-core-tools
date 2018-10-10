@@ -27,6 +27,13 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
 
+        public const string MiddlewareAuthEnabledSetting = "WEBSITE_AUTH_ENABLED";
+        public const string MiddlewareLocalSettingsSetting = "Host.LocalSettingsPath";
+        public const string MiddlewareCertPathSetting = "Host.HttpsCertPath";
+        public const string MiddlewareCertPasswordSetting = "Host.HttpsCertPassword";
+        public const string MiddlewareListenUrlSetting = "Host.ListenUrl";
+        public const string MiddlewareHostUrlSetting = "Host.DestinationHostUrl";
+
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
         public static string CliDetailedVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
