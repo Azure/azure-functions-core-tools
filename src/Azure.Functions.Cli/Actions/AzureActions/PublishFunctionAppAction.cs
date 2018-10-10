@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
-            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
+            var additionalAppSettings = ValidateFunctionAppPublish(functionApp, workerRuntime);
 
             if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild)
             {
@@ -146,7 +146,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
+        private IDictionary<string, string> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
         {
             var result = new Dictionary<string, string>();
 

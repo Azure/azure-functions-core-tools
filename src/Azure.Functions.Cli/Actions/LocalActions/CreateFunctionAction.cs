@@ -94,7 +94,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else if (workerRuntime != WorkerRuntime.dotnet || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
-                    ColoredConsole.Write("Select a language: ");
                     var displayList = templates
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
@@ -106,6 +105,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                     else
                     {
+                        ColoredConsole.Write("Select a language: ");
                         Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
                     }
                 }
