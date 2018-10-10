@@ -55,6 +55,7 @@ namespace Azure.Functions.Cli.Common
         public static class StaticResourcesNames
         {
             public const string PythonDockerBuild = "python_docker_build.sh";
+            public const string PythonBundleScript = "python_bundle_script.py";
         }
 
         public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.1" };

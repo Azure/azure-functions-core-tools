@@ -165,6 +165,10 @@ namespace Azure.Functions.Cli.Helpers
 
                 var scriptFilePath = Path.GetTempFileName();
                 await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
+
+                var bundleScriptFilePath = Path.GetTempFileName();
+                await FileSystemHelpers.WriteAllTextToFileAsync(bundleScriptFilePath, (await StaticResources.PythonBundleScript).Replace("\r\n", "\n"));
+
                 if (!string.IsNullOrWhiteSpace(additionalPackages))
                 {
                     // Give the container time to start up
@@ -173,7 +177,9 @@ namespace Azure.Functions.Cli.Helpers
                     await DockerHelpers.ExecInContainer(containerId, $"apt-get install -y {additionalPackages}");
                 }
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
+                await DockerHelpers.CopyToContainer(containerId, bundleScriptFilePath, Constants.StaticResourcesNames.PythonBundleScript);
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
+                await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonBundleScript}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
 
                 var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));

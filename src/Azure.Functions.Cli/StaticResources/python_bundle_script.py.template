@@ -1,0 +1,56 @@
+from PyInstaller.__main__ import run
+import os
+import sys
+
+not_allowed = ["__pycache__"]
+
+# Gets the list of all the possible modules from a directory
+def get_possible_modules(location):
+    all_modules = []
+    dirs, files = get_dirs_files(location)
+    for a_file in files:
+        if is_python_file(a_file):
+            all_modules.append(os.path.splitext(a_file)[0])
+    for a_dir in dirs:
+        if a_dir in not_allowed:
+            continue
+        if dir_has_python_files(os.path.join(location, a_dir)):
+            all_modules.append(a_dir)
+    return all_modules
+
+# Gets the files and directories from a location
+def get_dirs_files(location):
+    dir_entries = os.listdir(location)
+    files = [entry for entry in dir_entries if os.path.isfile(os.path.join(location, entry))]
+    dirs = [entry for entry in dir_entries if os.path.isdir(os.path.join(location, entry))]
+    return dirs, files
+
+# Checks if the directory has any python files in it
+def dir_has_python_files(a_dir):
+    dirs, files = get_dirs_files(a_dir)
+    for a_file in files:
+        if is_python_file(a_file):
+            return True
+    for a_sub_dir in dirs:
+        if a_sub_dir in not_allowed:
+            continue
+        if dir_has_python_files(os.path.join(a_dir, a_sub_dir)):
+            return True
+    return False
+
+def is_python_file(a_file):
+    return a_file.endswith('.so') or a_file.endswith('.py') or a_file.endswith('.pyd') or a_file.endswith('.pyo') or a_file.endswith('.pyc')
+
+def __main__():
+    if len(sys.argv) < 3:
+        print("Need more arguments: Usage: python_build_template.py [starter_script] [python_packages_path]")
+        return 
+    packages_location = sys.argv[2]
+    all_modules = get_possible_modules(packages_location)
+    entry_file = sys.argv[1]
+    # Creates a list of hidden imports arguments for pyinstaller in the format - "--hidden-import=<module>"
+    hidden_modules_commands = ["--hidden-import=" + module_name for module_name in all_modules]
+    run(["--paths=" + packages_location, "--distpath=.", *hidden_modules_commands, "--name=worker-bundle", entry_file])
+
+if __name__ == '__main__':
+    __main__()
