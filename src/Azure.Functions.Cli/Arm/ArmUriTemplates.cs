@@ -6,14 +6,12 @@ namespace Azure.Functions.Cli.Arm
 {
     internal static class ArmUriTemplates
     {
-        public const string ArmApiVersion = "2014-04-01";
+        public const string ArmApiVersion = "2018-09-01";
         public const string WebsitesApiVersion = "2015-08-01";
         public const string SyncTriggersApiVersion = "2016-08-01";
         public const string ArmUrl = "https://management.azure.com";
 
-        public static readonly ArmUriTemplate Subscriptions = new ArmUriTemplate($"{ArmUrl}/subscriptions", ArmApiVersion);
-        public static readonly ArmUriTemplate Subscription = new ArmUriTemplate($"{Subscriptions.TemplateUrl}/{{subscriptionId}}", ArmApiVersion);
-        public static readonly ArmUriTemplate SubscriptionResourceByNameAndType = new ArmUriTemplate(Subscription.TemplateUrl + "/resources?$filter=(name eq '{resourceName}' and resourceType eq '{resourceType}')", ArmApiVersion);
+        public static readonly ArmUriTemplate SubscriptionResourceByNameAndType = new ArmUriTemplate($"{ArmUrl}/resources?$filter=(SubscriptionId eq '{{subscriptionId}}' and name eq '{{resourceName}}' and resourceType eq '{{resourceType}}')", ArmApiVersion);
     }
 
     public class ArmUriTemplate
