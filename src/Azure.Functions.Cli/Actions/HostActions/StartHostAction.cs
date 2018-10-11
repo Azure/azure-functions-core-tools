@@ -19,6 +19,7 @@ using Colors.Net;
 using Fclp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Azure.AppService.Middleware;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost;
@@ -126,7 +127,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate)
+        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate, bool authenticationEnabled, Uri baseUri)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(workerRuntime, LanguageWorkerSetting));
@@ -139,11 +140,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 defaultBuilder
                 .UseKestrel(options =>
                 {
-                    options.Listen(IPAddress.Loopback, baseAddress.Port, listenOptins =>
+                    options.Listen(IPAddress.Loopback, baseAddress.Port, listenOptions =>
                     {
-                        listenOptins.UseHttps(certificate);
+                        listenOptions.UseHttps(certificate);
                     });
                 });
+            }
+
+            if (authenticationEnabled)
+            {
+                SetupMiddlewareConfig(baseUri);
             }
 
             return defaultBuilder
@@ -159,7 +165,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     loggingBuilder.AddDefaultWebJobsFilters();
                     loggingBuilder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, authenticationEnabled)))
                 .Build();
         }
 
@@ -184,42 +190,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
 
             return settings;
-        }
-
-        /// <summary>
-        /// Start up authentication middleware process
-        /// </summary>
-        /// <param name="listenUrl">Where clients send requests</param>
-        /// <param name="hostUrl">Where middleware authentication container sends its modified requests. Also where the Functions runtime will be listening to</param>
-        /// <param name="certPath">Full (not relative) path to local certificate (used for HTTPS)</param>
-        /// <param name="certPassword">Password used when creating above certificate</param>
-        /// <returns>Started task</returns>
-        private async Task StartAuthenticationProcessAsync(string listenUrl, string hostUrl, string certPath, string certPassword)
-        {
-            // Listen URL: Where client requests come in to
-            // Host Destination URL: Output location of middleware authentication container. This is what the Functions runtime will be listening to.
-            if (CommandChecker.CommandExists("dotnet"))
-            {
-                // TODO IMPORTANT - this is very much just for dev/testing. NOT shippable.
-                // The Middleware Linux Nuget is not yet available. 
-                // Once it is, this code will be changed to invoke that, rather than a hardcoded DLL
-                string dllPath = @"C:\wagit\AAPT\Antares\EasyAuth\src\EasyAuth\MiddlewareLinux\bin\Debug\netcoreapp2.0\MiddlewareLinux.dll";
-
-                string query = $"--{Constants.MiddlewareListenUrlSetting} {listenUrl} --{Constants.MiddlewareHostUrlSetting} {hostUrl} " +
-                    $"--{Constants.MiddlewareLocalSettingsSetting} {SecretsManager.MiddlewareAuthSettingsFileName}";
-                if (certPath != null && certPassword != null)
-                {
-                    query += $"  --{Constants.MiddlewareCertPathSetting} {certPath} --{Constants.MiddlewareCertPasswordSetting} {certPassword}";
-                }
-                var process = Process.Start("CMD.exe", $"/C dotnet {dllPath} {query}");
-                var cancellationToken = new CancellationTokenSource();
-                cancellationToken.Token.Register(() => process.Kill());
-                await process.WaitForExitAsync();
-            }
-            else
-            {
-                throw new FileNotFoundException("Must have dotnet installed in order to use local authentication.");
-            }
         }
 
         private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
@@ -262,44 +232,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate, string certPath, string certPassword) = await Setup();
 
-            int originalPort = Port;
-            if (authenticationEnabled)
-            {
-                // If it is enabled, then the Functions Host needs a different port
-                Port = Port + 2;
-            }
-
-            // Regardless of whether or not auth is enabled, clients should send requests here
-            var originalListenUri = listenUri.SetPort(originalPort);
-            var originalBaseUri = baseUri.SetPort(originalPort);
-            var authTask = Task.CompletedTask;
-            if (authenticationEnabled)
-            {
-                // 1. Modify the Function's Uris to listen to the output of the middleware container, 
-                // rather than the port client requests come in on
-                // 2. Start the middleware container to listen to the Function's  
-                string originalUrl = originalListenUri.ToString(); // 0.0.0.0:port, where requests will be sent
-                string destinationHostUrl = baseUri.ToString(); // Output of middleware container
-                authTask = StartAuthenticationProcessAsync(originalUrl, destinationHostUrl, certPath, certPassword);
-            }
-
-            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate);
+            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate, authenticationEnabled, baseUri);
             var runTask = host.RunAsync();
 
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
 
             await hostService.DelayUntilHostReady();
 
-            ColoredConsole.WriteLine($"Listening on {originalListenUri}");
+            ColoredConsole.WriteLine($"Listening on {listenUri}");
             ColoredConsole.WriteLine("Hit CTRL-C to exit...");
 
             var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
             var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
-            DisplayHttpFunctionsInfo(scriptHost, httpOptions.Value, originalBaseUri);
+            DisplayHttpFunctionsInfo(scriptHost, httpOptions.Value, baseUri);
             DisplayDisabledFunctions(scriptHost);
             await SetupDebuggerAsync(baseUri);
 
-            await Task.WhenAll(runTask, authTask);
+            await runTask;
         }
 
         private async Task PreRunConditions(WorkerRuntime workerRuntime)
@@ -459,6 +408,29 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
+        /// <summary>
+        /// Add additional settings to be consumed by the EasyAuth Middleware
+        /// </summary>
+        /// <param name="baseUri"></param>
+        private static void SetupMiddlewareConfig(Uri baseUri)
+        {
+            // These are not necessary when Easy Auth is used in conjunction with the Functions CLI
+            // We add them here for compatibility with existing Easy Auth / Middleware codebase
+            var args = new string[] {
+                string.Format("{0}={1}", Constants.MiddlewareListenUrlSetting, baseUri.ToString()),
+                string.Format("{0}={1}", Constants.MiddlewareHostUrlSetting, baseUri.ToString()),
+            };
+
+            // Add above arguments, as well as the settings from local.middleware.json
+            IConfigurationRoot config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile(SecretsManager.MiddlewareAuthSettingsFilePath)
+                .AddCommandLine(args)
+                .Build();
+
+            ModuleConfig.HostConfig = config;
+        }
+
         private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert, string path, string password)> Setup()
         {
             var protocol = UseHttps ? "https" : "http";
@@ -476,11 +448,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             private readonly WebHostBuilderContext _builderContext;
             private readonly ScriptApplicationHostOptions _hostOptions;
             private readonly string[] _corsOrigins;
+            private readonly bool _authenticationEnabled;
 
-            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins)
+            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool authEnabled)
             {
                 _builderContext = builderContext;
                 _hostOptions = hostOptions;
+                _authenticationEnabled = authEnabled;
 
                 if (!string.IsNullOrEmpty(corsOrigins))
                 {
@@ -535,6 +509,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 IApplicationLifetime applicationLifetime = app.ApplicationServices
                     .GetRequiredService<IApplicationLifetime>();
+
+                if (_authenticationEnabled)
+                {
+                    ILoggerProvider loggerProvider = app.ApplicationServices
+                        .GetRequiredService<ILoggerProvider>();
+
+                    app.UseAppServiceMiddleware(loggerProvider);
+                }
 
                 app.UseWebJobsScriptHost(applicationLifetime);
             }

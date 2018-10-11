@@ -72,6 +72,16 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.0.0-beta4-10082" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="0.1.20-alpha" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.0-12134" />
+    <PackageReference Include="Microsoft.Extensions.Logging.AzureAppServices" Version="2.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ! CANNOT BE MERGED. WILL NOT BE NECESSARY WHEN AVAILABLE VIA NUGET !-->
+    <Reference Include="Microsoft.Azure.AppService.Middleware">
+      <HintPath>C:\wagit\AAPT\Antares\EasyAuth\src\EasyAuth\MiddlewareLinux\bin\Debug\netcoreapp2.0\Microsoft.Azure.AppService.Middleware.dll</HintPath>
+    </Reference>
+    <Reference Include="MiddlewareLinux">
+      <HintPath>C:\wagit\AAPT\Antares\EasyAuth\src\EasyAuth\MiddlewareLinux\bin\Debug\netcoreapp2.0\MiddlewareLinux.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>
