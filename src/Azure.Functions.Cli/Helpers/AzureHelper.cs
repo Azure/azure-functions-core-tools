@@ -64,20 +64,18 @@ namespace Azure.Functions.Cli.Helpers
             return ArmHttpAsync<IEnumerable<FunctionInfo>>(HttpMethod.Get, url, accessToken);
         }
 
-        internal static async Task<string> GetFunctionKey(string functionAdminUrl, string functionScmUri, string accessToken)
+        internal static async Task<string> GetFunctionKey(string functionName, string appId, string accessToken)
         {
             // If anything goes wrong anywhere, simply return null and let the caller take care of it.
-            if (string.IsNullOrEmpty(functionAdminUrl) || string.IsNullOrEmpty(functionScmUri) || string.IsNullOrEmpty(accessToken))
+            if (string.IsNullOrEmpty(functionName) || string.IsNullOrEmpty(accessToken))
             {
                 return null;
             }
-            var scmUrl = new Uri($"https://{functionScmUri}/api/functions/admin/token");
-            var url = new Uri($"{functionAdminUrl}/keys");
-            var key = "";
+            var url = new Uri($"{ArmUriTemplates.ArmUrl}{appId}/hostruntime/admin/functions/{functionName}/keys?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var key = string.Empty;
             try
             {
-                var token = await ArmHttpAsync<string>(HttpMethod.Get, scmUrl, accessToken);
-                var keysJson = await ArmHttpAsync<JToken>(HttpMethod.Get, url, token);
+                var keysJson = await ArmHttpAsync<JToken>(HttpMethod.Get, url, accessToken);
                 key = (string)(keysJson["keys"] as JArray).First()["value"];
             }
             catch (Exception)
@@ -267,7 +265,7 @@ namespace Azure.Functions.Cli.Helpers
                 if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
                 {
                     // If there's a key available and the key is requested, add it to the url
-                    var key = showKeys? await GetFunctionKey(function.Href.AbsoluteUri, functionApp.ScmUri, accessToken) : null;
+                    var key = showKeys? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken) : null;
                     if (!string.IsNullOrEmpty(key))
                     {
                         ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");
