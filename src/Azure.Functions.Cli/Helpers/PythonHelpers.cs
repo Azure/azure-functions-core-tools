@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Helpers
             await InstallPipWheel();
             await InstallPythonAzureFunctionPackage();
             await PipFreeze();
+            await EnsureVirtualEnvrionmentIgnored();
         }
 
         public static void VerifyVirtualEnvironment()
@@ -31,6 +32,39 @@ namespace Azure.Functions.Cli.Helpers
             if (!InVirtualEnvironment)
             {
                 throw new CliException("For Python function apps, you have to be running in a venv. Please create and activate a Python 3.6 venv and run this command again.");
+            }
+        }
+
+        public static async Task EnsureVirtualEnvrionmentIgnored()
+        {
+            try
+            {
+                var virtualEnvName = Path.GetFileNameWithoutExtension(VirtualEnvironmentPath);
+                if (FileSystemHelpers.DirectoryExists(Path.Join(Environment.CurrentDirectory, virtualEnvName)))
+                {
+                    var funcIgnorePath = Path.Join(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
+                    // If .funcignore exists and already has the venv name, we are done here
+                    if (FileSystemHelpers.FileExists(funcIgnorePath))
+                    {
+                        var rawfuncIgnoreContents = await FileSystemHelpers.ReadAllTextFromFileAsync(funcIgnorePath);
+                        if (rawfuncIgnoreContents.Contains(Environment.NewLine + virtualEnvName))
+                        {
+                            return;
+                        }
+                    }
+                    // Write the current env to .funcignore
+                    ColoredConsole.WriteLine($"Writing {Constants.FuncIgnoreFile}");
+                    using (var fileStream = FileSystemHelpers.OpenFile(funcIgnorePath, FileMode.Append, FileAccess.Write))
+                    using (var streamWriter = new StreamWriter(fileStream))
+                    {
+                        await streamWriter.WriteAsync(Environment.NewLine + virtualEnvName);
+                        await streamWriter.FlushAsync();
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Safe execution, we aren't harmed by failures here
             }
         }
 
