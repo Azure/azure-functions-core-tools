@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
@@ -43,6 +44,28 @@ namespace Azure.Functions.Cli.Common
             public const string NoRunningInstances = "No running instances";
             public const string PidAndAllAreMutuallyExclusive = "-p/--processId and -a/--all are mutually exclusive";
             public const string EitherPidOrAllMustBeSpecified = "Must specify either -a/--all or -p/--processId <Pid>";
+        }
+
+        public static class AADConstants
+        {
+            public static class ServicePrincipals
+            {
+                public const string AzureADGraph = "00000002-0000-0000-c000-000000000000";
+            }
+
+            public static class Permissions
+            {
+                public static readonly Guid AccessApplication = new Guid("92042086-4970-4f83-be1c-e9c8e2fab4c8");
+                public static readonly Guid EnableSSO = new Guid("311a71cc-e848-46a1-bdf8-97ff7156d8e6");
+                public static readonly Guid ReadDirectoryData = new Guid("5778995a-e1bf-45b8-affa-663a9f3f4d04");
+                public static readonly Guid ReadAndWriteDirectoryData = new Guid("78c8a3c8-a07e-4b9e-af1b-b5ccab50a175");
+            }
+
+            public static class ResourceAccessTypes
+            {
+                public const string Application = "Role";
+                public const string User = "Scope";
+            }
         }
 
         public static class ArmConstants

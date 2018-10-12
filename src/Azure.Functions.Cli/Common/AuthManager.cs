@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Helpers;
@@ -14,7 +15,8 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using static Azure.Functions.Cli.Common.OutputTheme;
+using static Azure.Functions.Cli.Common.Constants;
+using static Azure.Functions.Cli.Extensions.StringExtensions;
 using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Common
@@ -48,13 +50,12 @@ namespace Azure.Functions.Cli.Common
 
                 int exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));               
 
-                // Clean up file we created to pass data in proper format to az CLI
+                // Delete temporary file created to pass data in proper format to az CLI
                 File.Delete($"{tempFile}");
 
                 if (exitCode != 0)
                 {
-                    ColoredConsole.WriteLine(Red(stderr.ToString().Trim(' ', '\n', '\r', '"')));
-                    return;
+                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r', '"'));
                 }
 
                 string response = stdout.ToString().Trim(' ', '\n', '\r', '"');
@@ -119,7 +120,7 @@ namespace Azure.Functions.Cli.Common
 
             // This AAD application is for local development - use localhost reply URLs, create local.middleware.json
             if (appName == null)
-            {               
+            {
                 // OAuth is port sensitive. There is no way of using a wildcard in the reply URLs to allow for variable ports
                 // Set the port in the reply URLs to the default used by the Functions Host
                 identifierUrl = "https://" + AADName + ".localhost";
@@ -162,6 +163,7 @@ namespace Azure.Functions.Cli.Common
             // Create a local auth .json file that will be used by the middleware
             var middlewareAuthSettingsFile = SecretsManager.MiddlewareAuthSettingsFileName;
             MiddlewareAuthSettings = new AuthSettingsFile(middlewareAuthSettingsFile);
+            MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_ALLOWED_AUDIENCES", serializedReplyUrls);
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_AUTO_AAD", "True");
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_CLIENT_ID", clientId);
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_CLIENT_SECRET", clientSecret);
@@ -172,14 +174,66 @@ namespace Azure.Functions.Cli.Common
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_TOKEN_STORE", "True");
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_UNAUTHENTICATED_ACTION", "AllowAnonymous");
 
-            // Middleware requires signing and encryption keys for local testing
-            // These will be different than the encryption and signing keys used by the application in production
+            // Create signing and encryption keys for local testing
             string encryptionKey = ComputeSha256Hash(clientSecret);
             string signingKey = ComputeSha256Hash(clientId);
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_ENCRYPTION_KEY", encryptionKey);
-            MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_SIGNING_KEY", signingKey);
-            MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_ALLOWED_AUDIENCES", serializedReplyUrls);
+            MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_SIGNING_KEY", signingKey);            
             MiddlewareAuthSettings.Commit();
+
+            // We also need to add this file to the .csproj so that it copies to \bin\debug\netstandard2.x when the Function builds
+            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
+
+            if (csProjFiles.Count == 1)
+            {
+                ModifyCSProj(csProjFiles.First());
+                return;
+            }
+            else if (csProjFiles.Count == 0)
+            {
+                // The working directory might be \bin\debug\netstandard2.x
+                // Try going up three levels to the main Function directory
+                var functionDir = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, @"..\..\..\"));
+                var functionDirProjFiles = FileSystemHelpers.GetFiles(functionDir, searchPattern: "*.csproj").ToList();
+
+                if (functionDirProjFiles.Count == 1)
+                {
+                    ModifyCSProj(functionDirProjFiles.First());
+                    return;
+                }
+            }
+
+            throw new CliException($"Need to be in same folder as .csproj file. Expected 1 .csproj but found {csProjFiles.Count}");
+        }
+
+        /// <summary>
+        /// Modify the Function's .csproj so the middleware auth json file will copy to the output directory
+        /// </summary>
+        public static void ModifyCSProj(string csProj)
+        {
+            var xmlFile = XDocument.Load(csProj);
+
+            var project = xmlFile.Element("Project");
+            var itemGroups = project.Elements("ItemGroup");
+
+            var existing = itemGroups.Elements("None").FirstOrDefault(elm => elm.Attribute("Update").Value.Equals(SecretsManager.MiddlewareAuthSettingsFileName));
+            if (existing != null)
+            {
+                // If we've previously added this file to the .csproj during a previous create-aad call, do not add again
+                return;
+            }
+
+            // Assemble the attribute
+            var newItemGroup = new XElement("ItemGroup");
+            var noneElement = new XElement("None", new XAttribute("Update", SecretsManager.MiddlewareAuthSettingsFileName));
+            noneElement.Add(new XElement("CopyToOutputDirectory", "PreserveNewest"));
+            noneElement.Add(new XElement("CopyToPublishDirectory", "Never"));
+            newItemGroup.Add(noneElement);
+
+            // append item group to project, rather than modifying existing item group
+            project.Add(newItemGroup);
+            xmlFile.Save(csProj);
+            ColoredConsole.WriteLine(Yellow($"Modified {csProj} to include {SecretsManager.MiddlewareAuthSettingsFileName} in output directory."));
         }
 
         public Dictionary<string, string> CreateAuthSettingsToPublish(string homepage, string clientId, string clientSecret, string tenant, List<string> replyUrls)
@@ -187,17 +241,19 @@ namespace Azure.Functions.Cli.Common
             // The 'allowedAudiences' setting of /config/authsettings is of the form ["{replyURL1}", "{replyURL2}"]
             string serializedArray = JsonConvert.SerializeObject(replyUrls, Formatting.Indented);
 
-            var authSettingsToPublish = new Dictionary<string, string>();
-            authSettingsToPublish.Add("allowedAudiences", serializedArray);
-            authSettingsToPublish.Add("isAadAutoProvisioned", "True");
-            authSettingsToPublish.Add("clientId", clientId);
-            authSettingsToPublish.Add("clientSecret", clientSecret);
-            authSettingsToPublish.Add("defaultProvider", "0"); // 0 corresponds to AzureActiveDirectory
-            authSettingsToPublish.Add("enabled", "True");
-            authSettingsToPublish.Add("issuer", "https://sts.windows.net/" + tenant + "/");
-            authSettingsToPublish.Add("runtimeVersion", "1.0.0");
-            authSettingsToPublish.Add("tokenStoreEnabled", "True");
-            authSettingsToPublish.Add("unauthenticatedClientAction", "1"); // Corresponds to AllowAnonymous
+            var authSettingsToPublish = new Dictionary<string, string>
+            {
+                { "allowedAudiences", serializedArray },
+                { "isAadAutoProvisioned", "True" },
+                { "clientId", clientId },
+                { "clientSecret", clientSecret },
+                { "defaultProvider", "0" }, // 0 corresponds to AzureActiveDirectory
+                { "enabled", "True" },
+                { "issuer", "https://sts.windows.net/" + tenant + "/" },
+                { "runtimeVersion", "1.0.0" },
+                { "tokenStoreEnabled", "True" },
+                { "unauthenticatedClientAction", "1" } // Corresponds to AllowAnonymous
+            };
 
             return authSettingsToPublish;
         }
@@ -208,31 +264,10 @@ namespace Azure.Functions.Cli.Common
             var result = await AzureHelper.UpdateFunctionAppAuthSettings(functionApp, accessToken);
             if (!result.IsSuccessful)
             {
-                ColoredConsole
-                    .Error
-                    .WriteLine(ErrorColor("Error updating app settings:"))
-                    .WriteLine(ErrorColor(result.ErrorResult));
-                return false;
+                throw new CliException((result.ErrorResult));
             }
             return true;
-        }
-
-        static string ComputeSha256Hash(string rawData)
-        {
-            // Create a SHA256   
-            using (SHA256 sha256Hash = SHA256.Create())
-            {
-                // ComputeHash - returns byte array  
-                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-                // Convert byte array to a string   
-                StringBuilder builder = new StringBuilder();
-                for (int i = 0; i < bytes.Length; i++)
-                {
-                    builder.Append(bytes[i].ToString("x2"));
-                }
-                return builder.ToString();
-            }
-        }
+        }   
 
         public static string GeneratePassword(int length)
         {
@@ -273,28 +308,6 @@ namespace Azure.Functions.Cli.Common
                 password.Any(c => char.IsLower(c)) &&
                 password.Any(c => char.IsDigit(c)) &&
                 password.Any(c => !char.IsLetterOrDigit(c));
-        }
-    }
-
-    static class AADConstants
-    {
-        public static class ServicePrincipals
-        {
-            public const string AzureADGraph = "00000002-0000-0000-c000-000000000000";
-        }
-
-        public static class Permissions
-        {
-            public static readonly Guid AccessApplication = new Guid("92042086-4970-4f83-be1c-e9c8e2fab4c8");
-            public static readonly Guid EnableSSO = new Guid("311a71cc-e848-46a1-bdf8-97ff7156d8e6");
-            public static readonly Guid ReadDirectoryData = new Guid("5778995a-e1bf-45b8-affa-663a9f3f4d04");
-            public static readonly Guid ReadAndWriteDirectoryData = new Guid("78c8a3c8-a07e-4b9e-af1b-b5ccab50a175");
-        }
-
-        public static class ResourceAccessTypes
-        {
-            public const string Application = "Role";
-            public const string User = "Scope";
         }
     }
 
