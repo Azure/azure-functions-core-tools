@@ -1,4 +1,4 @@
-version: 2.0.1.{build}
+version: "{build}"
 image: Visual Studio 2017
 
 clone_folder: c:\azure-functions-cli
@@ -7,17 +7,7 @@ build_script:
 - cmd: build.cmd
 
 artifacts:
-- path: deploy\Azure.Functions.*.zip
+- path: artifacts\Azure.Functions.*.zip
   name: Release
-- path: deploy\Azure.Functions.*.sha2
+- path: artifacts\Azure.Functions.*.sha2
   name: Release
-
-deploy:
-- provider: AzureBlob
-  storage_account_name: functionsclibuilds
-  storage_access_key:
-    secure: Ragovca8PBMRIjRGsY0Q0MCv7pw5sr06pov6ERYQIH+UWq9Jf0ILvSBZlO8o3mCIAKTf+khFKXeLqYAC6NFS0OvZ+n9GvcFVknSW5fmhOg/L8uYvXUXD4zXc9iO9t5Dh
-  container: builds
-  folder: $(APPVEYOR_BUILD_VERSION)
-  artifact: Release
-  set_content_type: true

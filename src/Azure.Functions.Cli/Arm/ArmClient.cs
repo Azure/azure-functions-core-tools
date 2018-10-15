@@ -46,6 +46,10 @@ namespace Azure.Functions.Cli.Arm
                             }
                             else
                             {
+                                if (StaticSettings.IsDebug)
+                                {
+                                    ColoredConsole.Error.WriteLine(ErrorColor(await response.Content.ReadAsStringAsync()));
+                                }
                                 retries--;
                             }
                         }

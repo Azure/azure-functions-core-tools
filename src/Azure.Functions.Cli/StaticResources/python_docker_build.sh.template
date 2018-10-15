@@ -7,9 +7,15 @@ cd /home/site/wwwroot
 if [ -d worker_venv ]; then
     rm -rf worker_venv
 fi
-python -m venv --copies worker_venv
-source worker_venv/bin/activate
-pip install -r requirements.txt
+
+pip install --target=./site_packages -r requirements.txt
+
+# Bundle using pyinstaller
+pip install pyinstaller==3.4
+python /python_bundle_script.py /azure-functions-host/workers/python/worker.py  ./site_packages
+rm -r ./site_packages ./build
+rm worker-bundle.spec
+
 apt-get update
 apt-get install zip -y
 zip --symlinks -r /app.zip .

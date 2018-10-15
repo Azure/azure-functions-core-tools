@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Arm.Models
     {
         public string SiteId { get; private set; }
 
-        public string SiteName { get; private set; }
+        public string SiteName { get; set; }
 
         public string HostName { get; set; }
 

@@ -1,4 +1,5 @@
 ﻿using Azure.Functions.Cli.Tests.E2E.Helpers;
+using System;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
@@ -36,6 +37,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "init 12n.ew-file$ --worker-runtime dotnet",
                     "new --prefix 12n.ew-file$ --template HttpTrigger --name 12@n.other-file$"
                 },
+                CommandTimeout = new TimeSpan(0, 1, 0),
                 CheckFiles =  new[]
                 {
                     new FileResult

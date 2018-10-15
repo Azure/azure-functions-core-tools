@@ -70,9 +70,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("Displays a list of files that will be included in publishing based on .funcignore")
                 .Callback(f => ListIncludedFiles = f);
             Parser
-                .Setup<bool>("zip")
+                .Setup<bool>("nozip")
                 .WithDescription("Publish in Run-From-Zip package. Requires the app to have AzureWebJobsStorage setting defined.")
-                .Callback(f => RunFromZipDeploy = f);
+                .SetDefault(false)
+                .Callback(f => RunFromZipDeploy = !f);
             Parser
                 .Setup<bool>("build-native-deps")
                 .SetDefault(false)
@@ -116,7 +117,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
-            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
+            var additionalAppSettings = ValidateFunctionAppPublish(functionApp, workerRuntime);
 
             if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild)
             {
@@ -146,7 +147,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
+        private IDictionary<string, string> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
         {
             var result = new Dictionary<string, string>();
 
@@ -234,7 +235,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromZipDeploy)
             {
-                throw new CliException("--zip is not supported with dedicated linux apps.");
+                throw new CliException("Run from package is not supported with dedicated linux apps. Please use --nozip");
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
@@ -246,7 +247,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
-            // if consumption Linux, or --zip, run from zip
+            // if consumption Linux, or run from zip
             if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
             {
                 await PublishRunFromZip(functionApp, await zipStreamFactory());
@@ -271,6 +272,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await SyncTriggers(functionApp);
             }
+            await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, showKeys: true);
         }
 
         private async Task SyncTriggers(Site functionApp)

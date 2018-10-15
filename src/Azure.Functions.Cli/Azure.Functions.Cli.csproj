@@ -4,7 +4,15 @@
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>
-    <Version>2.0.1.39-beta</Version>
+
+    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
+    <MajorMinorProductVersion>2.1</MajorMinorProductVersion>
+    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
+    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
+    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
+    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
+    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash)</InformationalVersion>
+
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
@@ -43,13 +51,16 @@
     <EmbeddedResource Include="StaticResources\python_docker_build.sh.template">
       <LogicalName>$(AssemblyName).python_docker_build.sh</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\python_bundle_script.py.template">
+      <LogicalName>$(AssemblyName).python_bundle_script.py</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\templates.json.template">
       <LogicalName>$(AssemblyName).templates.json</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\tools\python\packapp.py">
-      <Link>tools\python\packapp.py</Link>
+    <Content Include="..\..\tools\python\packapp\__main__.py">
+      <Link>tools\python\packapp\__main__.py</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -60,9 +71,10 @@
     <PackageReference Include="KubeClient" Version="2.1.5" />
     <PackageReference Include="KubeClient.Extensions.KubeConfig" Version="2.1.5" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.1.1" />
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.1.1-beta03" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.1.1-beta03-10111" />
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.0.0-beta4-10082" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.0-rc1-12080" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="0.1.20-alpha" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.0-12134" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
   </ItemGroup>
 </Project>

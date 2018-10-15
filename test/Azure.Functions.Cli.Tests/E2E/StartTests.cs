@@ -131,7 +131,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Test = async (_, p) =>
                     {
                         // give the host time to load functions and print any errors
-                        await Task.Delay(TimeSpan.FromSeconds(5));
+                        await Task.Delay(TimeSpan.FromSeconds(10));
                         p.Kill();
                     }
                 }
