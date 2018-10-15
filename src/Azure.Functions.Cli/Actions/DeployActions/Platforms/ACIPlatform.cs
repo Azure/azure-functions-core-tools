@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                         containerGroupName: ContainerGroupName,
                         containerGroup: containerDefinition);
 
-                    ColoredConsole.WriteLine("Container group sucessefully created");                    
+                    ColoredConsole.WriteLine("Container group sucessefully created.");                    
                 }
                 else
                 {
