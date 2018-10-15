@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.DeployActions.Platforms;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
@@ -157,7 +158,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            var image = $"{Registry}/{Name}";
+            var image = $"{Registry}/{Name.SanitizeImageName()}";
 
             ColoredConsole.WriteLine("Building Docker image...");
             await DockerHelpers.DockerBuild(image, Environment.CurrentDirectory);

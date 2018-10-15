@@ -1,4 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using Azure.Functions.Cli.Exceptions;
+using Newtonsoft.Json;
+using System;
+using System.Text.RegularExpressions;
 
 namespace Azure.Functions.Cli.Extensions
 {
@@ -21,6 +24,22 @@ namespace Azure.Functions.Cli.Extensions
             {
                 return false;
             }
+        }
+
+        public static string SanitizeImageName(this string imageName)
+        {
+            if (string.IsNullOrWhiteSpace(imageName))
+            {
+                throw new System.ArgumentException($"{nameof(imageName)} cannot be null or empty", nameof(imageName));
+            }
+
+            string cleanImageName = new Regex(@"[^\d\w_]").Replace(imageName, "");
+            if (string.IsNullOrWhiteSpace(cleanImageName))
+            {
+                throw new ImageNameFormatException(imageName);
+            }
+
+            return cleanImageName.ToLowerInvariant().Substring(0, Math.Min(cleanImageName.Length, 128)).Trim();
         }
     }
 }
