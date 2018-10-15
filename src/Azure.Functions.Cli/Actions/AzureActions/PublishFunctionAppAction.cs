@@ -266,8 +266,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishAppSettings(functionApp, new Dictionary<string, string>(), additionalAppSettings);
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(5));
-            await SyncTriggers(functionApp);
+            // Syncing triggers is not required when using zipdeploy api
+            if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                await SyncTriggers(functionApp);
+            }
             await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, showKeys: true);
         }
 
