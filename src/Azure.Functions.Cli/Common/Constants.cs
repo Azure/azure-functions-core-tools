@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using Microsoft.Azure.WebJobs.Script.Description;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -51,14 +52,29 @@ namespace Azure.Functions.Cli.Common
             public static class ServicePrincipals
             {
                 public const string AzureADGraph = "00000002-0000-0000-c000-000000000000";
+                public const string MicrosoftGraph = "00000003-0000-0000-c000-000000000000";
             }
 
             public static class Permissions
             {
                 public static readonly Guid AccessApplication = new Guid("92042086-4970-4f83-be1c-e9c8e2fab4c8");
-                public static readonly Guid EnableSSO = new Guid("311a71cc-e848-46a1-bdf8-97ff7156d8e6");
-                public static readonly Guid ReadDirectoryData = new Guid("5778995a-e1bf-45b8-affa-663a9f3f4d04");
-                public static readonly Guid ReadAndWriteDirectoryData = new Guid("78c8a3c8-a07e-4b9e-af1b-b5ccab50a175");
+                public static readonly Guid EnableSSO = new Guid("311a71cc-e848-46a1-bdf8-97ff7156d8e6");           
+            }
+
+            public static class MicrosoftGraphReadPermissions
+            {
+                public static readonly Guid UserRead = new Guid("e1fe6dd8-ba31-4d61-89e7-88639da4683d"); // sign in, read user profile
+                public static readonly Guid FilesReadAll = new Guid("df85f4d6-205c-4ac5-a5ea-6bf408dba283"); // read all files user can access
+                public static readonly Guid FilesRead = new Guid("10465720-29dd-4523-a11a-6a75c743c9d9"); // read user's files
+                public static readonly Guid MailRead = new Guid("570282fd-fa5c-430d-a7fd-fc8dc98a9dca"); // read user's mail
+            }
+
+            public static class MicrosoftGraphReadWritePermissions
+            {
+                public static readonly Guid FilesWriteAll = new Guid("863451e7-0667-486c-a5d6-d135439485f0"); // full access to all files user can access
+                public static readonly Guid FilesWrite = new Guid("5c28f0bf-8a70-41f1-8ab2-9032436ddb65"); // full access to user's files
+                public static readonly Guid MailWrite = new Guid("024d486e-b451-40bb-833d-3e66d98c5c73"); // read, write user's mail
+                public static readonly Guid MailSend = new Guid("e383f46e-2787-4529-855e-0e479a3ffac0"); // send mail on behalf of user
             }
 
             public static class ResourceAccessTypes
@@ -66,6 +82,48 @@ namespace Azure.Functions.Cli.Common
                 public const string Application = "Role";
                 public const string User = "Scope";
             }
+
+            public static Dictionary<(string, BindingDirection), List<Guid>> PermissionMap = new Dictionary<(string, BindingDirection), List<Guid>>
+            {
+               { ("graphwebhooktrigger", BindingDirection.In), new List<Guid>
+                   {
+                       MicrosoftGraphReadPermissions.FilesRead,
+                       MicrosoftGraphReadPermissions.MailRead,
+                       MicrosoftGraphReadPermissions.UserRead // TODO !! check if this is the case
+                   }
+               },
+               { ("outlook", BindingDirection.In), new List<Guid>
+                   {
+                       MicrosoftGraphReadPermissions.MailRead
+                   }
+               },
+               { ("outlook", BindingDirection.Out), new List<Guid>
+                   {
+                       MicrosoftGraphReadWritePermissions.MailWrite,
+                       MicrosoftGraphReadWritePermissions.MailSend
+                   }
+               },
+               { ("excel", BindingDirection.In), new List<Guid>
+                   {
+                       MicrosoftGraphReadPermissions.FilesRead,
+                   }
+               },
+               { ("excel", BindingDirection.Out), new List<Guid>
+                   {
+                       MicrosoftGraphReadWritePermissions.FilesWrite,
+                   }
+               },
+               { ("onedrive", BindingDirection.In), new List<Guid>
+                   {
+                       MicrosoftGraphReadPermissions.FilesRead,
+                   }
+               },
+               { ("onedrive", BindingDirection.Out), new List<Guid>
+                   {
+                      MicrosoftGraphReadWritePermissions.FilesWrite,
+                   }
+               }
+            };
         }
 
         public static class ArmConstants

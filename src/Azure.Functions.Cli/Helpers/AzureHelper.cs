@@ -95,7 +95,6 @@ namespace Azure.Functions.Cli.Helpers
                 LoadSitePublishingCredentialsAsync(site, accessToken),
                 LoadSiteConfigAsync(site, accessToken),
                 LoadAppSettings(site, accessToken),
-                LoadAuthSettings(site, accessToken),
                 LoadConnectionStrings(site, accessToken)
             }
             //.IgnoreFailures()
@@ -116,14 +115,6 @@ namespace Azure.Functions.Cli.Helpers
             var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AppSettings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, string>>>(HttpMethod.Post, url, accessToken);
             site.AzureAppSettings = armResponse.properties;
-            return site;
-        }
-
-        private async static Task<Site> LoadAuthSettings(Site site, string accessToken)
-        {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AuthSettings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
-            var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, string>>>(HttpMethod.Post, url, accessToken);
-            site.AzureAuthSettings = armResponse.properties;
             return site;
         }
 

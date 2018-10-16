@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Common
     class AuthSettingsFile
     {
         public bool IsEncrypted { get; set; }
-        public Dictionary<string, string> Values { get; set; } = new Dictionary<string, string>();
+        public Dictionary<string, string> Values { get; set; }
         private readonly string _filePath;
         private const string reason = "secrets.manager.auth";
 
@@ -24,11 +24,11 @@ namespace Azure.Functions.Cli.Common
                 string path = Path.Combine(Environment.CurrentDirectory, _filePath);
                 var content = FileSystemHelpers.ReadAllTextFromFile(path);
                 var authSettings = JObject.Parse(content);
-                Values = authSettings.ToObject<Dictionary<string, string>>();
+                Values = new Dictionary<string, string>(authSettings.ToObject<Dictionary<string, string>>(), StringComparer.OrdinalIgnoreCase);
             }
             catch
             {
-                Values = new Dictionary<string, string>();
+                Values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 IsEncrypted = false;
             }
         }

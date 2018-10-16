@@ -52,6 +52,23 @@ namespace Azure.Functions.Cli.Helpers
             return bindings;
         }
 
+        public static IEnumerable<(string, BindingDirection)> GetBindingsWithDirection()
+        {
+            var functionJsonfiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: Constants.FunctionJsonFileName);
+            var bindings = new HashSet<(string, BindingDirection)>();
+            foreach (var functionJson in functionJsonfiles)
+            {
+                string functionJsonContents = FileSystemHelpers.ReadAllTextFromFile(functionJson);
+                var functionMetadata = JsonConvert.DeserializeObject<FunctionMetadata>(functionJsonContents);
+                foreach (var binding in functionMetadata.Bindings)
+                {
+                    bindings.Add((binding.Type.ToLower(), binding.Direction));
+                }
+            }
+            return bindings;
+        }
+
+
         public static IEnumerable<ExtensionPackage> GetExtensionPackages()
         {
             Dictionary<string, ExtensionPackage> packages = new Dictionary<string, ExtensionPackage>();

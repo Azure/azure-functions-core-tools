@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Actions.HostActions.WebHost.Security
         public AuthMiddleware(RequestDelegate next, IApplicationBuilder app, ILoggerProvider loggerProvider)
         {
             _next = next;
-            this.Configure(app: app, loggerFactory: null, loggerProvider: loggerProvider);
+            this.Configure(app, loggerProvider);
         }
 
         public Task Invoke(HttpContext httpContext)

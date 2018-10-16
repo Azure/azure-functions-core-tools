@@ -131,6 +131,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(workerRuntime, LanguageWorkerSetting));
+
+            if (authenticationEnabled)
+            {
+                var middlewareAuthSettings = new AuthSettingsFile(SecretsManager.MiddlewareAuthSettingsFilePath).GetValues();
+                settings.AddRange((IReadOnlyDictionary<string, string>)middlewareAuthSettings);
+
+                SetupMiddlewareConfig(baseUri);
+            }
+            
             UpdateEnvironmentVariables(settings);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
@@ -145,11 +154,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         listenOptions.UseHttps(certificate);
                     });
                 });
-            }
-
-            if (authenticationEnabled)
-            {
-                SetupMiddlewareConfig(baseUri);
             }
 
             return defaultBuilder
@@ -227,10 +231,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // Determine if middleware (Easy Auth) is enabled
             var middlewareAuthSettings = _secretsManager.GetMiddlewareAuthSettings();
-            bool authenticationEnabled = middlewareAuthSettings.ContainsKeyCaseInsensitive(Constants.MiddlewareAuthEnabledSetting) &&
-                middlewareAuthSettings[Constants.MiddlewareAuthEnabledSetting].ToLower().Equals("true");
+            bool authenticationEnabled =
+                middlewareAuthSettings.TryGetValue(Constants.MiddlewareAuthEnabledSetting, out string enabledValue) &&
+                bool.TryParse(enabledValue, out bool isEnabled) &&
+                isEnabled;
 
-            (var listenUri, var baseUri, var certificate, string certPath, string certPassword) = await Setup();
+            (var listenUri, var baseUri, var certificate) = await Setup();
 
             IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate, authenticationEnabled, baseUri);
             var runTask = host.RunAsync();
@@ -431,16 +437,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
             ModuleConfig.HostConfig = config;
         }
 
-        private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert, string path, string password)> Setup()
+        private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert)> Setup()
         {
             var protocol = UseHttps ? "https" : "http";
             if (UseHttps)
             {
-                (X509Certificate2 cert, string certPath, string certPassword) = await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword);
-                return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert, certPath, certPassword);
+                X509Certificate2 cert = await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword);
+                return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
             }
 
-            return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), null, null, null);
+            return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), null);
         }
 
         public class Startup : IStartup
