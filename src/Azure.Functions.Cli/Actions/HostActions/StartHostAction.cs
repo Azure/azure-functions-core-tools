@@ -55,8 +55,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string CertPassword { get; set; }
 
-        public DebuggerType Debugger { get; set; }
-
         public string LanguageWorkerSetting { get; set; }
 
         public bool Build { get; set; }
@@ -104,12 +102,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Setup<string>("password")
                 .WithDescription("to use with --cert. Either the password, or a file that contains the password for the pfx file")
                 .Callback(p => CertPassword = p);
-
-            Parser
-                .Setup<DebuggerType>("debug")
-                .WithDescription("Default is None. Options are VSCode and VS")
-                .SetDefault(DebuggerType.None)
-                .Callback(d => Debugger = d);
 
             Parser
                 .Setup<string>("language-worker")
@@ -233,7 +225,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
             DisplayHttpFunctionsInfo(scriptHost, httpOptions.Value, baseUri);
             DisplayDisabledFunctions(scriptHost);
-            await SetupDebuggerAsync(baseUri);
 
             await runTask;
         }
@@ -316,33 +307,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             return httpMethods.Replace(Environment.NewLine, string.Empty).Replace(" ", string.Empty)
                 .Replace("\"", string.Empty).ToUpperInvariant();
-        }
-
-        private async Task SetupDebuggerAsync(Uri baseUri)
-        {
-            if (Debugger == DebuggerType.Vs)
-            {
-                using (var client = new HttpClient { BaseAddress = baseUri })
-                {
-                    await DebuggerHelper.AttachManagedAsync(client);
-                }
-            }
-            else if (Debugger == DebuggerType.VsCode)
-            {
-                var debuggerStatus = await DebuggerHelper.TrySetupDebuggerAsync();
-                if (debuggerStatus == DebuggerStatus.Error)
-                {
-                    ColoredConsole
-                        .Error
-                        .WriteLine(ErrorColor("Unable to configure vscode debugger. Check your launch.json."));
-                    return;
-                }
-                else
-                {
-                    ColoredConsole
-                        .WriteLine("launch.json for VSCode configured.");
-                }
-            }
         }
 
         internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
