@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string LanguageWorkerSetting { get; set; }
 
-        public bool Build { get; set; }
+        public bool NoBuild { get; set; }
 
 
         public StartHostAction(ISecretsManager secretsManager)
@@ -117,9 +117,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(w => LanguageWorkerSetting = w);
 
             Parser
-                .Setup<bool>("build")
-                .WithDescription("Build current project before running. For dotnet projects only. Default is to false.")
-                .Callback(b => Build = b);
+                .Setup<bool>("no-build")
+                .WithDescription("Do no build current project before running. For dotnet projects only. Default is set to false.")
+                .SetDefault(false)
+                .Callback(b => NoBuild = b);
 
             return Parser.Parse(args);
         }
@@ -244,11 +245,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 PythonHelpers.VerifyVirtualEnvironment();
             }
-            else if (workerRuntime == WorkerRuntime.dotnet && Build)
+            else if (workerRuntime == WorkerRuntime.dotnet && !NoBuild)
             {
-                const string outputPath = "bin/output";
-                await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty);
-                Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+                if (DotnetHelpers.CanDotnetBuild())
+                {
+                    var outputPath = Path.Combine("bin", "output");
+                    await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty);
+                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+                }
+                else if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
+                }
             }
 
             if (!NetworkHelpers.IsPortAvailable(Port))
