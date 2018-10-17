@@ -121,9 +121,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild)
             {
-                const string outputPath = "bin/publish";
-                await DotnetHelpers.BuildDotnetProject(outputPath, DotnetCliParameters);
-                Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+                if (DotnetHelpers.CanDotnetBuild())
+                {
+                    var outputPath = Path.Combine("bin", "publish");
+                    await DotnetHelpers.BuildDotnetProject(outputPath, DotnetCliParameters);
+                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+                }
+                else if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
+                }
             }
 
             if (ListIncludedFiles)

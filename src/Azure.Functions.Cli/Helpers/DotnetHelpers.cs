@@ -70,28 +70,35 @@ namespace Azure.Functions.Cli.Helpers
             };
         }
 
-        public static async Task BuildDotnetProject(string outputPath, string dotnetCliParams)
+        public static bool CanDotnetBuild()
         {
             EnsureDotnet();
             var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
-            if (csProjFiles.Count == 1)
+            // If the project name is extensions only then is extensions.csproj a valid csproj file
+            if (!Path.GetFileName(Environment.CurrentDirectory).Equals("extensions"))
             {
-                if (FileSystemHelpers.DirectoryExists(outputPath))
-                {
-                    FileSystemHelpers.DeleteDirectorySafe(outputPath);
-                }
-
-                var exe = new Executable("dotnet", $"build --output {outputPath} {dotnetCliParams}");
-                var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e));
-                if (exitCode != 0)
-                {
-                    throw new CliException("Error building project");
-                }
+                csProjFiles.Remove("extensions.csproj");
             }
-            else
+            if (csProjFiles.Count > 1)
             {
                 throw new CliException($"Can't determine Project to build. Expected 1 .csproj but found {csProjFiles.Count}");
             }
+            return csProjFiles.Count == 1;
+        }
+
+        public static async Task<bool> BuildDotnetProject(string outputPath, string dotnetCliParams)
+        {
+            if (FileSystemHelpers.DirectoryExists(outputPath))
+            {
+                FileSystemHelpers.DeleteDirectorySafe(outputPath);
+            }
+            var exe = new Executable("dotnet", $"build --output {outputPath} {dotnetCliParams}");
+            var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e));
+            if (exitCode != 0)
+            {
+                throw new CliException("Error building project");
+            }
+            return true;
         }
 
         public static string GetCsproj()
