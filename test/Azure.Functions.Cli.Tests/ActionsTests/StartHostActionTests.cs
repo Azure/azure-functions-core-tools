@@ -71,6 +71,23 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             exception.Should().BeNull();
         }
 
+        [Fact]
+        public async Task CheckIfProjectIsAlreadyBuilt()
+        {
+            var fileSystem = GetFakeFileSystem(new[]
+            {
+                (Path.Combine("x:", "folder1"), "{'scriptFile': '../bin/blah.dll'}"),
+                (Path.Combine("x:", "folder2"), "{'bindings': [{'type': 'httpTrigger'}]}")
+            });
+            fileSystem.File.Exists(Arg.Is(Path.Combine("x:", "folder1", "../bin/blah.dll"))).Returns(true);
+            FileSystemHelpers.Instance = fileSystem;
+            bool test = await StartHostAction.HasBeenBuilt(".");
+            Assert.True(test);
+
+            fileSystem.File.Exists(Arg.Is(Path.Combine("x:", "folder1", "../bin/blah.dll"))).Returns(false);
+            Assert.False(await StartHostAction.HasBeenBuilt("."));
+        }
+
         [SkippableFact]
         public async Task CheckNonOptionalSettingsPrintsWarningForMissingSettings()
         {

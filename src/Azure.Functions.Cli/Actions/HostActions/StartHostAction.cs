@@ -235,17 +235,48 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 PythonHelpers.VerifyVirtualEnvironment();
             }
-            else if (workerRuntime == WorkerRuntime.dotnet && Build)
+            else if (workerRuntime == WorkerRuntime.dotnet)
             {
-                const string outputPath = "bin/output";
-                await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty);
-                Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+                string outputPath = Path.Join("bin", "output");
+                if (Build)
+                {
+                    await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty);
+                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+                }
+                // If the current directory does not have a built project, but there is a built project in the output path, change the directory to output path
+                else if (!await HasBeenBuilt(".") && await HasBeenBuilt(outputPath))
+                {
+                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+                    ColoredConsole.WriteLine(Yellow($"Using the built project in {Environment.CurrentDirectory}"));
+                }
             }
 
             if (!NetworkHelpers.IsPortAvailable(Port))
             {
                 throw new CliException($"Port {Port} is unavailable. Close the process using that port, or specify another port using --port [-p].");
             }
+        }
+
+        public static async Task<bool> HasBeenBuilt(string path)
+        {
+            try
+            {
+                var directories = FileSystemHelpers.GetDirectories(path);
+                foreach (var directory in directories)
+                {
+                    if (FileSystemHelpers.FileExists(Path.Join(directory, "function.json")))
+                    {
+                        var funcSettings = await FileSystemHelpers.ReadAllTextFromFileAsync(Path.Join(directory, "function.json"));
+                        var values = JsonConvert.DeserializeObject<JObject>(funcSettings);
+                        return FileSystemHelpers.FileExists(Path.Join(directory, values["scriptFile"].ToString()));
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            return false;
         }
 
         private void DisplayDisabledFunctions(IScriptJobHost scriptHost)
