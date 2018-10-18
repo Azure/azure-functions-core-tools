@@ -17,7 +17,10 @@ namespace Azure.Functions.Cli.Helpers
 
                 foreach (var tcpi in tcpConnInfoArray)
                 {
-                    if (tcpi.LocalEndPoint.Port == port)
+                    // if state is TIME_WAIT that means the port was closed but not enough time has passed
+                    // to ensure remote connections recieved termination ack. This can happen if the cli is used
+                    // multiple times in a short period in a regular dev/test flow.
+                    if (tcpi.LocalEndPoint.Port == port && tcpi.State != TcpState.TimeWait)
                     {
                         return false;
                     }
