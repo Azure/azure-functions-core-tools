@@ -90,7 +90,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                throw new CliException($"Can't determin Project to build. Expected 1 .csproj but found {csProjFiles.Count}");
+                throw new CliException($"Can't determine Project to build. Expected 1 .csproj but found {csProjFiles.Count}");
             }
         }
 
