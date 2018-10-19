@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Helpers
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\" --AzureFunctionsVersion V2"
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new azureFunctionsProjectTemplates --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var exe = new Executable("dotnet", $"new func --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
