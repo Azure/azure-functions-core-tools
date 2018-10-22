@@ -228,6 +228,27 @@ namespace Azure.Functions.Cli.Helpers
             response.EnsureSuccessStatusCode();
         }
 
+        public static async Task<HttpResult<string, string>> UpdateWebSettings(Site site, Dictionary<string, string> webSettings, string accessToken)
+        {
+            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/web?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = webSettings });
+            if (response.IsSuccessStatusCode)
+            {
+                // Simply reading it as a string because we do not care about the result content particularly
+                var result = await response.Content.ReadAsStringAsync();
+                return new HttpResult<string, string>(result);
+            }
+            else
+            {
+                var result = await response.Content.ReadAsStringAsync();
+                var parsedResult = JsonConvert.DeserializeObject<JObject>(result);
+                var errorMessage = parsedResult["Message"].ToString();
+                return string.IsNullOrEmpty(errorMessage)
+                    ? new HttpResult<string, string>(null, result)
+                    : new HttpResult<string, string>(null, errorMessage);
+            }
+        }
+
         public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, string accessToken)
         {
             var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");

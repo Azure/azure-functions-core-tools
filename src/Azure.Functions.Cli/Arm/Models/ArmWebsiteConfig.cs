@@ -3,5 +3,6 @@
     internal class ArmWebsiteConfig
     {
         public string scmType { get; set; }
+        public string linuxFxVersion { get; set; }
     }
 }
