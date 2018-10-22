@@ -26,6 +26,8 @@ namespace Azure.Functions.Cli.Arm.Models
 
         public string Sku { get; set; }
 
+        public string LinuxFxVersion { get; set; }
+
         public IDictionary<string, string> AzureAppSettings { get; set; }
 
         public IDictionary<string, AppServiceConnectionString> ConnectionStrings { get; set; }

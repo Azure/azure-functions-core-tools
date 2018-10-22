@@ -117,7 +117,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
-            var additionalAppSettings = ValidateFunctionAppPublish(functionApp, workerRuntime);
+            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
 
             if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild)
             {
@@ -147,7 +147,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private IDictionary<string, string> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
+        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
         {
             var result = new Dictionary<string, string>();
 
@@ -222,6 +222,40 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 else
                 {
                     throw new CliException("Your app is configured with Azure Files for editing from Azure Portal.\nTo force publish use --force. This will remove Azure Files from your app.");
+                }
+            }
+
+            if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+            {
+                var allImages = Constants.WorkerRuntimeImages.Values.SelectMany(image => image).ToList();
+                if (!allImages.Any(image => functionApp.LinuxFxVersion.IndexOf(image, StringComparison.OrdinalIgnoreCase) != -1))
+                {
+                    ColoredConsole.WriteLine($"Your functionapp is using a custom image {functionApp.LinuxFxVersion}.\nAssuming that the image contains the correct framework.\n");
+                }
+                // If there the functionapp is our image but does not match the worker runtime image, we either fail or force update
+                else if (Constants.WorkerRuntimeImages.TryGetValue(workerRuntime, out IEnumerable<string> linuxFxImages) &&
+                    !linuxFxImages.Any(image => functionApp.LinuxFxVersion.IndexOf(image, StringComparison.OrdinalIgnoreCase) != -1))
+                {
+                    if (Force)
+                    {
+                        var updatedSettings = new Dictionary<string, string>
+                        {
+                            [Constants.LinuxFxVersion] = $"DOCKER|{Constants.WorkerRuntimeImages.GetValueOrDefault(workerRuntime).FirstOrDefault()}"
+                        };
+                        var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken);
+
+                        if (!settingsResult.IsSuccessful)
+                        {
+                            ColoredConsole.Error
+                                .WriteLine(ErrorColor("Error updating linux image version:"))
+                                .WriteLine(ErrorColor(settingsResult.ErrorResult));
+                        }
+                    }
+                    else
+                    {
+                        throw new CliException($"Your Linux dedicated app has the container image version (LinuxFxVersion) set to {functionApp.LinuxFxVersion} which is not expected for the worker runtime {workerRuntime}. " +
+                        $"To force publish use --force. This will update your app to the expected image for worker runtime {workerRuntime}\n");
+                    }
                 }
             }
 
