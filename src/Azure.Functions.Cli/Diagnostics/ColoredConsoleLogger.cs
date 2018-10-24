@@ -50,16 +50,15 @@ namespace Azure.Functions.Cli.Diagnostics
 
         private static IEnumerable<RichString> GetMessageString(LogLevel level, string formattedMessage, Exception exception)
         {
+            if (exception != null)
+            {
+                formattedMessage += Environment.NewLine + Utility.FlattenException(exception);
+            }
+
             switch (level)
             {
                 case LogLevel.Error:
-                    string errorMessage = formattedMessage +
-                        Environment.NewLine +
-                        (exception == null
-                        ? string.Empty
-                        : Utility.FlattenException(exception));
-
-                    return SplitAndApply(errorMessage, ErrorColor);
+                    return SplitAndApply(formattedMessage, ErrorColor);
                 case LogLevel.Warning:
                     return SplitAndApply(formattedMessage, WarningColor);
                 case LogLevel.Information:
