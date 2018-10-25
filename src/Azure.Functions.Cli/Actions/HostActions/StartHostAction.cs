@@ -218,9 +218,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             await hostService.DelayUntilHostReady();
 
-            ColoredConsole.WriteLine($"Listening on {listenUri}");
-            ColoredConsole.WriteLine("Hit CTRL-C to exit...");
-
             var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
             var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
             DisplayHttpFunctionsInfo(scriptHost, httpOptions.Value, baseUri);
