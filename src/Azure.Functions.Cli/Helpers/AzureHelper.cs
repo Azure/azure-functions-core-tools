@@ -17,6 +17,7 @@ namespace Azure.Functions.Cli.Helpers
     public static class AzureHelper
     {
         private static string _storageApiVersion = "2018-02-01";
+        private static string _authSettingsApiVersion = "2018-02-01";
 
         public static async Task<Site> GetFunctionApp(string name, string accessToken)
         {
@@ -252,7 +253,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAuthSettings(Site site, string accessToken)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/authsettings?api-version={_storageApiVersion}");
+            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/authsettings?api-version={_authSettingsApiVersion}");
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAuthSettings });
             if (response.IsSuccessStatusCode)
             {

@@ -8,14 +8,14 @@ using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    // Invoke via `func azure auth create-aad --appRegistrationName {yourAppRegistrationName} --appName {yourAppName}`
-    [Action(Name = "create-aad", Context = Context.Azure, SubContext = Context.Auth, HelpText = "Creates an Azure Active Directory registration. Can be linked to an Azure App Service or Function app.")]
+    // Invoke via `func azure auth create-aad --AADAppRegistrationName {yourAppRegistrationName} --appName {yourAppName}`
+    [Action(Name = "create-aad", Context = Context.Azure, SubContext = Context.Auth, HelpText = "Creates an Azure Active Directory app registration. Can be linked to an Azure App Service or Function app.")]
     class CreateAADApplication : BaseAzureAction
     {
         private readonly IAuthManager _authManager;
         private readonly ISecretsManager _secretsManager;
 
-        public string AADName { get; set; }
+        public string AADAppRegistrationName { get; set; }
 
         public string AppName { get; set; }
 
@@ -29,15 +29,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
 
-            await _authManager.CreateAADApplication(AccessToken, AADName, workerRuntime, AppName);
+            await _authManager.CreateAADApplication(AccessToken, AADAppRegistrationName, workerRuntime, AppName);
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
-                .Setup<string>("appRegistrationName")
+                .Setup<string>("AADAppRegistrationName")
                 .WithDescription("Name of the Azure Active Directory app registration to create.")
-                .Callback(f => AADName = f);
+                .Callback(f => AADAppRegistrationName = f);
 
             Parser
                 .Setup<string>("appName")

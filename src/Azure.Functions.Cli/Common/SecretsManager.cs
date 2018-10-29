@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Common
             get
             {
                 var authFile = "local.middleware.json";
-                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, new List<string>
+                var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, new []
                 {
                     ScriptConstants.HostMetadataFileName,
                     authFile,

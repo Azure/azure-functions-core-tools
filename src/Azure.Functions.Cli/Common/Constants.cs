@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Common
                    {
                        MicrosoftGraphReadPermissions.FilesRead,
                        MicrosoftGraphReadPermissions.MailRead,
-                       MicrosoftGraphReadPermissions.UserRead // TODO !! check if this is the case
+                       MicrosoftGraphReadPermissions.UserRead
                    }
                },
                { ("outlook", BindingDirection.In), new List<Guid>

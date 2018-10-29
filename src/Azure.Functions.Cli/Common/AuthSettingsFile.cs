@@ -18,15 +18,32 @@ namespace Azure.Functions.Cli.Common
 
         public AuthSettingsFile(string filePath)
         {
-            _filePath = filePath;
-            try
+            _filePath = filePath ?? throw new CliException("Received null value for auth settings filename.");
+            
+            string path = Path.Combine(Environment.CurrentDirectory, _filePath);
+
+            if (File.Exists(path))
             {
-                string path = Path.Combine(Environment.CurrentDirectory, _filePath);
-                var content = FileSystemHelpers.ReadAllTextFromFile(path);
-                var authSettings = JObject.Parse(content);
-                Values = new Dictionary<string, string>(authSettings.ToObject<Dictionary<string, string>>(), StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    var content = FileSystemHelpers.ReadAllTextFromFile(path);
+                    var authSettings = JObject.Parse(content);
+                    Values = new Dictionary<string, string>(authSettings.ToObject<Dictionary<string, string>>(), StringComparer.OrdinalIgnoreCase);
+                }
+                catch (UnauthorizedAccessException unauthorizedAccess)
+                {
+                    throw new CliException(unauthorizedAccess.Message);
+                }
+                catch (JsonReaderException jsonError)
+                {
+                    throw new CliException(jsonError.Message);
+                }
+                catch (Exception generic)
+                {
+                    throw new CliException(generic.ToString());
+                }
             }
-            catch
+            else
             {
                 Values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 IsEncrypted = false;
@@ -55,7 +72,18 @@ namespace Azure.Functions.Cli.Common
 
         public void Commit()
         {
-            FileSystemHelpers.WriteAllTextToFile(_filePath, JsonConvert.SerializeObject(this.GetValues(), Formatting.Indented));
+            try
+            {
+                FileSystemHelpers.WriteAllTextToFile(_filePath, JsonConvert.SerializeObject(this.GetValues(), Formatting.Indented));
+            }
+            catch (UnauthorizedAccessException unauthorizedAccess)
+            {
+                throw new CliException(unauthorizedAccess.Message);
+            }
+            catch (Exception generic)
+            {
+                throw new CliException(generic.ToString());
+            }
         }
 
         public IDictionary<string, string> GetValues()
@@ -64,8 +92,8 @@ namespace Azure.Functions.Cli.Common
             {
                 try
                 {
-                    return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty((string)v.Value) ? string.Empty :
-                        Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String((string)v.Value), reason)));
+                    return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty :
+                        Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), reason)));
                 }
                 catch (Exception e)
                 {
@@ -74,7 +102,7 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                return Values.ToDictionary(k => k.Key, v => (string)v.Value);
+                return Values.ToDictionary(k => k.Key, v => v.Value);
             }
         }
     }

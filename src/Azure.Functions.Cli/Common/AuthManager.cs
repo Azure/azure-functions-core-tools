@@ -30,33 +30,37 @@ namespace Azure.Functions.Cli.Common
 
         private WorkerRuntime _workerRuntime;
 
-        public async Task CreateAADApplication(string accessToken, string AADName, WorkerRuntime workerRuntime, string appName)
+        private static string _requiredResourceFilename = "requiredResourceAccessList.txt";
+
+        public async Task CreateAADApplication(string accessToken, string AADAppRegistrationName, WorkerRuntime workerRuntime, string appName)
         {
-            if (string.IsNullOrEmpty(AADName))
+            if (string.IsNullOrEmpty(AADAppRegistrationName))
             {
-                throw new CliArgumentsException("Must specify name of new Azure Active Directory registration with --appRegistrationName parameter.",
-                    new CliArgument { Name = "appRegistrationName", Description = "Name of new Azure Active Directory registration" });
+                throw new CliArgumentsException("Must provide name for a new Azure Active Directory app registration with --AADAppRegistrationName parameter.",
+                    new CliArgument { Name = "AADAppRegistrationName", Description = "Name of new Azure Active Directory app registration" });
             }
 
             if (CommandChecker.CommandExists("az"))
             {
                 _workerRuntime = workerRuntime;
+                _requiredResourceFilename = string.Format("{0}-{1}", AADAppRegistrationName, _requiredResourceFilename);
 
                 List<string> replyUrls;
-                string tempFile, clientSecret, hostName, query = CreateQuery(AADName, appName, out tempFile, out clientSecret, out replyUrls, out hostName);
+                string clientSecret, hostName, commandLineArgs = GetCommandLineArguments(AADAppRegistrationName, appName, out clientSecret, out replyUrls, out hostName);
 
-                ColoredConsole.WriteLine("Query successfully constructed. Creating new Azure AD Application now..");
+                string command = $"ad app create {commandLineArgs}";
+                ColoredConsole.WriteLine($"Creating new Azure AD Application via:\n" +
+                    $"az {command}");
 
                 var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                       ? new Executable("cmd", $"/c az ad app create {query}")
-                       : new Executable("az", $"ad app create {query}");
+                       ? new Executable("cmd", $"/c az {command}")
+                       : new Executable("az", command);
+
+
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
 
                 int exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));               
-
-                // Delete temporary file created to pass data in proper format to az CLI
-                File.Delete($"{tempFile}");
 
                 if (exitCode != 0)
                 {
@@ -64,7 +68,7 @@ namespace Azure.Functions.Cli.Common
                 }
 
                 string response = stdout.ToString().Trim(' ', '\n', '\r', '"');
-                ColoredConsole.WriteLine(Green($"Successfully created new AAD registration {AADName}"));
+                ColoredConsole.WriteLine(Green($"Successfully created new AAD registration {AADAppRegistrationName}"));
                 ColoredConsole.WriteLine(White(response));
 
                 JObject application = JObject.Parse(response);
@@ -75,7 +79,7 @@ namespace Azure.Functions.Cli.Common
                 if (appName == null)
                 {
                     // Update function application's (local) auth settings
-                    CreateAndCommitAuthSettings(hostName, clientId, clientSecret, tenantId, replyUrls);                                        
+                    CreateAndCommitAuthSettings(hostName, clientId, clientSecret, tenantId, replyUrls);
                 }
                 else
                 {
@@ -88,7 +92,7 @@ namespace Azure.Functions.Cli.Common
 
                     await PublishAuthSettingAsync(connectedSite, accessToken, authSettingsToPublish);
 
-                    ColoredConsole.WriteLine(Green($"Successfully updated {appName}'s auth settings to reference new AAD registration {AADName}"));
+                    ColoredConsole.WriteLine(Green($"Successfully updated {appName}'s auth settings to reference new AAD app registration {AADAppRegistrationName}"));
                 }
             }
             else
@@ -98,20 +102,20 @@ namespace Azure.Functions.Cli.Common
         }
 
         /// <summary>
-        /// Create the query to send to az ad app create
+        /// Create the string of arguments to send to az ad app create
         /// </summary>
-        /// <param name="AADName">Name of the new AAD application</param>
+        /// <param name="AADAppRegistrationName">Name of the new AAD application</param>
         /// <param name="appName">Name of an existing Azure Application to link to this AAD application</param>
         /// <returns></returns>
-        private string CreateQuery(string AADName, string appName, out string tempFile, out string clientSecret, out List<string> replyUrls, out string hostName)
+        private string GetCommandLineArguments(string AADAppRegistrationName, string appName, out string clientSecret, out List<string> replyUrls, out string hostName)
         {
             clientSecret = GeneratePassword(128);
             string authCallback = "/.auth/login/aad/callback";
 
             var requiredResourceAccess = GetRequiredResourceAccesses();
+
             // It is easiest to pass them in the right format to the az CLI via a (temp) file + filename
-            tempFile = $"{Guid.NewGuid()}.txt";
-            File.WriteAllText(tempFile, JsonConvert.SerializeObject(requiredResourceAccess));
+            File.WriteAllText(_requiredResourceFilename, JsonConvert.SerializeObject(requiredResourceAccess));
 
             // Based on whether or not this AAD application is to be used in production or a local environment,
             // these parameters are different (plus reply URLs):
@@ -122,7 +126,7 @@ namespace Azure.Functions.Cli.Common
             {
                 // OAuth is port sensitive. There is no way of using a wildcard in the reply URLs to allow for variable ports
                 // Set the port in the reply URLs to the default used by the Functions Host
-                identifierUrl = "http://" + AADName + ".localhost";
+                identifierUrl = "http://" + AADAppRegistrationName + ".localhost";
                 homepage = "http://localhost:" + StartHostAction.DefaultPort;
                 hostName = "localhost:" + StartHostAction.DefaultPort;
                 string localhostSSL = "https://localhost:" + StartHostAction.DefaultPort + authCallback;
@@ -149,8 +153,8 @@ namespace Azure.Functions.Cli.Common
 
             string serializedReplyUrls = string.Join(" ", replyUrls.ToArray<string>());
 
-            return $"--display-name {AADName} --homepage {homepage} --identifier-uris {identifierUrl} --password {clientSecret}" +
-                    $" --reply-urls {serializedReplyUrls} --oauth2-allow-implicit-flow true --required-resource-access @{tempFile}";
+            return $"--display-name {AADAppRegistrationName} --homepage {homepage} --identifier-uris {identifierUrl} --password {clientSecret}" +
+                    $" --reply-urls {serializedReplyUrls} --oauth2-allow-implicit-flow true --required-resource-access @{_requiredResourceFilename}";
 
         }
 
@@ -213,7 +217,7 @@ namespace Azure.Functions.Cli.Common
         private void CreateAndCommitAuthSettings(string hostName, string clientId, string clientSecret, string tenant, List<string> replyUrls)
         {
             // The WEBSITE_AUTH_ALLOWED_AUDIENCES setting is of the form "{replyURL1} {replyURL2}"
-            string serializedReplyUrls = string.Join(" ", replyUrls.ToArray<string>());
+            string serializedReplyUrls = string.Join(" ", replyUrls);
 
             // Create a local auth .json file that will be used by the middleware
             var middlewareAuthSettingsFile = SecretsManager.MiddlewareAuthSettingsFileName;
@@ -265,24 +269,19 @@ namespace Azure.Functions.Cli.Common
             }
 
             // If we're in the function root\bin\debug\netstandard2.x, the .csproj file will be up three directories
-            try
+            var functionDir = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, @"..\..\..\"));
+                
+            if (Directory.Exists(functionDir))
             {
-                var functionDir = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, @"..\..\..\"));
                 var functionDirProjFiles = FileSystemHelpers.GetFiles(functionDir, searchPattern: "*.csproj").ToList();
 
                 if (functionDirProjFiles.Count == 1)
                 {
                     return functionDirProjFiles.First();
                 }
-                else
-                {
-                    return null;
-                }
             }
-            catch (DirectoryNotFoundException e)
-            {
-                return null;
-            }
+
+            return null;
         }
 
         /// <summary>
@@ -319,11 +318,11 @@ namespace Azure.Functions.Cli.Common
         private Dictionary<string, string> CreateAuthSettingsToPublish(string clientId, string clientSecret, string tenant, List<string> replyUrls)
         {
             // The 'allowedAudiences' setting of /config/authsettings is of the form ["{replyURL1}", "{replyURL2}"]
-            string serializedArray = JsonConvert.SerializeObject(replyUrls, Formatting.Indented);
+            string serializedReplyUrls = JsonConvert.SerializeObject(replyUrls, Formatting.Indented);
 
             var authSettingsToPublish = new Dictionary<string, string>
             {
-                { "allowedAudiences", serializedArray },
+                { "allowedAudiences", serializedReplyUrls },
                 { "isAadAutoProvisioned", "True" },
                 { "clientId", clientId },
                 { "clientSecret", clientSecret },
