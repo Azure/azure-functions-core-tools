@@ -45,6 +45,9 @@
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\python_docker_build_no_bundler.sh.template">
+      <LogicalName>$(AssemblyName).python_docker_build_no_bundler.sh</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\vscode.extensions.json.template">
       <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>
     </EmbeddedResource>
