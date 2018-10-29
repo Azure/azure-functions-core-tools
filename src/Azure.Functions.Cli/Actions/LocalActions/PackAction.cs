@@ -22,6 +22,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string FolderName { get; set; } = string.Empty;
         public string OutputPath { get; set; }
         public bool BuildNativeDeps { get; set; }
+        public bool NoBundler { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
 
         public PackAction(ISecretsManager secretsManager)
@@ -40,6 +41,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(false)
                 .WithDescription("Skips generating .wheels folder when publishing python function apps.")
                 .Callback(f => BuildNativeDeps = f);
+            Parser
+                .Setup<bool>("no-bundler")
+                .SetDefault(false)
+                .WithDescription("Skips generating a bundle when publishing python function apps with build-native-deps.")
+                .Callback(f => NoBundler = f);
+
             Parser
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
@@ -91,7 +98,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     throw new CliException($"Could not delete {outputPath}");
                 }
             }
-            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, additionalPackages: AdditionalPackages);
+            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, NoBundler, additionalPackages: AdditionalPackages);
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
             await FileSystemHelpers.WriteToFile(outputPath, zipStream);
         }

@@ -45,6 +45,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PythonBundleScript => GetValue(Constants.StaticResourcesNames.PythonBundleScript);
 
+        public static Task<string> PythonDockerBuildNoBundler => GetValue(Constants.StaticResourcesNames.PythonDockerBuildNoBundler);
+
         public static Task<string> TemplatesJson => GetValue("templates.json");
     }
 }

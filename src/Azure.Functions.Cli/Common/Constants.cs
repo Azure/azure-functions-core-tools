@@ -63,6 +63,7 @@ namespace Azure.Functions.Cli.Common
         public static class StaticResourcesNames
         {
             public const string PythonDockerBuild = "python_docker_build.sh";
+            public const string PythonDockerBuildNoBundler = "python_docker_build_no_bundler.sh";
             public const string PythonBundleScript = "python_bundle_script.py";
         }
 
