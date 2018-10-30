@@ -1,15 +1,13 @@
 ﻿using System;
-using System.Linq;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    // Invoke via `func azure auth create-aad --AADAppRegistrationName {yourAppRegistrationName} --appName {yourAppName}`
-    [Action(Name = "create-aad", Context = Context.Azure, SubContext = Context.Auth, HelpText = "Creates an Azure Active Directory app registration. Can be linked to an Azure App Service or Function app.")]
+    // Invoke via `func azure auth create-aad-app --AADAppRegistrationName {yourAppRegistrationName} --appName {yourAppName}`
+    [Action(Name = "create-aad-app", Context = Context.Azure, SubContext = Context.Auth, HelpText = "Creates an Azure Active Directory app registration. Can be linked to an Azure App Service or Function app.")]
     class CreateAADApplication : BaseAzureAction
     {
         private readonly IAuthManager _authManager;
@@ -41,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             Parser
                 .Setup<string>("appName")
-                .WithDescription("Name of the Azure App Service or Azure Functions app which corresponds to the Azure AD app registration.")
+                .WithDescription("Name of the Azure App Service or Azure Functions app which will be connected to the Azure AD app registration.")
                 .Callback(f => AppName = f);
 
             return base.ParseArgs(args);

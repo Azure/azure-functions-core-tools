@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.Extensions
             return cleanImageName.ToLowerInvariant().Substring(0, Math.Min(cleanImageName.Length, 128)).Trim();
         }
 
-        public static string ComputeSha256Hash(string rawData)
+        public static string ComputeSha256Hash(this string rawData)
         {
             // Create a SHA256   
             using (SHA256 sha256Hash = SHA256.Create())

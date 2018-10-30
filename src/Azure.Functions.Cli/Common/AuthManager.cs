@@ -45,11 +45,10 @@ namespace Azure.Functions.Cli.Common
                 _workerRuntime = workerRuntime;
                 _requiredResourceFilename = string.Format("{0}-{1}", AADAppRegistrationName, _requiredResourceFilename);
 
-                List<string> replyUrls;
-                string clientSecret, hostName, commandLineArgs = GetCommandLineArguments(AADAppRegistrationName, appName, out clientSecret, out replyUrls, out hostName);
+                string clientSecret, hostName, homepage, commandLineArgs = GetCommandLineArguments(AADAppRegistrationName, appName, out clientSecret, out hostName, out homepage);
 
                 string command = $"ad app create {commandLineArgs}";
-                ColoredConsole.WriteLine($"Creating new Azure AD Application via:\n" +
+                ColoredConsole.WriteLine($"Creating new Azure AD Application via:{Environment.NewLine}" +
                     $"az {command}");
 
                 var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
@@ -79,16 +78,16 @@ namespace Azure.Functions.Cli.Common
                 if (appName == null)
                 {
                     // Update function application's (local) auth settings
-                    CreateAndCommitAuthSettings(hostName, clientId, clientSecret, tenantId, replyUrls);
+                    CreateAndCommitAuthSettings(homepage, hostName, clientId, clientSecret, tenantId);
                 }
                 else
                 {
                     // Connect this AAD application to the Site whose name was supplied (set site's /config/authsettings)
                     // Tell customer what we're doing, since finding and updating the site can take a number of seconds
-                    ColoredConsole.WriteLine($"\nUpdating auth settings of application {appName}..");
+                    ColoredConsole.WriteLine($"{Environment.NewLine}Updating auth settings of application {appName}..");
 
                     var connectedSite = await AzureHelper.GetFunctionApp(appName, accessToken);
-                    var authSettingsToPublish = CreateAuthSettingsToPublish(clientId, clientSecret, tenantId, replyUrls);
+                    var authSettingsToPublish = CreateAuthSettingsToPublish(homepage, clientId, clientSecret, tenantId);
 
                     await PublishAuthSettingAsync(connectedSite, accessToken, authSettingsToPublish);
 
@@ -97,7 +96,7 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                throw new FileNotFoundException("Cannot find az cli. `auth create-aad` requires the Azure CLI.");
+                throw new FileNotFoundException("Cannot find az cli. `auth create-aad-app` requires the Azure CLI.");
             }
         }
 
@@ -107,7 +106,7 @@ namespace Azure.Functions.Cli.Common
         /// <param name="AADAppRegistrationName">Name of the new AAD application</param>
         /// <param name="appName">Name of an existing Azure Application to link to this AAD application</param>
         /// <returns></returns>
-        private string GetCommandLineArguments(string AADAppRegistrationName, string appName, out string clientSecret, out List<string> replyUrls, out string hostName)
+        private string GetCommandLineArguments(string AADAppRegistrationName, string appName, out string clientSecret, out string hostName, out string homepage)
         {
             clientSecret = GeneratePassword(128);
             string authCallback = "/.auth/login/aad/callback";
@@ -119,7 +118,9 @@ namespace Azure.Functions.Cli.Common
 
             // Based on whether or not this AAD application is to be used in production or a local environment,
             // these parameters are different (plus reply URLs):
-            string identifierUrl, homepage;
+            string identifierUrl;
+
+            string serializedReplyUrls;
 
             // This AAD application is for local development - use localhost reply URLs, create local.middleware.json
             if (appName == null)
@@ -132,11 +133,12 @@ namespace Azure.Functions.Cli.Common
                 string localhostSSL = "https://localhost:" + StartHostAction.DefaultPort + authCallback;
                 string localhost = "http://localhost:" + StartHostAction.DefaultPort + authCallback;
 
-                replyUrls = new List<string>
+                var replyUrlsArray = new []
                 {                
                     localhost,
                     localhostSSL
-                };               
+                };
+                serializedReplyUrls = string.Join(" ", replyUrlsArray);
             }
             else
             {
@@ -145,13 +147,12 @@ namespace Azure.Functions.Cli.Common
                 hostName = appName + ".azurewebsites.net";
                 string replyUrl = homepage + authCallback;
 
-                replyUrls = new List<string>
+                var replyUrlsArray = new []
                 {
                     replyUrl
                 };
+                serializedReplyUrls = string.Join(" ", replyUrlsArray);
             }
-
-            string serializedReplyUrls = string.Join(" ", replyUrls.ToArray<string>());
 
             return $"--display-name {AADAppRegistrationName} --homepage {homepage} --identifier-uris {identifierUrl} --password {clientSecret}" +
                     $" --reply-urls {serializedReplyUrls} --oauth2-allow-implicit-flow true --required-resource-access @{_requiredResourceFilename}";
@@ -214,15 +215,12 @@ namespace Azure.Functions.Cli.Common
             return resourceList;
         }
 
-        private void CreateAndCommitAuthSettings(string hostName, string clientId, string clientSecret, string tenant, List<string> replyUrls)
+        private void CreateAndCommitAuthSettings(string homepage, string hostName, string clientId, string clientSecret, string tenant)
         {
-            // The WEBSITE_AUTH_ALLOWED_AUDIENCES setting is of the form "{replyURL1} {replyURL2}"
-            string serializedReplyUrls = string.Join(" ", replyUrls);
-
             // Create a local auth .json file that will be used by the middleware
             var middlewareAuthSettingsFile = SecretsManager.MiddlewareAuthSettingsFileName;
             MiddlewareAuthSettings = new AuthSettingsFile(middlewareAuthSettingsFile);
-            MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_ALLOWED_AUDIENCES", serializedReplyUrls);
+            MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_ALLOWED_AUDIENCES", homepage);
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_AUTO_AAD", "True");
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_CLIENT_ID", clientId);
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_CLIENT_SECRET", clientSecret);
@@ -235,61 +233,62 @@ namespace Azure.Functions.Cli.Common
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_HOSTNAME", hostName);
 
             // Create signing and encryption keys for local testing
-            string encryptionKey = ComputeSha256Hash(clientSecret);
-            string signingKey = ComputeSha256Hash(clientId);
+            string encryptionKey = clientSecret.ComputeSha256Hash();
+            string signingKey = clientId.ComputeSha256Hash();
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_ENCRYPTION_KEY", encryptionKey);
             MiddlewareAuthSettings.SetAuthSetting("WEBSITE_AUTH_SIGNING_KEY", signingKey);
             MiddlewareAuthSettings.Commit();
 
-            ColoredConsole.WriteLine(Yellow($"Created {SecretsManager.MiddlewareAuthSettingsFileName} with authentication settings necessary for local development.\n" +
+            ColoredConsole.WriteLine(Yellow($"Created {SecretsManager.MiddlewareAuthSettingsFileName} with authentication settings necessary for local development.{Environment.NewLine}" +
                 $"Running this function locally will only work with the Function Host default port of {StartHostAction.DefaultPort}"));
 
             if (_workerRuntime == WorkerRuntime.dotnet)
             {
-                // If this is a dotnet function, we also need to add this file to the .csproj 
+                // If this is a dotnet function, we also need to add this file to the .(fs/cs)proj 
                 // so that it copies to \bin\debug\netstandard2.x when the Function builds
-                string csProjFile = GetCSProjFilePath();
+                string projFile = GetProjFilePath();
 
-                if (csProjFile == null)
+                if (projFile == null)
                 {
-                    throw new CliException($"Auth settings file {SecretsManager.MiddlewareAuthSettingsFileName} could not be added to a .csproj and will not be present in the the bin or output directories.");
+                    ColoredConsole.WriteLine(Red($"Auth settings file {SecretsManager.MiddlewareAuthSettingsFileName} could not be added to a .csproj or .fsproj file and will not be present in the the bin or output directories."));
+                    return;
                 }
 
-                ModifyCSProj(csProjFile);
+                ModifyCSProj(projFile);
             }
         }
 
-        public static string GetCSProjFilePath()
+        public static string GetProjFilePath()
         {
-            // If we're in the Function root, the .csproj file will be in this folder
-            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
-            if (csProjFiles.Count == 1)
+            // If we're in the Function root, the fs/cs proj file will be in this folder
+            var projFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.*proj").ToList();
+            if (projFiles.Count == 1)
             {
-                return csProjFiles.First();
+                return projFiles.First();
             }
 
-            // If we're in the function root\bin\debug\netstandard2.x, the .csproj file will be up three directories
+            // If we're in the function root\bin\debug\netstandard2.x, the fs/cs proj file will be up three directories
             var functionDir = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, @"..\..\..\"));
                 
             if (Directory.Exists(functionDir))
             {
-                var functionDirProjFiles = FileSystemHelpers.GetFiles(functionDir, searchPattern: "*.csproj").ToList();
+                var functionDirProjFiles = FileSystemHelpers.GetFiles(functionDir, searchPattern: "*.*proj").ToList();
 
                 if (functionDirProjFiles.Count == 1)
                 {
                     return functionDirProjFiles.First();
                 }
-            }
+            }        
 
             return null;
         }
 
         /// <summary>
-        /// Modify the Function's .csproj so the middleware auth json file will copy to the output directory
+        /// Modify the Function's .csproj or .fsproj so the middleware auth json file will copy to the output directory
         /// </summary>
-        private static void ModifyCSProj(string csProj)
+        private static void ModifyCSProj(string projFile)
         {
-            var xmlFile = XDocument.Load(csProj);
+            var xmlFile = XDocument.Load(projFile);
 
             var project = xmlFile.Element("Project");
             var itemGroups = project.Elements("ItemGroup");
@@ -297,7 +296,7 @@ namespace Azure.Functions.Cli.Common
             var existing = itemGroups.Elements("None").FirstOrDefault(elm => elm.Attribute("Update").Value.Equals(SecretsManager.MiddlewareAuthSettingsFileName));
             if (existing != null)
             {
-                // If we've added this file to the .csproj during a previous create-aad call, do not add again
+                // If we've added this file to the proj file during a previous create-aad-app call, do not add again
                 return;
             }
 
@@ -310,19 +309,16 @@ namespace Azure.Functions.Cli.Common
 
             // Append item group to project & save
             project.Add(newItemGroup);
-            xmlFile.Save(csProj);
+            xmlFile.Save(projFile);
 
-            ColoredConsole.WriteLine(Yellow($"Modified {csProj} to include {SecretsManager.MiddlewareAuthSettingsFileName} in output directory."));
+            ColoredConsole.WriteLine(Yellow($"Modified {projFile} to include {SecretsManager.MiddlewareAuthSettingsFileName} in the output directories."));
         }
 
-        private Dictionary<string, string> CreateAuthSettingsToPublish(string clientId, string clientSecret, string tenant, List<string> replyUrls)
+        private Dictionary<string, string> CreateAuthSettingsToPublish(string homepage, string clientId, string clientSecret, string tenant)
         {
-            // The 'allowedAudiences' setting of /config/authsettings is of the form ["{replyURL1}", "{replyURL2}"]
-            string serializedReplyUrls = JsonConvert.SerializeObject(replyUrls, Formatting.Indented);
-
             var authSettingsToPublish = new Dictionary<string, string>
             {
-                { "allowedAudiences", serializedReplyUrls },
+                { "allowedAudiences", homepage },
                 { "isAadAutoProvisioned", "True" },
                 { "clientId", clientId },
                 { "clientSecret", clientSecret },
