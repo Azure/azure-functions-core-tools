@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Interfaces
 
         Task GetHistory(string instanceId);
 
-        Task GetRuntimeStatus(string instanceId);
+        Task GetRuntimeStatus(string instanceId, bool getAllExecutions);
 
         Task RaiseEvent(string instanceId, string eventName, object eventData);
 

@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.Common
             ColoredConsole.Write($"History: {chronological_history.ToString(Formatting.Indented)}");
         }
 
-        public async Task GetRuntimeStatus(string instanceId)
+        public async Task GetRuntimeStatus(string instanceId, bool getAllExecutions)
         {
             if (string.IsNullOrEmpty(instanceId))
             {
@@ -75,8 +75,7 @@ namespace Azure.Functions.Cli.Common
                     new CliArgument { Name = "id", Description = "ID of the orchestration instance for which to retrieve the runtime status." });
             }
 
-            bool unusedBoolean = false;
-            var statuses = await _client.GetOrchestrationStateAsync(instanceId, allExecutions: unusedBoolean);
+            var statuses = await _client.GetOrchestrationStateAsync(instanceId, allExecutions: getAllExecutions);
 
             foreach (OrchestrationState status in statuses)
             {

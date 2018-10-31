@@ -10,6 +10,8 @@ namespace Azure.Functions.Cli.Actions.DurableActions
     {
         private readonly IDurableManager _durableManager;
 
+        private bool GetAllExecutions;
+
         public DurableGetRuntimeStatus(IDurableManager durableManager)
         {
             _durableManager = durableManager;
@@ -22,7 +24,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.GetRuntimeStatus(Id);
+            Parser
+             .Setup<bool>("getAllExecutions")
+             .WithDescription("If true, the status of all executions is retrieved. If false, only the status of the most recent execution is retrieved.")
+             .SetDefault(false)
+             .Callback(n => GetAllExecutions = n);
+
+            await _durableManager.GetRuntimeStatus(Id, GetAllExecutions);
         }
     }
 }
