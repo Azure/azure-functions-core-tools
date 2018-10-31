@@ -4,7 +4,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 {
     abstract class BaseDurableAction : BaseAction
     {
-        protected string Id { get; set; }
+        protected string ID { get; set; }
 
         protected BaseDurableAction() { }
 
@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                 .Setup<string>("id")
                 .WithDescription("Specifies the id of an orchestration function")
                 .SetDefault(null)
-                .Callback(i => Id = i);
+                .Callback(i => ID = i);
 
             return base.ParseArgs(args);
         }

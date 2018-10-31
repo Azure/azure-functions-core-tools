@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
@@ -10,7 +11,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
     {
         private string FunctionName { get; set; }
 
-        private object Input { get; set; }
+        private string Input { get; set; }
 
         private string Version { get; set; }
 
@@ -24,7 +25,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
-                .Setup<string>("functionName")
+                .Setup<string>("function-name")
                 .WithDescription("Name of the orchestrator function to start")
                 .SetDefault(null)
                 .Callback(n => FunctionName = n);
@@ -44,7 +45,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.StartNew(FunctionName, Version, Id, Input);
+            if (string.IsNullOrEmpty(FunctionName))
+            {
+                throw new CliArgumentsException("Must specify the name of of the orchestration function to start.",
+                    new CliArgument { Name = "function-name", Description = "Name of the orchestration function to start." });
+            }
+
+            await _durableManager.StartNew(FunctionName, Version, ID, Input);
         }
     }
 }

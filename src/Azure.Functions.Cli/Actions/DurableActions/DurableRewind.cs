@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
@@ -29,7 +30,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.Rewind(Id, Reason);
+            if (string.IsNullOrEmpty(ID))
+            {
+                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to rewind.",
+                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to rewind." });
+            }
+
+            await _durableManager.Rewind(ID, Reason);
         }
     }
 }

@@ -8,7 +8,6 @@ using DurableTask.Core;
 using DurableTask.Core.History;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-
 using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Common
@@ -24,7 +23,7 @@ namespace Azure.Functions.Cli.Common
         public DurableManager(ISecretsManager secretsManager)
         {
             var connectionString = secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)).Value;
-            if (connectionString == null)
+            if (string.IsNullOrEmpty(connectionString))
             {
                 throw new CliException("Unable to retrieve storage connection string.");
             }
@@ -47,12 +46,6 @@ namespace Azure.Functions.Cli.Common
 
         public async Task GetHistory(string instanceId)
         {
-            if (string.IsNullOrEmpty(instanceId))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to retrieve the history for.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to retrieve the history of." });
-            }
-
             var historyString = await _orchestrationService.GetOrchestrationHistoryAsync(instanceId, null);
 
             JArray history = JArray.Parse(historyString);
@@ -69,36 +62,24 @@ namespace Azure.Functions.Cli.Common
 
         public async Task GetRuntimeStatus(string instanceId, bool getAllExecutions)
         {
-            if (string.IsNullOrEmpty(instanceId))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to get the runtime status of.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance for which to retrieve the runtime status." });
-            }
-
             var statuses = await _client.GetOrchestrationStateAsync(instanceId, allExecutions: getAllExecutions);
 
             foreach (OrchestrationState status in statuses)
             {
-                ColoredConsole.WriteLine($"Name: {status.Name}{Environment.NewLine}" +
-                    $"Instance: {status.OrchestrationInstance}{Environment.NewLine}" +
-                    $"Version: {status.Version}{Environment.NewLine}" +
-                    $"TimeCreated: {status.CreatedTime}{Environment.NewLine}" +
-                    $"CompletedTime: {status.CompletedTime}{Environment.NewLine}" +
-                    $"LastUpdatedTime: {status.LastUpdatedTime}{Environment.NewLine}" +
-                    $"Input: {status.Input}{Environment.NewLine}" +
-                    $"Output: {status.Output}{Environment.NewLine}" +
-                    $"Status: {status.OrchestrationStatus}{Environment.NewLine}");
+                ColoredConsole.WriteLine($"Name: {status.Name}");
+                ColoredConsole.WriteLine($"Instance: {status.OrchestrationInstance}");
+                ColoredConsole.WriteLine($"Version: {status.Version}");
+                ColoredConsole.WriteLine($"TimeCreated: {status.CreatedTime}");
+                ColoredConsole.WriteLine($"CompletedTime: {status.CompletedTime}");
+                ColoredConsole.WriteLine($"LastUpdatedTime: {status.LastUpdatedTime}");
+                ColoredConsole.WriteLine($"Input: {status.Input}");
+                ColoredConsole.WriteLine($"Output: {status.Output}");
+                ColoredConsole.WriteLine($"Status: {status.OrchestrationStatus}");
             }
         }
 
         public async Task RaiseEvent(string instanceId, string eventName, object eventData)
         {
-            if (string.IsNullOrEmpty(instanceId))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to raise an event for.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to raise an event for." });
-            }
-
             var orchestrationInstance = new OrchestrationInstance
             {
                 InstanceId = instanceId
@@ -111,12 +92,6 @@ namespace Azure.Functions.Cli.Common
 
         public async Task Rewind(string instanceId, string reason)
         {
-            if (string.IsNullOrEmpty(instanceId))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to rewind.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to rewind." });
-            }
-
             var oldStatus = await _client.GetOrchestrationStateAsync(instanceId, false);
 
             try
@@ -127,10 +102,6 @@ namespace Azure.Functions.Cli.Common
             {
                 // DurableTask.AzureStorage throws this error when it cannot find an orchestration instance matching the query
                 throw new CliException("Orchestration instance not rewound. Must have a status of 'Failed', or an EventType of 'TaskFailed' or 'SubOrchestrationInstanceFailed' to be rewound.");
-            }
-            catch (Exception e)
-            {
-                throw new CliException(e.ToString());
             }
             
             ColoredConsole.WriteLine($"Rewind message sent to instance {instanceId}. Retrieving new status now..");
@@ -145,18 +116,12 @@ namespace Azure.Functions.Cli.Common
                 ColoredConsole.Write(Green("Status before rewind: "));
                 ColoredConsole.Write($"{oldStatus[0].OrchestrationStatus}{Environment.NewLine}");
                 ColoredConsole.Write(Green("Status after rewind: "));
-                ColoredConsole.Write($"{newStatus[0].OrchestrationStatus}{Environment.NewLine}");
+                ColoredConsole.WriteLine($"{newStatus[0].OrchestrationStatus}");
             }
         }
 
         public async Task StartNew(string functionName, string version, string instanceId, object input)
-        {
-            if (string.IsNullOrEmpty(functionName))
-            {
-                throw new CliArgumentsException("Must specify the name of of the orchestration function to start.",
-                    new CliArgument { Name = "functionName", Description = "Name of the orchestration function to start." });
-            }
-
+        {           
             if (string.IsNullOrEmpty(instanceId))
             {
                 instanceId = $"{Guid.NewGuid():N}";
@@ -178,12 +143,6 @@ namespace Azure.Functions.Cli.Common
 
         public async Task Terminate(string instanceId, string reason)
         {
-            if (string.IsNullOrEmpty(instanceId))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to terminate.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to terminate." });
-            }
-
             var orchestrationInstance = new OrchestrationInstance
             {
                 InstanceId = instanceId

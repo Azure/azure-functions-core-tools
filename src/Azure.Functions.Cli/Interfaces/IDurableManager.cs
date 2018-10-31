@@ -1,5 +1,5 @@
-﻿using Azure.Functions.Cli.Helpers;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+
 namespace Azure.Functions.Cli.Interfaces
 {
     internal interface IDurableManager
