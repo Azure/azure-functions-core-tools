@@ -140,6 +140,12 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"{Constants.RequirementsTxt} is not found. " +
                 $"{Constants.RequirementsTxt} is required for python function apps. Please make sure to generate one before publishing.");
             }
+            var externalPythonPackages = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
+            if (FileSystemHelpers.DirectoryExists(externalPythonPackages))
+            {
+                ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
+                FileSystemHelpers.DeleteDirectorySafe(Path.Combine(functionAppRoot, Constants.ExternalPythonPackages));
+            }
 
             if (buildNativeDeps)
             {
