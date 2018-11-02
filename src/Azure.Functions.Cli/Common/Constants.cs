@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli.Common
         public const string FuncIgnoreFile = ".funcignore";
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string RequirementsTxt = "requirements.txt";
+        public const string CachedPackagesTxt = "cached_packages.txt";
         public const string FunctionJsonFileName = "function.json";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
@@ -26,6 +27,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
+        public const string CachedRequirementsUrl = "https://raw.githubusercontent.com/Azure/azure-functions-docker/master/host/2.0/stretch/amd64/python-context/cached_start/cached_requirements.txt";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

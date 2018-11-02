@@ -24,7 +24,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public bool BuildNativeDeps { get; set; }
         public bool NoBundler { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
-
+        public bool UseCached { get; set; }
+        public bool Force { get; set; }
         public PackAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -46,7 +47,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(false)
                 .WithDescription("Skips generating a bundle when publishing python function apps with build-native-deps.")
                 .Callback(f => NoBundler = f);
-
+            Parser
+                .Setup<bool>("use-cached")
+                .SetDefault(false)
+                .WithDescription("Exclude cached python packages while packaging.")
+                .Callback(f => UseCached = f);
+            Parser
+                .Setup<bool>("force")
+                .SetDefault(false)
+                .WithDescription("Ignore the differences in venv and requirements.txt when used with --use-cached. ")
+                .Callback(f => Force = f);
             Parser
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
@@ -98,7 +108,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     throw new CliException($"Could not delete {outputPath}");
                 }
             }
-            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, NoBundler, additionalPackages: AdditionalPackages);
+            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, NoBundler, UseCached, Force, additionalPackages: AdditionalPackages);
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
             await FileSystemHelpers.WriteToFile(outputPath, zipStream);
         }

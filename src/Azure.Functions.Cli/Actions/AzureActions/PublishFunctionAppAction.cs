@@ -41,6 +41,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
         public string DotnetCliParameters { get; set; }
+        public bool UseCached { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -101,6 +102,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("no-build")
                 .WithDescription("Skip building dotnet functions")
                 .Callback(f => NoBuild = f);
+            Parser
+                .Setup<bool>("use-cached")
+                .SetDefault(false)
+                .WithDescription("Exclude cached python packages while packaging.")
+                .Callback(f => UseCached = f);
             Parser
                 .Setup<string>("dotnet-cli-params")
                 .WithDescription("When publishing dotnet functions, the core tools calls 'dotnet build --output bin/publish'. Any parameters passed to this will be appended to the command line.")
@@ -292,7 +298,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBundler, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBundler, UseCached, Force, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // if consumption Linux, or run from zip
             if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)

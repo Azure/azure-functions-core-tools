@@ -58,6 +58,9 @@ def find_and_build_deps(args):
     app_path = pathlib.Path(args.path)
     req_txt = app_path / 'requirements.txt'
 
+    if args.requirements:
+        req_txt = pathlib.Path(args.requirements)
+
     if not req_txt.exists():
         die('missing requirements.txt file.  '
             'If you do not have any requirements, please pass --no-deps.')
@@ -205,6 +208,7 @@ def parse_args(argv):
     parser.add_argument('--verbose', default=False, action='store_true')
     parser.add_argument('--platform', type=str)
     parser.add_argument('--python-version', type=str)
+    parser.add_argument('--requirements', type=str)
     parser.add_argument('--no-deps', default=False, action='store_true')
     parser.add_argument('--packages-dir-name', type=str,
                         default='.python_packages',

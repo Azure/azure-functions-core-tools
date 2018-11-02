@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, bool noBundler, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
+        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, bool noBundler, bool useCached, bool force, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -20,7 +20,11 @@ namespace Azure.Functions.Cli.Helpers
 
             if (workerRuntime == WorkerRuntime.python)
             {
-                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, noBundler, additionalPackages);
+                if (useCached && !PythonHelpers.InVirtualEnvironment)
+                {
+                    throw new CliException("For Python function apps using cached packages, you have to be running in a venv with the required packages installed while packaging/publish.");
+                }
+                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, noBundler, useCached, force, additionalPackages);
             }
             else if (workerRuntime == WorkerRuntime.dotnet && !ignoreDotNetCheck)
             {

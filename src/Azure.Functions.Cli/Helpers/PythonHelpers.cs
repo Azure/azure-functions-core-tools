@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
+using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -14,7 +16,7 @@ namespace Azure.Functions.Cli.Helpers
     public static class PythonHelpers
     {
         private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0a5", "azure-functions-worker==1.0.0a6" };
-        private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
+        public static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
         public static async Task InstallPackage()
@@ -133,19 +135,22 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool noBundler, string additionalPackages)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool noBundler, bool useCached, bool force, string additionalPackages)
         {
-            if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
+            var userRequirements = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
+            if (!FileSystemHelpers.FileExists(userRequirements))
             {
                 throw new CliException($"{Constants.RequirementsTxt} is not found. " +
                 $"{Constants.RequirementsTxt} is required for python function apps. Please make sure to generate one before publishing.");
             }
 
+            var requirementsTxtFile = useCached ? await FilterRequirementsTxt(functionAppRoot, userRequirements, force) : userRequirements;
+
             if (buildNativeDeps)
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
                 {
-                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages, noBundler);
+                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages, noBundler, requirementsTxtFile);
                 }
                 else
                 {
@@ -154,26 +159,106 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                return await InternalPreparePythonDeployment(files, functionAppRoot);
+                return await InternalPreparePythonDeployment(files, functionAppRoot, requirementsTxtFile);
             }
         }
 
-        private static async Task<Stream> InternalPreparePythonDeployment(IEnumerable<string> files, string functionAppRoot)
+        private static async Task<string> FilterRequirementsTxt(string functionAppRoot, string userRequirements, bool force)
         {
-            var packagesPath = await RestorePythonRequirements(functionAppRoot);
+            var userRequirementsContents = FileSystemHelpers.ReadAllLines(userRequirements);
+
+            await EnsureRequirementsTxtUpdated(userRequirementsContents, force);
+
+            var tmp = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", string.Empty));
+            FileSystemHelpers.EnsureDirectory(tmp);
+
+            var cachedPyPackages = await FetchCachedPackagesFile();
+            var userCachedPackages = userRequirementsContents.Intersect(cachedPyPackages, StringComparer.OrdinalIgnoreCase);
+            var newRequirements = userRequirementsContents.Except(cachedPyPackages, StringComparer.OrdinalIgnoreCase);
+
+            await FileSystemHelpers.WriteAllTextToFileAsync(Path.Join(functionAppRoot, Constants.CachedPackagesTxt), string.Join(Environment.NewLine, userCachedPackages));
+
+            var newRequirementsFile = Path.Join(tmp, Constants.RequirementsTxt);
+            await FileSystemHelpers.WriteAllTextToFileAsync(newRequirementsFile, string.Join(Environment.NewLine, newRequirements));
+
+            return newRequirementsFile;
+        }
+
+        private static async Task EnsureRequirementsTxtUpdated(string[] userRequirementsContents, bool force)
+        {
+            var freezeRequirements = new List<string>();
+            var exe = new Executable("pip", "freeze");
+            var exitCode = await exe.RunAsync(l => freezeRequirements.Add(l));
+
+            if (exitCode != 0)
+            {
+                throw new CliException($"Error running {exe.Command}");
+            }
+
+            if (freezeRequirements
+                .Except(userRequirementsContents)
+                .Union(userRequirementsContents
+                .Except(freezeRequirements))
+                .Any(req => !string.IsNullOrWhiteSpace(req) && !string.IsNullOrEmpty(req)))
+            {
+                ColoredConsole.WriteLine(WarningColor("The requirements.txt file does not contain all requirements from 'pip freeze' command."));
+                if (force)
+                {
+                    ColoredConsole.WriteLine(WarningColor("--force was passed, ignoring the requirements.txt check."));
+                }
+                else
+                {
+                    ColoredConsole.Error.WriteLine($"Expected requirements:");
+                    ColoredConsole.Error.WriteLine($"{string.Join(Environment.NewLine, freezeRequirements)}");
+                    throw new CliException($"Please ensure that all the required packages and dependencies are captured in requirements.txt. Use --force to ignore this check");
+                }
+            }
+        }
+
+        private static async Task<string[]> FetchCachedPackagesFile()
+        {
+            using (var client = new HttpClient(new HttpClientHandler()))
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", "functions-cli/2.0");
+                HttpResponseMessage clientResponse = null;
+                try
+                {
+                    await RetryHelper.Retry(async () =>
+                    {
+                        // This may not work if the URL isn't ready or updated
+                        clientResponse = await client.GetAsync(Constants.CachedRequirementsUrl);
+                        clientResponse.EnsureSuccessStatusCode();
+                    }, retryCount: 3);
+                }
+                catch (Exception)
+                {
+                    throw new CliException("Error trying to fetch cached requirements");
+                }
+
+                // Should never happen
+                if (clientResponse == null)
+                {
+                    throw new CliException("Error trying to fetch cached requirements");
+                }
+                var cachedPackages = await clientResponse.Content.ReadAsStringAsync();
+                return cachedPackages.Split(Environment.NewLine);
+            }
+        }
+
+        private static async Task<Stream> InternalPreparePythonDeployment(IEnumerable<string> files, string functionAppRoot, string requirementsTxt)
+        {
+            var packagesPath = await RestorePythonRequirements(functionAppRoot, requirementsTxt);
             return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesPath)), functionAppRoot);
         }
 
-        private static async Task<string> RestorePythonRequirements(string functionAppRoot)
+        private static async Task<string> RestorePythonRequirements(string functionAppRoot, string requirementsTxt)
         {
             var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
             FileSystemHelpers.EnsureDirectory(packagesLocation);
 
-            var requirementsTxt = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
-
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
 
-            var exe = new Executable("python", $"{packApp} --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
+            var exe = new Executable("python", $"{packApp} --platform linux --python-version 36 --requirements {requirementsTxt} --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
@@ -185,7 +270,7 @@ namespace Azure.Functions.Cli.Helpers
             return packagesLocation;
         }
 
-        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool noBundler)
+        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool noBundler, string requirementsTxt)
         {
             var appContentPath = CopyToTemp(files, functionAppRoot);
 
@@ -218,6 +303,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
                 await DockerHelpers.CopyToContainer(containerId, bundleScriptFilePath, Constants.StaticResourcesNames.PythonBundleScript);
+                await DockerHelpers.CopyToContainer(containerId, requirementsTxt, $"/{Constants.RequirementsTxt}");
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonBundleScript}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");

@@ -9,7 +9,7 @@ if [ -d worker_venv ]; then
 fi
 python -m venv --copies worker_venv
 source worker_venv/bin/activate
-pip install -r requirements.txt
+pip install -r /requirements.txt
 apt-get update
 apt-get install zip -y
 zip --symlinks -r /app.zip .
