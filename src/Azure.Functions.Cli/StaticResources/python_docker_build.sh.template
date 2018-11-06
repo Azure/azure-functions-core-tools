@@ -9,16 +9,16 @@ if [ -d worker_venv ]; then
 fi
 
 python -m venv --copies worker_venv
-source worker_venv/bin/activate
-pip install -r requirements.txt
+worker_venv/bin/pip install -r requirements.txt
 
 # Bundle using pyinstaller
 pip install pyinstaller==3.4
 
+pyinstaller_success=false
+
 # If pyinstaller succeeds, we deactivate and remove the venv
 if python /python_bundle_script.py /azure-functions-host/workers/python/worker.py  ./worker_venv/lib/python3.6/site-packages; then
-	deactivate
-	rm -rf ./worker_venv
+	pyinstaller_success=true
 else
 	if [ -d ./worker-bundle ]; then
 		rm -r ./worker-bundle
@@ -35,4 +35,9 @@ fi
 
 apt-get update
 apt-get install zip -y
-zip --symlinks -r /app.zip .
+
+if [ "$pyinstaller_success" = true ]; then
+	zip --symlinks -r /app.zip . -x "worker_venv/*"
+else
+	zip --symlinks -r /app.zip .
+fi
