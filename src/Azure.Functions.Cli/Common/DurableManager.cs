@@ -1,11 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using DurableTask.AzureStorage;
 using DurableTask.Core;
 using DurableTask.Core.History;
+using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Colors.Net.StringStaticMethods;
@@ -18,30 +22,77 @@ namespace Azure.Functions.Cli.Common
 
         private readonly TaskHubClient _client;
 
-        private const string TaskHubName = "DurableFunctionsHub";
+        private string TaskHubName;
 
+        private string ConnectionString;
+      
         public DurableManager(ISecretsManager secretsManager)
         {
-            var connectionString = secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)).Value;
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                throw new CliException("Unable to retrieve storage connection string.");
-            }
+            this.SetConnectionStringAndTaskHubName(secretsManager);
 
             var settings = new AzureStorageOrchestrationServiceSettings
             {
                 TaskHubName = TaskHubName,
-                StorageConnectionString = connectionString,
+                StorageConnectionString = ConnectionString,
             };
 
             _orchestrationService = new AzureStorageOrchestrationService(settings);
             _client = new TaskHubClient(_orchestrationService);
         }
 
-        public async Task DeleteHistory()
+        // HELP WANTED: Is there a better way to do this?? (parse host.json for durable settings)
+        private void SetConnectionStringAndTaskHubName(ISecretsManager secretsManager)
+        {       
+            // Set connection string key and task hub name to defaults
+            var connectionStringKey = "AzureWebJobsStorage";
+            TaskHubName = "DurableFunctionsHub";
+
+            try
+            {
+                // Attempt to retrieve Durable override settings from host.json
+                dynamic hostSettings = JObject.Parse(File.ReadAllText(ScriptConstants.HostMetadataFileName));
+
+                if (hostSettings.version?.Equals("2.0") == true)
+                {
+                    // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
+                    connectionStringKey = hostSettings.extensions.durableTask.AzureStorageConnectionStringName ?? connectionStringKey;
+                    TaskHubName = hostSettings.extensions.durableTask.HubName ?? TaskHubName;
+                }
+                else
+                {
+                    connectionStringKey = hostSettings.durableTask.AzureStorageConnectionStringName ?? connectionStringKey;
+                    TaskHubName = hostSettings.durableTask.HubName ?? TaskHubName;
+                }
+            }
+            catch { }
+
+            ConnectionString = secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
+            if (string.IsNullOrEmpty(ConnectionString))
+            {
+                throw new CliException($"Unable to retrieve storage connection string with key '{connectionStringKey}'");
+            }
+        }
+
+
+        public async Task DeleteTaskHub(string connectionString, bool deleteInstanceStore)
         {
-            await _orchestrationService.DeleteAsync();
-            ColoredConsole.Write(Green("History and instance tables and queues successfully deleted."));
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                var settings = new AzureStorageOrchestrationServiceSettings
+                {
+                    TaskHubName = TaskHubName,
+                    StorageConnectionString = connectionString,
+                };
+
+                var orchestrationService = new AzureStorageOrchestrationService(settings);
+                await orchestrationService.DeleteAsync(deleteInstanceStore);
+            }
+            else
+            {
+                await _orchestrationService.DeleteAsync(deleteInstanceStore);
+            }
+
+            ColoredConsole.Write(Green("Task hub successfully deleted."));
         }
 
         public async Task GetHistory(string instanceId)
@@ -53,41 +104,60 @@ namespace Azure.Functions.Cli.Common
             JArray chronological_history = new JArray(history.OrderBy(obj => (string)obj["TimeStamp"]));
             foreach (JObject jobj in chronological_history)
             {
+                // Convert EventType enum values to their equivalent string value
                 var parsed = Enum.TryParse(jobj["EventType"].ToString(), out EventType eventName);
                 jobj["EventType"] = eventName.ToString();
             }
 
-            ColoredConsole.Write($"History: {chronological_history.ToString(Formatting.Indented)}");
+            ColoredConsole.Write($"{chronological_history.ToString(Formatting.Indented)}");
         }
 
-        public async Task GetRuntimeStatus(string instanceId, bool getAllExecutions)
+        public async Task GetInstances(DateTime createdTimeFrom, DateTime createdTimeTo, IEnumerable<OrchestrationStatus> statuses, int top, string continuationToken)
         {
-            var statuses = await _client.GetOrchestrationStateAsync(instanceId, allExecutions: getAllExecutions);
+            DurableStatusQueryResult queryResult = await _orchestrationService.GetOrchestrationStateAsync(createdTimeFrom, createdTimeTo, statuses, top, continuationToken);           
+
+            // TODO? Status of each instance prints as an integer, rather than the string of the OrchestrationStatus enum
+            ColoredConsole.WriteLine(JsonConvert.SerializeObject(queryResult.OrchestrationState, Formatting.Indented));
+
+            ColoredConsole.WriteLine(Green($"Continuation token for next set of results: '{queryResult.ContinuationToken}'"));
+        }
+
+        public async Task GetRuntimeStatus(string instanceId, bool showInput, bool showOutput)
+        {
+            var statuses = await _orchestrationService.GetOrchestrationStateAsync(instanceId, allExecutions: false, fetchInput: showInput);
 
             foreach (OrchestrationState status in statuses)
             {
-                ColoredConsole.WriteLine($"Name: {status.Name}");
-                ColoredConsole.WriteLine($"Instance: {status.OrchestrationInstance}");
-                ColoredConsole.WriteLine($"Version: {status.Version}");
-                ColoredConsole.WriteLine($"TimeCreated: {status.CreatedTime}");
-                ColoredConsole.WriteLine($"CompletedTime: {status.CompletedTime}");
-                ColoredConsole.WriteLine($"LastUpdatedTime: {status.LastUpdatedTime}");
-                ColoredConsole.WriteLine($"Input: {status.Input}");
-                ColoredConsole.WriteLine($"Output: {status.Output}");
-                ColoredConsole.WriteLine($"Status: {status.OrchestrationStatus}");
+                status.Output = (showOutput) ? status.Output : null;
+                ColoredConsole.WriteLine(JsonConvert.SerializeObject(status, Formatting.Indented));
             }
         }
 
-        public async Task RaiseEvent(string instanceId, string eventName, object eventData)
+        public async Task PurgeHistory(DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses)
+        {
+            await _orchestrationService.PurgeInstanceHistoryAsync(createdAfter, createdBefore, runtimeStatuses);
+
+            string messageToPrint = $"Purged orchestration history of instances created between '{createdAfter}' and '{createdBefore}'";
+
+            if (runtimeStatuses != null)
+            {
+                string statuses = string.Join(",", runtimeStatuses.Select(x => x.ToString()).ToArray());
+                messageToPrint += $" and whose runtime status matched one of the following: [{statuses}]";
+            }
+
+            ColoredConsole.WriteLine(Green(messageToPrint));
+        }
+
+        public async Task RaiseEvent(string instanceId, string eventName, object data)
         {
             var orchestrationInstance = new OrchestrationInstance
             {
                 InstanceId = instanceId
             };
 
-            await _client.RaiseEventAsync(orchestrationInstance, eventName, eventData);
+            await _client.RaiseEventAsync(orchestrationInstance, eventName, data);
 
-            ColoredConsole.WriteLine(Green($"Raised event {eventName} to instance {instanceId} with data {eventData}"));
+            ColoredConsole.WriteLine(Green($"Raised event '{eventName}' to instance '{instanceId}'."));
         }
 
         public async Task Rewind(string instanceId, string reason)
@@ -104,7 +174,7 @@ namespace Azure.Functions.Cli.Common
                 throw new CliException("Orchestration instance not rewound. Must have a status of 'Failed', or an EventType of 'TaskFailed' or 'SubOrchestrationInstanceFailed' to be rewound.");
             }
             
-            ColoredConsole.WriteLine($"Rewind message sent to instance {instanceId}. Retrieving new status now..");
+            ColoredConsole.WriteLine($"Rewind message sent to instance '{instanceId}'. Retrieving new status now...");
 
             // Wait three seconds before retrieving the updated status
             await Task.Delay(3000);
@@ -114,30 +184,31 @@ namespace Azure.Functions.Cli.Common
                 && newStatus != null && newStatus.Count > 0)
             {
                 ColoredConsole.Write(Green("Status before rewind: "));
-                ColoredConsole.Write($"{oldStatus[0].OrchestrationStatus}{Environment.NewLine}");
+                ColoredConsole.WriteLine($"{oldStatus[0].OrchestrationStatus}");
                 ColoredConsole.Write(Green("Status after rewind: "));
                 ColoredConsole.WriteLine($"{newStatus[0].OrchestrationStatus}");
             }
         }
 
-        public async Task StartNew(string functionName, string version, string instanceId, object input)
+        public async Task StartNew(string functionName, string instanceId, object data)
         {           
             if (string.IsNullOrEmpty(instanceId))
             {
                 instanceId = $"{Guid.NewGuid():N}";
             }
 
-            await _client.CreateOrchestrationInstanceAsync(functionName, version, instanceId, input);
+            await _client.CreateOrchestrationInstanceAsync(functionName, version: string.Empty, instanceId: instanceId, input: data);
 
             var status = await _client.GetOrchestrationStateAsync(instanceId, false);
 
             if (status != null && status.Count > 0)
             {
-                ColoredConsole.WriteLine(Green($"Started {status[0].Name} with new instance {status[0].OrchestrationInstance.InstanceId} at {status[0].CreatedTime}."));
+                ColoredConsole.WriteLine(Green($"Started '{status[0].Name}' at {status[0].CreatedTime}. " +
+                    $"Instance ID: '{status[0].OrchestrationInstance.InstanceId}'."));
             }
             else
             {
-                throw new CliException($"Could not start new instance {instanceId}.");
+                throw new CliException($"Could not start new instance '{instanceId}'.");
             }
         }
 
@@ -150,31 +221,74 @@ namespace Azure.Functions.Cli.Common
 
             await _client.TerminateInstanceAsync(orchestrationInstance, reason);
 
-            var status = await _client.GetOrchestrationStateAsync(instanceId, false);
+            var status = (await _client.GetOrchestrationStateAsync(instanceId, false)).FirstOrDefault();
 
-            if (status != null && status.Count > 0)
+            if (status != null)
             {
-                if (status[0].OrchestrationStatus == OrchestrationStatus.Running)
+                if (status.OrchestrationStatus != OrchestrationStatus.Terminated)
                 {
-                    ColoredConsole.WriteLine($"Found & terminated instance {instanceId}. Waiting 10 seconds for 'Terminated' status..");
-                    // If it's still marked as running, wait a little bit and then poll again
-                    await Task.Delay(10000);
-                    status = await _client.GetOrchestrationStateAsync(instanceId, false);
+                    ColoredConsole.WriteLine($"Sent a termination message to instance '{instanceId}'. Waiting up to 30 seconds for the orchestration to actually terminate...");
+                    status = await _client.WaitForOrchestrationAsync(
+                        orchestrationInstance,
+                        timeout: TimeSpan.FromSeconds(30),
+                        cancellationToken: CancellationToken.None);
                 }
 
-                if (status?[0]?.OrchestrationStatus == OrchestrationStatus.Terminated)
+                if (status?.OrchestrationStatus == OrchestrationStatus.Terminated)
                 {
-                    ColoredConsole.WriteLine(Green($"Successfully terminated {instanceId}"));
+                    ColoredConsole.WriteLine(Green($"Successfully terminated '{instanceId}'"));
                 }
                 else
                 {
-                    throw new CliException($"Instance did not terminate within 10 seconds. Current status: {status[0].OrchestrationStatus}");
+                    throw new CliException($"Instance did not terminate within the given timeout.");
                 }
             }
             else
             {
-                ColoredConsole.WriteLine(Yellow($"Failed to find instance {instanceId}. No instance was terminated."));
+                ColoredConsole.WriteLine(Yellow($"Failed to find instance '{instanceId}'. No instance was terminated."));
             }
-        }       
+        }
+
+        public static dynamic DeserializeInstanceInput(string input)
+        {
+            // User passed a filename. Retrieve the contents
+            if (!string.IsNullOrEmpty(input) && input[0] == '@')
+            {
+                string contents = string.Empty;
+                string filePath = input.Substring(1);
+                if (File.Exists(filePath))
+                {
+                    contents = File.ReadAllText(filePath);
+                }
+                else
+                {
+                    throw new CliException($"Could not find input file at '{filePath}'");
+                }
+
+                try
+                {
+                    return JsonConvert.DeserializeObject(contents);
+                }
+                catch (Exception e)
+                {
+                    throw new CliException($"Could not deserialize the input to the orchestration instance into a valid JSON object.", e);
+                }
+            }
+
+            return input;
+        }
+
+        public static IEnumerable<OrchestrationStatus> ParseStatuses(string statusString)
+        {
+            // Convert the string list of statuses to filter by into an array of enums
+            IEnumerable<OrchestrationStatus> statuses = null;
+            if (!string.IsNullOrEmpty(statusString))
+            {
+                string[] statusArray = statusString.Split(' ');
+                statuses = statusArray.Select(s => (OrchestrationStatus)Enum.Parse(typeof(OrchestrationStatus), s, ignoreCase: true));
+            }
+
+            return statuses;
+        }
     }
 }

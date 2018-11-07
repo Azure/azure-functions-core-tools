@@ -11,7 +11,9 @@ namespace Azure.Functions.Cli.Actions.DurableActions
     {
         private readonly IDurableManager _durableManager;
 
-        private bool GetAllExecutions;
+        private bool ShowInput { get; set; }
+
+        private bool ShowOutput { get; set; }
 
         public DurableGetRuntimeStatus(IDurableManager durableManager)
         {
@@ -21,23 +23,22 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
-                .Setup<bool>("get-all-executions")
-                .WithDescription("If true, the status of all executions is retrieved. If false, only the status of the most recent execution is retrieved.")
+                .Setup<bool>("show-input")
+                .WithDescription("If set to true, the response will contain the input of the function.")
                 .SetDefault(false)
-                .Callback(n => GetAllExecutions = n);
+                .Callback(n => ShowInput = n);
+            Parser
+                .Setup<bool>("show-output")
+                .WithDescription("If set to true, the response will contain the execution history.")
+                .SetDefault(false)
+                .Callback(n => ShowOutput = n);
 
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
-            if (string.IsNullOrEmpty(ID))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to get the runtime status of.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance for which to retrieve the runtime status." });
-            }
-
-            await _durableManager.GetRuntimeStatus(ID, GetAllExecutions);
+            await _durableManager.GetRuntimeStatus(Id, ShowInput, ShowOutput);
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
@@ -30,13 +29,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            if (string.IsNullOrEmpty(ID))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to terminate.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to terminate." });
-            }
-
-            await _durableManager.Terminate(ID, Reason);
+            await _durableManager.Terminate(Id, Reason);
         }
     }
 }

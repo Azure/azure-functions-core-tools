@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli
         [Description("Commands for installing extensions")]
         Extensions,
 
-        [Description("Commands for working with Durable Functions locally")]
+        [Description("Commands for working with Durable Functions")]
         Durable
     }
 

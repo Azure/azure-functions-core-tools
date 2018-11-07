@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                  .Callback(n => EventName = n);
             Parser
                .Setup<string>("event-data")
-               .WithDescription("Data to pass to the event")
+               .WithDescription("Data to pass to the event, either in-line or via a JSON file. Prefix the path to the file with @ (@path/to/file.json).")
                .SetDefault(null)
                .Callback(d => EventData = d);
 
@@ -38,13 +38,8 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            if (string.IsNullOrEmpty(ID))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to raise an event for.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to raise an event for." });
-            }
-
-            await _durableManager.RaiseEvent(ID, EventName, EventData);
+            dynamic input = DurableManager.DeserializeInstanceInput(EventData);
+            await _durableManager.RaiseEvent(Id, EventName, EventData);
         }
     }
 }

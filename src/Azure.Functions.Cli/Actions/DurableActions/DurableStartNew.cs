@@ -7,13 +7,15 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "start-new", Context = Context.Durable, HelpText = "Start a new instance of the specified orchestrator function")]
-    class DurableStartNew : BaseDurableAction
+    class DurableStartNew : BaseAction
     {
         private string FunctionName { get; set; }
 
         private string Input { get; set; }
 
         private string Version { get; set; }
+
+        private string Id { get; set; }
 
         private readonly IDurableManager _durableManager;
 
@@ -25,33 +27,28 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
+                .Setup<string>("id")
+                .WithDescription("Specifies the id of an orchestration instance")
+                .SetDefault(null)
+                .Callback(i => Id = i);
+            Parser
                 .Setup<string>("function-name")
                 .WithDescription("Name of the orchestrator function to start")
-                .SetDefault(null)
+                .Required()
                 .Callback(n => FunctionName = n);
             Parser
                .Setup<string>("input")
-               .WithDescription("Input to the orchestrator function")
+               .WithDescription("Input to the orchestrator function, either in-line or via a JSON file. Prefix the path to the file with @ (@path/to/file.json).")
                .SetDefault(null)
                .Callback(p => Input = p);
-            Parser
-               .Setup<string>("version")
-               .WithDescription("Version of the orchestrator function")
-               .SetDefault(null)
-               .Callback(v => Version = v);
 
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
-            if (string.IsNullOrEmpty(FunctionName))
-            {
-                throw new CliArgumentsException("Must specify the name of of the orchestration function to start.",
-                    new CliArgument { Name = "function-name", Description = "Name of the orchestration function to start." });
-            }
-
-            await _durableManager.StartNew(FunctionName, Version, ID, Input);
+            dynamic input = DurableManager.DeserializeInstanceInput(Input);
+            await _durableManager.StartNew(FunctionName, Id, input);
         }
     }
 }

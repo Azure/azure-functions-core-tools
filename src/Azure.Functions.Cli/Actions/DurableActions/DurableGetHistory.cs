@@ -17,13 +17,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            if (string.IsNullOrEmpty(ID))
-            {
-                throw new CliArgumentsException("Must specify the id of the orchestration instance you wish to retrieve the history for.",
-                    new CliArgument { Name = "id", Description = "ID of the orchestration instance to retrieve the history of." });
-            }
-
-            await _durableManager.GetHistory(ID);
+            await _durableManager.GetHistory(Id);
         }
     }
 }
