@@ -82,7 +82,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
                 if (exitCode != 0)
                 {
-                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r'));
+                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r') + $"{Environment.NewLine}" + "Make sure to run \"az login\" to log in to Azure and retry this command.");
                 }
                 else
                 {
