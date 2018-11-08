@@ -74,8 +74,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (CommandChecker.CommandExists("az"))
             {
                 var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? new Executable("cmd", "/c az account get-access-token --query \"accessToken\"")
-                    : new Executable("az", "account get-access-token --query \"accessToken\"");
+                    ? new Executable("cmd", "/c az account get-access-token --query \"accessToken\" --output json")
+                    : new Executable("az", "account get-access-token --query \"accessToken\" --output json");
 
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();

@@ -2,12 +2,12 @@ using System;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Newtonsoft.Json;
-using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Arm
 {
@@ -46,10 +46,6 @@ namespace Azure.Functions.Cli.Arm
                             }
                             else
                             {
-                                if (StaticSettings.IsDebug)
-                                {
-                                    ColoredConsole.Error.WriteLine(ErrorColor(await response.Content.ReadAsStringAsync()));
-                                }
                                 retries--;
                             }
                         }
@@ -73,18 +69,22 @@ namespace Azure.Functions.Cli.Arm
         private static async Task<HttpResponseMessage> HttpInvoke(Uri uri, string verb, string accessToken, object objectPayload)
         {
             var payload = JsonConvert.SerializeObject(objectPayload);
-            using (var client = new HttpClient(new HttpClientHandler()))
+            HttpMessageHandler handler = new HttpClientHandler();
+
+            if (StaticSettings.IsDebug)
+            {
+                handler = new LoggingHandler(handler);
+            }
+
+            using (var client = new HttpClient(handler))
             {
                 const string jsonContentType = "application/json";
                 client.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
                 client.DefaultRequestHeaders.Add("User-Agent", "functions-cli/2.0");
                 client.DefaultRequestHeaders.Add("Accept", jsonContentType);
+                client.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
 
                 HttpResponseMessage response = null;
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine(VerboseColor($"{verb.ToUpper()} {uri.ToString()}"));
-                }
 
                 if (String.Equals(verb, "get", StringComparison.OrdinalIgnoreCase))
                 {
@@ -117,6 +117,38 @@ namespace Azure.Functions.Cli.Arm
 
                 return response;
             }
+        }
+    }
+
+    // https://stackoverflow.com/a/18925296
+    public class LoggingHandler : DelegatingHandler
+    {
+        public LoggingHandler(HttpMessageHandler innerHandler)
+            : base(innerHandler)
+        {
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            ColoredConsole.WriteLine(DarkGray("Request:"));
+            ColoredConsole.WriteLine(DarkGray(request.ToString()));
+            if (request.Content != null)
+            {
+                ColoredConsole.WriteLine(DarkGray(await request.Content.ReadAsStringAsync()));
+            }
+            ColoredConsole.WriteLine();
+
+            HttpResponseMessage response = await base.SendAsync(request, cancellationToken);
+
+            ColoredConsole.WriteLine(DarkGray("Response:"));
+            ColoredConsole.WriteLine(DarkGray(response.ToString()));
+            if (response.Content != null)
+            {
+                Console.WriteLine(DarkGray(await response.Content.ReadAsStringAsync()));
+            }
+            ColoredConsole.WriteLine().WriteLine();
+
+            return response;
         }
     }
 }
