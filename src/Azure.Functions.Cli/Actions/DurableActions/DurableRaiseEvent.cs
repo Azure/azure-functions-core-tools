@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                  .Callback(n => EventName = n);
             Parser
                .Setup<string>("event-data")
-               .WithDescription("Data to pass to the event, either in-line or via a JSON file. Prefix the path to the file with @ (@path/to/file.json).")
+               .WithDescription("Data to pass to the event, either in-line or via a JSON file. For files, prefix the path to the file with @ (e.g. \"@path/to/file.json\").")
                .SetDefault(null)
                .Callback(d => EventData = d);
 
@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         public override async Task RunAsync()
         {
             dynamic input = DurableManager.DeserializeInstanceInput(EventData);
-            await _durableManager.RaiseEvent(Id, EventName, EventData);
+            await _durableManager.RaiseEvent(Id, EventName, input);
         }
     }
 }

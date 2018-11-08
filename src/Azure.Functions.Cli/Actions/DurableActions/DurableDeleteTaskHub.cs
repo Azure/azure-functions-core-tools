@@ -12,8 +12,6 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         private string ConnectionString { get; set; }
 
-        private bool DeleteInstanceStore { get; set; }
-
         public DurableDeleteTaskHub(IDurableManager durableManager)
         {
             _durableManager = durableManager;
@@ -26,18 +24,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                 .WithDescription("(Optional) Storage connection string to use.")
                 .SetDefault(null)
                 .Callback(n => ConnectionString = n);
-            Parser
-                .Setup<bool>("delete-instance-store")
-                .WithDescription("If set to false, the instance store will not be deleted. The default value is true.")
-                .SetDefault(true)
-                .Callback(n => DeleteInstanceStore = n);
 
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
-            await _durableManager.DeleteTaskHub(ConnectionString, DeleteInstanceStore);
+            await _durableManager.DeleteTaskHub(ConnectionString);
         }
     }
 }

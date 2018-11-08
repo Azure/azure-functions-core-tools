@@ -22,30 +22,37 @@ namespace Azure.Functions.Cli.Common
 
         private readonly TaskHubClient _client;
 
-        private string TaskHubName;
+        private readonly string _taskHubName;
 
-        private string ConnectionString;
-      
+        private readonly string _connectionString;
+
+        public const string DefaultConnectionStringKey = "AzureWebJobsStorage";
+
+        public const string DefaultTaskHubName = "DurableFunctionsHub";
+
         public DurableManager(ISecretsManager secretsManager)
         {
-            this.SetConnectionStringAndTaskHubName(secretsManager);
+            this.SetConnectionStringAndTaskHubName(secretsManager, ref _taskHubName, ref _connectionString);
 
-            var settings = new AzureStorageOrchestrationServiceSettings
+            if (!string.IsNullOrEmpty(_connectionString))
             {
-                TaskHubName = TaskHubName,
-                StorageConnectionString = ConnectionString,
-            };
+                var settings = new AzureStorageOrchestrationServiceSettings
+                {
+                    TaskHubName = _taskHubName,
+                    StorageConnectionString = _connectionString,
+                };
 
-            _orchestrationService = new AzureStorageOrchestrationService(settings);
-            _client = new TaskHubClient(_orchestrationService);
+                _orchestrationService = new AzureStorageOrchestrationService(settings);
+                _client = new TaskHubClient(_orchestrationService);
+            }
         }
 
         // HELP WANTED: Is there a better way to do this?? (parse host.json for durable settings)
-        private void SetConnectionStringAndTaskHubName(ISecretsManager secretsManager)
+        private void SetConnectionStringAndTaskHubName(ISecretsManager secretsManager, ref string taskHubName, ref string connectionString)
         {       
             // Set connection string key and task hub name to defaults
-            var connectionStringKey = "AzureWebJobsStorage";
-            TaskHubName = "DurableFunctionsHub";
+            var connectionStringKey = DefaultConnectionStringKey;
+            taskHubName = DefaultTaskHubName;
 
             try
             {
@@ -55,41 +62,46 @@ namespace Azure.Functions.Cli.Common
                 if (hostSettings.version?.Equals("2.0") == true)
                 {
                     // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
-                    connectionStringKey = hostSettings.extensions.durableTask.AzureStorageConnectionStringName ?? connectionStringKey;
-                    TaskHubName = hostSettings.extensions.durableTask.HubName ?? TaskHubName;
+                    connectionStringKey = hostSettings?.extensions?.durableTask?.AzureStorageConnectionStringName ?? connectionStringKey;
+                    taskHubName = hostSettings?.extensions?.durableTask?.HubName ?? taskHubName;
                 }
                 else
                 {
-                    connectionStringKey = hostSettings.durableTask.AzureStorageConnectionStringName ?? connectionStringKey;
-                    TaskHubName = hostSettings.durableTask.HubName ?? TaskHubName;
+                    connectionStringKey = hostSettings?.durableTask?.AzureStorageConnectionStringName ?? connectionStringKey;
+                    taskHubName = hostSettings?.durableTask?.HubName ?? taskHubName;
                 }
             }
-            catch { }
-
-            ConnectionString = secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
-            if (string.IsNullOrEmpty(ConnectionString))
+            catch(Exception e)
             {
-                throw new CliException($"Unable to retrieve storage connection string with key '{connectionStringKey}'");
+                ColoredConsole.WriteLine(Yellow($"Exception thrown while attempting to parse override connection string and task hub name from {ScriptConstants.HostMetadataFileName}:"));
+                ColoredConsole.WriteLine(Yellow(e.Message));
+            }
+
+            connectionString = secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                // Warn user rather than throwing an error in the case of 1. manual override with --connection-string or 2. testing
+                ColoredConsole.WriteLine(Yellow($"Unable to retrieve storage connection string with key '{connectionStringKey}'"));
             }
         }
 
 
-        public async Task DeleteTaskHub(string connectionString, bool deleteInstanceStore)
+        public async Task DeleteTaskHub(string connectionString)
         {
             if (!string.IsNullOrEmpty(connectionString))
             {
                 var settings = new AzureStorageOrchestrationServiceSettings
                 {
-                    TaskHubName = TaskHubName,
+                    TaskHubName = _taskHubName,
                     StorageConnectionString = connectionString,
                 };
 
                 var orchestrationService = new AzureStorageOrchestrationService(settings);
-                await orchestrationService.DeleteAsync(deleteInstanceStore);
+                await orchestrationService.DeleteAsync();
             }
             else
             {
-                await _orchestrationService.DeleteAsync(deleteInstanceStore);
+                await _orchestrationService.DeleteAsync();
             }
 
             ColoredConsole.Write(Green("Task hub successfully deleted."));

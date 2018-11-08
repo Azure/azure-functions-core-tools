@@ -36,8 +36,6 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                 .Callback(n => CreatedTimeTo = n);
             Parser
                 .Setup<string>("runtime-status")
-                // TODO --- this description is probably too long...
-                // Also, confirm that the runtime status list is confined to those four statuses (https://github.com/gled4er/durabletask/blob/dee6f2194fe36cb742402fa215d2c472f6b124e8/src/DurableTask.AzureStorage/Tracking/AzureTableTrackingStore.cs#L711)
                 .WithDescription("(Optional) Delete the history of instances whose status match these. Options: 'completed', 'terminated', 'canceled', 'failed'. Can provide multiple (space separated) statuses. Default: delete instance history regardless of status")
                 .SetDefault(string.Empty)
                 .Callback(n => Statuses = n);

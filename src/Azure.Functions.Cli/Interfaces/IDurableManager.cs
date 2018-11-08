@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Interfaces
 {
     internal interface IDurableManager
     {
-        Task DeleteTaskHub(string connectionString, bool deleteInstanceStore);
+        Task DeleteTaskHub(string connectionString);
 
         Task GetHistory(string instanceId);
 

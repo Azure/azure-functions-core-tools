@@ -4,6 +4,7 @@ using Autofac;
 using FluentAssertions;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Actions.AzureActions;
+using Azure.Functions.Cli.Actions.DurableActions;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Arm;
@@ -52,6 +53,15 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("azure functionapp --help", typeof(HelpAction))]
         [InlineData("azure --help", typeof(HelpAction))]
         [InlineData("--help", typeof(HelpAction))]
+        [InlineData("durable delete-task-hub --connection-string connection", typeof(DurableDeleteTaskHub))]
+        [InlineData("durable get-history --id 1234 --show-input true", typeof(DurableGetHistory))]
+        [InlineData("durable get-instances --created-before 11/10/2018", typeof(DurableGetInstances))]
+        [InlineData("durable get-runtime-status --id 1234", typeof(DurableGetRuntimeStatus))]
+        [InlineData("durable purge-history --created-after 11/5/2018", typeof(DurablePurgeHistory))]
+        [InlineData("durable raise-event --id 1234", typeof(DurableRaiseEvent))]
+        [InlineData("durable rewind --id 1234", typeof(DurableRewind))]
+        [InlineData("durable start-new --function-name functostart", typeof(DurableStartNew))]
+        [InlineData("durable terminate --id 1234", typeof(DurableTerminate))]
         public void ResolveCommandLineCorrectly(string args, Type returnType)
         {
             var fileSystem = Substitute.For<IFileSystem>();
@@ -92,6 +102,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();
+
+            builder.RegisterType<DurableManager>()
+                .As<IDurableManager>();
 
             return builder.Build();
         }

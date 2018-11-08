@@ -13,8 +13,6 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         private string Input { get; set; }
 
-        private string Version { get; set; }
-
         private string Id { get; set; }
 
         private readonly IDurableManager _durableManager;
@@ -38,7 +36,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                 .Callback(n => FunctionName = n);
             Parser
                .Setup<string>("input")
-               .WithDescription("Input to the orchestrator function, either in-line or via a JSON file. Prefix the path to the file with @ (@path/to/file.json).")
+               .WithDescription("Input to the orchestrator function, either in-line or via a JSON file. For files, prefix the path to the file with @ (e.g. \"@path/to/file.json\").")
                .SetDefault(null)
                .Callback(p => Input = p);
 
