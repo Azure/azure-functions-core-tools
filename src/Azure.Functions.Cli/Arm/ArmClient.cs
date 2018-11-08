@@ -144,7 +144,7 @@ namespace Azure.Functions.Cli.Arm
             ColoredConsole.WriteLine(DarkGray(response.ToString()));
             if (response.Content != null)
             {
-                Console.WriteLine(DarkGray(await response.Content.ReadAsStringAsync()));
+                ColoredConsole.WriteLine(DarkGray(await response.Content.ReadAsStringAsync()));
             }
             ColoredConsole.WriteLine().WriteLine();
 
