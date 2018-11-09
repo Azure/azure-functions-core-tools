@@ -34,16 +34,19 @@ namespace Azure.Functions.Cli.Helpers
 
         public static Stream CreateZip(IEnumerable<string> files, string rootPath)
         {
-            var memoryStream = new MemoryStream();
-            using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+            const int defaultBufferSize = 4096;
+            var fileStream = new FileStream(Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite, defaultBufferSize, FileOptions.DeleteOnClose);
+
+            using (var zip = new ZipArchive(fileStream, ZipArchiveMode.Create, leaveOpen: true))
             {
                 foreach (var fileName in files)
                 {
                     zip.AddFile(fileName, fileName, rootPath);
                 }
             }
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            return memoryStream;
+
+            fileStream.Seek(0, SeekOrigin.Begin);
+            return fileStream;
         }
     }
 }
