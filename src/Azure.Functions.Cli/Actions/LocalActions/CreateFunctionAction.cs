@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("csx")
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         public async override Task RunAsync()

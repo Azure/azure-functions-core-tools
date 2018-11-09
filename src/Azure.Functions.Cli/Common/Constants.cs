@@ -26,6 +26,9 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
+        public const string TelemtryOptOutVariable = "FUNCTIONS_CLI_TELEMETRY_OPTOUT";
+        // This should be injected during build
+        public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

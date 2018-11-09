@@ -122,7 +122,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .SetDefault(false)
                 .Callback(b => NoBuild = b);
 
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate)

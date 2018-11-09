@@ -65,7 +65,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("update extensions version when running 'func extensions install'")
                 .Callback(force => Force = force);
 
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         public async override Task RunAsync()
