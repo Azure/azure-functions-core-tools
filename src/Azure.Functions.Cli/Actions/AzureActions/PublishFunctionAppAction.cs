@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
@@ -354,7 +355,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             ColoredConsole.WriteLine("Preparing archive...");
 
-            ColoredConsole.WriteLine("Uploading content...");
             var sas = await UploadZipToStorage(zipFile, functionApp.AzureAppSettings);
 
             functionApp.AzureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
@@ -374,24 +374,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-
-
         public async Task PublishZipDeploy(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             await RetryHelper.Retry(async () =>
             {
-                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
+                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
                 using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri("api/zipdeploy", UriKind.Relative)))
                 {
                     request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
 
                     ColoredConsole.WriteLine("Creating archive for current directory...");
 
-                    request.Content = CreateStreamContentZip(await zipFileFactory());
+                    (var content, var length) = CreateStreamContentZip(await zipFileFactory());
+                    request.Content = content;
 
-                    ColoredConsole.WriteLine("Uploading archive...");
-                    var response = await client.SendAsync(request);
-                    if (!response.IsSuccessStatusCode)
+                    HttpResponseMessage response = null;
+                    using (var pb = new SimpleProgressBar($"Uploading {Utilities.BytesToHumanReadable(length)}"))
+                    {
+                        handler.HttpSendProgress += (s, e) => pb.Report(e.ProgressPercentage);
+                        response = await client.SendAsync(request);
+                    }
+
+                    if (response == null || !response.IsSuccessStatusCode)
                     {
                         throw new CliException($"Error uploading archive ({response.StatusCode}).");
                     }
@@ -414,7 +419,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             var releaseName = Guid.NewGuid().ToString();
             var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
-            await blob.UploadFromStreamAsync(zip);
+            using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(zip.Length)}", zip.Length))
+            {
+                await blob.UploadFromStreamAsync(zip,
+                    AccessCondition.GenerateEmptyCondition(),
+                    new BlobRequestOptions(),
+                    new OperationContext(),
+                    progress,
+                    new CancellationToken());
+            }
 
             var sasConstraints = new SharedAccessBlobPolicy();
             sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
@@ -534,16 +547,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return result;
         }
 
-        private static StreamContent CreateStreamContentZip(Stream zipFile)
+        private static (StreamContent, long) CreateStreamContentZip(Stream zipFile)
         {
             var content = new StreamContent(zipFile);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
-            return content;
+            return (content, zipFile.Length);
         }
 
-        private HttpClient GetRemoteZipClient(Uri url)
+        private HttpClient GetRemoteZipClient(Uri url, HttpMessageHandler handler = null)
         {
-            var client = new HttpClient
+            handler = handler ?? new HttpClientHandler();
+            var client = new HttpClient(handler)
             {
                 BaseAddress = url,
                 MaxResponseContentBufferSize = 30 * 1024 * 1024,
