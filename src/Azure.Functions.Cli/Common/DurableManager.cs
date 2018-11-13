@@ -173,8 +173,8 @@ namespace Azure.Functions.Cli.Common
             }
 
             ColoredConsole.WriteLine(Green(messageToPrint));
-            ColoredConsole.WriteLine($"Instances deleted: {stats.instancesDeleted}");
-            ColoredConsole.WriteLine($"Rows deleted: {stats.rowsDeleted}");
+            ColoredConsole.WriteLine($"Instances deleted: {stats.InstancesDeleted}");
+            ColoredConsole.WriteLine($"Rows deleted: {stats.RowsDeleted}");
         }
 
         public async Task RaiseEvent(string connectionString, string instanceId, string eventName, object data)
