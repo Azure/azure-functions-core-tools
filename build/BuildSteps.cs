@@ -113,7 +113,11 @@ namespace Build
                 : Path.Combine(Settings.OutputDir, "linux-x64", "func");
             Environment.SetEnvironmentVariable("FUNC_PATH", funcPath);
 
-            Environment.SetEnvironmentVariable("STORAGE_CONNECTION", "UseDevelopmentStorage=true");
+            string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))
+            {
+                Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
+            }          
             Environment.SetEnvironmentVariable("DURABLE", Settings.DurableFolder);
 
             Shell.Run("dotnet", $"test {Settings.TestProjectFile}");

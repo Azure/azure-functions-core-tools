@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Tests.E2E
     /// </summary>
     public class DurableTests : BaseE2ETest
     {
-        private static readonly string StorageConnectionString = Environment.GetEnvironmentVariable("STORAGE_CONNECTION");
+        private static readonly string StorageConnectionString = Environment.GetEnvironmentVariable("DURABLE_STORAGE_CONNECTION");
 
         private static readonly string WorkingDirPath = Environment.GetEnvironmentVariable("DURABLE");
 
@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new string[]
                 {
-                    "Purged orchestration history of instances created between '1/1/0001 12:00:00 AM' and '12/30/9999 11:59:59 PM'"
+                    "Purged orchestration history for all instances created between '1/1/0001 12:00:00 AM' and '12/30/9999 11:59:59 PM'"
                 }
             },
             _output,
@@ -177,10 +177,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $"durable start-new --function-name Counter --input 3 --connection-string {StorageConnectionString} --id {instanceId}",
                     $"durable raise-event --id {instanceId} --event-name operation --event-data baddata --connection-string {StorageConnectionString}",
                     $"durable rewind --id {instanceId} --connection-string {StorageConnectionString}"
-                },
-                Test = async (workingDir, p) =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(10));
                 },
                 OutputContains = new string[]
                 {

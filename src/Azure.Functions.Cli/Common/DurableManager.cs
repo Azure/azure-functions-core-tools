@@ -158,13 +158,13 @@ namespace Azure.Functions.Cli.Common
             }            
         }
 
-        public async Task PurgeHistory(string connectionString, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses)
+         public async Task PurgeHistory(string connectionString, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses)
         {
             SetStorageServiceAndTaskHubClient(ref _orchestrationService, ref _client, connectionString);
 
-            await _orchestrationService.PurgeInstanceHistoryAsync(createdAfter, createdBefore, runtimeStatuses);
+            var stats = await _orchestrationService.PurgeInstanceHistoryAsync(createdAfter, createdBefore, runtimeStatuses);
 
-            string messageToPrint = $"Purged orchestration history of instances created between '{createdAfter}' and '{createdBefore}'";
+            string messageToPrint = $"Purged orchestration history for all instances created between '{createdAfter}' and '{createdBefore}'";
 
             if (runtimeStatuses != null)
             {
@@ -173,6 +173,8 @@ namespace Azure.Functions.Cli.Common
             }
 
             ColoredConsole.WriteLine(Green(messageToPrint));
+            ColoredConsole.WriteLine($"Instances deleted: {stats.instancesDeleted}");
+            ColoredConsole.WriteLine($"Rows deleted: {stats.rowsDeleted}");
         }
 
         public async Task RaiseEvent(string connectionString, string instanceId, string eventName, object data)
