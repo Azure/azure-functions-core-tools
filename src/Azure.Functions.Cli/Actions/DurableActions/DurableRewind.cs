@@ -6,7 +6,7 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "rewind", Context = Context.Durable, HelpText = "Rewind the specified orchestration instance")]
-    class DurableRewind : BaseDurableAction
+    class DurableRewind : BaseDurableActionWithId
     {
         private string Reason { get; set; }
 
@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.Rewind(Id, Reason);
+            await _durableManager.Rewind(ConnectionString, Id, Reason);
         }
     }
 }

@@ -6,7 +6,7 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "terminate", Context = Context.Durable, HelpText = "Terminate the specified orchestration instance")]
-    class DurableTerminate : BaseDurableAction
+    class DurableTerminate : BaseDurableActionWithId
     {
         private string Reason { get; set; }
 
@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.Terminate(Id, Reason);
+            await _durableManager.Terminate(ConnectionString, Id, Reason);
         }
     }
 }

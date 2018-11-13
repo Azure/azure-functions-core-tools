@@ -9,20 +9,20 @@ namespace Azure.Functions.Cli.Interfaces
     {
         Task DeleteTaskHub(string connectionString);
 
-        Task GetHistory(string instanceId);
+        Task GetHistory(string connectionString, string instanceId);
 
-        Task GetInstances(DateTime createdTimeFrom, DateTime createdTimeTo, IEnumerable<OrchestrationStatus> statuses, int top, string continuationToken);
+        Task GetInstances(string connectionString, DateTime createdTimeFrom, DateTime createdTimeTo, IEnumerable<OrchestrationStatus> statuses, int top, string continuationToken);
 
-        Task GetRuntimeStatus(string instanceId, bool showInput, bool showOutput);
+        Task GetRuntimeStatus(string connectionString, string instanceId, bool showInput, bool showOutput);
 
-        Task PurgeHistory(DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses);
+        Task PurgeHistory(string connectionString, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses);
 
-        Task RaiseEvent(string instanceId, string eventName, object eventData);
+        Task RaiseEvent(string connectionString, string instanceId, string eventName, object eventData);
 
-        Task Rewind(string instanceId, string reason);
+        Task Rewind(string connectionString, string instanceId, string reason);
 
-        Task StartNew(string functionName, string instanceId, object input);
+        Task StartNew(string connectionString, string functionName, string instanceId, object input);
 
-        Task Terminate(string instanceId, string reason);                
+        Task Terminate(string connectionString, string instanceId, string reason);
     }
 }

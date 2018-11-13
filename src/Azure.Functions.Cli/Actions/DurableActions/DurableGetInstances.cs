@@ -1,17 +1,14 @@
-﻿using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Interfaces;
-using DurableTask.Core;
-using Fclp;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Interfaces;
+using Fclp;
+
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "get-instances", Context = Context.Durable, HelpText = "Retrieve the status of all orchestration instances. Supports paging via 'top' parameter.")]
-    class DurableGetInstances : BaseAction
+    class DurableGetInstances : BaseDurableAction
     {
         private readonly IDurableManager _durableManager;
 
@@ -62,8 +59,9 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         }
 
         public override async Task RunAsync()
-        {          
-            await _durableManager.GetInstances(CreatedTimeFrom, CreatedTimeTo, DurableManager.ParseStatuses(Statuses), Top, ContinuationToken);
+        {
+            await _durableManager.GetInstances(ConnectionString, CreatedTimeFrom, CreatedTimeTo,
+                DurableManager.ParseStatuses(Statuses), Top, ContinuationToken);
         }
     }
 }

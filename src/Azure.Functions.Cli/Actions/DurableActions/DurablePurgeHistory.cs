@@ -7,7 +7,7 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "purge-history", Context = Context.Durable, HelpText = "Purge orchestration instance state, history, and blob storage for orchestrations older than the specified threshold time.")]
-    class DurablePurgeHistory : BaseAction
+    class DurablePurgeHistory : BaseDurableAction
     {
         private readonly IDurableManager _durableManager;
 
@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.PurgeHistory(CreatedTimeFrom, CreatedTimeTo, DurableManager.ParseStatuses(Statuses));
+            await _durableManager.PurgeHistory(ConnectionString, CreatedTimeFrom, CreatedTimeTo, DurableManager.ParseStatuses(Statuses));
         }
 
 

@@ -7,7 +7,7 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "get-runtime-status", Context = Context.Durable, HelpText = "Retrieve the status of the specified orchestration instance")]
-    class DurableGetRuntimeStatus : BaseDurableAction
+    class DurableGetRuntimeStatus : BaseDurableActionWithId
     {
         private readonly IDurableManager _durableManager;
 
@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.GetRuntimeStatus(Id, ShowInput, ShowOutput);
+            await _durableManager.GetRuntimeStatus(ConnectionString, Id, ShowInput, ShowOutput);
         }
     }
 }

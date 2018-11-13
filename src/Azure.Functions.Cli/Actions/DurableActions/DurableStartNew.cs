@@ -7,7 +7,7 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "start-new", Context = Context.Durable, HelpText = "Start a new instance of the specified orchestrator function")]
-    class DurableStartNew : BaseAction
+    class DurableStartNew : BaseDurableAction
     {
         private string FunctionName { get; set; }
 
@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             Parser
                 .Setup<string>("id")
                 .WithDescription("Specifies the id of an orchestration instance")
-                .SetDefault(null)
+                .SetDefault($"{Guid.NewGuid():N}")
                 .Callback(i => Id = i);
             Parser
                 .Setup<string>("function-name")
@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         public override async Task RunAsync()
         {
             dynamic input = DurableManager.DeserializeInstanceInput(Input);
-            await _durableManager.StartNew(FunctionName, Id, input);
+            await _durableManager.StartNew(ConnectionString, FunctionName, Id, input);
         }
     }
 }

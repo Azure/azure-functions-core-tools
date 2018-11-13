@@ -54,14 +54,14 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("azure --help", typeof(HelpAction))]
         [InlineData("--help", typeof(HelpAction))]
         [InlineData("durable delete-task-hub --connection-string connection", typeof(DurableDeleteTaskHub))]
-        [InlineData("durable get-history --id 1234 --show-input true", typeof(DurableGetHistory))]
-        [InlineData("durable get-instances --created-before 11/10/2018", typeof(DurableGetInstances))]
-        [InlineData("durable get-runtime-status --id 1234", typeof(DurableGetRuntimeStatus))]
-        [InlineData("durable purge-history --created-after 11/5/2018", typeof(DurablePurgeHistory))]
-        [InlineData("durable raise-event --id 1234", typeof(DurableRaiseEvent))]
-        [InlineData("durable rewind --id 1234", typeof(DurableRewind))]
-        [InlineData("durable start-new --function-name functostart", typeof(DurableStartNew))]
-        [InlineData("durable terminate --id 1234", typeof(DurableTerminate))]
+        [InlineData("durable get-history --id ab1b5de4c5a9450eafa5a4cf249b3169 --show-input true --connection-string connection", typeof(DurableGetHistory))]
+        [InlineData("durable get-instances --created-before 11/10/2018 --connection-string connection", typeof(DurableGetInstances))]
+        [InlineData("durable get-runtime-status --id ab1b5de4c5a9450eafa5a4cf249b3169 --connection-string connection", typeof(DurableGetRuntimeStatus))]
+        [InlineData("durable purge-history --created-after 11/5/2018 --connection-string connection", typeof(DurablePurgeHistory))]
+        [InlineData("durable raise-event --id ab1b5de4c5a9450eafa5a4cf249b3169 --connection-string connection", typeof(DurableRaiseEvent))]
+        [InlineData("durable rewind --id ab1b5de4c5a9450eafa5a4cf249b3169 --connection-string connection", typeof(DurableRewind))]
+        [InlineData("durable start-new --function-name functostart --connection-string connection", typeof(DurableStartNew))]
+        [InlineData("durable terminate --id ab1b5de4c5a9450eafa5a4cf249b3169 --connection-string connection", typeof(DurableTerminate))]
         public void ResolveCommandLineCorrectly(string args, Type returnType)
         {
             var fileSystem = Substitute.For<IFileSystem>();

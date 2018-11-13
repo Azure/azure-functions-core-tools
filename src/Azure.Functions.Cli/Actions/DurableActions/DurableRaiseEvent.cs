@@ -7,7 +7,7 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "raise-event", Context = Context.Durable, HelpText = "Raise an event to the specified orchestration instance")]
-    class DurableRaiseEvent : BaseDurableAction
+    class DurableRaiseEvent : BaseDurableActionWithId
     {
         private string EventName { get; set; }
 
@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         public override async Task RunAsync()
         {
             dynamic input = DurableManager.DeserializeInstanceInput(EventData);
-            await _durableManager.RaiseEvent(Id, EventName, input);
+            await _durableManager.RaiseEvent(ConnectionString, Id, EventName, input);
         }
     }
 }

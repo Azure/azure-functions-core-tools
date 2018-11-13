@@ -14,33 +14,55 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
     public static class CliTester
     {
         private static string _func = System.Environment.GetEnvironmentVariable("FUNC_PATH");
-        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null) => Run(new[] { runConfiguration }, output);
 
-        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null)
+        private const string StartHostCommand = "start --build";
+
+        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null, string workingDir = null, bool startHost = false) => Run(new[] { runConfiguration }, output, workingDir, startHost);
+
+        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null, bool startHost = false)
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
-            Directory.CreateDirectory(tempDir);
-            File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "NuGet.Config"), Path.Combine(tempDir, "NuGet.Config"));
+            string workingDirectory = workingDir ?? Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
+
+            bool cleanupDirectory = string.IsNullOrEmpty(workingDir);
+            if (cleanupDirectory)
+            {
+                Directory.CreateDirectory(workingDirectory);
+            }
+
+            string nugetConfigPath = Path.Combine(workingDirectory, "NuGet.Config");
+            File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "NuGet.Config"), nugetConfigPath);
+
             try
             {
-                await InternalRun(tempDir, runConfigurations, output);
+                await InternalRun(workingDirectory, runConfigurations, output, startHost);
             }
             finally
             {
                 try
                 {
-                    Directory.Delete(tempDir, recursive: true);
+                    if (cleanupDirectory)
+                    {
+                        Directory.Delete(workingDirectory, recursive: true);
+                    }
+                    else
+                    {
+                        File.Delete(nugetConfigPath);
+                    }
                 }
                 catch { }
             }
         }
 
-        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output)
+        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost)
         {
+            var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
+
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
             foreach (var runConfiguration in runConfigurations)
             {
+                Task hostTask = startHost ? hostExe.RunAsync() : Task.Delay(runConfiguration.CommandTimeout);
+
                 stdout.Clear();
                 stderr.Clear();
                 var exitError = false;
@@ -52,19 +74,26 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     logStd($"Running: > {exe.Command}");
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
+                        if (startHost)
+                        {
+                            // Give the host a couple seconds to handle the first requests before executing the final command
+                            await Task.Delay(TimeSpan.FromSeconds(5));
+                        }
+
                         var exitCode = await exe.RunAsync(logStd, logErr, timeout: runConfiguration.CommandTimeout);
                         exitError &= exitCode != 1;
                     }
                     else
                     {
                         var exitCodeTask = exe.RunAsync(logStd, logErr);
+
                         try
                         {
                             await runConfiguration.Test.Invoke(workingDir, exe.Process);
                         }
                         finally
                         {
-                            await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout));
+                            await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout), hostTask);
                             if (!exitCodeTask.IsCompleted)
                             {
                                 exe.Process.Kill();
@@ -82,6 +111,12 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     await runConfiguration.Test.Invoke(workingDir, null);
                 }
+
+                if (startHost)
+                {               
+                    hostExe.Process.Kill();
+                }
+
 
                 AssertExitError(runConfiguration, exitError);
                 AssertFiles(runConfiguration, workingDir);

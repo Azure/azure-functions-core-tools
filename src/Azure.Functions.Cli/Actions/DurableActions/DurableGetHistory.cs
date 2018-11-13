@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "get-history", Context = Context.Durable, HelpText = "Retrieve the history of the specified orchestration instance")]
-    class DurableGetHistory : BaseDurableAction
+    class DurableGetHistory : BaseDurableActionWithId
     {
         private readonly IDurableManager _durableManager;
 
@@ -17,7 +16,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.GetHistory(Id);
+            await _durableManager.GetHistory(ConnectionString, Id);
         }
     }
 }
