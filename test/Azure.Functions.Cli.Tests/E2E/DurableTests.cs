@@ -20,30 +20,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         public DurableTests(ITestOutputHelper output) : base(output) { }
 
         [SkippableFact]
-        public async Task DurableDeleteTaskHubTest()
-        {
-            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
-                reason: _storageReason);
-
-            string instanceId = $"{Guid.NewGuid():N}";
-
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    $"durable delete-task-hub --connection-string {StorageConnectionString}",
-                },
-                OutputContains = new string[]
-                {
-                    "Task hub successfully deleted."
-                }
-            },
-            _output,
-            workingDir: WorkingDirPath,
-            startHost: false);
-        }
-
-        [SkippableFact]
         public async Task DurableGetHistoryTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -129,6 +105,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     $"durable purge-history --connection-string {StorageConnectionString}"
+                },
+                Test = async (workingDir, p) =>
+                {
+                    // Delay for 10 seconds to let the deletion finish before starting other tests
+                    await Task.Delay(TimeSpan.FromSeconds(10));
                 },
                 OutputContains = new string[]
                 {
@@ -233,6 +214,35 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output, 
             workingDir: WorkingDirPath,
             startHost: true);
+        }
+
+        [SkippableFact]
+        public async Task DurableDeleteTaskHubTest()
+        {
+            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
+                reason: _storageReason);
+
+            string instanceId = $"{Guid.NewGuid():N}";
+
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"durable delete-task-hub --connection-string {StorageConnectionString}",
+                },
+                Test = async (workingDir, p) =>
+                {
+                    // Delay for 10 seconds to let the deletion finish before starting other tests
+                    await Task.Delay(TimeSpan.FromSeconds(10));
+                },
+                OutputContains = new string[]
+                {
+                    "Task hub successfully deleted."
+                }
+            },
+            _output,
+            workingDir: WorkingDirPath,
+            startHost: false);
         }
     }
 }
