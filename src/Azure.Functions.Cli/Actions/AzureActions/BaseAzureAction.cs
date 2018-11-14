@@ -14,6 +14,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 {
     abstract class BaseAzureAction : BaseAction, IInitializableAction
     {
+        private string _getAccessTokenPowerShellScript = @"
+if(Get-Module -ListAvailable Az.Profile) {
+    $currentAzureContext = Get-AzContext;
+} elseif (Get-Module -ListAvailable AzureRm.Profile) {
+    $currentAzureContext = Get-AzureRmContext;
+} else {
+    throw 'Unable to locate Az or AzureRm. Please install the Az module and try again.';
+}
+$azureRmProfile = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile;
+$profileClient = New-Object Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient($azureRmProfile);
+$profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).AccessToken;
+";
+
         public string AccessToken { get; set; }
         public bool ReadStdin { get; set; }
 
@@ -89,9 +102,44 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     return stdout.ToString().Trim(' ', '\n', '\r', '"');
                 }
             }
+            else if (CommandChecker.CommandExists("pwsh"))
+            {
+                
+                var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? new Executable("cmd", $"/c pwsh -NonInteractive -o Text -NoProfile -c {_getAccessTokenPowerShellScript}")
+                    : new Executable("pwsh", $"-NonInteractive -o Text -NoProfile -c {_getAccessTokenPowerShellScript}");
+
+                var stdout = new StringBuilder();
+                var stderr = new StringBuilder();
+                var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
+                if (exitCode != 0)
+                {
+                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r') + $"{Environment.NewLine}" + "Make sure to run \"Login-AzAccount\" or \"Login-AzureRmAccount\" to log in to Azure and retry this command.");
+                }
+                else
+                {
+                    return stdout.ToString().Trim(' ', '\n', '\r', '"');
+                }
+            }
+            else if (CommandChecker.CommandExists("powershell"))
+            {
+                var az = new Executable("cmd", $"/c powershell -NonInteractive -o Text -NoProfile -c {_getAccessTokenPowerShellScript}");
+
+                var stdout = new StringBuilder();
+                var stderr = new StringBuilder();
+                var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
+                if (exitCode != 0)
+                {
+                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r') + $"{Environment.NewLine}" + "Make sure to run \"Login-AzAccount\" or \"Login-AzureRmAccount\" to log in to Azure and retry this command.");
+                }
+                else
+                {
+                    return stdout.ToString().Trim(' ', '\n', '\r', '"');
+                }
+            }
             else
             {
-                throw new FileNotFoundException("Cannot find az cli. Please make sure to install az cli.");
+                throw new FileNotFoundException("Cannot find az cli or Azure PowerShell. Please make sure to install az cli or Azure PowerShell.");
             }
         }
     }
