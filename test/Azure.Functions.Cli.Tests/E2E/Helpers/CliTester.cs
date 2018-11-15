@@ -68,17 +68,19 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 for (var i = 0; i < runConfiguration.Commands.Length; i++)
                 {
                     var command = runConfiguration.Commands[i];
-                    var exe = new Executable(_func, command, workingDirectory: workingDir);
+                    var exe = new Executable(_func, command, workingDirectory: workingDir);                
+
+                    if (startHost && i == runConfiguration.Commands.Length - 1)
+                    {
+                        // Give the host time to handle the first requests before executing the final command
+                        logStd($"Pausing to let the Functions host handle previous requests.");
+                        await Task.Delay(TimeSpan.FromSeconds(10));
+                    }
+
                     logStd($"Running: > {exe.CleanCommand()}");
-                   
+
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
-                        if (startHost)
-                        {
-                            // Give the host time to handle the first requests before executing the final command
-                            await Task.Delay(TimeSpan.FromSeconds(12));
-                        }
-
                         var exitCode = await exe.RunAsync(logStd, logErr, timeout: runConfiguration.CommandTimeout);
                         exitError &= exitCode != 1;
                     }
@@ -92,11 +94,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         }
                         finally
                         {
-                            if (startHost)
-                            {
-                                logStd("Starting Functions Host now.");
-                            }
-                            await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout), hostTask);
+                            await Task.WhenAny(exitCodeTask, Task.Delay(runConfiguration.CommandTimeout));
                             if (!exitCodeTask.IsCompleted)
                             {
                                 exe.Process.Kill();
@@ -115,9 +113,9 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     await runConfiguration.Test.Invoke(workingDir, null);
                 }
 
-                if (startHost)
+                if (startHost && !hostExe.Process.HasExited)
                 {
-                    logStd("Terminating the Functions Host now.");
+                    logStd("Terminating the Functions host.");
                     hostExe.Process.Kill();
                 }
 
