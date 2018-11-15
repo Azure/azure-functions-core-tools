@@ -3,7 +3,7 @@ dotnet build Azure.Functions.Cli.sln
 
 $outDir = "$([System.IO.Path]::GetTempPath())cli"
 
-Remove-Item -Recurse -Force $outDir
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $outDir
 
 if ($IsMacOS) { $runtime = 'osx-x64' }
 elseif ($IsLinux) { $runtime = 'linux-x64' }
