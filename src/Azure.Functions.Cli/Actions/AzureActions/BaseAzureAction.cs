@@ -5,7 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
+using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -102,6 +104,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     return (true, stdout.ToString().Trim(' ', '\n', '\r', '"'));
                 }
+                else
+                {
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor($"Unable to fetch access token from az cli. Error: {stderr.ToString().Trim(' ', '\n', '\r')}"));
+                    }
+                }
             }
             return (false, null);
         }
@@ -122,28 +131,40 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     return (true, stdout.ToString().Trim(' ', '\n', '\r', '"'));
                 }
+                else
+                {
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor($"Unable to fetch access token from Az.Profile in PowerShell Core. Error: {stderr.ToString().Trim(' ', '\n', '\r')}"));
+                    }
+                }
             }
+
             // Windows PowerShell can use Az or AzureRM so first we check if powershell.exe is available
-            else if (CommandChecker.CommandExists(_windowsPowerShellExecutable))
+            if (CommandChecker.CommandExists(_windowsPowerShellExecutable))
             {
-                string scriptToRun;
+                string moduleToUse;
 
                 // depending on if Az.Profile or AzureRM.Profile is available, we need to change the prefix
                 if (await CommandChecker.PowerShellModuleExistsAsync(_windowsPowerShellExecutable, _azProfileModuleName))
                 {
-                    scriptToRun = GetPowerShellAccessTokenScript(_azProfileModuleName);
+                    moduleToUse = _azProfileModuleName;
                 }
                 else if (await CommandChecker.PowerShellModuleExistsAsync(_windowsPowerShellExecutable, _azureRmProfileModuleName))
                 {
-                    scriptToRun = GetPowerShellAccessTokenScript(_azureRmProfileModuleName);
+                    moduleToUse = _azureRmProfileModuleName;
                 }
                 else
                 {
                     // User doesn't have either Az.Profile or AzureRM.Profile
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor("Unable to find Az.Profile or AzureRM.Profile."));
+                    }
                     return (false, null);
                 }
 
-                var az = new Executable("powershell", $"-NonInteractive -o Text -NoProfile -c {scriptToRun}");
+                var az = new Executable("powershell", $"-NonInteractive -o Text -NoProfile -c {GetPowerShellAccessTokenScript(moduleToUse)}");
 
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
@@ -151,6 +172,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (exitCode == 0)
                 {
                     return (true, stdout.ToString().Trim(' ', '\n', '\r', '"'));
+                }
+                else
+                {
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor($"Unable to fetch access token from '{moduleToUse}'. Error: {stderr.ToString().Trim(' ', '\n', '\r')}"));
+                    }
                 }
             }
             return (false, null);
