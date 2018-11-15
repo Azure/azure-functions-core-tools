@@ -30,12 +30,13 @@ namespace Azure.Functions.Cli.Tests.E2E
             string taskHubName = "deleteTaskHubTest";
 
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            
+
+            await DurableHelper.AddWebJobsSetting(_output);
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable delete-task-hub --task-hub-name {taskHubName}",
                 },
                 OutputContains = new string[]
@@ -58,12 +59,12 @@ namespace Azure.Functions.Cli.Tests.E2E
             string taskHubName = "getHistoryTest";
 
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            
+            await DurableHelper.AddWebJobsSetting(_output);
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
                     $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}",
                     $"durable get-history --id {instanceId} --task-hub-name {taskHubName}"
@@ -90,12 +91,12 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "getInstancesTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            
+            await DurableHelper.AddWebJobsSetting(_output);
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable get-instances --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
@@ -117,12 +118,12 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getRuntimeStatus";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-           
+            await DurableHelper.AddWebJobsSetting(_output);
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable get-runtime-status --id {instanceId} --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
@@ -143,12 +144,12 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "purgeHistoryTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            
+            await DurableHelper.AddWebJobsSetting(_output);
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable purge-history --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
@@ -171,12 +172,12 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "raiseEventTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-                        
+            await DurableHelper.AddWebJobsSetting(_output);
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
                     $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}"
                 },
@@ -199,12 +200,12 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "rewindTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            
+            await DurableHelper.AddWebJobsSetting(_output);
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
                     $"durable raise-event --id {instanceId} --event-name operation --event-data baddata --task-hub-name {taskHubName}",
                     $"durable rewind --id {instanceId} --task-hub-name {taskHubName}"
@@ -229,13 +230,12 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "startNewTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            await DurableHelper.AddWebJobsSetting(_output);
 
-            
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable start-new --function-name Counter --input 3 --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
@@ -257,12 +257,12 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "terminateTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            await DurableHelper.AddWebJobsSetting(_output);
 
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
                     $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
                     $"durable terminate --id {instanceId} --task-hub-name {taskHubName}"
                 },

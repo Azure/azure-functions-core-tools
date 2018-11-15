@@ -1,15 +1,22 @@
-﻿using Microsoft.Azure.WebJobs.Script;
+﻿using Azure.Functions.Cli.Common;
+using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
+using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
 {
     public static class DurableHelper
     {
+        private static readonly string StorageConnectionString = Environment.GetEnvironmentVariable("DURABLE_STORAGE_CONNECTION");
+
+        private static readonly string WorkingDirPath = Environment.GetEnvironmentVariable("DURABLE");
+
         public static void SetTaskHubNameAndId(string workingDirectoryPath, string taskHubName)
         {
             string hostJsonPath = Path.Combine(workingDirectoryPath, ScriptConstants.HostMetadataFileName);
@@ -36,6 +43,20 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 string output = JsonConvert.SerializeObject(hostSettings, Formatting.Indented);
                 File.WriteAllText(hostJsonPath, output);
             }
+        }
+
+        public static async Task AddWebJobsSetting(ITestOutputHelper output)
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                },
+            },
+            output,
+            workingDir: WorkingDirPath,
+            startHost: false);
         }
     }
 }
