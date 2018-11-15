@@ -35,7 +35,7 @@ namespace Azure.Functions.Cli.Common
         {
             if (StaticSettings.IsDebug)
             {
-                Colors.Net.ColoredConsole.WriteLine(VerboseColor($"> {Command}"));
+                Colors.Net.ColoredConsole.WriteLine(VerboseColor($"> {this.CleanCommand()}"));
             }
 
             var processInfo = new ProcessStartInfo
@@ -102,6 +102,19 @@ namespace Azure.Functions.Cli.Common
                     Process.Kill();
                     throw new Exception("Process didn't exit within specified timeout");
                 }
+            }
+        }
+
+        public string CleanCommand()
+        {
+            var args = Command.Split(" ");
+            if (args.Length == 5 && args[1].Equals("settings", StringComparison.InvariantCultureIgnoreCase))
+            {
+                return $"{args[0]} {args[1]} {args[2]} {args[3]} ******";
+            }
+            else
+            {
+                return Command;
             }
         }
     }

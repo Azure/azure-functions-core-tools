@@ -81,7 +81,6 @@ namespace Azure.Functions.Cli.Common
             connectionStringKey = connectionStringKey ?? this._connectionStringKey;
             taskHubName = taskHubName ?? this._taskHubName;
 
-            Console.WriteLine($"Connection string key: {connectionStringKey}");
             var connectionString = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
 
             if (!string.IsNullOrEmpty(connectionString))
