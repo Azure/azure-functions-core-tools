@@ -53,7 +53,13 @@ namespace Azure.Functions.Cli
                     }
                     // All Actions are async. No return value is expected from any action.
                     await action.RunAsync();
+
                     // If we are here, we succeeded
+                    if (action is ITelemetryEventAction)
+                    {
+                        var telemetryEvent = action as ITelemetryEventAction;
+                        telemetryEvent.UpdateTelemetryLogEvent(app._consoleEvent);
+                    }
                     app._consoleEvent.IsSuccessful = true;
                 }
                 stopWatch.Stop();

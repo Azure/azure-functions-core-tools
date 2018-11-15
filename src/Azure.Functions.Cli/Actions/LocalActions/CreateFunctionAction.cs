@@ -9,13 +9,14 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Azure.Functions.Cli.Helpers.TelemetryHelpers;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
     [Action(Name = "new", Context = Context.Function, HelpText = "Create a new function from a template.")]
     [Action(Name = "new", HelpText = "Create a new function from a template.")]
     [Action(Name = "create", Context = Context.Function, HelpText = "Create a new function from a template.")]
-    internal class CreateFunctionAction : BaseAction
+    internal class CreateFunctionAction : BaseAction, ITelemetryEventAction
     {
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
@@ -148,6 +149,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
+        }
+
+        public void UpdateTelemetryLogEvent(ConsoleAppLogEvent consoleEvent)
+        {
+            consoleEvent.CommandEvents = new Dictionary<string, string>
+            {
+                { "language", Language },
+                { "trigger", TemplateName }
+            };
         }
     }
 }

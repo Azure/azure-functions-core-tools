@@ -20,6 +20,7 @@ namespace Azure.Functions.Cli.Helpers
             public bool IsSuccessful { get; set; }
             public bool ParseError { get; set; }
             public long TimeTaken { get; set; }
+            public IDictionary<string, string> CommandEvents { get; set; }
         }
 
         public static IEnumerable<string> GetCommandsFromCommandLineOptions(IEnumerable<ICommandLineOption> options)
@@ -78,6 +79,12 @@ namespace Azure.Functions.Cli.Helpers
                 { "parseError" , consoleEvent.ParseError.ToString() },
                 { "isSuccessful" , consoleEvent.IsSuccessful.ToString() }
             };
+
+            if (consoleEvent.CommandEvents != null)
+            {
+                // This should be ok as long as there's no duplicate keys
+                properties = properties.Union(consoleEvent.CommandEvents).ToDictionary(k => k.Key, v => v.Value);
+            }
 
             var metrics = new Dictionary<string, double>
             {

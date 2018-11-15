@@ -13,6 +13,7 @@ namespace Build
                 .CreateForTarget(args)
                 .Then(Clean)
                 .Then(RestorePackages)
+                .Then(ReplaceTelemetryInstrumentationKey)
                 .Then(DotnetPublish)
                 .Then(AddDistLib)
                 .Then(AddPythonWorker)

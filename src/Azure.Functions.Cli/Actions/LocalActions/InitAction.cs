@@ -11,12 +11,13 @@ using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Azure.Functions.Cli.Helpers.TelemetryHelpers;
 using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
     [Action(Name = "init", HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
-    internal class InitAction : BaseAction
+    internal class InitAction : BaseAction, ITelemetryEventAction
     {
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
 
@@ -101,12 +102,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (Csx)
             {
                 workerRuntime = Helpers.WorkerRuntime.dotnet;
+                WorkerRuntime = workerRuntime.ToString();
             }
             else if (string.IsNullOrEmpty(WorkerRuntime))
             {
                 ColoredConsole.Write("Select a worker runtime: ");
                 workerRuntime = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.AvailableWorkersList);
-                ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
+                WorkerRuntime = workerRuntime.ToString();
+                ColoredConsole.WriteLine(TitleColor(WorkerRuntime));
             }
             else
             {
@@ -228,6 +231,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
             }
+        }
+
+        public void UpdateTelemetryLogEvent(ConsoleAppLogEvent consoleEvent)
+        {
+            consoleEvent.CommandEvents = new Dictionary<string, string>
+            {
+                { "worker-runtime", WorkerRuntime }
+            };
         }
     }
 }
