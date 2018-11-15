@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.Rewind(ConnectionString, Id, Reason);
+            await _durableManager.Rewind(ConnectionString, TaskHubName, Id, Reason);
         }
     }
 }

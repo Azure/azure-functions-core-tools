@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -7,7 +8,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.Tests.E2E
 {
     /// <summary>
-    /// Class of E2E tests for Durable Functions. These should not be run in parallel
+    /// Class of E2E tests for Durable Functions
     /// </summary>
     public class DurableTests : BaseE2ETest
     {
@@ -19,6 +20,38 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         public DurableTests(ITestOutputHelper output) : base(output) { }
 
+
+        [SkippableFact]
+        public async Task DurableDeleteTaskHubTest()
+        {
+            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
+                reason: _storageReason);
+
+            string taskHubName = "deleteTaskHubTest";
+            bool requiresHost = false;
+
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+            
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable delete-task-hub --task-hub-name {taskHubName}",
+                },
+                OutputContains = new string[]
+                {
+                    "Task hub successfully deleted."
+                }
+            },
+            _output,
+            workingDir: WorkingDirPath,
+            startHost: requiresHost);
+        }
+
         [SkippableFact]
         public async Task DurableGetHistoryTest()
         {
@@ -26,14 +59,22 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string instanceId = $"{Guid.NewGuid():N}";
-
+            string taskHubName = "getHistoryTest";
+            bool requiresHost = true;
+            
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+            
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"durable start-new --function-name Counter --connection-string {StorageConnectionString} --id {instanceId}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data add --connection-string {StorageConnectionString}",
-                    $"durable get-history --id {instanceId} --connection-string {StorageConnectionString}"
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
+                    $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}",
+                    $"durable get-history --id {instanceId} --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
@@ -45,7 +86,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: true);
+            startHost: requiresHost);
         }
 
         [SkippableFact]
@@ -54,11 +95,20 @@ namespace Azure.Functions.Cli.Tests.E2E
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
                 reason: _storageReason);
 
+            string taskHubName = "getInstancesTest";
+            bool requiresHost = false;
+
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+            
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"durable get-instances --connection-string {StorageConnectionString}"
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable get-instances --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
@@ -67,7 +117,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: false);
+            startHost: requiresHost);
         }
 
         [SkippableFact]
@@ -77,12 +127,20 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string instanceId = $"{Guid.NewGuid():N}";
+            string taskHubName = "getRuntimeStatus";
+            bool requiresHost = false;
 
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+           
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"durable get-runtime-status --id {instanceId} --connection-string {StorageConnectionString}"
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable get-runtime-status --id {instanceId} --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
@@ -91,7 +149,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: false);
+            startHost: requiresHost);
         }
 
         [SkippableFact]
@@ -100,16 +158,20 @@ namespace Azure.Functions.Cli.Tests.E2E
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
                 reason: _storageReason);
 
+            string taskHubName = "purgeHistoryTest";
+            bool requiresHost = true;
+
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+            
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"durable purge-history --connection-string {StorageConnectionString}"
-                },
-                Test = async (workingDir, p) =>
-                {
-                    // Delay for 10 seconds to let the deletion finish before starting other tests
-                    await Task.Delay(TimeSpan.FromSeconds(10));
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable purge-history --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
@@ -118,7 +180,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: false);
+            startHost: requiresHost);
         }
 
         [SkippableFact]
@@ -128,19 +190,30 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string instanceId = $"{Guid.NewGuid():N}";
+            string taskHubName = "raiseEventTest";
+            bool requiresHost = false;
 
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+            
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"durable start-new --function-name Counter --input 3 --connection-string {StorageConnectionString} --id {instanceId}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data add --connection-string {StorageConnectionString}"
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
+                    $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
                     $"Raised event 'operation' to instance '{instanceId}'"
                 }
-            }, _output, workingDir: WorkingDirPath);
+            }, 
+            _output, 
+            workingDir: WorkingDirPath,
+            startHost: requiresHost);
         }
 
         [SkippableFact]
@@ -150,14 +223,22 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string instanceId = $"{Guid.NewGuid():N}";
+            string taskHubName = "rewindTest";
+            bool requiresHost = true;
 
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+            
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"durable start-new --function-name Counter --input 3 --connection-string {StorageConnectionString} --id {instanceId}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data baddata --connection-string {StorageConnectionString}",
-                    $"durable rewind --id {instanceId} --connection-string {StorageConnectionString}"
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
+                    $"durable raise-event --id {instanceId} --event-name operation --event-data baddata --task-hub-name {taskHubName}",
+                    $"durable rewind --id {instanceId} --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
@@ -167,7 +248,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: true);
+            startHost: requiresHost);
         }
 
         [SkippableFact]
@@ -176,11 +257,20 @@ namespace Azure.Functions.Cli.Tests.E2E
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
                 reason: _storageReason);
 
+            string taskHubName = "startNewTest";
+            bool requiresHost = false;
+
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
+            
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"durable start-new --function-name Counter --input 3 --connection-string {StorageConnectionString}"
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable start-new --function-name Counter --input 3 --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
@@ -188,7 +278,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             },
             _output,
-            workingDir: WorkingDirPath);
+            workingDir: WorkingDirPath,
+            startHost: requiresHost);
         }
 
         [SkippableFact]
@@ -198,13 +289,21 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string instanceId = $"{Guid.NewGuid():N}";
+            string taskHubName = "terminateTest";
+            bool requiresHost = true;
+
+            if (requiresHost)
+            {
+                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            }
 
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                     {
-                        $"durable start-new --function-name Counter --connection-string {StorageConnectionString} --id {instanceId}",
-                        $"durable terminate --id {instanceId} --connection-string {StorageConnectionString}"
+                        $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                        $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
+                        $"durable terminate --id {instanceId} --task-hub-name {taskHubName}"
                     },
                 OutputContains = new string[]
                     {
@@ -213,36 +312,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, 
             _output, 
             workingDir: WorkingDirPath,
-            startHost: true);
-        }
-
-        [SkippableFact]
-        public async Task DurableDeleteTaskHubTest()
-        {
-            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
-                reason: _storageReason);
-
-            string instanceId = $"{Guid.NewGuid():N}";
-
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    $"durable delete-task-hub --connection-string {StorageConnectionString}",
-                },
-                Test = async (workingDir, p) =>
-                {
-                    // Delay for 10 seconds to let the deletion finish before starting other tests
-                    await Task.Delay(TimeSpan.FromSeconds(10));
-                },
-                OutputContains = new string[]
-                {
-                    "Task hub successfully deleted."
-                }
-            },
-            _output,
-            workingDir: WorkingDirPath,
-            startHost: false);
+            startHost: requiresHost);
         }
     }
 }

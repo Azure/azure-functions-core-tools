@@ -60,8 +60,8 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.GetInstances(ConnectionString, CreatedTimeFrom, CreatedTimeTo,
-                DurableManager.ParseStatuses(Statuses), Top, ContinuationToken);
+            await _durableManager.GetInstances(ConnectionString, TaskHubName, CreatedTimeFrom, 
+                CreatedTimeTo, DurableManager.ParseStatuses(Statuses), Top, ContinuationToken);
         }
     }
 }

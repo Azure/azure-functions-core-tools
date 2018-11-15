@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         public override async Task RunAsync()
         {
             dynamic input = DurableManager.DeserializeInstanceInput(Input);
-            await _durableManager.StartNew(ConnectionString, FunctionName, Id, input);
+            await _durableManager.StartNew(ConnectionString, TaskHubName, FunctionName, Id, input);
         }
     }
 }

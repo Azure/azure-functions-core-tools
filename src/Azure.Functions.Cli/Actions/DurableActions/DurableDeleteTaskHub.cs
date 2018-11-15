@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Interfaces;
-using Fclp;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
@@ -17,7 +16,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.DeleteTaskHub(ConnectionString);
+            await _durableManager.DeleteTaskHub(ConnectionString, TaskHubName);
         }
     }
 }

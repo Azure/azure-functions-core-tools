@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.GetRuntimeStatus(ConnectionString, Id, ShowInput, ShowOutput);
+            await _durableManager.GetRuntimeStatus(ConnectionString, TaskHubName, Id, ShowInput, ShowOutput);
         }
     }
 }

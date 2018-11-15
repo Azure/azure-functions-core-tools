@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.PurgeHistory(ConnectionString, CreatedTimeFrom, CreatedTimeTo, DurableManager.ParseStatuses(Statuses));
+            await _durableManager.PurgeHistory(ConnectionString, TaskHubName, CreatedTimeFrom, CreatedTimeTo, DurableManager.ParseStatuses(Statuses));
         }
 
 

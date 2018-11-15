@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.GetHistory(ConnectionString, Id);
+            await _durableManager.GetHistory(ConnectionString, TaskHubName, Id);
         }
     }
 }

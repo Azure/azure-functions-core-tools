@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using FluentAssertions;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
@@ -71,7 +69,16 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     var command = runConfiguration.Commands[i];
                     var exe = new Executable(_func, command, workingDirectory: workingDir);
-                    logStd($"Running: > {exe.Command}");
+
+                    if (!exe.Command.StartsWith("settings add"))
+                    {
+                        logStd($"Running: > {exe.Command}");
+                    }
+                    else
+                    {
+                        logStd($"settings add *****");
+                    }
+                    
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
                         if (startHost)
