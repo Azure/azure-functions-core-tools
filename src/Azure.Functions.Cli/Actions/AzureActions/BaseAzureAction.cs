@@ -14,19 +14,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 {
     abstract class BaseAzureAction : BaseAction, IInitializableAction
     {
-        private const string _getAccessTokenPowerShellScript = @"
-if(Get-Module -ListAvailable Az.Profile) {
-    $currentAzureContext = Get-AzContext;
-} elseif (Get-Module -ListAvailable AzureRm.Profile) {
-    $currentAzureContext = Get-AzureRmContext;
-} else {
-    throw 'Unable to locate Az or AzureRm. Please install the Az module and try again.';
-}
-$azureRmProfile = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile;
-$profileClient = New-Object Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient($azureRmProfile);
-$profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).AccessToken;
-";
-
         // Az is the Azure PowerShell module that works in both PowerShell Core and Windows PowerShell
         private const string _azProfileModuleName = "Az.Profile";
 
@@ -91,10 +78,16 @@ $profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).Ac
 
         private async Task<string> GetAccessToken()
         {
-            return await AzureCliGetToken();
+            (bool cliSucceeded, string cliToken) = await TryGetAzCliToken();
+            if (cliSucceeded) return cliToken;
+
+            (bool powershellSucceeded, string psToken) = await TryGetAzPowerShellToken();
+            if (powershellSucceeded) return psToken;
+            
+            throw new CliException("Unable to connect to Azure. Make sure you have the `az` CLI or Azure PowerShell installed and logged in and try again");
         }
 
-        private async Task<string> AzureCliGetToken()
+        private async Task<(bool succeeded, string token)> TryGetAzCliToken()
         {
             if (CommandChecker.CommandExists("az"))
             {
@@ -105,17 +98,18 @@ $profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).Ac
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
                 var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
-                if (exitCode != 0)
+                if (exitCode == 0)
                 {
-                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r') + $"{Environment.NewLine}" + "Make sure to run \"az login\" to log in to Azure and retry this command.");
-                }
-                else
-                {
-                    return stdout.ToString().Trim(' ', '\n', '\r', '"');
+                    return (true, stdout.ToString().Trim(' ', '\n', '\r', '"'));
                 }
             }
-            // PowerShell Core can only load the Az module so we can check for both of those here.
-            else if (CommandChecker.CommandExists(_powerShellCoreExecutable) &&
+            return (false, null);
+        }
+
+        private async Task<(bool succeeded, string token)> TryGetAzPowerShellToken()
+        {
+            // PowerShell Core can only use Az so we can check that it exists and that the Az module exists
+            if (CommandChecker.CommandExists(_powerShellCoreExecutable) &&
                 await CommandChecker.PowerShellModuleExistsAsync(_powerShellCoreExecutable, _azProfileModuleName))
             {
                 var az = new Executable(_powerShellCoreExecutable,
@@ -124,13 +118,9 @@ $profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).Ac
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
                 var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
-                if (exitCode != 0)
+                if (exitCode == 0)
                 {
-                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r') + $"{Environment.NewLine}" + "Make sure to run \"Login-AzAccount\" to log in to Azure and retry this command.");
-                }
-                else
-                {
-                    return stdout.ToString().Trim(' ', '\n', '\r', '"');
+                    return (true, stdout.ToString().Trim(' ', '\n', '\r', '"'));
                 }
             }
             // Windows PowerShell can use Az or AzureRM so first we check if powershell.exe is available
@@ -149,7 +139,8 @@ $profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).Ac
                 }
                 else
                 {
-                    throw new FileNotFoundException("Cannot find az cli or Azure PowerShell. Please make sure to install az cli or Azure PowerShell.");
+                    // User doesn't have either Az.Profile or AzureRM.Profile
+                    return (false, null);
                 }
 
                 var az = new Executable("powershell", $"-NonInteractive -o Text -NoProfile -c {scriptToRun}");
@@ -157,19 +148,12 @@ $profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).Ac
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
                 var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
-                if (exitCode != 0)
+                if (exitCode == 0)
                 {
-                    throw new CliException(stderr.ToString().Trim(' ', '\n', '\r') + $"{Environment.NewLine}" + "Make sure to run \"Login-AzAccount\" or \"Login-AzureRmAccount\" to log in to Azure and retry this command.");
-                }
-                else
-                {
-                    return stdout.ToString().Trim(' ', '\n', '\r', '"');
+                    return (true, stdout.ToString().Trim(' ', '\n', '\r', '"'));
                 }
             }
-            else
-            {
-                throw new FileNotFoundException("Cannot find az cli or Azure PowerShell. Please make sure to install az cli or Azure PowerShell.");
-            }
+            return (false, null);
         }
 
         // Sets the prefix of the script in case they have Az.Profile or AzureRM.Profile
@@ -194,7 +178,7 @@ $profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).Ac
             return $@"
 $currentAzureContext = Get-{prefix}Context;
 $azureRmProfile = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile;
-$profileClient = New-Object Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient($azureRmProfile);
+$profileClient = New-Object Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient $azureRmProfile;
 $profileClient.AcquireAccessToken($currentAzureContext.Subscription.TenantId).AccessToken;
 ";
         }
