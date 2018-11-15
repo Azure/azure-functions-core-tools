@@ -9,5 +9,8 @@ namespace Azure.Functions.Cli.Common
 
         [JsonProperty("CORS", DefaultValueHandling = DefaultValueHandling.Ignore)]
         public string Cors { get; set; }
+
+        [JsonProperty("CORSCredentials", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool CorsCredentials { get; set; }
     }
 }
