@@ -70,13 +70,14 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     var command = runConfiguration.Commands[i];
                     var exe = new Executable(_func, command, workingDirectory: workingDir);
 
-                    if (!exe.Command.StartsWith("settings add"))
+                    var args = exe.Command.Split(" ");
+                    if (args.Count() == 5 && args[1].Equals("settings", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        logStd($"Running: > {exe.Command}");
+                        logStd($"Running: > {args[0]} {args[1]} {args[2]} {args[3]} ******");
                     }
                     else
                     {
-                        logStd($"settings add *****");
+                        logStd($"Running: > {exe.Command}");
                     }
                     
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)

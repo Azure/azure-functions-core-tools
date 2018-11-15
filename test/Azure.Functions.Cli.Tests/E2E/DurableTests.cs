@@ -28,12 +28,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "deleteTaskHubTest";
-            bool requiresHost = false;
 
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -49,7 +45,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: false);
         }
 
         [SkippableFact]
@@ -60,12 +56,8 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getHistoryTest";
-            bool requiresHost = true;
-            
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
+
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -82,11 +74,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "OrchestratorStarted",
                     "ExecutionStarted",
                     "OrchestratorCompleted"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(45)
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: true);
         }
 
         [SkippableFact]
@@ -96,12 +89,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "getInstancesTest";
-            bool requiresHost = false;
-
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -117,7 +105,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: false);
         }
 
         [SkippableFact]
@@ -128,12 +116,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getRuntimeStatus";
-            bool requiresHost = false;
-
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
            
             await CliTester.Run(new RunConfiguration
             {
@@ -149,7 +132,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: false);
         }
 
         [SkippableFact]
@@ -159,12 +142,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "purgeHistoryTest";
-            bool requiresHost = true;
-
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -176,11 +154,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new string[]
                 {
                     "Purged orchestration history for all instances created between '1/1/0001 12:00:00 AM' and '12/30/9999 11:59:59 PM'"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(45)
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: true);
         }
 
         [SkippableFact]
@@ -191,13 +170,8 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "raiseEventTest";
-            bool requiresHost = false;
-
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
-            
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+                        
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
@@ -213,7 +187,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, 
             _output, 
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: false);
         }
 
         [SkippableFact]
@@ -224,12 +198,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "rewindTest";
-            bool requiresHost = true;
-
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -244,11 +213,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "Status before rewind: Failed",
                     "Status after rewind: Failed"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(45)
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: true);
         }
 
         [SkippableFact]
@@ -258,12 +228,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "startNewTest";
-            bool requiresHost = false;
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
 
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
             
             await CliTester.Run(new RunConfiguration
             {
@@ -279,7 +245,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             },
             _output,
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: false);
         }
 
         [SkippableFact]
@@ -290,29 +256,25 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "terminateTest";
-            bool requiresHost = true;
-
-            if (requiresHost)
-            {
-                DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
-            }
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
 
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
-                    {
-                        $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
-                        $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
-                        $"durable terminate --id {instanceId} --task-hub-name {taskHubName}"
-                    },
+                {
+                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
+                    $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
+                    $"durable terminate --id {instanceId} --task-hub-name {taskHubName}"
+                },
                 OutputContains = new string[]
-                    {
-                        $"Successfully terminated '{instanceId}'"
-                    }
+                {
+                    $"Successfully terminated '{instanceId}'"
+                },
+                CommandTimeout = TimeSpan.FromSeconds(45)
             }, 
             _output, 
             workingDir: WorkingDirPath,
-            startHost: requiresHost);
+            startHost: true);
         }
     }
 }
