@@ -112,10 +112,15 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     await runConfiguration.Test.Invoke(workingDir, null);
                 }
 
-                if (startHost && hostExe.Process?.HasExited == false)
+                if (startHost)
                 {
-                    logStd("Terminating the Functions host.");
-                    hostExe.Process.Kill();                 
+                    if (hostExe.Process?.HasExited == false)
+                    {
+                        logStd("Terminating the Functions host.");
+                        hostExe.Process.Kill();
+                    }                
+
+                    Environment.SetEnvironmentVariable("AzureFunctionsWebHost:hostid", null);
                 }
 
 

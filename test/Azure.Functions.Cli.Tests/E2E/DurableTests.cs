@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "deleteTaskHubTest";
 
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getHistoryTest";
 
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "getInstancesTest";
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getRuntimeStatus";
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
            
             await CliTester.Run(new RunConfiguration
             {
@@ -142,7 +142,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "purgeHistoryTest";
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -170,7 +170,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "raiseEventTest";
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
                         
             await CliTester.Run(new RunConfiguration
             {
@@ -198,7 +198,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "rewindTest";
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
             
             await CliTester.Run(new RunConfiguration
             {
@@ -228,7 +228,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "startNewTest";
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
 
             
             await CliTester.Run(new RunConfiguration
@@ -256,7 +256,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "terminateTest";
-            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
 
             await CliTester.Run(new RunConfiguration
             {

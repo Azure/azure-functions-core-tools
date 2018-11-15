@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 {
     public static class DurableHelper
     {
-        public static void SetTaskHubName(string workingDirectoryPath, string taskHubName)
+        public static void SetTaskHubNameAndId(string workingDirectoryPath, string taskHubName)
         {
             string hostJsonPath = Path.Combine(workingDirectoryPath, ScriptConstants.HostMetadataFileName);
             if (File.Exists(hostJsonPath))
@@ -23,11 +23,15 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
                     hostSettings["extensions"]["durableTask"]["HubName"] = taskHubName;
+                    Environment.SetEnvironmentVariable("AzureFunctionsWebHost:hostid", $"{Guid.NewGuid():N}");
                 }
                 else
                 {
                     hostSettings["durableTask"]["HubName"] = taskHubName;
-                }
+
+                    // If the version is 1.0, set the host id via host.json
+                    hostSettings["id"] = $"{Guid.NewGuid():N}";
+                }      
 
                 string output = JsonConvert.SerializeObject(hostSettings, Formatting.Indented);
                 File.WriteAllText(hostJsonPath, output);
