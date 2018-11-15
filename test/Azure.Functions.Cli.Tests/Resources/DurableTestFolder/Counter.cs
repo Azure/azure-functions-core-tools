@@ -22,7 +22,7 @@ namespace durablefx
             // Check if an instance with the specified ID already exists.
             if (starter != null)
             {
-                var existingInstance = await starter.GetStatusAsync(instanceId, showHistory: false, showHistoryOutput: false, showInput: false);
+                var existingInstance = await starter.GetStatusAsync(instanceId, showHistory: false, showHistoryOutput: false);
 
                 if (existingInstance == null)
                 {
