@@ -59,8 +59,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             var stderr = new StringBuilder();
             foreach (var runConfiguration in runConfigurations)
             {
-                Task hostTask = startHost ? hostExe.RunAsync() : Task.Delay(runConfiguration.CommandTimeout);
-
+                Task hostTask = startHost ? hostExe.RunAsync(logStd, logErr) : Task.Delay(runConfiguration.CommandTimeout);
                 stdout.Clear();
                 stderr.Clear();
                 var exitError = false;
@@ -74,7 +73,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     {
                         // Give the host time to handle the first requests before executing the final command
                         logStd($"Pausing to let the Functions host handle previous requests.");
-                        await Task.Delay(TimeSpan.FromSeconds(10));
+                        await Task.Delay(TimeSpan.FromSeconds(20));
                     }
 
                     logStd($"Running: > {exe.CleanCommand()}");
@@ -113,10 +112,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     await runConfiguration.Test.Invoke(workingDir, null);
                 }
 
-                if (startHost && !hostExe.Process.HasExited)
+                if (startHost && hostExe.Process?.HasExited == false)
                 {
                     logStd("Terminating the Functions host.");
-                    hostExe.Process.Kill();
+                    hostExe.Process.Kill();                 
                 }
 
 

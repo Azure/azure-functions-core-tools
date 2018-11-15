@@ -212,7 +212,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new string[]
                 {
                     "Status before rewind: Failed",
-                    "Status after rewind: Failed"
+                    "Status after rewind:"
                 },
                 CommandTimeout = TimeSpan.FromSeconds(45)
             },
