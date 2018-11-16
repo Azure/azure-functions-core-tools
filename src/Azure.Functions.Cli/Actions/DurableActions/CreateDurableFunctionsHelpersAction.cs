@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                     .Any(a => a.AttributeClass.ToString() == "Microsoft.Azure.WebJobs.ActivityTriggerAttribute");
         }
 
-        private static async Task<IEnumerable<(SemanticModel model, IEnumerable<IMethodSymbol> methods)>> GetActivityFunctionMethods(Project project)
+        private static async Task<IEnumerable<IMethodSymbol>> GetActivityFunctionMethods(Project project)
         {
             var attributeType = typeof(FunctionNameAttribute);
             string[] attributeNames;
@@ -135,10 +135,11 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                             // filter to just methods with attribute of the correct type
                             .Where(m => m.GetAttributes().Any(a => a.AttributeClass.ToString() == attributeType.FullName))
                             .Where(MethodHasActivityTriggerParameter);
-                        return (model, matchingMethods);
+                        return matchingMethods;
                     })
                     .WaitAllAndUnwrap()
-                );//.SelectMany(o => o);
+                )
+                .SelectMany(o => o);
             return methods;
         }
     }

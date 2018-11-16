@@ -17,68 +17,94 @@ namespace Azure.Functions.Cli.Actions.DurableActions
     // Putting this method in a separate file for the inclusion of the SyntaxFactory methods
     internal partial class CreateDurableFunctionsHelpersAction : BaseAction
     {
-        private static CompilationUnitSyntax GenerateCode(Project project, IEnumerable<(SemanticModel model, IEnumerable<IMethodSymbol> methods)> methodsBySemanticModel)
+        private static CompilationUnitSyntax GenerateCode(Project project, IEnumerable<IMethodSymbol> activityMethods)
         {
             var syntaxGenerator = SyntaxGenerator.GetGenerator(project);
 
-            var namespaces = new HashSet<string>
+
+            NameSyntax buildNameSyntax(string @namespace)
             {
-                "Microsoft.Azure.WebJobs",
-                "System",
-                "System.Collections.Generic",
-                "System.Text",
-                "System.Threading.Tasks"
-            };
+
+                var hierarchy = @namespace.Split(".");
+                if (hierarchy.Length == 1)
+                {
+                    return IdentifierName(hierarchy[0]);
+                }
+                var nameSyntax = QualifiedName(IdentifierName(hierarchy[0]), IdentifierName(hierarchy[1]));
+                for (int i = 2; i < hierarchy.Length; i++)
+                {
+                    nameSyntax = QualifiedName(nameSyntax, IdentifierName(hierarchy[i]));
+                }
+                return nameSyntax;
+            }
             UsingDirectiveSyntax NamespaceToUsingDirectiveSyntax(string @namespace)
             {
-                NameSyntax buildNameSyntax()
-                {
-
-                    var hierarchy = @namespace.Split(".");
-                    if (hierarchy.Length == 1)
-                    {
-                        return IdentifierName(hierarchy[0]);
-                    }
-                    var nameSyntax = QualifiedName(IdentifierName(hierarchy[0]), IdentifierName(hierarchy[1]));
-                    for (int i = 2; i < hierarchy.Length; i++)
-                    {
-                        nameSyntax = QualifiedName(nameSyntax, IdentifierName(hierarchy[i]));
-                    }
-                    return nameSyntax;
-                }
-                return UsingDirective(buildNameSyntax());
+                return UsingDirective(buildNameSyntax(@namespace));
             }
-            var generatedMethods = methodsBySemanticModel.Select(o => GenerateMethodsForSemanticModel(o.model, o.methods, namespaces))
-                                        .SelectMany(o => o)
-                                        .Cast<MemberDeclarationSyntax>()
-                                        .ToList();
-            var usingDirectives = namespaces.Select(NamespaceToUsingDirectiveSyntax).ToList();
+            var activityMethodsByNamespace = activityMethods.GroupBy(m => m.ContainingNamespace);
+
+            var generatedMethodsByNamespace = activityMethodsByNamespace.Select(
+                group =>
+                    {
+                        var usingNamespaces = new HashSet<string>
+                        {
+                            "Microsoft.Azure.WebJobs",
+                            "System",
+                            "System.Collections.Generic",
+                            "System.Text",
+                            "System.Threading.Tasks"
+                        };
+                        var generatedMethods = group.Select(m => (MemberDeclarationSyntax)GenerateMethod(m, usingNamespaces)).ToList(); // Force enumeration so that the usings are generated
+                        return new
+                        {
+                            Namespace = group.Key,
+                            UsingNamespaces = usingNamespaces,
+                            GeneratedMethods = generatedMethods
+                        };
+                    })
+                    .ToList();
+
+
+            var namespacesWithGeneratedMethods = generatedMethodsByNamespace.Select(groupOfMethods =>
+            {
+                // TODO - Revisit the approach to type qualification.
+                // If two usings in separate files would bring in a type with the same name then this approach 
+                // of sharing a single set of usings would result in ambiguity about which type was referred to.
+                // The original intent was to generate code that felt close to the original code (hence preserving whether types were qualified or not)
+                var usingDirectives = groupOfMethods.UsingNamespaces
+                                    .Select(NamespaceToUsingDirectiveSyntax)
+                                    .ToList();
+                return NamespaceDeclaration(
+                    buildNameSyntax(groupOfMethods.Namespace.ToString())
+                )
+                .WithUsings(List(usingDirectives))
+                .WithMembers(
+                    SingletonList<MemberDeclarationSyntax>(
+                        ClassDeclaration("DurableFunctionGeneratedExtensions")
+                        .WithModifiers(
+                            TokenList(
+                                new[]{
+                                    Token(SyntaxKind.PublicKeyword),
+                                    Token(SyntaxKind.StaticKeyword)
+                                }
+                            )
+                        )
+                        .WithMembers(
+                            List(groupOfMethods.GeneratedMethods))
+                        )
+                    );
+            });
 
             return CompilationUnit()
-                    .WithUsings(List(usingDirectives))
                     .WithMembers(
-                        SingletonList<MemberDeclarationSyntax>(
-                            NamespaceDeclaration(
-                                IdentifierName("FunctionApp1")) // TODO - put this in the correct namespace
-                            .WithMembers(
-                                SingletonList<MemberDeclarationSyntax>(
-                                    ClassDeclaration("DurableFunctionGeneratedExtensions")
-                                    .WithModifiers(
-                                        TokenList(
-                                            new[]{
-                                                Token(SyntaxKind.PublicKeyword),
-                                                Token(SyntaxKind.StaticKeyword)}))
-                                    .WithMembers(
-                                        List(generatedMethods))))))
+                        List<MemberDeclarationSyntax>(
+                            namespacesWithGeneratedMethods
+                        )
+                    )
                     .NormalizeWhitespace();
         }
 
-        private static IEnumerable<MethodDeclarationSyntax> GenerateMethodsForSemanticModel(SemanticModel model, IEnumerable<IMethodSymbol> methods, HashSet<string> namespaces)
-        {
-            return methods.Select(m => GenerateMethod(model, m, namespaces));
-        }
-
-        private static MethodDeclarationSyntax GenerateMethod(SemanticModel model, IMethodSymbol method, HashSet<string> namespaces)
+        private static MethodDeclarationSyntax GenerateMethod(IMethodSymbol method, HashSet<string> namespaces)
         {
             AddNamespacesForMethodTypes(method, namespaces);
 
@@ -199,7 +225,10 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         {
             void AddNamespacesForType(ITypeSymbol typeSymbol)
             {
-                namespaces.Add(typeSymbol.ContainingNamespace.ToString());
+                if (!typeSymbol.ContainingNamespace.IsGlobalNamespace)
+                {
+                    namespaces.Add(typeSymbol.ContainingNamespace.ToString());
+                }
                 if (typeSymbol is INamedTypeSymbol nts)
                     foreach (var typeArgument in nts.TypeArguments)
                         AddNamespacesForType(typeArgument);
