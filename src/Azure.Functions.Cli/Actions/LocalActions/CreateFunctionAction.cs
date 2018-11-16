@@ -136,10 +136,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (template == null)
                 {
-                    ColoredConsole.Error.WriteLine(ErrorColor($"Can't find template \"{TemplateName}\" in \"{Language}\""));
+                    throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\"");
                 }
                 else
                 {
+                    ExtensionsHelper.EnsureDotNetForExtensions(template);
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
                     FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;

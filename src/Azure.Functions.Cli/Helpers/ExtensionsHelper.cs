@@ -67,5 +67,14 @@ namespace Azure.Functions.Cli.Helpers
 
             return packages.Values;
         }
+
+        public static void EnsureDotNetForExtensions(Template template)
+        {
+            if (template.Metadata.Extensions != null && !CommandChecker.CommandExists("dotnet"))
+            {
+                throw new CliException($"The {template.Metadata.Name} template has extensions which require dotnet on your path. " +
+                    $"Please make sure to install dotnet for your system from https://www.microsoft.com/net/download");
+            }
+        }
     }
 }
