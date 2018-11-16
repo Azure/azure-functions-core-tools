@@ -118,13 +118,10 @@ namespace Build
             {
                 Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
             }
-            else
-            {
-                Environment.SetEnvironmentVariable("AzureWebJobsStorage", Environment.GetEnvironmentVariable(durableStorageConnectionVar));
-            }
+
             Environment.SetEnvironmentVariable("DURABLE", Settings.DurableFolder);        
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} --filter DurableGetHistoryTest");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
         }
 
         public static void Zip()
