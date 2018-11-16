@@ -116,10 +116,13 @@ namespace Build
             string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))
             {
-
                 Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
-            }          
-            Environment.SetEnvironmentVariable("DURABLE", Settings.DurableFolder);
+            }
+            else
+            {
+                Environment.SetEnvironmentVariable("AzureWebJobsStorage", Environment.GetEnvironmentVariable(durableStorageConnectionVar));
+            }
+            Environment.SetEnvironmentVariable("DURABLE", Settings.DurableFolder);        
 
             Shell.Run("dotnet", $"test {Settings.TestProjectFile} --filter DurableGetHistoryTest");
         }
