@@ -44,19 +44,5 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 File.WriteAllText(hostJsonPath, output);
             }
         }
-
-        public static async Task AddWebJobsSetting(ITestOutputHelper output)
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    $"settings add {DurableManager.DefaultConnectionStringKey} {StorageConnectionString}",
-                },
-            },
-            output,
-            workingDir: WorkingDirPath,
-            startHost: false);
-        }
     }
 }

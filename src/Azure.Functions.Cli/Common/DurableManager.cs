@@ -81,7 +81,8 @@ namespace Azure.Functions.Cli.Common
             connectionStringKey = connectionStringKey ?? this._connectionStringKey;
             taskHubName = taskHubName ?? this._taskHubName;
 
-            var connectionString = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
+            var connectionString = Environment.GetEnvironmentVariable(connectionStringKey); // Prioritize environment variables
+            connectionString = connectionString ?? _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
 
             if (!string.IsNullOrEmpty(connectionString))
             {

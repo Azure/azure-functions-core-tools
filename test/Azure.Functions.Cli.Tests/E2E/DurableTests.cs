@@ -30,8 +30,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string taskHubName = "deleteTaskHubTest";
 
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -47,6 +46,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output,
             workingDir: WorkingDirPath,
             startHost: false);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -59,7 +60,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string taskHubName = "getHistoryTest";
 
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -81,6 +82,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output,
             workingDir: WorkingDirPath,
             startHost: true);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -91,7 +94,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "getInstancesTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -107,6 +110,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output,
             workingDir: WorkingDirPath,
             startHost: false);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -118,7 +123,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getRuntimeStatus";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -134,6 +139,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output,
             workingDir: WorkingDirPath,
             startHost: false);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -144,7 +151,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "purgeHistoryTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -161,6 +168,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output,
             workingDir: WorkingDirPath,
             startHost: true);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -172,7 +181,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "raiseEventTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -189,6 +198,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output, 
             workingDir: WorkingDirPath,
             startHost: false);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -200,7 +211,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "rewindTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -220,6 +231,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output,
             workingDir: WorkingDirPath,
             startHost: true);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -230,7 +243,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "startNewTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -246,6 +259,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output,
             workingDir: WorkingDirPath,
             startHost: false);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
         [SkippableFact]
@@ -257,7 +272,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "terminateTest";
             DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
-            await DurableHelper.AddWebJobsSetting(_output);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
             {
@@ -275,6 +290,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             _output, 
             workingDir: WorkingDirPath,
             startHost: true);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
     }
 }

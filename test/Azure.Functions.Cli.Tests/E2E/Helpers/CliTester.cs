@@ -76,7 +76,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         await Task.Delay(TimeSpan.FromSeconds(20));
                     }
 
-                    logStd($"Running: > {exe.CleanCommand()}");
+                    logStd($"Running: > {exe.Command}");
 
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
