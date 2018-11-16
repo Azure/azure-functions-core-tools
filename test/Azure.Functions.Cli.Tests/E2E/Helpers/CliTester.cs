@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     if (hostExe.Process?.HasExited == false)
                     {
-                        logStd("Terminating the Functions host.");
+                        logStd($"[{DateTime.Now}] Terminating the Functions host.");
                         hostExe.Process.Kill();
                     }                
 
