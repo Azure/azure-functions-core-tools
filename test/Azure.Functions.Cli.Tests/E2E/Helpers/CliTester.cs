@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     if (startHost && i == runConfiguration.Commands.Length - 1)
                     {
                         // Give the host time to handle the first requests before executing the final command
-                        logStd($"Pausing to let the Functions host handle previous requests.");
+                        logStd($"[{DateTime.Now}] Pausing to let the Functions host handle previous requests.");
                         await Task.Delay(TimeSpan.FromSeconds(120));
                     }
 
