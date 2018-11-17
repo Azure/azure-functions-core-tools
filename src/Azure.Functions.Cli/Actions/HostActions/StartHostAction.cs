@@ -341,8 +341,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allHttpTrigger)
                 {
-                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. This is required for all triggers other than HTTP. "
-                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
+                    ColoredConsole.WriteLine(WarningColor($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. This is required for most triggers other than HTTP. "
+                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}."));
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
