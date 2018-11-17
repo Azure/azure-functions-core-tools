@@ -1,13 +1,8 @@
-﻿using Azure.Functions.Cli.Common;
+﻿using System;
+using System.IO;
 using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Threading.Tasks;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
 {
@@ -15,9 +10,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
     {
         private static readonly string StorageConnectionString = Environment.GetEnvironmentVariable("DURABLE_STORAGE_CONNECTION");
 
-        private static readonly string WorkingDirPath = Environment.GetEnvironmentVariable("DURABLE");
-
-        public static void SetTaskHubNameAndId(string workingDirectoryPath, string taskHubName)
+        public static void SetTaskHubName(string workingDirectoryPath, string taskHubName)
         {
             string hostJsonPath = Path.Combine(workingDirectoryPath, ScriptConstants.HostMetadataFileName);
             if (File.Exists(hostJsonPath))
@@ -30,14 +23,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
                     hostSettings["extensions"]["durableTask"]["HubName"] = taskHubName;
-                    Environment.SetEnvironmentVariable("AzureFunctionsWebHost:hostid", $"{Guid.NewGuid():N}");
                 }
                 else
                 {
                     hostSettings["durableTask"]["HubName"] = taskHubName;
-
-                    // If the version is 1.0, set the host id via host.json
-                    hostSettings["id"] = $"{Guid.NewGuid():N}";
                 }      
 
                 string output = JsonConvert.SerializeObject(hostSettings, Formatting.Indented);

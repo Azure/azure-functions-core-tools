@@ -73,7 +73,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     {
                         // Give the host time to handle the first requests before executing the final command
                         logStd($"[{DateTime.Now}] Pausing to let the Functions host handle previous requests.");
-                        await Task.Delay(TimeSpan.FromSeconds(120));
+                        await Task.Delay(TimeSpan.FromSeconds(20));
                         logStd($"[{DateTime.Now}] Resuming commands.");
                     }
 
@@ -119,9 +119,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     {
                         logStd($"[{DateTime.Now}] Terminating the Functions host.");
                         hostExe.Process.Kill();
-                    }                
-
-                    Environment.SetEnvironmentVariable("AzureFunctionsWebHost:hostid", null);
+                    }
                 }
 
 

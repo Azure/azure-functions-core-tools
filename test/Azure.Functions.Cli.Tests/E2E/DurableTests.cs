@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string taskHubName = "deleteTaskHubTest";
 
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getHistoryTest";
 
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "getInstancesTest";
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -122,7 +122,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "getRuntimeStatus";
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -150,7 +150,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "purgeHistoryTest";
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -180,7 +180,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "raiseEventTest";
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -210,7 +210,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "rewindTest";
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -242,7 +242,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string taskHubName = "startNewTest";
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
@@ -271,7 +271,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "terminateTest";
-            DurableHelper.SetTaskHubNameAndId(WorkingDirPath, taskHubName);
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
             await CliTester.Run(new RunConfiguration
