@@ -47,6 +47,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string CorsOrigins { get; set; }
 
+        public bool CorsCredentials { get; set; }
+
         public int Timeout { get; set; }
 
         public bool UseHttps { get; set; }
@@ -80,6 +82,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription($"A comma separated list of CORS origins with no spaces. Example: https://functions.azure.com,https://functions-staging.azure.com")
                 .SetDefault(hostSettings.Cors ?? string.Empty)
                 .Callback(c => CorsOrigins = c);
+
+            Parser
+                .Setup<bool>("cors-credentials")
+                .WithDescription($"Allow cross-origin authenticated requests (i.e. cookies and the Authentication header)")
+                .SetDefault(hostSettings.CorsCredentials)
+                .Callback(v => CorsCredentials = v);
 
             Parser
                 .Setup<int>('t', "timeout")
@@ -150,7 +158,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     loggingBuilder.AddDefaultWebJobsFilters();
                     loggingBuilder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials)))
                 .Build();
         }
 
@@ -393,8 +401,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             private readonly WebHostBuilderContext _builderContext;
             private readonly ScriptApplicationHostOptions _hostOptions;
             private readonly string[] _corsOrigins;
+            private readonly bool _corsCredentials;
 
-            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins)
+            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials)
             {
                 _builderContext = builderContext;
                 _hostOptions = hostOptions;
@@ -402,6 +411,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 if (!string.IsNullOrEmpty(corsOrigins))
                 {
                     _corsOrigins = corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                    _corsCredentials = corsCredentials;
                 }
             }
 
@@ -444,9 +454,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     app.UseCors(builder =>
                     {
-                        builder.WithOrigins(_corsOrigins)
+                        var origins = builder.WithOrigins(_corsOrigins)
                             .AllowAnyHeader()
                             .AllowAnyMethod();
+                        if (_corsCredentials)
+                        {
+                            origins.AllowCredentials();
+                        }
                     });
                 }
 
