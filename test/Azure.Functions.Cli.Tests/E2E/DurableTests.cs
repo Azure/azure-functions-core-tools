@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new string[]
                 {
-                    "Task hub successfully deleted."
+                    $"Task hub '{taskHubName}' successfully deleted."
                 }
             },
             _output,
@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 reason: _storageReason);
 
             string instanceId = $"{Guid.NewGuid():N}";
-            string taskHubName = "getRuntimeStatus";
+            string taskHubName = "getRuntimeStatusTest";
             DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
