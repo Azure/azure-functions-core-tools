@@ -19,8 +19,8 @@ namespace Build
                 : value;
         }
 
-        public const string ItemTemplatesVersion = "2.0.0-10311";
-        public const string ProjectTemplatesVersion = "2.0.0-10311";
+        public const string ItemTemplatesVersion = "2.0.10321";
+        public const string ProjectTemplatesVersion = "2.0.10321";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
@@ -42,9 +42,9 @@ namespace Build
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
-        public static readonly string ItemTemplates = $"https://www.myget.org/F/azure-appservice/api/v2/package/Azure.Functions.Templates/{ItemTemplatesVersion}";
+        public static readonly string ItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{ItemTemplatesVersion}";
 
-        public static readonly string ProjectTemplates = $"https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.AzureFunctions.ProjectTemplates/{ProjectTemplatesVersion}";
+        public static readonly string ProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{ProjectTemplatesVersion}";
 
         public static string BuildNumber => config(null, "Build.BuildId") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
 
