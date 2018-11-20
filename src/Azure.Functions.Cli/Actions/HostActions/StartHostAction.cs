@@ -84,7 +84,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(c => CorsOrigins = c);
 
             Parser
-                .Setup<bool>("corsCredentials")
+                .Setup<bool>("cors-credentials")
                 .WithDescription($"Allow cross-origin authenticated requests (i.e. cookies and the Authentication header)")
                 .SetDefault(hostSettings.CorsCredentials)
                 .Callback(v => CorsCredentials = v);
