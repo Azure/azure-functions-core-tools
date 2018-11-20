@@ -2,20 +2,19 @@ from PyInstaller.__main__ import run
 import os
 import sys
 
-not_allowed = ["__pycache__"]
 
 # Gets the list of all the possible modules from a directory
-def get_possible_modules(location):
+def get_possible_modules(location, parent = ''):
     all_modules = []
     dirs, files = get_dirs_files(location)
     for a_file in files:
         if is_python_file(a_file):
-            all_modules.append(os.path.splitext(a_file)[0])
+            all_modules.append(parent + os.path.splitext(a_file)[0])
     for a_dir in dirs:
-        if a_dir in not_allowed:
-            continue
         if dir_has_python_files(os.path.join(location, a_dir)):
-            all_modules.append(a_dir)
+            all_modules.append(parent + a_dir)
+        # Now we recurse through the sub_directory to get all the possible modules and append it to the parent list
+        all_modules.extend(get_possible_modules(os.path.join(location, a_dir), parent + a_dir + '.'))
     return all_modules
 
 # Gets the files and directories from a location
@@ -32,8 +31,6 @@ def dir_has_python_files(a_dir):
         if is_python_file(a_file):
             return True
     for a_sub_dir in dirs:
-        if a_sub_dir in not_allowed:
-            continue
         if dir_has_python_files(os.path.join(a_dir, a_sub_dir)):
             return True
     return False
