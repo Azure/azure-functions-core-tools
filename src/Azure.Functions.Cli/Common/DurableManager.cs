@@ -115,7 +115,7 @@ namespace Azure.Functions.Cli.Common
         private void CheckAssemblies()
         {
             // Retrieve list of DurableTask.AzureStorage DLL files
-            var assemblyFilePaths = Directory.GetFiles(Environment.CurrentDirectory, $"{DurableAzureStorageExtensionName}", SearchOption.AllDirectories).ToList<string>();
+            var assemblyFilePaths = Directory.GetFiles(Environment.CurrentDirectory, DurableAzureStorageExtensionName, SearchOption.AllDirectories);
             
             if (assemblyFilePaths.Count() == 0)
             {
@@ -124,18 +124,17 @@ namespace Azure.Functions.Cli.Common
                 return;
             }
 
-            // Convert them to a sorted list of FileInfo objects. Sort by the last modified time of the enclosing bin folder
-            var assemblyFiles = assemblyFilePaths.Select(assemblyFilePath => new FileInfo(assemblyFilePath)).ToList().OrderBy(file => file.Directory.LastWriteTime);
+            // Sort list of DLL files by the last modified time of their enclosing bin folder. Choose most recent
+            var mostRecentAssembly = assemblyFilePaths.Select(assemblyFilePath => new FileInfo(assemblyFilePath)).OrderBy(file => file.Directory.LastWriteTime).Last();
 
             var minimumExtensionVersion = new Version(MinimumDurableAzureStorageExtensionVersion);
 
-            var mostRecentAssembly = FileVersionInfo.GetVersionInfo(assemblyFiles.LastOrDefault().FullName);
-            var mostRecentAssemblyVersion = new Version(mostRecentAssembly.FileVersion);
+            var mostRecentAssemblyVersion = new Version(FileVersionInfo.GetVersionInfo(mostRecentAssembly.FullName).FileVersion);
 
             if (mostRecentAssemblyVersion < minimumExtensionVersion)
             {
-                 throw new CliException($"Durable Functions CLI commands must be used with {DurableAzureStorageExtensionName} versions greater than or equal to 1.4.0." +
-                     $"{Environment.NewLine}Your version: '{mostRecentAssemblyVersion}'");
+                 throw new CliException($"Durable Functions CLI commands must be used with {DurableAzureStorageExtensionName} versions greater than or equal to {MinimumDurableAzureStorageExtensionVersion}" +
+                     $"{Environment.NewLine}Your version: '{mostRecentAssemblyVersion}'. Path of DLL in question: {mostRecentAssembly.FullName}");
             }
         }
 
