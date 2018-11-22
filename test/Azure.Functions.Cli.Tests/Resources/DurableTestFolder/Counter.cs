@@ -6,13 +6,15 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace durablefx
 {
     public static class Counter
     {
         [FunctionName("HttpStartSingle")]
-        public static async Task<HttpResponseMessage> Run(
+        public static async Task<HttpResponseMessage> HttpStartSingle(
             [HttpTrigger(AuthorizationLevel.Anonymous, methods: "post", Route = "orchestrators/{functionName}/{instanceId}")] HttpRequestMessage req,
             [OrchestrationClient] DurableOrchestrationClient starter,
             string functionName,
@@ -51,7 +53,7 @@ namespace durablefx
         }
 
         [FunctionName("Counter")]
-        public static async Task Increment([OrchestrationTrigger] DurableOrchestrationContext ctx)
+        public static async Task Math([OrchestrationTrigger] DurableOrchestrationContext ctx)
         {
             int counterState = ctx.GetInput<int>();
             string operation = await ctx.WaitForExternalEvent<string>("operation");
@@ -70,6 +72,26 @@ namespace durablefx
             }
 
             ctx.ContinueAsNew(counterState);
+        }
+
+        [FunctionName("JsonInput")]
+        public static async Task JsonInput([OrchestrationTrigger] DurableOrchestrationContext ctx)
+        {
+            string input = ctx.GetInput<string>();
+
+            if (!string.IsNullOrEmpty(input))
+            {
+                JObject testParsingInput = JObject.Parse(input);
+            }
+
+            string data = await ctx.WaitForExternalEvent<string>("parse");
+
+            if (!string.IsNullOrEmpty(data))
+            {
+                JObject testParsingEventData = JObject.Parse(data);
+            }
+
+            ctx.ContinueAsNew(data);
         }
     }
 }

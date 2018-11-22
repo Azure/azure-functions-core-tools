@@ -214,7 +214,7 @@ namespace Azure.Functions.Cli.Common
             ColoredConsole.WriteLine($"Rows deleted: {stats.RowsDeleted}");
         }
 
-        public async Task RaiseEvent(string connectionStringKey, string taskHubName, string instanceId, string eventName, object data)
+        public async Task RaiseEvent(string connectionStringKey, string taskHubName, string instanceId, string eventName, string data)
         {
             Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
 
@@ -260,7 +260,7 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        public async Task StartNew(string connectionStringKey, string taskHubName, string functionName, string instanceId, object data)
+        public async Task StartNew(string connectionStringKey, string taskHubName, string functionName, string instanceId, string data)
         {
             Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
 
@@ -317,7 +317,7 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        public static dynamic DeserializeInstanceInput(string input)
+        public static string RetrieveCommandInputData(string input)
         {
             // User passed a filename. Retrieve the contents
             if (!string.IsNullOrEmpty(input) && input[0] == '@')
@@ -333,14 +333,7 @@ namespace Azure.Functions.Cli.Common
                     throw new CliException($"Could not find input file at '{filePath}'");
                 }
 
-                try
-                {
-                    return JsonConvert.DeserializeObject(contents);
-                }
-                catch (Exception e)
-                {
-                    throw new CliException($"Could not deserialize the input to the orchestration instance into a valid JSON object.", e);
-                }
+                return contents;
             }
 
             return input;

@@ -1,7 +1,9 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
+using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -203,6 +205,50 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [SkippableFact]
+        public async Task DurableRaiseEventTest_FileInput()
+        {
+            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
+                reason: _storageReason);
+
+            string taskHubName = "raiseEventFileInputTest";
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
+
+            string filename = Path.Combine(WorkingDirPath, "raiseEvent.json");
+            var testObject = new
+            {
+                Name = "RaiseEvent",
+                Hello = "World"
+            };
+
+            File.WriteAllText(filename, JsonConvert.SerializeObject(testObject));
+
+            string instanceId = $"{Guid.NewGuid():N}";
+
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"durable start-new --function-name JsonInput --id {instanceId} --task-hub-name {taskHubName}",
+                    $"durable raise-event --id {instanceId} --event-name operation --event-data @raiseEvent.json --task-hub-name {taskHubName}",
+                    $"durable get-runtime-status --id {instanceId}"
+                },
+                OutputContains = new string[]
+                {
+                    $"Raised event 'operation' to instance '{instanceId}'",
+                    "\"OrchestrationStatus\": 0",
+                }
+            },
+            _output,
+            workingDir: WorkingDirPath,
+            startHost: true);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
+
+            File.Delete(filename);
+        }
+
+        [SkippableFact]
         public async Task DurableRewindTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -261,6 +307,49 @@ namespace Azure.Functions.Cli.Tests.E2E
             startHost: false);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
+        }
+
+        [SkippableFact]
+        public async Task DurableStartNewTest_FileInput()
+        {
+            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
+                reason: _storageReason);
+
+            string taskHubName = "startNewFileInputTest";
+            DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
+
+            string filename = Path.Combine(WorkingDirPath, "startnew.json");
+            var testObject = new
+            {
+                Name = "StartNew",
+                Hello = "World"
+            };
+
+            File.WriteAllText(filename, JsonConvert.SerializeObject(testObject));
+
+            string instanceId = $"{Guid.NewGuid():N}";
+
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"durable start-new --function-name JsonInput --input @startnew.json --task-hub-name {taskHubName} --id {instanceId}",
+                    $"durable get-runtime-status --id {instanceId}"
+                },
+                OutputContains = new string[]
+                {
+                    "Started 'JsonInput'",
+                    "\"OrchestrationStatus\": 0",
+                }
+            },
+            _output,
+            workingDir: WorkingDirPath,
+            startHost: true);
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
+
+            File.Delete(filename);
         }
 
         [SkippableFact]
