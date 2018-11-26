@@ -18,11 +18,11 @@ namespace Azure.Functions.Cli.Interfaces
 
         Task PurgeHistory(string connectionString, string taskHubName, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses);
 
-        Task RaiseEvent(string connectionString, string taskHubName, string instanceId, string eventName, string eventData);
+        Task RaiseEvent(string connectionString, string taskHubName, string instanceId, string eventName, object eventData);
 
         Task Rewind(string connectionString, string taskHubName, string instanceId, string reason);
 
-        Task StartNew(string connectionString, string taskHubName, string functionName, string instanceId, string input);
+        Task StartNew(string connectionString, string taskHubName, string functionName, string instanceId, object input);
 
         Task Terminate(string connectionString, string taskHubName, string instanceId, string reason);
     }

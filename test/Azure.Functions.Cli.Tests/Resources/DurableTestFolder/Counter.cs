@@ -77,19 +77,16 @@ namespace durablefx
         [FunctionName("JsonInput")]
         public static async Task JsonInput([OrchestrationTrigger] DurableOrchestrationContext ctx)
         {
-            string input = ctx.GetInput<string>();
+            var input = ctx.GetInput<dynamic>();
 
-            if (!string.IsNullOrEmpty(input))
+            if (input != null)
             {
-                JObject testParsingInput = JObject.Parse(input);
+                string helloTest = input.Hello;
             }
 
-            string data = await ctx.WaitForExternalEvent<string>("parse");
+            var data = await ctx.WaitForExternalEvent<dynamic>("parse");
 
-            if (!string.IsNullOrEmpty(data))
-            {
-                JObject testParsingEventData = JObject.Parse(data);
-            }
+            string nameTest = data.Name;
 
             ctx.ContinueAsNew(data);
         }
