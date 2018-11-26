@@ -224,21 +224,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
             }
 
-            if (functionApp.IsLinux &&
-                functionApp.IsDynamic &&
-                functionApp.AzureAppSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"))
-            {
-                if (Force)
-                {
-                    result.Add("WEBSITE_CONTENTSHARE", null);
-                    result.Add("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", null);
-                }
-                else
-                {
-                    throw new CliException("Your app is configured with Azure Files for editing from Azure Portal.\nTo force publish use --force. This will remove Azure Files from your app.");
-                }
-            }
-
             if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
                 var allImages = Constants.WorkerRuntimeImages.Values.SelectMany(image => image).ToList();
