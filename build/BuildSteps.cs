@@ -38,16 +38,44 @@ namespace Build
             Shell.Run("dotnet", $"restore {Settings.ProjectFile} {feeds}");
         }
 
+        private static string GetRuntimeId(string runtime)
+        {
+            switch (runtime)
+            {
+                case "min.win-x86":
+                case "min.win-x64":
+                    return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
+                case "no-runtime":
+                    return string.Empty;
+                default:
+                    return runtime;
+            }
+        }
+
         public static void DotnetPublish()
         {
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
+                var rid = GetRuntimeId(runtime);
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     $"-o {outputPath} -c Release " +
-                                    (runtime.Equals("no-runtime", StringComparison.OrdinalIgnoreCase) ? string.Empty : $" -r {runtime}"));
+                                    (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
+
+                if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
+                {
+                    RemoveLanguageWorkers(outputPath);
+                }
+            }
+        }
+
+        private static void RemoveLanguageWorkers(string outputPath)
+        {
+            foreach (var languageWorker in Settings.LanguageWorkers)
+            {
+                Directory.Delete($"{outputPath}//workers//{languageWorker}", recursive: true);
             }
         }
 
