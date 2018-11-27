@@ -77,7 +77,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.2.2" />
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.0.0-beta7" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="0.1.35-alpha" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.0-12198" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.12210" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
   </ItemGroup>
 </Project>
