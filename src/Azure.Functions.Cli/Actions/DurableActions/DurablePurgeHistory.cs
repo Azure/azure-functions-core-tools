@@ -26,12 +26,12 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         {
             Parser
                 .Setup<DateTime>("created-after")
-                .WithDescription("(Optional) Delete the history of instances created after this date/time (UTC). Format: mm/dd/yyyy HH:mm")
+                .WithDescription("(Optional) Delete the history of instances created after this date/time (UTC). All ISO 8601 formatted datetimes accepted.")
                 .SetDefault(DateTime.MinValue)
                 .Callback(n => CreatedTimeFrom = n);
             Parser
                 .Setup<DateTime>("created-before")
-                .WithDescription("(Optional) Delete the history of instances created before this date/time (UTC). Format: mm/dd/yyyy HH:mm")
+                .WithDescription("(Optional) Delete the history of instances created before this date/time (UTC). All ISO 8601 formatted datetimes accepted.")
                 .SetDefault(DateTime.MaxValue.AddDays(-1)) // subtract one to avoid overflow/timezone error
                 .Callback(n => CreatedTimeTo = n);
             Parser

@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Common
 
         private string _taskHubName;
 
-        private readonly string _connectionStringKey;
+        private string _connectionStringKey;
 
         public const string DefaultConnectionStringKey = "AzureWebJobsStorage";
 
@@ -39,15 +39,15 @@ namespace Azure.Functions.Cli.Common
 
         public DurableManager(ISecretsManager secretsManager)
         {
-            this._secretsManager = secretsManager;
-            this.SetConnectionStringAndTaskHubName(ref _taskHubName, ref _connectionStringKey);
+            _secretsManager = secretsManager;
+            SetConnectionStringAndTaskHubName();
         }
 
-        private void SetConnectionStringAndTaskHubName(ref string taskHubName, ref string connectionStringKey)
+        private void SetConnectionStringAndTaskHubName()
         {
             // Set connection string key and task hub name to defaults
-            connectionStringKey = DefaultConnectionStringKey;
-            taskHubName = DefaultTaskHubName;
+            _connectionStringKey = DefaultConnectionStringKey;
+            _taskHubName = DefaultTaskHubName;
 
             try
             {
@@ -60,13 +60,13 @@ namespace Azure.Functions.Cli.Common
                     if (version?.Equals("2.0") == true)
                     {
                         // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
-                        connectionStringKey = hostSettings?.extensions?.durableTask?.AzureStorageConnectionStringName ?? connectionStringKey;
-                        taskHubName = hostSettings?.extensions?.durableTask?.HubName ?? taskHubName;
+                        _connectionStringKey = hostSettings?.extensions?.durableTask?.AzureStorageConnectionStringName ?? _connectionStringKey;
+                        _taskHubName = hostSettings?.extensions?.durableTask?.HubName ?? _taskHubName;
                     }
                     else
                     {
-                        connectionStringKey = hostSettings?.durableTask?.AzureStorageConnectionStringName ?? connectionStringKey;
-                        taskHubName = hostSettings?.durableTask?.HubName ?? taskHubName;
+                        _connectionStringKey = hostSettings?.durableTask?.AzureStorageConnectionStringName ?? _connectionStringKey;
+                        _taskHubName = hostSettings?.durableTask?.HubName ?? _taskHubName;
                     }
                 }
                 else
@@ -81,13 +81,13 @@ namespace Azure.Functions.Cli.Common
             }     
         }
 
-        private void SetStorageServiceAndTaskHubClient(ref AzureStorageOrchestrationService orchestrationService, ref TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
+        private void SetStorageServiceAndTaskHubClient(out AzureStorageOrchestrationService orchestrationService, out TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
         {
-            connectionStringKey = connectionStringKey ?? this._connectionStringKey;
-            this._taskHubName = taskHubName ?? this._taskHubName;
+            _connectionStringKey = connectionStringKey ?? _connectionStringKey;
+            _taskHubName = taskHubName ?? _taskHubName;
 
-            var connectionString = Environment.GetEnvironmentVariable(connectionStringKey); // Prioritize environment variables
-            connectionString = connectionString ?? _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
+            var connectionString = Environment.GetEnvironmentVariable(_connectionStringKey); // Prioritize environment variables
+            connectionString = connectionString ?? _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(_connectionStringKey, StringComparison.OrdinalIgnoreCase)).Value;
 
             if (!string.IsNullOrEmpty(connectionString))
             {
@@ -97,8 +97,8 @@ namespace Azure.Functions.Cli.Common
                     StorageConnectionString = connectionString,
                 };
 
-                _orchestrationService = new AzureStorageOrchestrationService(settings);
-                _client = new TaskHubClient(orchestrationService);
+                orchestrationService = new AzureStorageOrchestrationService(settings);
+                taskHubClient = new TaskHubClient(orchestrationService);
             }
             else
             {
@@ -106,10 +106,10 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        private void Initialize(ref AzureStorageOrchestrationService orchestrationService, ref TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
+        private void Initialize(out AzureStorageOrchestrationService orchestrationService, out TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
         {
             CheckAssemblies();
-            SetStorageServiceAndTaskHubClient(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            SetStorageServiceAndTaskHubClient(out orchestrationService, out taskHubClient, connectionStringKey, taskHubName);
         }
 
         private void CheckAssemblies()
@@ -140,7 +140,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task DeleteTaskHub(string connectionStringKey, string taskHubName)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             await _orchestrationService.DeleteAsync();
 
@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task GetHistory(string connectionStringKey, string taskHubName, string instanceId)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             var historyString = await _orchestrationService.GetOrchestrationHistoryAsync(instanceId, null);
 
@@ -169,7 +169,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task GetInstances(string connectionStringKey, string taskHubName, DateTime createdTimeFrom, DateTime createdTimeTo, IEnumerable<OrchestrationStatus> statuses, int top, string continuationToken)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             DurableStatusQueryResult queryResult = await _orchestrationService.GetOrchestrationStateAsync(createdTimeFrom, createdTimeTo, statuses, top, continuationToken);
 
@@ -181,7 +181,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task GetRuntimeStatus(string connectionStringKey, string taskHubName, string instanceId, bool showInput, bool showOutput)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             var status = (await _orchestrationService.GetOrchestrationStateAsync(instanceId, allExecutions: false, fetchInput: showInput)).FirstOrDefault();
 
@@ -198,7 +198,7 @@ namespace Azure.Functions.Cli.Common
 
          public async Task PurgeHistory(string connectionStringKey, string taskHubName, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             var runtimeStatusesArray = runtimeStatuses?.ToArray();
             var stats = await _orchestrationService.PurgeInstanceHistoryAsync(createdAfter, createdBefore, runtimeStatusesArray);
@@ -218,7 +218,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task RaiseEvent(string connectionStringKey, string taskHubName, string instanceId, string eventName, object data)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             var orchestrationInstance = new OrchestrationInstance
             {
@@ -232,7 +232,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task Rewind(string connectionStringKey, string taskHubName, string instanceId, string reason)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             var oldStatus = await _client.GetOrchestrationStateAsync(instanceId, false);
 
@@ -264,7 +264,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task StartNew(string connectionStringKey, string taskHubName, string functionName, string instanceId, object data)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             await _client.CreateOrchestrationInstanceAsync(functionName, version: string.Empty, instanceId: instanceId, input: data);
 
@@ -282,7 +282,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task Terminate(string connectionStringKey, string taskHubName, string instanceId, string reason)
         {
-            Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
+            Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
             var orchestrationInstance = new OrchestrationInstance
             {
