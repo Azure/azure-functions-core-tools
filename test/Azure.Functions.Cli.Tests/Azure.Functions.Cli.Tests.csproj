@@ -5,6 +5,11 @@
     <AssemblyName>Azure.Functions.Cli.Tests</AssemblyName>
     <RootNamespace>Azure.Functions.Cli.Tests</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Resources\**" />
+    <EmbeddedResource Remove="Resources\**" />
+    <None Remove="Resources\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="5.2.0" />

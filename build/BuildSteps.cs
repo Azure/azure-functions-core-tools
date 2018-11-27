@@ -112,6 +112,15 @@ namespace Build
                 ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
                 : Path.Combine(Settings.OutputDir, "linux-x64", "func");
             Environment.SetEnvironmentVariable("FUNC_PATH", funcPath);
+
+            string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))
+            {
+                Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
+            }
+
+            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);        
+
             Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
         }
 

@@ -34,7 +34,10 @@ namespace Azure.Functions.Cli
         Templates,
 
         [Description("Commands for installing extensions")]
-        Extensions
+        Extensions,
+
+        [Description("Commands for working with Durable Functions")]
+        Durable
     }
 
     internal static class ContextEnumExtensions
