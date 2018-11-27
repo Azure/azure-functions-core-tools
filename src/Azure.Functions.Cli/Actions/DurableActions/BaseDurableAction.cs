@@ -2,11 +2,11 @@
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
-    abstract class BaseDurableAction : BaseAction
+    internal abstract class BaseDurableAction : BaseAction
     {
-        protected string ConnectionString;
+        protected string ConnectionString { get; set; }
 
-        protected string TaskHubName;
+        protected string TaskHubName { get; set; }
 
         protected BaseDurableAction() { }
 

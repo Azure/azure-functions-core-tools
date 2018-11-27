@@ -155,15 +155,16 @@ namespace Azure.Functions.Cli.Common
 
             JArray history = JArray.Parse(historyString);
 
-            JArray chronological_history = new JArray(history.OrderBy(obj => (string)obj["TimeStamp"]));
-            foreach (JObject jobj in chronological_history)
+            JArray chronologicalHistory = new JArray(history.OrderBy(obj => (string)obj["TimeStamp"]));
+
+            foreach (JObject jobj in chronologicalHistory)
             {
                 // Convert EventType enum values to their equivalent string value
-                var parsed = Enum.TryParse(jobj["EventType"].ToString(), out EventType eventName);
+                Enum.TryParse(jobj["EventType"].ToString(), out EventType eventName);
                 jobj["EventType"] = eventName.ToString();
             }
 
-            ColoredConsole.Write($"{chronological_history.ToString(Formatting.Indented)}");
+            ColoredConsole.Write($"{chronologicalHistory.ToString(Formatting.Indented)}");
         }
 
         public async Task GetInstances(string connectionStringKey, string taskHubName, DateTime createdTimeFrom, DateTime createdTimeTo, IEnumerable<OrchestrationStatus> statuses, int top, string continuationToken)
@@ -199,13 +200,14 @@ namespace Azure.Functions.Cli.Common
         {
             Initialize(ref _orchestrationService, ref _client, connectionStringKey, taskHubName);
 
-            var stats = await _orchestrationService.PurgeInstanceHistoryAsync(createdAfter, createdBefore, runtimeStatuses);
+            var runtimeStatusesArray = runtimeStatuses?.ToArray();
+            var stats = await _orchestrationService.PurgeInstanceHistoryAsync(createdAfter, createdBefore, runtimeStatusesArray);
 
             string messageToPrint = $"Purged orchestration history for all instances created between '{createdAfter}' and '{createdBefore}'";
 
-            if (runtimeStatuses != null)
+            if (runtimeStatusesArray != null)
             {
-                string statuses = string.Join(",", runtimeStatuses.Select(x => x.ToString()).ToArray());
+                string statuses = string.Join(",", runtimeStatusesArray);
                 messageToPrint += $" and whose runtime status matched one of the following: [{statuses}]";
             }
 

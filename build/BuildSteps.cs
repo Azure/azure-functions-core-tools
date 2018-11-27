@@ -119,7 +119,7 @@ namespace Build
                 Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
             }
 
-            Environment.SetEnvironmentVariable("DURABLE", Settings.DurableFolder);        
+            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);        
 
             Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
         }

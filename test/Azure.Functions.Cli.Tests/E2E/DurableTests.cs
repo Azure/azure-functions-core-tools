@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Tests.E2E
     {
         private static readonly string StorageConnectionString = Environment.GetEnvironmentVariable("DURABLE_STORAGE_CONNECTION");
 
-        private static readonly string WorkingDirPath = Environment.GetEnvironmentVariable("DURABLE");
+        private static readonly string WorkingDirPath = Environment.GetEnvironmentVariable("DURABLE_FUNCTION_PATH");
 
         private const string _storageReason = "Durable E2E tests need a storage account connection";
 

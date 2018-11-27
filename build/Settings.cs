@@ -30,7 +30,7 @@ namespace Build
 
         public static readonly string TestProjectFile = Path.Combine(TestProjectPath, "Azure.Functions.Cli.Tests.csproj");
 
-        public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources/DurableTestFolder");
+        public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
         public static readonly string[] TargetRuntimes = new[] { "win-x86", "win-x64", "linux-x64", "osx-x64", "no-runtime" };
 

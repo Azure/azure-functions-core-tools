@@ -2,7 +2,7 @@
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
-    abstract class BaseDurableActionWithId : BaseDurableAction
+    internal abstract class BaseDurableActionWithId : BaseDurableAction
     {
         protected string Id { get; set; }
 
