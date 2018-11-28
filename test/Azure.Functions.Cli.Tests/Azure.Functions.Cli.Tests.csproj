@@ -296,13 +296,13 @@
       <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Logging.ApplicationInsights.2.3.0-beta1-11391\lib\net45\Microsoft.Azure.WebJobs.Logging.ApplicationInsights.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.1.0.0-beta3-12154\lib\net451\Microsoft.Azure.WebJobs.Script.dll</HintPath>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.1.0.0-beta3-12205\lib\net451\Microsoft.Azure.WebJobs.Script.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.Extensibility, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.Extensibility.1.0.0-beta3-10955\lib\net45\Microsoft.Azure.WebJobs.Script.Extensibility.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.WebHost, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.WebHost.1.0.0-beta3-12154\lib\net451\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.WebHost.1.0.0-beta3-12205\lib\net451\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.ServiceBus, Version=2.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.Azure.WebJobs.ServiceBus.2.3.0-beta1-11391\lib\net45\Microsoft.Azure.WebJobs.ServiceBus.dll</HintPath>
@@ -386,7 +386,7 @@
       <HintPath>..\..\packages\EnterpriseLibrary.TransientFaultHandling.6.0.1304.0\lib\portable-net45+win+wp8\Microsoft.Practices.EnterpriseLibrary.TransientFaultHandling.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Rest.ClientRuntime, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Rest.ClientRuntime.2.3.11\lib\net452\Microsoft.Rest.ClientRuntime.dll</HintPath>
+      <HintPath>..\..\packages\Microsoft.Rest.ClientRuntime.2.3.17\lib\net452\Microsoft.Rest.ClientRuntime.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.ServiceBus, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\..\packages\WindowsAzure.ServiceBus.3.4.5\lib\net45-full\Microsoft.ServiceBus.dll</HintPath>
