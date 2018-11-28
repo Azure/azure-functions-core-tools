@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool Force { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
-        public bool NoBundler { get; set; }
+        public bool BundleDeps { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
         public string DotnetCliParameters { get; set; }
@@ -82,10 +82,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("Skips generating .wheels folder when publishing python function apps.")
                 .Callback(f => BuildNativeDeps = f);
             Parser
-                .Setup<bool>("no-bundler")
+                .Setup<bool>("bundle-deps")
                 .SetDefault(false)
-                .WithDescription("Skips generating a bundle when publishing python function apps with build-native-deps.")
-                .Callback(f => NoBundler = f);
+                .WithDescription("Tries to bundler dependencies of python function apps with build-native-deps.")
+                .Callback(f => BundleDeps = f);
             Parser
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
@@ -224,6 +224,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
             }
 
+            // Python does not allow editing from Azure Portal
             if (functionApp.IsLinux &&
                 functionApp.IsDynamic &&
                 functionApp.AzureAppSettings.ContainsKey("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"))
@@ -293,7 +294,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBundler, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, BundleDeps, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // if consumption Linux, or run from zip
             if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)

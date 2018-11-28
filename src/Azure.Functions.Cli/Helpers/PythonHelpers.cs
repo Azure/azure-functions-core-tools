@@ -133,7 +133,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool noBundler, string additionalPackages)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool bundleDeps, string additionalPackages)
         {
             if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
             {
@@ -151,7 +151,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
                 {
-                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages, noBundler);
+                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages, bundleDeps);
                 }
                 else
                 {
@@ -191,7 +191,7 @@ namespace Azure.Functions.Cli.Helpers
             return packagesLocation;
         }
 
-        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool noBundler)
+        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool bundleDeps)
         {
             var appContentPath = CopyToTemp(files, functionAppRoot);
 
@@ -204,13 +204,13 @@ namespace Azure.Functions.Cli.Helpers
                 await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/home/site/wwwroot");
 
                 var scriptFilePath = Path.GetTempFileName();
-                if (noBundler)
+                if (bundleDeps)
                 {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildNoBundler).Replace("\r\n", "\n"));
+                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
                 }
                 else
                 {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
+                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildNoBundler).Replace("\r\n", "\n"));
                 }
                 var bundleScriptFilePath = Path.GetTempFileName();
                 await FileSystemHelpers.WriteAllTextToFileAsync(bundleScriptFilePath, (await StaticResources.PythonBundleScript).Replace("\r\n", "\n"));
