@@ -75,7 +75,7 @@ namespace Build
         {
             foreach (var languageWorker in Settings.LanguageWorkers)
             {
-                Directory.Delete($"{outputPath}//workers//{languageWorker}", recursive: true);
+                Directory.Delete(Path.Combine(outputPath, "workers", languageWorker), recursive: true);
             }
         }
 
@@ -147,7 +147,7 @@ namespace Build
                 Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
             }
 
-            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);        
+            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
             Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
         }
