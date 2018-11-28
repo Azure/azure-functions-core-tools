@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsStorageAccountNamePrefix = "AzureFunctions";
         public const string StorageAccountArmType = "Microsoft.Storage/storageAccounts";
         public const string FunctionAppArmKind = "functionapp";
-        public const string CliVersion = "1.0.16";
+        public const string CliVersion = "1.0.17";
         public const string CliDebug = "CLI_DEBUG";
         public const string DefaultSqlProviderName = "System.Data.SqlClient";
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
