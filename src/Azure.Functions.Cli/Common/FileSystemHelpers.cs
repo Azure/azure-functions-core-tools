@@ -28,6 +28,11 @@ namespace Azure.Functions.Cli.Common
             return Instance.File.ReadAllBytes(path);
         }
 
+        internal static string[] ReadAllLines(string path)
+        {
+            return Instance.File.ReadAllLines(path);
+        }
+
         public static string ReadAllTextFromFile(string path)
         {
             return Instance.File.ReadAllText(path);

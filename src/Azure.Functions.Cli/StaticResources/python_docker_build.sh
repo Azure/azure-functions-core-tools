@@ -9,15 +9,19 @@ if [ -d worker_venv ]; then
 fi
 
 python -m venv --copies worker_venv
-worker_venv/bin/pip install -r requirements.txt
+worker_venv/bin/pip install -r /requirements.txt
 
 # Bundle using pyinstaller
 worker_venv/bin/pip install pyinstaller==3.4
 
+if [ -f /cached_requirements.txt ]; then
+	pip install --target=/cached_requirements -r /cached_requirements.txt
+fi
+
 pyinstaller_success=false
 
 # If pyinstaller succeeds, we deactivate and remove the venv
-if worker_venv/bin/python /python_bundle_script.py /azure-functions-host/workers/python/worker.py; then
+if worker_venv/bin/python /python_bundle_script.py /azure-functions-host/workers/python/worker.py /cached_requirements; then
 	pyinstaller_success=true
 else
 	if [ -d ./worker-bundle ]; then
