@@ -52,6 +52,24 @@ namespace Azure.Functions.Cli.Helpers
             .Where(k => k != WorkerRuntime.java)
             .Where(k => k != WorkerRuntime.powershell);
 
+        public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
+        {
+            IDictionary<WorkerRuntime, string> workerToDisplayStrings = new Dictionary<WorkerRuntime, string>();
+            foreach (WorkerRuntime wr in availableWorkersRuntime.Keys)
+            {
+                switch (wr)
+                {
+                    case WorkerRuntime.python:
+                        workerToDisplayStrings[wr] = "python (preview)";
+                        break;
+                    default:
+                        workerToDisplayStrings[wr] = wr.ToString();
+                        break;
+                }
+            }
+            return workerToDisplayStrings;
+        }
+
         public static WorkerRuntime NormalizeWorkerRuntime(string workerRuntime)
         {
             if (string.IsNullOrWhiteSpace(workerRuntime))
