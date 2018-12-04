@@ -9,7 +9,7 @@ def get_possible_modules(location, parent = ''):
     dirs, files = get_dirs_files(location)
     for a_file in files:
         if is_python_file(a_file):
-            all_modules.append(parent + os.path.splitext(a_file)[0])
+            all_modules.append(parent + a_file.split(os.extsep)[0])
     for a_dir in dirs:
         if dir_has_python_files(os.path.join(location, a_dir)):
             all_modules.append(parent + a_dir)
