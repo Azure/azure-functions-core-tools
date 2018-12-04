@@ -341,7 +341,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "Started 'JsonInput'",
                     "\"OrchestrationStatus\": 0",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(30)
             },
             _output,
             workingDir: WorkingDirPath,
