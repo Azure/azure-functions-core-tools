@@ -266,9 +266,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
+            // For dedicated linux apps, we do not support Run from zip right now
             if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromZipDeploy)
             {
-                throw new CliException("Run from package is not supported with dedicated linux apps. Please use --nozip");
+                ColoredConsole.WriteLine("Assuming --nozip (do not run from package) for publishing to Linux dedicated plan.");
+                RunFromZipDeploy = false;
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
