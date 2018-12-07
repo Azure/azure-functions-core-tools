@@ -22,6 +22,11 @@
     <RepositoryType>git</RepositoryType>
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <StartupObject />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <OutputPath></OutputPath>
+    <NoWarn>1701;1702;</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">

@@ -347,6 +347,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => t.Equals("httpTrigger", StringComparison.OrdinalIgnoreCase));
 
+
                 if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allHttpTrigger)
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. This is required for all triggers other than HTTP. "
