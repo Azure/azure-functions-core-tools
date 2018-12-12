@@ -54,7 +54,9 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                             "System.Text",
                             "System.Threading.Tasks"
                         };
-                        var generatedMethods = group.Select(m => (MemberDeclarationSyntax)GenerateMethod(m, usingNamespaces)).ToList(); // Force enumeration so that the usings are generated
+                        var generatedMethods = group
+                                                .SelectMany(m => (MemberDeclarationSyntax[])GenerateMethodForActivity(m, usingNamespaces))
+                                                .ToList(); // Force enumeration so that the usings are generated
                         return new
                         {
                             Namespace = group.Key,
@@ -195,7 +197,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                         )
                     );
         }
-        private static MethodDeclarationSyntax GenerateMethod(IMethodSymbol method, HashSet<string> namespaces)
+        private static MethodDeclarationSyntax[] GenerateMethodForActivity(IMethodSymbol method, HashSet<string> namespaces)
         {
             AddNamespacesForMethodTypes(method, namespaces);
 
@@ -204,69 +206,140 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             // Ensure return type is Task/Task<T>
             var returnType = GetAsyncTypeFromType(methodDeclaration.ReturnType);
             var methodName = EnsureMethodNameEndsInAsync(method);
+            var methodNameWithRetry = methodName
+                                        .Substring(0, methodName.Length - 5) // strip Async
+                                        + "WithRetryAsync";
             var functionName = GetFunctionNameForMethod(method);
 
             var activityParameter = GetActivityTriggerParameter(method);
 
             var callActivityAsyncSyntax = GetCallActivityAsyncSyntax(returnType);
+            var callActivityWithRetryAsyncSyntax = GetCallActivityAsyncSyntax(returnType, "CallActivityWithRetryAsync");
 
-            return MethodDeclaration(returnType, methodName)
-                    .WithModifiers(TokenList(new[] { Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword) }))
-                    .WithParameterList(
-                        ParameterList(
-                            SeparatedList<ParameterSyntax>(
-                                new SyntaxNodeOrToken[]{
-                                        Parameter(Identifier("activityHelper"))
-                                            .WithModifiers(
-                                                TokenList(Token(SyntaxKind.ThisKeyword))
-                                            )
-                                            .WithType(
-                                                IdentifierName("DurableFunctionActivityHelpers")
-                                            ),
-                                        Token(SyntaxKind.CommaToken),
-                                        Parameter(activityParameter.Identifier)
-                                            .WithType(activityParameter.Type)
-                                }
+            return new[]
+                {
+                    MethodDeclaration(returnType, methodName)
+                        .WithModifiers(TokenList(new[] { Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword) }))
+                        .WithParameterList(
+                            ParameterList(
+                                SeparatedList<ParameterSyntax>(
+                                    new SyntaxNodeOrToken[]{
+                                            Parameter(Identifier("activityHelper"))
+                                                .WithModifiers(
+                                                    TokenList(Token(SyntaxKind.ThisKeyword))
+                                                )
+                                                .WithType(
+                                                    IdentifierName("DurableFunctionActivityHelpers")
+                                                ),
+                                            Token(SyntaxKind.CommaToken),
+                                            Parameter(activityParameter.Identifier)
+                                                .WithType(activityParameter.Type)
+                                    }
+                                )
                             )
                         )
-                    )
-                    .WithBody(
-                        Block(
-                            SingletonList<StatementSyntax>(
-                                ReturnStatement(
-                                    InvocationExpression(
-                                       MemberAccessExpression(
-                                           SyntaxKind.SimpleMemberAccessExpression, 
+                        .WithBody(
+                            Block(
+                                SingletonList<StatementSyntax>(
+                                    ReturnStatement(
+                                        InvocationExpression(
                                            MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression, 
-                                                IdentifierName("activityHelper"), 
-                                                IdentifierName("Context")
-                                            ), 
-                                           callActivityAsyncSyntax
+                                               SyntaxKind.SimpleMemberAccessExpression,
+                                               MemberAccessExpression(
+                                                    SyntaxKind.SimpleMemberAccessExpression,
+                                                    IdentifierName("activityHelper"),
+                                                    IdentifierName("Context")
+                                                ),
+                                               callActivityAsyncSyntax
+                                            )
                                         )
-                                    )
-                                    .WithArgumentList(
-                                        ArgumentList(
-                                            SeparatedList<ArgumentSyntax>(
-                                                new SyntaxNodeOrToken[]{
-                                                        Argument(
-                                                            LiteralExpression(
-                                                                SyntaxKind.StringLiteralExpression,
-                                                                Literal(functionName)
+                                        .WithArgumentList(
+                                            ArgumentList(
+                                                SeparatedList<ArgumentSyntax>(
+                                                    new SyntaxNodeOrToken[]{
+                                                            Argument(
+                                                                LiteralExpression(
+                                                                    SyntaxKind.StringLiteralExpression,
+                                                                    Literal(functionName)
+                                                                )
+                                                            ),
+                                                            Token(SyntaxKind.CommaToken),
+                                                            Argument(
+                                                                IdentifierName(activityParameter.Identifier.ValueText)
                                                             )
-                                                        ),
-                                                        Token(SyntaxKind.CommaToken),
-                                                        Argument(
-                                                            IdentifierName(activityParameter.Identifier.ValueText)
-                                                        )
-                                                }
+                                                    }
+                                                )
                                             )
                                         )
                                     )
                                 )
                             )
+                        ),
+                    MethodDeclaration(returnType, methodNameWithRetry )
+                        .WithModifiers(TokenList(new[] { Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword) }))
+                        .WithParameterList(
+                            ParameterList(
+                                SeparatedList<ParameterSyntax>(
+                                    new SyntaxNodeOrToken[]{
+                                            Parameter(Identifier("activityHelper"))
+                                                .WithModifiers(
+                                                    TokenList(Token(SyntaxKind.ThisKeyword))
+                                                )
+                                                .WithType(
+                                                    IdentifierName("DurableFunctionActivityHelpers")
+                                                ),
+                                            Token(SyntaxKind.CommaToken),
+                                            Parameter(Identifier("retryOptions"))
+                                                .WithType(IdentifierName("RetryOptions")),
+                                            Token(SyntaxKind.CommaToken),
+                                            Parameter(activityParameter.Identifier)
+                                                .WithType(activityParameter.Type)
+                                    }
+                                )
+                            )
                         )
-                    );
+                        .WithBody(
+                            Block(
+                                SingletonList<StatementSyntax>(
+                                    ReturnStatement(
+                                        InvocationExpression(
+                                           MemberAccessExpression(
+                                               SyntaxKind.SimpleMemberAccessExpression,
+                                               MemberAccessExpression(
+                                                    SyntaxKind.SimpleMemberAccessExpression,
+                                                    IdentifierName("activityHelper"),
+                                                    IdentifierName("Context")
+                                                ),
+                                               callActivityWithRetryAsyncSyntax
+                                            )
+                                        )
+                                        .WithArgumentList(
+                                            ArgumentList(
+                                                SeparatedList<ArgumentSyntax>(
+                                                    new SyntaxNodeOrToken[]{
+                                                            Argument(
+                                                                LiteralExpression(
+                                                                    SyntaxKind.StringLiteralExpression,
+                                                                    Literal(functionName)
+                                                                )
+                                                            ),
+                                                            Token(SyntaxKind.CommaToken),
+                                                            Argument(
+                                                                IdentifierName("retryOptions")
+                                                            ),
+                                                            Token(SyntaxKind.CommaToken),
+                                                            Argument(
+                                                                IdentifierName(activityParameter.Identifier.ValueText)
+                                                            )
+                                                    }
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                };
         }
 
         private static string EnsureMethodNameEndsInAsync(IMethodSymbol method)
@@ -285,7 +358,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         /// </summary>
         /// <param name="returnType"></param>
         /// <returns></returns>
-        private static SimpleNameSyntax GetCallActivityAsyncSyntax(TypeSyntax returnType)
+        private static SimpleNameSyntax GetCallActivityAsyncSyntax(TypeSyntax returnType, string methodName = "CallActivityAsync")
         {
             SimpleNameSyntax callActivityAsyncSyntax;
 
@@ -300,13 +373,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                 && gns.TypeArgumentList.Arguments.Count == 1) // only add TypeArguments for Task<T> (for Task, leave alone)
             {
                 // Have Task<T> - capture the T for the call to CallActivityAsync
-                callActivityAsyncSyntax = GenericName(Identifier("CallActivityAsync"))
+                callActivityAsyncSyntax = GenericName(Identifier(methodName))
                                             .WithTypeArgumentList(gns.TypeArgumentList);
             }
             else
             {
                 // just Task!
-                callActivityAsyncSyntax = IdentifierName("CallActivityAsync");
+                callActivityAsyncSyntax = IdentifierName(methodName);
             }
 
             return callActivityAsyncSyntax;
