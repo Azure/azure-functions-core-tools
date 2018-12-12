@@ -73,7 +73,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(f => ListIncludedFiles = f);
             Parser
                 .Setup<bool>("nozip")
-                .WithDescription("Publish in Run-From-Zip package. Requires the app to have AzureWebJobsStorage setting defined.")
+                .WithDescription("Turns the default Run-From-Package mode off.")
                 .SetDefault(false)
                 .Callback(f => RunFromZipDeploy = !f);
             Parser
