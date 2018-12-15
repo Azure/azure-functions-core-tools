@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
         public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null, bool startHost = false)
         {
-            string workingDirectory = workingDir ?? Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
+            string workingDirectory = workingDir ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
             bool cleanupDirectory = string.IsNullOrEmpty(workingDir);
             if (cleanupDirectory)
@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 for (var i = 0; i < runConfiguration.Commands.Length; i++)
                 {
                     var command = runConfiguration.Commands[i];
-                    var exe = new Executable(_func, command, workingDirectory: workingDir);                
+                    var exe = new Executable(_func, command, workingDirectory: workingDir);
 
                     if (startHost && i == runConfiguration.Commands.Length - 1)
                     {

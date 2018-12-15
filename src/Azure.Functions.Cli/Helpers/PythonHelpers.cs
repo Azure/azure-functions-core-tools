@@ -228,7 +228,7 @@ namespace Azure.Functions.Cli.Helpers
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonBundleScript}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
 
-                var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
+                var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 FileSystemHelpers.EnsureDirectory(tempDir);
 
                 await DockerHelpers.CopyFromContainer(containerId, $"/app.zip", tempDir);
