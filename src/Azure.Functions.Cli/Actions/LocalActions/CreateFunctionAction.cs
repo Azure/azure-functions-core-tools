@@ -31,6 +31,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _secretsManager = secretsManager;
         }
 
+        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, string language, string templateName, string functionName, bool csx)
+        {
+            _templatesManager = templatesManager;
+            _secretsManager = secretsManager;
+            Language = language;
+            TemplateName = templateName;
+            FunctionName = functionName;
+            Csx = csx;
+        }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser

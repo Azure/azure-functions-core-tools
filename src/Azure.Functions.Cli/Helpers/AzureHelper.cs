@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
@@ -298,6 +300,126 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 ColoredConsole.WriteLine();
             }
+        }
+
+        private static void EnsureAzureCli()
+        {
+            if (!CommandChecker.CommandExists("az"))
+            {
+                throw new CliException("Unable to connect to Azure. Make sure you have the `az` CLI installed and logged in and try again");
+            }
+        }
+
+        private static async Task<string> RunAzCliCommand(string cliArgs)
+        {
+            EnsureAzureCli();
+            var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? new Executable("cmd", $"/c az {cliArgs}")
+                : new Executable("az", $"{cliArgs}");
+            var stdout = new StringBuilder();
+            var stderr = new StringBuilder();
+            var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
+            if (exitCode == 0)
+            {
+                return stdout.ToString().Trim(' ', '\n', '\r', '"');
+            }
+            throw new CliException($"Error running az CLI command 'az {cliArgs}'. Error: {stderr.ToString().Trim(' ', '\n', '\r')}");
+        }
+
+        public static async Task<bool> CheckIfResourceGroupAlreadyExists(string resoruceGroup)
+        {
+            var azOutput = await RunAzCliCommand($"group exists --name {resoruceGroup} --output json");
+            if (azOutput.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static async Task<bool> IsStorageAccountNameTaken(string name)
+        {
+            var azOutput = await RunAzCliCommand($"storage account check-name --name {name} --output json");
+            try
+            {
+                var available = JsonConvert.DeserializeObject<JObject>(azOutput)["nameAvailable"].ToString();
+                if (available.Equals("true", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            catch (Exception)
+            {
+                throw new CliException($"Error trying to get the name availability of the Azure Storage Account name {name}");
+            }
+            return true;
+        }
+
+        public static async Task<bool> CheckIfFunctionAppAlreadyExists(string name, string accessToken)
+        {
+            try
+            {
+                var functionApp = await GetFunctionApp(name, accessToken);
+                return true;
+            }
+            catch (ArmResourceNotFoundException)
+            {
+                // If we didn't find the resource
+                return false;
+            }
+        }
+
+        public static async Task CreateResourceGroup(string location, string name)
+        {
+            var azOutput = await RunAzCliCommand($"group create -l {location} -n {name}");
+            try
+            {
+                var properties = JsonConvert.DeserializeObject<JObject>(azOutput)["properties"].ToString();
+                var provisioningState = JsonConvert.DeserializeObject<JObject>(properties)["provisioningState"].ToString();
+                if (!provisioningState.Contains("Succeeded"))
+                {
+                    throw new CliException($"Trying to create a Resource Group failed. az cli returned a status of {provisioningState} instead of 'Succeeded'");
+                }
+            }
+            catch
+            {
+                throw new CliException($"Error trying to get the success status while creating a new Resource Group");
+            }
+        }
+
+        public static async Task CreateAzureStorage(string name, string resourceGroup, string sku= "Standard_LRS")
+        {
+            var azOutput = await RunAzCliCommand($"storage account create --name {name} --resource-group {resourceGroup} --sku {sku}");
+            try
+            {
+                var provisioningState = JsonConvert.DeserializeObject<JObject>(azOutput)["provisioningState"].ToString();
+                if (!provisioningState.Contains("Succeeded"))
+                {
+                    throw new CliException($"Trying to create a Storage Account failed. az cli returned a status of {provisioningState} instead of 'Succeeded'");
+                }
+            }
+            catch
+            {
+                throw new CliException($"Error trying to get the success status while creating a new Storage Account");
+            }
+        }
+
+        public static async Task CreateAzureFunction(string resourceGroup, string storageAccount, string name, string os, string runtime, string location)
+        {
+            var azOutput = await RunAzCliCommand($"functionapp create --resource-group {resourceGroup} -s {storageAccount} --name {name} --os-type {os} --runtime {runtime} -c {location}");
+            var available = "";
+            try
+            {
+                available = JsonConvert.DeserializeObject<JObject>(azOutput)["availabilityState"].ToString();
+                if (available.Equals("normal", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+            catch (Exception)
+            {
+                throw new CliException("Error trying to get the availabilityState of the created function app");
+            }
+            throw new CliException($"The availabilityState returned a status of {available} instead of Normal");
         }
     }
 }

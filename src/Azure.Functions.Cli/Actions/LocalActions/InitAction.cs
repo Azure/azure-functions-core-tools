@@ -44,6 +44,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             _templatesManager = templatesManager;
         }
+        public InitAction(ITemplatesManager templatesManager, SourceControl sourceControl, string workerRuntime, bool force, bool initDocker, bool csx, string folderName = null)
+        {
+            _templatesManager = templatesManager;
+            SourceControl = sourceControl;
+            WorkerRuntime = workerRuntime;
+            Force = force;
+            InitDocker = initDocker;
+            Csx = csx;
+            FolderName = folderName;
+        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

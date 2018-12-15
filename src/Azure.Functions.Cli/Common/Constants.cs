@@ -19,6 +19,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string RequirementsTxt = "requirements.txt";
         public const string FunctionJsonFileName = "function.json";
+        public const string PublishConfigurationFileName = "publish_configuration.json";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
         public const string FunctionsExtensionVersion = "FUNCTIONS_EXTENSION_VERSION";
@@ -26,6 +27,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
+        public const string FunctionAppKeyPublish = "functionapp";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

@@ -49,6 +49,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             _secretsManager = secretsManager;
         }
 
+        public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager, string functionAppName, string accessToken)
+        {
+            _settings = settings;
+            _secretsManager = secretsManager;
+            AccessToken = accessToken;
+            FunctionAppName = functionAppName;
+        }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
