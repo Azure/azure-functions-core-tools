@@ -13,24 +13,32 @@ namespace Azure.Functions.Cli.Common
 
         public SimpleProgressBar(string title)
         {
-            var bufferWidth = Console.BufferWidth;
-            bufferWidth = bufferWidth > 100 ? 100 : bufferWidth;
-            this.width = bufferWidth - (title.Length + 4);
-
-            ColoredConsole.Write(title);
-
-            ColoredConsole.Write(" [");
-
-            for (var i = 0; i < width; i++)
+            try
             {
-                ColoredConsole.Write('-');
+                var bufferWidth = Console.BufferWidth;
+                bufferWidth = bufferWidth > 100 ? 100 : bufferWidth;
+                this.width = bufferWidth - (title.Length + 4);
+
+                ColoredConsole.Write(title);
+
+                ColoredConsole.Write(" [");
+
+                for (var i = 0; i < width; i++)
+                {
+                    ColoredConsole.Write('-');
+                }
+
+                ColoredConsole.Write("]");
+
+                for (var i = 0; i < width + 1; i++)
+                {
+                    ColoredConsole.Write('\b');
+                }
             }
-
-            ColoredConsole.Write("]");
-
-            for (var i = 0; i < width + 1; i++)
+            catch
             {
-                ColoredConsole.Write('\b');
+                isCompleted = true;
+                ColoredConsole.WriteLine();
             }
         }
 
