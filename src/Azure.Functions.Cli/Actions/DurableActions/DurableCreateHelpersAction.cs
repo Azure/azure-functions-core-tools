@@ -23,11 +23,12 @@ using Azure.Functions.Cli.Actions.LocalActions;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "create-helpers", Context = Context.Durable, HelpText = "Create or update generated durable functions helpers")]
-    internal partial class CreateDurableFunctionsHelpersAction : BaseAction
+    internal partial class DurableCreateHelpersAction : BaseAction
     {
+        public const string GeneratedFileName = "DurableFunctionsHelpers.generated.cs";
         private readonly ISecretsManager _secretsManager;
 
-        public CreateDurableFunctionsHelpersAction(ISecretsManager secretsManager)
+        public DurableCreateHelpersAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
         }
@@ -62,9 +63,8 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
             var generatedCode = compilationUnitSyntax.ToString();
 
-            var generatedFilename = "DurableFunctionsHelpers.generated.cs";
             var csprojFolder = Path.GetDirectoryName(csproj);
-            var generatedFilePath = System.IO.Path.Combine(csprojFolder, generatedFilename);
+            var generatedFilePath = Path.Combine(csprojFolder, GeneratedFileName);
             ColoredConsole.WriteLine(AdditionalInfoColor($"Writing generated code to {generatedFilePath}"));
             await FileSystemHelpers.WriteAllTextToFileAsync(generatedFilePath, generatedCode);
         }

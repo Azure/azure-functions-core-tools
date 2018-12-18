@@ -15,7 +15,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     // Putting this method in a separate file for the inclusion of the SyntaxFactory methods
-    internal partial class CreateDurableFunctionsHelpersAction : BaseAction
+    internal partial class DurableCreateHelpersAction : BaseAction
     {
         private static CompilationUnitSyntax GenerateCode(Project project, IEnumerable<IMethodSymbol> activityMethods)
         {
