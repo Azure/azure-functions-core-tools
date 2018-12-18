@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Diagnostics
         private readonly Func<string, LogLevel, bool> _filter;
         private readonly string _category;
 
-        public ColoredConsoleLogger(string category, Func<string, LogLevel, bool> filter)
+        public ColoredConsoleLogger(string category, Func<string, LogLevel, bool> filter = null)
         {
             _category = category;
             _filter = filter;

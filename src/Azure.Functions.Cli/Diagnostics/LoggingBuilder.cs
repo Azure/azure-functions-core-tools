@@ -1,6 +1,4 @@
-﻿using System;
-using System.Linq;
-using Azure.Functions.Cli.Common;
+﻿using Azure.Functions.Cli.Common;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.ApplicationInsights.Extensibility.Implementation;
@@ -14,7 +12,7 @@ namespace Azure.Functions.Cli.Diagnostics
     {
         public void Configure(ILoggingBuilder builder)
         {
-            builder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
+            builder.AddProvider(new ColoredConsoleLoggerProvider());
 
             builder.Services.AddSingleton<TelemetryClient>(provider =>
             {
