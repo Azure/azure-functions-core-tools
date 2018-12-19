@@ -164,7 +164,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new string[]
                 {
-                    $"Purged orchestration history for all instances created between '{DurablePurgeHistory.CreatedAfterDefault}' and '{DurablePurgeHistory.CreatedBeforeDefault}'"
+                    $"Purged orchestration history for all instances created between '{DurableManager.CreatedAfterDefault}' and '{DurableManager.CreatedBeforeDefault}'"
                 },
                 CommandTimeout = TimeSpan.FromSeconds(45)
             },

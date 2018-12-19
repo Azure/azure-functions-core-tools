@@ -37,6 +37,10 @@ namespace Azure.Functions.Cli.Common
 
         public const string MinimumDurableAzureStorageExtensionVersion = "1.4.0";
 
+        public readonly static DateTime CreatedAfterDefault = DateTime.MinValue;
+        public readonly static DateTime CreatedBeforeDefault = DateTime.MaxValue.AddDays(-1); // subtract one to avoid overflow/timezone error
+
+
         public DurableManager(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
