@@ -163,7 +163,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new string[]
                 {
-                    "Purged orchestration history for all instances created between '1/1/0001 12:00:00 AM' and '12/30/9999 11:59:59 PM'"
+                    $"Purged orchestration history for all instances created between '{DateTime.MinValue}' and '{DateTime.MaxValue.AddDays(-1)}'"
                 },
                 CommandTimeout = TimeSpan.FromSeconds(45)
             },
