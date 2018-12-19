@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Actions.DurableActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Newtonsoft.Json;
@@ -163,7 +164,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new string[]
                 {
-                    $"Purged orchestration history for all instances created between '{DateTime.MinValue}' and '{DateTime.MaxValue.AddDays(-1)}'"
+                    $"Purged orchestration history for all instances created between '{DurablePurgeHistory.CreatedAfterDefault}' and '{DurablePurgeHistory.CreatedBeforeDefault}'"
                 },
                 CommandTimeout = TimeSpan.FromSeconds(45)
             },
