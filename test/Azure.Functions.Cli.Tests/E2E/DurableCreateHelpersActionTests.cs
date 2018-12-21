@@ -84,6 +84,63 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
+        [SkippableFact]
+        public async Task types_test()
+        {
+            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
+                reason: _storageReason);
+
+            string taskHubName = "basicTest";
+
+            var workingDirPath = Path.Combine(WorkingDirBasePath, "TypesTest");
+
+            DurableHelper.SetTaskHubName(workingDirPath, taskHubName);
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
+
+            DeleteFileIfExists(Path.Combine(workingDirPath, DurableCreateHelpersAction.GeneratedFileName));
+
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new string[]
+                {
+                    "settings decrypt",
+                    "settings add FUNCTIONS_WORKER_RUNTIME dotnet",
+                    "durable create-helpers",
+                    "start --build --port 7073"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(15));
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        var statusUri = await StartNewOrchestrationAsync(client, "/api/Function1_HttpStart");
+                        dynamic result = await WaitForCompletionAsync(
+                            client,
+                            statusUri,
+                            pollInterval: TimeSpan.FromSeconds(5),
+                            completionTimeout: TimeSpan.FromSeconds(30));
+
+                        p.Kill();
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+
+                        Assert.NotNull(result);
+                        var runtimeStatus = (string)result.runtimeStatus;
+                        runtimeStatus.Should().Be("Completed", because: "the orchestration should complete successfully");
+
+                        var output = (int)result.output;
+                        output.Should().Be(0);
+                    }
+                },
+            }
+            , _output
+            , workingDir: workingDirPath
+            );
+
+            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
+        }
+
+
         private void DeleteFileIfExists(string path)
         {
             if (File.Exists(path))
