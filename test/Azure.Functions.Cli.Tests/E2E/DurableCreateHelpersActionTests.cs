@@ -31,68 +31,55 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async Task basic_call_activity_test()
         {
-            Skip.If(string.IsNullOrEmpty(StorageConnectionString),
-                reason: _storageReason);
-
-            string taskHubName = "basicTest";
-
-            var workingDirPath = Path.Combine(WorkingDirBasePath, "BasicCallActivityTest");
-
-            DurableHelper.SetTaskHubName(workingDirPath, taskHubName);
-            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
-
-            DeleteFileIfExists(Path.Combine(workingDirPath, DurableCreateHelpersAction.GeneratedFileName));
-
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new string[]
+            await RunResourceTest(
+                taskHubName: "basicTest",
+                testFolderName: "BasicCallActivityTest",
+                resultVerifier: result =>
                 {
-                    "settings decrypt",
-                    "settings add FUNCTIONS_WORKER_RUNTIME dotnet",
-                    "durable create-helpers",
-                    "start --build --port 7073"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(15));
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        var statusUri = await StartNewOrchestrationAsync(client, "/api/Function1_HttpStart");
-                        dynamic result = await WaitForCompletionAsync(
-                            client,
-                            statusUri,
-                            pollInterval: TimeSpan.FromSeconds(5),
-                            completionTimeout: TimeSpan.FromSeconds(30));
+                    Assert.NotNull(result);
+                    var runtimeStatus = (string)result.runtimeStatus;
+                    runtimeStatus.Should().Be("Completed", because: "the orchestration should complete successfully");
 
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-
-                        Assert.NotNull(result);
-                        var runtimeStatus = (string)result.runtimeStatus;
-                        runtimeStatus.Should().Be("Completed", because: "the orchestration should complete successfully");
-
-                        var output = ((JArray)result.output).ToObject<string[]>();
-                        output.Should().BeEquivalentTo("Hello Tokyo!", "Hello Seattle!", "Hello London!");
-                    }
-                },
-            }
-            , _output
-            , workingDir: workingDirPath
-            );
-
-            Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
+                    var output = ((JArray)result.output).ToObject<string[]>();
+                    output.Should().BeEquivalentTo("Hello Tokyo!", "Hello Seattle!", "Hello London!");
+                });
         }
 
         [SkippableFact]
         public async Task types_test()
         {
+            await RunResourceTest(
+                taskHubName: "typesTest",
+                testFolderName: "TypesTest",
+                resultVerifier: result =>
+                {
+                    Assert.NotNull(result);
+                    var output = (int)result.output;
+                    output.Should().Be(0);
+                });
+        }
+
+        [SkippableFact]
+        public async Task attribute_matching_test()
+        {
+            await RunResourceTest(
+                taskHubName: "attributeTest",
+                testFolderName: "AttributeMatchingTest",
+                resultVerifier: result =>
+                {
+                    Assert.NotNull(result);
+                    var output = (int)result.output;
+                    output.Should().Be(0);
+                });
+        }
+
+        private async Task RunResourceTest(string taskHubName, string testFolderName, Action<dynamic> resultVerifier)
+        {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
                 reason: _storageReason);
 
-            string taskHubName = "basicTest";
 
-            var workingDirPath = Path.Combine(WorkingDirBasePath, "TypesTest");
+            var workingDirPath = Path.Combine(WorkingDirBasePath, testFolderName);
 
             DurableHelper.SetTaskHubName(workingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
@@ -124,12 +111,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                         await Task.Delay(TimeSpan.FromSeconds(2));
 
-                        Assert.NotNull(result);
-                        var runtimeStatus = (string)result.runtimeStatus;
-                        runtimeStatus.Should().Be("Completed", because: "the orchestration should complete successfully");
 
-                        var output = (int)result.output;
-                        output.Should().Be(0);
+                        resultVerifier(result);
                     }
                 },
             }
@@ -139,6 +122,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
+
 
 
         private void DeleteFileIfExists(string path)
