@@ -73,7 +73,24 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
         }
 
-        private async Task RunResourceTest(string taskHubName, string testFolderName, Action<dynamic> resultVerifier)
+        [SkippableFact]
+        public async Task namespaces_test()
+        {
+            await RunResourceTest(
+                taskHubName: "namespaceTest",
+                testFolderName: "NamespacesTest",
+                resultVerifier: result =>
+                {
+                    Assert.NotNull(result);
+                    var output = (int)result.output;
+                    output.Should().Be(0);
+                });
+        }
+
+        private async Task RunResourceTest(
+                string taskHubName, 
+                string testFolderName, 
+                Action<dynamic> resultVerifier)
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
                 reason: _storageReason);

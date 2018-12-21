@@ -11,6 +11,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.CSharp;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using System.Collections.Immutable;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
@@ -37,30 +38,16 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                 }
                 return nameSyntax;
             }
-            UsingDirectiveSyntax NamespaceToUsingDirectiveSyntax(string @namespace)
-            {
-                return UsingDirective(buildNameSyntax(@namespace));
-            }
             var activityMethodsByNamespace = activityMethods.GroupBy(m => m.ContainingNamespace);
 
             var generatedMethodsByNamespace = activityMethodsByNamespace.Select(
                 group =>
                     {
-                        var usingNamespaces = new HashSet<string>
-                        {
-                            "Microsoft.Azure.WebJobs",
-                            "System",
-                            "System.Collections.Generic",
-                            "System.Text",
-                            "System.Threading.Tasks"
-                        };
                         var generatedMethods = group
-                                                .SelectMany(m => (MemberDeclarationSyntax[])GenerateMethodForActivity(m, usingNamespaces))
-                                                .ToList(); // Force enumeration so that the usings are generated
+                                                .SelectMany(m => (MemberDeclarationSyntax[])GenerateMethodForActivity(m)); 
                         return new
                         {
                             Namespace = group.Key,
-                            UsingNamespaces = usingNamespaces,
                             GeneratedMethods = generatedMethods
                         };
                     })
@@ -69,17 +56,9 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
             var namespacesWithGeneratedMethods = generatedMethodsByNamespace.Select(groupOfMethods =>
             {
-                // TODO - Revisit the approach to type qualification.
-                // If two usings in separate files would bring in a type with the same name then this approach 
-                // of sharing a single set of usings would result in ambiguity about which type was referred to.
-                // The original intent was to generate code that felt close to the original code (hence preserving whether types were qualified or not)
-                var usingDirectives = groupOfMethods.UsingNamespaces
-                                    .Select(NamespaceToUsingDirectiveSyntax)
-                                    .ToList();
                 return NamespaceDeclaration(
                     buildNameSyntax(groupOfMethods.Namespace.ToString())
                 )
-                .WithUsings(List(usingDirectives))
                 .WithMembers(
                     SingletonList<MemberDeclarationSyntax>(
                         ClassDeclaration("DurableFunctionGeneratedExtensions")
@@ -98,6 +77,75 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             });
 
             return CompilationUnit()
+                    .WithUsings(
+                        List(
+                            new UsingDirectiveSyntax[] {
+                                UsingDirective(
+                                    QualifiedName(
+                                        QualifiedName(
+                                            IdentifierName("System"), 
+                                            IdentifierName("Collections")
+                                        ), 
+                                        IdentifierName("Generic")
+                                    )
+                                ),
+                                UsingDirective(
+                                    QualifiedName(
+                                        QualifiedName(
+                                            IdentifierName("System"), 
+                                            IdentifierName("Net")
+                                        ), 
+                                        IdentifierName("Http")
+                                    )
+                                ),
+                                UsingDirective(
+                                    QualifiedName(
+                                        QualifiedName(
+                                            IdentifierName("System"), 
+                                            IdentifierName("Threading")
+                                        ), 
+                                        IdentifierName("Tasks")
+                                    )
+                                ),
+                                UsingDirective(
+                                    QualifiedName(
+                                        QualifiedName(
+                                            IdentifierName("Microsoft"), 
+                                            IdentifierName("Azure")
+                                        ), 
+                                        IdentifierName("WebJobs")
+                                    )
+                                ),
+                                UsingDirective(
+                                    QualifiedName(
+                                        QualifiedName(
+                                            QualifiedName(
+                                                QualifiedName(
+                                                    IdentifierName("Microsoft"), 
+                                                    IdentifierName("Azure")
+                                                ), 
+                                                IdentifierName("WebJobs")
+                                            ), 
+                                            IdentifierName("Extensions")
+                                        ), 
+                                        IdentifierName("Http")
+                                    )
+                                ),
+                                UsingDirective(
+                                    QualifiedName(
+                                        QualifiedName(
+                                            QualifiedName(
+                                                IdentifierName("Microsoft"), 
+                                                IdentifierName("Azure")
+                                            ), 
+                                            IdentifierName("WebJobs")
+                                        ), 
+                                        IdentifierName("Host")
+                                    )
+                                )
+                            }
+                        )
+                    )
                     .WithMembers(
                         List(
                             namespacesWithGeneratedMethods
@@ -197,14 +245,10 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                         )
                     );
         }
-        private static MethodDeclarationSyntax[] GenerateMethodForActivity(IMethodSymbol method, HashSet<string> namespaces)
+        private static MethodDeclarationSyntax[] GenerateMethodForActivity(IMethodSymbol method)
         {
-            AddNamespacesForMethodTypes(method, namespaces);
-
-            var methodDeclaration = (MethodDeclarationSyntax)method.DeclaringSyntaxReferences[0].GetSyntax(); // TODO - What is the cost of this?
-
             // Ensure return type is Task/Task<T>
-            var returnType = GetAsyncTypeFromType(methodDeclaration.ReturnType);
+            var returnType = GetAsyncTypeFromType(method.ReturnType);
             var methodName = EnsureMethodNameEndsInAsync(method);
             var methodNameWithRetry = methodName
                                         .Substring(0, methodName.Length - 5) // strip Async
@@ -232,8 +276,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                                                     IdentifierName("DurableFunctionActivityHelpers")
                                                 ),
                                             Token(SyntaxKind.CommaToken),
-                                            Parameter(activityParameter.Identifier)
-                                                .WithType(activityParameter.Type)
+                                            activityParameter
                                     }
                                 )
                             )
@@ -292,8 +335,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                                             Parameter(Identifier("retryOptions"))
                                                 .WithType(IdentifierName("RetryOptions")),
                                             Token(SyntaxKind.CommaToken),
-                                            Parameter(activityParameter.Identifier)
-                                                .WithType(activityParameter.Type)
+                                            activityParameter
                                     }
                                 )
                             )
@@ -386,30 +428,6 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         }
 
         /// <summary>
-        /// Add namespaces used in the specified method to the HashSet
-        /// </summary>
-        /// <param name="method"></param>
-        /// <param name="namespaces"></param>
-        private static void AddNamespacesForMethodTypes(IMethodSymbol method, HashSet<string> namespaces)
-        {
-            void AddNamespacesForType(ITypeSymbol typeSymbol)
-            {
-                if (!typeSymbol.ContainingNamespace.IsGlobalNamespace)
-                {
-                    namespaces.Add(typeSymbol.ContainingNamespace.ToString());
-                }
-                if (typeSymbol is INamedTypeSymbol nts)
-                    foreach (var typeArgument in nts.TypeArguments)
-                        AddNamespacesForType(typeArgument);
-            }
-            AddNamespacesForType(method.ReturnType);
-            foreach (var parameter in method.Parameters)
-                AddNamespacesForType(parameter.Type);
-            foreach (var typeArgument in method.TypeArguments)
-                AddNamespacesForType(typeArgument);
-        }
-
-        /// <summary>
         /// Get the FunctionName for the method based on the FunctionNameAttribute
         /// </summary>
         /// <param name="method"></param>
@@ -430,16 +448,16 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         private static ParameterSyntax GetActivityTriggerParameter(IMethodSymbol method)
         {
             var parameter = method.Parameters.First(ParameterIsActivityTrigger);
-            var syntax = (ParameterSyntax)parameter.DeclaringSyntaxReferences[0].GetSyntax();
-            return syntax;
+            return Parameter(Identifier(parameter.Name))
+                        .WithType(GetQualifiedName(parameter.Type));
         }
 
         /// <summary>
-        /// Get an async type (e.g. Task or Task&lt;T&gt;) from the specified TypeSyntax
+        ///  Get an async type (e.g. Task or Task&lt;T&gt;) from the specified ITypeSymbol
         /// </summary>
-        /// <param name="typeSyntax"></param>
+        /// <param name="typeSymbol"></param>
         /// <returns></returns>
-        private static TypeSyntax GetAsyncTypeFromType(TypeSyntax typeSyntax)
+        private static TypeSyntax GetAsyncTypeFromType(ITypeSymbol typeSymbol)
         {
             // The goal of this method is to return a type that represents an async method
             // E.g.s
@@ -447,69 +465,106 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             //     void      => Task
             //     Task      => Task
             //     Task<int> => Task<int>
-            var result = typeSyntax;
-
-            // common function to handle returnTypeSyntax directly and as part of a QualifiedNameSyntax
-            TypeSyntax HandleSimpleNameSyntax(SimpleNameSyntax sns)
+            if (IsTask(typeSymbol))
             {
-                var snsResult = typeSyntax;
-                if (sns is IdentifierNameSyntax ins)
-                {
-                    if (ins.Identifier.ValueText == "Task")
-                    {
-                        // nothing to do - already Task
-                    }
-                    else
-                    {
-                        // Convert T to Task<T>
-                        snsResult = GenericName(
-                                           Identifier("Task"))
-                                               .WithTypeArgumentList(
-                                                   TypeArgumentList(SingletonSeparatedList(typeSyntax))); // use returnTpeSyntax to keep name qualification
-                    }
-                }
-                else if (sns is GenericNameSyntax gns)
-                {
-                    if (gns.Identifier.ValueText == "Task")
-                    {
-                        // nothing to do
-                    }
-                    else
-                    {
-                        snsResult = GenericName(
-                                           Identifier("Task"))
-                                               .WithTypeArgumentList(
-                                                   TypeArgumentList(SingletonSeparatedList(typeSyntax))); // use returnTpeSyntax to keep name qualification
-                    }
-                }
-                return snsResult;
+                // Already task - retain as is
+                return GetQualifiedName(typeSymbol);
             }
-
-            if (typeSyntax is PredefinedTypeSyntax pts)
+            else
             {
-                if (pts.Keyword.ValueText == "void")
+                if (typeSymbol.SpecialType == SpecialType.System_Void)
                 {
-                    // convert void to Task
-                    result = IdentifierName("Task");
+                    return QualifiedName(
+                                QualifiedName(
+                                    QualifiedName(
+                                        IdentifierName("System"),
+                                        IdentifierName("Threading")
+                                    ),
+                                    IdentifierName("Tasks")
+                                ),
+                                IdentifierName("Task")
+                            );
                 }
                 else
                 {
-                    // convert T to Task<T>
-                    result = GenericName(
-                                        Identifier("Task"))
-                                            .WithTypeArgumentList(
-                                                TypeArgumentList(SingletonSeparatedList(typeSyntax)));
+                    return QualifiedName(
+                                QualifiedName(
+                                    QualifiedName(
+                                        IdentifierName("System"),
+                                        IdentifierName("Threading")
+                                    ),
+                                    IdentifierName("Tasks")
+                                ), GenericName(Identifier("Task"))
+                                        .WithTypeArgumentList(
+                                            TypeArgumentList(
+                                                SingletonSeparatedList<TypeSyntax>(GetQualifiedName(typeSymbol))
+                                            )
+                                        )
+                    );
+                }
+
+            }
+        }
+
+        private static bool IsTask(ITypeSymbol typeSymbol)
+        {
+            if (typeSymbol.Name == "Task"
+                && typeSymbol.ContainingNamespace?.Name == "Tasks"
+                && typeSymbol.ContainingNamespace?.ContainingNamespace?.Name == "Threading"
+                && typeSymbol.ContainingNamespace?.ContainingNamespace?.ContainingNamespace?.Name == "System"
+                )
+            {
+                return true;
+            }
+            return false;
+        }
+        private static NameSyntax GetQualifiedName(ISymbol symbol)
+        {
+            SimpleNameSyntax getIdentiferWithGenericArgsIfApplicable(ISymbol s)
+            {
+                INamedTypeSymbol namedTypeSymbol = symbol as INamedTypeSymbol;
+                if (namedTypeSymbol != null && namedTypeSymbol.IsGenericType)
+                {
+                    return GenericName(Identifier(s.Name))
+                                .WithTypeArgumentList(GetTypeArgumentList(namedTypeSymbol.TypeArguments));
+                }
+                else
+                {
+                    return IdentifierName(s.Name);
                 }
             }
-            else if (typeSyntax is SimpleNameSyntax sns)
+
+            if (symbol.ContainingSymbol != null)
             {
-                result = HandleSimpleNameSyntax(sns);
+                var namespaceSymbol = symbol.ContainingSymbol as INamespaceSymbol;
+                if (namespaceSymbol == null
+                    || !namespaceSymbol.IsGlobalNamespace)
+                {
+                    return QualifiedName(
+                                GetQualifiedName(symbol.ContainingSymbol),
+                                getIdentiferWithGenericArgsIfApplicable(symbol)
+                            );
+                }
             }
-            else if (typeSyntax is QualifiedNameSyntax qns)
+            return getIdentiferWithGenericArgsIfApplicable(symbol);
+        }
+
+        private static TypeArgumentListSyntax GetTypeArgumentList(ImmutableArray<ITypeSymbol> typeArguments)
+        {
+            var list = new List<SyntaxNodeOrToken>();
+            bool addSeparator = false;
+            foreach (var typeArgument in typeArguments)
             {
-                result = HandleSimpleNameSyntax(qns.Right);
+                if (addSeparator)
+                {
+                    list.Add(Token(SyntaxKind.CommaToken));
+                }
+                list.Add(GetQualifiedName(typeArgument));
+                addSeparator = true;
             }
-            return result;
+            return TypeArgumentList(
+                        SeparatedList<TypeSyntax>(list)
+                    );
         }
     }
 }

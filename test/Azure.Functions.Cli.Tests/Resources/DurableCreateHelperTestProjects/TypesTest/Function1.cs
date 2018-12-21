@@ -116,20 +116,12 @@ namespace TypesTest
             return starter.CreateCheckStatusResponse(req, instanceId);
         }
 
-        // TODO - add a test for a type inside a class
-        //        Currently this fails if the type isn't qualified with the class name 
-        //        which is valid inside the class but not in the extension methods
-        //public class SomeType
-        //{
-        //    public int Property { get; set; }
-        //}
+        public class SomeType
+        {
+           public int Property { get; set; }
+        }
 
     }
-    public class SomeType
-    {
-        public int Property { get; set; }
-    }
-
     namespace Nested
     {
         // TODO - add a test for a two classes with the same name in different namespaces
