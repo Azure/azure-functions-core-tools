@@ -170,7 +170,7 @@ func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or
 Using the configuration options an Azure Function app can also be deployed to a [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/) (Azure Kubernetes Service) Kubernetes cluster and use [ACR](https://azure.microsoft.com/en-us/services/container-registry/) as the registry server. Do all of the following *before* you run the deployment command.
 
 #### Create a AKS cluster
-You can create an AKS cluster using the [Azure Portal](https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough-portal) or using [Azure CLI]https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough.
+You can create an AKS cluster using the [Azure Portal](https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough-portal) or using [Azure CLI](https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough).
 
 Once your AKS cluster is created make sure that you can access it using kubectl. To make kubectl run in the context of your cluster, configure a connection using the command below.
 ```azurecli
