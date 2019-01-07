@@ -154,6 +154,9 @@ func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --min 3 --max 10
 ```
 
+#### Scaling out Http Trigger
+Currently the solution is configured to scale out using the Horizontal Pod Autoscaler when any pod reaches a CPU of 60%.
+
 ### Get function logs
 
 ```
