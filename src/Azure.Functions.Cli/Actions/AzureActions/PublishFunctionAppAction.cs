@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
@@ -393,8 +394,21 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
+        private static string CalculateMd5(Stream stream)
+        {
+            using (var md5 = MD5.Create())
+            {
+                var hash = md5.ComputeHash(stream);
+                var base64String = Convert.ToBase64String(hash);
+                stream.Position = 0;
+                return base64String;
+            }
+        }
+
         private async Task<string> UploadZipToStorage(Stream zip, IDictionary<string, string> appSettings)
         {
+            var zipMD5 = CalculateMd5(zip);
+
             const string containerName = "function-releases";
             const string blobNameFormat = "{0}-{1}.zip";
 
@@ -414,6 +428,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     new OperationContext(),
                     progress,
                     new CancellationToken());
+            }
+
+            var cloudMd5 = blob.Properties.ContentMD5;
+
+            if (!cloudMd5.Equals(zipMD5))
+            {
+                throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
             }
 
             var sasConstraints = new SharedAccessBlobPolicy();
