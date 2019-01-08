@@ -5,7 +5,6 @@
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>azurefunc</ToolCommandName>
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
     <MajorMinorProductVersion>2.3</MajorMinorProductVersion>
     <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
