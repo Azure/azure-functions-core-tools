@@ -407,44 +407,49 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task<string> UploadZipToStorage(Stream zip, IDictionary<string, string> appSettings)
         {
-            var zipMD5 = CalculateMd5(zip);
-
-            const string containerName = "function-releases";
-            const string blobNameFormat = "{0}-{1}.zip";
-
-            var storageConnection = appSettings["AzureWebJobsStorage"];
-            var storageAccount = CloudStorageAccount.Parse(storageConnection);
-            var blobClient = storageAccount.CreateCloudBlobClient();
-            var blobContainer = blobClient.GetContainerReference(containerName);
-            await blobContainer.CreateIfNotExistsAsync();
-
-            var releaseName = Guid.NewGuid().ToString();
-            var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
-            using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(zip.Length)}", zip.Length))
+            return await RetryHelper.Retry(async () =>
             {
-                await blob.UploadFromStreamAsync(zip,
-                    AccessCondition.GenerateEmptyCondition(),
-                    new BlobRequestOptions(),
-                    new OperationContext(),
-                    progress,
-                    new CancellationToken());
-            }
+                // Setting position to zero, in case we retry, we want to reset the stream
+                zip.Position = 0;
+                var zipMD5 = CalculateMd5(zip);
 
-            var cloudMd5 = blob.Properties.ContentMD5;
+                const string containerName = "function-releases";
+                const string blobNameFormat = "{0}-{1}.zip";
 
-            if (!cloudMd5.Equals(zipMD5))
-            {
-                throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
-            }
+                var storageConnection = appSettings["AzureWebJobsStorage"];
+                var storageAccount = CloudStorageAccount.Parse(storageConnection);
+                var blobClient = storageAccount.CreateCloudBlobClient();
+                var blobContainer = blobClient.GetContainerReference(containerName);
+                await blobContainer.CreateIfNotExistsAsync();
 
-            var sasConstraints = new SharedAccessBlobPolicy();
-            sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
-            sasConstraints.SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddYears(10);
-            sasConstraints.Permissions = SharedAccessBlobPermissions.Read;
+                var releaseName = Guid.NewGuid().ToString();
+                var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
+                using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(zip.Length)}", zip.Length))
+                {
+                    await blob.UploadFromStreamAsync(zip,
+                        AccessCondition.GenerateEmptyCondition(),
+                        new BlobRequestOptions(),
+                        new OperationContext(),
+                        progress,
+                        new CancellationToken());
+                }
 
-            var blobToken = blob.GetSharedAccessSignature(sasConstraints);
+                var cloudMd5 = blob.Properties.ContentMD5;
 
-            return blob.Uri + blobToken;
+                if (!cloudMd5.Equals(zipMD5))
+                {
+                    throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
+                }
+
+                var sasConstraints = new SharedAccessBlobPolicy();
+                sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
+                sasConstraints.SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddYears(10);
+                sasConstraints.Permissions = SharedAccessBlobPermissions.Read;
+
+                var blobToken = blob.GetSharedAccessSignature(sasConstraints);
+
+                return blob.Uri + blobToken;
+            }, 3, TimeSpan.FromSeconds(1), displayError: true);
         }
 
         private static void InternalListIgnoredFiles(GitIgnoreParser ignoreParser)
