@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string FolderName { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
 
-        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes" };
+        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes", "knative" };
         private readonly ITemplatesManager _templatesManager;
 
         public DeployAction(ITemplatesManager templatesManager)
@@ -92,7 +92,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (!CommandChecker.CommandExists("kubectl"))
             {
-                ColoredConsole.Error.WriteLine(ErrorColor($"kubectl is required for deploying to kubernetes. Please make sure to install kubectl and try again."));
+                ColoredConsole.Error.WriteLine(ErrorColor($"kubectl is required for deploying to kubernetes and knative. Please make sure to install kubectl and try again."));
                 return;
             }
 
@@ -110,7 +110,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await DockerHelpers.DockerBuild(image, Environment.CurrentDirectory);
 
             ColoredConsole.WriteLine("Pushing function image to registry...");
-            await DockerHelpers.DockerPush(image);
+           // await DockerHelpers.DockerPush(image);
 
             var platform = PlatformFactory.CreatePlatform(Platform, ConfigPath);
 

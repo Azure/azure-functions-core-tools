@@ -168,6 +168,18 @@ func logs --name myfunction --platform kubernetes
 ```bash
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --config /mypath/config
 ```
+### Deploy a function to Knative
+
+#### Prerequisites
+
+* [Knative](https://github.com/knative/docs/tree/master/install/)
+
+Deploying Azure Functions to knative is supported with the ```--platform knative``` flag.
+The Core Tools CLI identifies non HTTP trigger functions and annotates the knative manifest with the the ```minScale``` annotation to opt out of scale-to-zero.
+
+```bash
+func deploy --platform knative --name myfunction --registry <docker-hub-id or registry-server>
+```
 
 ### Deploying a function to AKS using ACR
 Using the configuration options an Azure Function app can also be deployed to a [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/) (Azure Kubernetes Service) Kubernetes cluster and use [ACR](https://azure.microsoft.com/en-us/services/container-registry/) as the registry server. Do all of the following *before* you run the deployment command.
