@@ -12,6 +12,8 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             {
                 case "kubernetes":
                     return new KubernetesPlatform(configFile);
+                case "knative":
+                    return new KnativePlatform(configFile);
                 default:
                     return null;
             }
