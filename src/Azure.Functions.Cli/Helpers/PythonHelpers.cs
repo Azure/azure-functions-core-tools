@@ -245,7 +245,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static string CopyToTemp(IEnumerable<string> files, string rootPath)
         {
-            var tmp = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", string.Empty));
+            var tmp = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             FileSystemHelpers.EnsureDirectory(tmp);
 
             foreach (var file in files)
