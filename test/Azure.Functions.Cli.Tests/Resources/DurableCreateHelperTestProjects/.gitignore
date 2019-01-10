@@ -1,1 +1,4 @@
+# ignore generated files
 **/DurableFunctionsHelpers.generated.cs
+# ignore settings files as they are generated at test time
+**/local.settings.json
