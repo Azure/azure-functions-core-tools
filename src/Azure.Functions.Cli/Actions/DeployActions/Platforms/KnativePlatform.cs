@@ -92,7 +92,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         {
             var str = File.ReadAllText(string.Format("{0}/function.json", functionName));
             var jObj = JsonConvert.DeserializeObject<FunctionJson>(str);
-            return jObj.bindings.Any(d=> d.type == "http");
+            return jObj.bindings.Any(d=> d.type == "httpTrigger");
         }
 
         private KnativeService GetKnativeService(string name, string image, string nameSpace, int min, int max, bool isHTTP)
