@@ -83,7 +83,8 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             ColoredConsole.WriteLine("Plese note: it may take a few minutes for the knative service to be reachable");
         }
 
-        private string GetFunctionHost(string functionName, string nameSpace) {
+        private string GetFunctionHost(string functionName, string nameSpace) 
+        {
             return string.Format("{0}.{1}.example.com", functionName, nameSpace);
         }
 
@@ -115,11 +116,13 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations = new Dictionary<string, string>();
 
             // opt out of knative scale-to-zero for non-http triggers
-            if (!isHTTP) {
+            if (!isHTTP) 
+            {
                 knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations.Add("autoscaling.knative.dev/minScale", min.ToString());
             }
 
-            if (max > 0) {
+            if (max > 0) 
+            {
                 knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations.Add("autoscaling.knative.dev/maxScale", max.ToString());
             }
 
