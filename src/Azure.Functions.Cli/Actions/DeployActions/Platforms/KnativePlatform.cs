@@ -74,8 +74,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
             var host = GetFunctionHost(name, nameSpace);
 
-            ColoredConsole.WriteLine("");
-
+            ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Function deployed successfully!");
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine($"Function URL: http://{externalIP}");
