@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine($"Function URL: http://{externalIP}");
             ColoredConsole.WriteLine($"Function Host: {host}");
-            ColoredConsole.WriteLine("");
+            ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Plese note: it may take a few minutes for the knative service to be reachable");
         }
 
