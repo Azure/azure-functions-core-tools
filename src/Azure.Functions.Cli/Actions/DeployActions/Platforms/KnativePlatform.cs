@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             File.Delete("deployment.json");
 
             var externalIP = await GetIstioClusterIngressIP();
-            if (externalIP == "")
+            if (string.IsNullOrEmpty(externalIP))
             {
                 ColoredConsole.WriteLine("Couldn't find Istio Cluster Ingress External IP");
                 return;
