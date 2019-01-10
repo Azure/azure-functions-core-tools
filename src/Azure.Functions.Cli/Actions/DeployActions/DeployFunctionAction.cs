@@ -110,7 +110,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await DockerHelpers.DockerBuild(image, Environment.CurrentDirectory);
 
             ColoredConsole.WriteLine("Pushing function image to registry...");
-           // await DockerHelpers.DockerPush(image);
+            await DockerHelpers.DockerPush(image);
 
             var platform = PlatformFactory.CreatePlatform(Platform, ConfigPath);
 
