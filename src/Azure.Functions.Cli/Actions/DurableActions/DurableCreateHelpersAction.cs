@@ -41,7 +41,8 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             if (workerRuntime != WorkerRuntime.dotnet)
             {
                 ColoredConsole.WriteLine(ErrorColor($"create-durable-helpers does not support runtime: {workerRuntime}"));
-                return;
+
+                Environment.Exit(ExitCodes.GeneralError);
             }
 
             var csproj = DotnetHelpers.GetCsproj();
