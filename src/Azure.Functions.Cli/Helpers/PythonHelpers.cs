@@ -185,7 +185,15 @@ namespace Azure.Functions.Cli.Helpers
 
             if (exitCode != 0)
             {
-                throw new CliException("There was an error restoring dependencies." + sbErrors.ToString());
+                var errorMessage = "There was an error restoring dependencies." + sbErrors.ToString();
+                // If --build-native-deps if required, we exit with this specific code to notify other toolings
+                // If this exit code changes, partner tools must be updated
+                if (exitCode == ExitCodes.BuildNativeDepsRequired)
+                {
+                    ColoredConsole.WriteLine(ErrorColor(errorMessage));
+                    Environment.Exit(ExitCodes.BuildNativeDepsRequired);
+                }
+                throw new CliException(errorMessage);
             }
 
             return packagesLocation;
