@@ -44,6 +44,7 @@ namespace Azure.Functions.Cli.Common
             public const string NoRunningInstances = "No running instances";
             public const string PidAndAllAreMutuallyExclusive = "-p/--processId and -a/--all are mutually exclusive";
             public const string EitherPidOrAllMustBeSpecified = "Must specify either -a/--all or -p/--processId <Pid>";
+            public const string ExtensionsNeedDotnet = "Extensions command requires dotnet on your path. Please make sure to install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download";
         }
 
         public static class ArmConstants

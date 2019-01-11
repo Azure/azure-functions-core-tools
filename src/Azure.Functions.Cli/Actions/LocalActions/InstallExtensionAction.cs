@@ -113,7 +113,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                ColoredConsole.Error.WriteLine(ErrorColor("Extensions command require dotnet on your path. Please make sure to install dotnet for your system from https://www.microsoft.com/net/download"));
+                ColoredConsole.Error.WriteLine(ErrorColor(Constants.Errors.ExtensionsNeedDotnet));
             }
         }
 
