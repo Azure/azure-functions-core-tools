@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     abstract class BaseAzureAction : BaseAction, IInitializableAction
     {
         // Az is the Azure PowerShell module that works in both PowerShell Core and Windows PowerShell
-        private const string _azProfileModuleName = "Az.Profile";
+        private const string _azProfileModuleName = "Az.Accounts";
 
         // AzureRm is the Azure PowerShell module that only works on Windows PowerShell
         private const string _azureRmProfileModuleName = "AzureRM.Profile";
@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             (bool powershellSucceeded, string psToken) = await TryGetAzPowerShellToken();
             if (powershellSucceeded) return psToken;
             
-            throw new CliException("Unable to connect to Azure. Make sure you have the `az` CLI or Azure PowerShell installed and logged in and try again");
+            throw new CliException($"Unable to connect to Azure. Make sure you have the `az` CLI or `{_azProfileModuleName}` PowerShell installed and logged in and try again");
         }
 
         private async Task<(bool succeeded, string token)> TryGetAzCliToken()
