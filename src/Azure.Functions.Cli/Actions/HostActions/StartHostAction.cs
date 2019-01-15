@@ -181,7 +181,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
-
+            settings.Add("FUNCTIONS_CORETOOLS_ENVIRONMENT", "True");
             return settings;
         }
 
