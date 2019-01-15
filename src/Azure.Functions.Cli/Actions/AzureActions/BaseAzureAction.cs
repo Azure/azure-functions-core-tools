@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             (bool powershellSucceeded, string psToken) = await TryGetAzPowerShellToken();
             if (powershellSucceeded) return psToken;
             
-            throw new CliException($"Unable to connect to Azure. Make sure you have the `az` CLI or `{_azProfileModuleName}` PowerShell installed and logged in and try again");
+            throw new CliException($"Unable to connect to Azure. Make sure you have the `az` CLI or `{_azProfileModuleName}` PowerShell module installed and logged in and try again");
         }
 
         private async Task<(bool succeeded, string token)> TryGetAzCliToken()
