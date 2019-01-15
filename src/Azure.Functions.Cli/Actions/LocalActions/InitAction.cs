@@ -137,6 +137,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 await PythonHelpers.InstallPackage();
             }
+            else if (workerRuntime == Helpers.WorkerRuntime.powershell)
+            {
+                await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
+            }
         }
 
         private async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime)

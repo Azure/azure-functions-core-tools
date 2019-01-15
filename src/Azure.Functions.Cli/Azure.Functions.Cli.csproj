@@ -57,6 +57,9 @@
     <EmbeddedResource Include="StaticResources\python_bundle_script.py.template">
       <LogicalName>$(AssemblyName).python_bundle_script.py</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\profile.ps1.template">
+      <LogicalName>$(AssemblyName).profile.ps1</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\templates.json.template">
       <LogicalName>$(AssemblyName).templates.json</LogicalName>
     </EmbeddedResource>
