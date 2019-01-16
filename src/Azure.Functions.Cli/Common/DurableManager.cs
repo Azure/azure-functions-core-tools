@@ -59,18 +59,26 @@ namespace Azure.Functions.Cli.Common
                 {
                     // Attempt to retrieve Durable override settings from host.json
                     dynamic hostSettings = JObject.Parse(File.ReadAllText(ScriptConstants.HostMetadataFileName));
+                    JObject durableTask = null;
 
                     string version = hostSettings["version"];
                     if (version?.Equals("2.0") == true)
                     {
                         // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
-                        _connectionStringKey = hostSettings?.extensions?.durableTask?.AzureStorageConnectionStringName ?? _connectionStringKey;
-                        _taskHubName = hostSettings?.extensions?.durableTask?.HubName ?? _taskHubName;
+                        durableTask = hostSettings?.extensions?.durableTask;
                     }
                     else
                     {
-                        _connectionStringKey = hostSettings?.durableTask?.AzureStorageConnectionStringName ?? _connectionStringKey;
-                        _taskHubName = hostSettings?.durableTask?.HubName ?? _taskHubName;
+                        durableTask = hostSettings?.durableTask;
+                    }
+
+                    if (durableTask != null)
+                    {
+                        // Override connection string or task hub name if they exist in host.json
+                        _connectionStringKey = durableTask.GetValue("AzureStorageConnectionStringName", StringComparison.OrdinalIgnoreCase)?.ToString()
+                            ?? _connectionStringKey;
+                        _taskHubName = durableTask.GetValue("HubName", StringComparison.OrdinalIgnoreCase)?.ToString()
+                            ?? _taskHubName;
                     }
                 }
                 else
