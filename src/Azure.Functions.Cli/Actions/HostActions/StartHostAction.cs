@@ -125,7 +125,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate)
+        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(workerRuntime, LanguageWorkerSetting));
@@ -138,7 +138,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 defaultBuilder
                 .UseKestrel(options =>
                 {
-                    options.Listen(IPAddress.Loopback, baseAddress.Port, listenOptins =>
+                    options.Listen(IPAddress.Loopback, listenAddress.Port, listenOptins =>
                     {
                         listenOptins.UseHttps(certificate);
                     });
@@ -147,7 +147,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
-                .UseUrls(baseAddress.ToString())
+                .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
                 {
                     configBuilder.AddEnvironmentVariables();
@@ -220,7 +220,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate);
+            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();
 
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
