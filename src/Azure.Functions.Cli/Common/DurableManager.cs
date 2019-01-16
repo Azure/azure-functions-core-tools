@@ -65,12 +65,18 @@ namespace Azure.Functions.Cli.Common
                     {
                         // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
                         _connectionStringKey = hostSettings?.extensions?.durableTask?.AzureStorageConnectionStringName ?? _connectionStringKey;
+
+                        // Allow uppercase or lowercase hub name in host.json
                         _taskHubName = hostSettings?.extensions?.durableTask?.HubName ?? _taskHubName;
+                        _taskHubName = hostSettings?.extensions?.durableTask?.hubName ?? _taskHubName;
                     }
                     else
                     {
                         _connectionStringKey = hostSettings?.durableTask?.AzureStorageConnectionStringName ?? _connectionStringKey;
+
+                        // Allow uppercase or lowercase hub name in host.json
                         _taskHubName = hostSettings?.durableTask?.HubName ?? _taskHubName;
+                        _taskHubName = hostSettings?.durableTask?.hubName ?? _taskHubName;
                     }
                 }
                 else
