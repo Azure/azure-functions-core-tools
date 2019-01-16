@@ -17,23 +17,36 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("node")]
         [InlineData("java")]
+        [InlineData("powershell")]
         public Task init_with_worker_runtime(string workerRuntime)
         {
+            var files = new List<FileResult>
+            {
+                new FileResult
+                {
+                    Name = "local.settings.json",
+                    ContentContains = new []
+                    {
+                        "FUNCTIONS_WORKER_RUNTIME",
+                        workerRuntime
+                    }
+                },
+                
+            };
+            
+            if (workerRuntime == "powershell")
+            {
+                files.Add(new FileResult
+                {
+                    Name = "profile.ps1",
+                    ContentContains = new [] { "# Azure Functions profile.ps1" }
+                });
+            }
+
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] { $"init . --worker-runtime {workerRuntime}" },
-                CheckFiles = new FileResult[]
-                {
-                    new FileResult
-                    {
-                        Name = "local.settings.json",
-                        ContentContains = new []
-                        {
-                            "FUNCTIONS_WORKER_RUNTIME",
-                            workerRuntime
-                        }
-                    }
-                },
+                CheckFiles = files.ToArray(),
                 OutputContains = new[]
                 {
                     "Writing .gitignore",
