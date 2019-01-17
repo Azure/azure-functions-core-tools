@@ -5,6 +5,7 @@ using Microsoft.Azure.WebJobs.Script;
 using System;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Azure.Functions.Cli
 {
@@ -53,7 +54,7 @@ namespace Azure.Functions.Cli
 
         internal static string SanitizeNameSpace(string nameSpace)
         {
-            return SanitizeLiteral(nameSpace, allowed: ".");
+            return SanitizeLiteral(nameSpace, allowed: ".", removeRegex: "\\.[0-9]");
         }
 
         internal static string SanitizeClassName(string className)
@@ -61,27 +62,46 @@ namespace Azure.Functions.Cli
             return SanitizeLiteral(className);
         }
 
-        internal static string SanitizeLiteral(string unsanitized, string allowed = "")
+        internal static string SanitizeLiteral(string unsanitized, string allowed = "", string removeRegex = "")
         {
+            var fillerChar = '_';
+
             if (string.IsNullOrEmpty(unsanitized))
             {
                 return unsanitized;
             }
+
+            // Literals are allowed to start with '_' and '@'
             var sanitized = !char.IsLetter(unsanitized[0]) && !new[] { '_', '@' }.Contains(unsanitized[0])
-                ? new StringBuilder("_" + unsanitized.Substring(0, 1))
+                ? new StringBuilder(fillerChar + unsanitized.Substring(0, 1))
                 : new StringBuilder(unsanitized.Substring(0, 1));
+
             foreach (char character in unsanitized.Substring(1))
             {
                 if (!char.IsLetterOrDigit(character) && !(allowed.Contains(character)))
                 {
-                    sanitized.Append('_');
+                    sanitized.Append(fillerChar);
                 }
                 else
                 {
                     sanitized.Append(character);
                 }
             }
-            return sanitized.ToString();
+
+            var sanitizedString = sanitized.ToString();
+
+            if (!string.IsNullOrEmpty(removeRegex))
+            {
+                Match match = Regex.Match(sanitizedString, removeRegex);
+                string matchString;
+                // Keep removing the matching regex until no more match is found
+                while(!string.IsNullOrEmpty(matchString = match.Value))
+                {
+                    sanitizedString = sanitizedString.Replace(matchString, new string(fillerChar, matchString.Length));
+                    match = Regex.Match(sanitizedString, removeRegex);
+                }
+            }
+            return sanitizedString;
         }
 
         internal static bool EqualsIgnoreCaseAndSpace(string str, string another)
