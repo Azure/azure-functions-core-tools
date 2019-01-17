@@ -34,18 +34,18 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init 12n.ew-file$ --worker-runtime dotnet",
-                    "new --prefix 12n.ew-file$ --template HttpTrigger --name 12@n.other-file$"
+                    "init 12n.e.0w-file$ --worker-runtime dotnet",
+                    "new --prefix 12n.e.0w-file$ --template HttpTrigger --name 12@n.other-file$"
                 },
                 CommandTimeout = new TimeSpan(0, 1, 0),
                 CheckFiles =  new[]
                 {
                     new FileResult
                     {
-                        Name = "12n.ew-file$/_12_n_other_file_.cs",
+                        Name = "12n.e.0w-file$/_12_n_other_file_.cs",
                         ContentContains = new[]
                         {
-                            "namespace _12n.ew_file_",
+                            "namespace _12n.e__w_file_",
                             "public static class _12_n_other_file_"
                         }
                     }
