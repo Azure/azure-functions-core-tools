@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Colors.Net;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -17,6 +18,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public override async Task RunAsync()
         {
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
+
+            if (functionApp.IsLinux && functionApp.IsDynamic)
+            {
+                throw new CliException("Log stream is not currently supported in Linux Consumption Apps. Please use Azure App Insights for logging.");
+            }
             var basicHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{functionApp.PublishingUserName}:{functionApp.PublishingPassword}"));
 
             using (var client = new HttpClient())
