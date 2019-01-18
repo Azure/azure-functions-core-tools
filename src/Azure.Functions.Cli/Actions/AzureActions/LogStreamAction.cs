@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {
-                throw new CliException("Log stream is not currently supported in Linux Consumption Apps. Please use Azure App Insights for logging.");
+                throw new CliException("Log stream is not currently supported in Linux Consumption Apps. Please use Azure Application Insights Live Stream in the Azure portal.");
             }
             var basicHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{functionApp.PublishingUserName}:{functionApp.PublishingPassword}"));
 
