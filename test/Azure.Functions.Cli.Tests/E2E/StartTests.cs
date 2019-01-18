@@ -9,6 +9,8 @@ using Azure.Functions.Cli.Tests.E2E.Helpers;
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
+using System.Net.Sockets;
+using System.Net;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -136,6 +138,33 @@ namespace Azure.Functions.Cli.Tests.E2E
                     }
                 }
             }, _output);
+        }
+
+        [Fact]
+        public async Task start_host_port_in_use()
+        {
+            var tcpListner = new TcpListener(IPAddress.Any, 8081);
+            try
+            {
+                tcpListner.Start();
+
+                await CliTester.Run(new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                    "init . --worker-runtime node",
+                    "new --template \"Http Trigger\" --name HttpTrigger",
+                    "start --port 8081"
+                },
+                    ExpectExit = true,
+                    ExitInError = true,
+                    ErrorContains = new[] { "Port 8081 is unavailable" }
+                }, _output);
+            }
+            finally
+            {
+                tcpListner.Stop();
+            }
         }
     }
 }
