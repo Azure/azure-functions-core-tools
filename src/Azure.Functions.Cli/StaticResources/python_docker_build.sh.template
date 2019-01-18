@@ -12,12 +12,12 @@ python -m venv --copies worker_venv
 worker_venv/bin/pip install -r requirements.txt
 
 # Bundle using pyinstaller
-pip install pyinstaller==3.4
+worker_venv/bin/pip install pyinstaller==3.4
 
 pyinstaller_success=false
 
 # If pyinstaller succeeds, we deactivate and remove the venv
-if python /python_bundle_script.py /azure-functions-host/workers/python/worker.py  ./worker_venv/lib/python3.6/site-packages; then
+if worker_venv/bin/python /python_bundle_script.py /azure-functions-host/workers/python/worker.py; then
 	pyinstaller_success=true
 else
 	if [ -d ./worker-bundle ]; then

@@ -1,6 +1,8 @@
-from PyInstaller.__main__ import run
 import os
 import sys
+
+from PyInstaller.__main__ import run
+from distutils.sysconfig import get_python_lib
 
 
 # Gets the list of all the possible modules from a directory
@@ -39,10 +41,10 @@ def is_python_file(a_file):
     return a_file.endswith('.so') or a_file.endswith('.py') or a_file.endswith('.pyd') or a_file.endswith('.pyo') or a_file.endswith('.pyc')
 
 def __main__():
-    if len(sys.argv) < 3:
-        print("Need more arguments: Usage: python_build_template.py [starter_script] [python_packages_path]")
+    if len(sys.argv) < 2:
+        print("Need more arguments: Usage: python_build_template.py [starter_script]")
         return 
-    packages_location = sys.argv[2]
+    packages_location = get_python_lib()
     all_modules = get_possible_modules(packages_location)
     entry_file = sys.argv[1]
     # Creates a list of hidden imports arguments for pyinstaller in the format - "--hidden-import=<module>"
