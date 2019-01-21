@@ -87,10 +87,26 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
         }
 
+        [SkippableFact]
+        public async Task suborchestrator_test()
+        {
+            await RunResourceTest(
+                taskHubName: "suborchestratorTest",
+                testFolderName: "SubOrchestratorTest",
+                resultVerifier: result =>
+                {
+                    Assert.NotNull(result);
+                    var output = (string)result.output;
+                    output.Should().Be("Hello Test!");
+                },
+                orchestrationStartUri: "/api/Parent_HttpStart");
+        }
+        
         private async Task RunResourceTest(
                 string taskHubName, 
                 string testFolderName, 
-                Action<dynamic> resultVerifier)
+                Action<dynamic> resultVerifier,
+                string orchestrationStartUri = "/api/Function1_HttpStart")
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
                 reason: _storageReason);
@@ -118,7 +134,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     await Task.Delay(TimeSpan.FromSeconds(15));
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        var statusUri = await StartNewOrchestrationAsync(client, "/api/Function1_HttpStart");
+                        var statusUri = await StartNewOrchestrationAsync(client, orchestrationStartUri);
                         dynamic result = await WaitForCompletionAsync(
                             client,
                             statusUri,

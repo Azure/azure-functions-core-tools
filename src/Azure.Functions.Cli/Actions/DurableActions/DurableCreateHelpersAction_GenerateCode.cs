@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
     // Putting this method in a separate file for the inclusion of the SyntaxFactory methods
     internal partial class DurableCreateHelpersAction : BaseAction
     {
-        private static CompilationUnitSyntax GenerateCode(Project project, IEnumerable<IMethodSymbol> activityMethods)
+        private static CompilationUnitSyntax GenerateCode(Project project, IEnumerable<(FunctionType functionType, IMethodSymbol method)> activitiesAndOrchestrators)
         {
             var syntaxGenerator = SyntaxGenerator.GetGenerator(project);
 
@@ -38,13 +38,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                 }
                 return nameSyntax;
             }
-            var activityMethodsByNamespace = activityMethods.GroupBy(m => m.ContainingNamespace);
+            var activitiesAndOrchestratorsByNamespace = activitiesAndOrchestrators.GroupBy(m => m.method.ContainingNamespace);
 
-            var generatedMethodsByNamespace = activityMethodsByNamespace.Select(
+            var generatedMethodsByNamespace = activitiesAndOrchestratorsByNamespace.Select(
                 group =>
                     {
                         var generatedMethods = group
-                                                .SelectMany(m => (MemberDeclarationSyntax[])GenerateMethodForActivity(m)); 
+                                                .SelectMany(m => (MemberDeclarationSyntax[])GenerateMethod(m));
                         return new
                         {
                             Namespace = group.Key,
@@ -83,36 +83,36 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                                 UsingDirective(
                                     QualifiedName(
                                         QualifiedName(
-                                            IdentifierName("System"), 
+                                            IdentifierName("System"),
                                             IdentifierName("Collections")
-                                        ), 
+                                        ),
                                         IdentifierName("Generic")
                                     )
                                 ),
                                 UsingDirective(
                                     QualifiedName(
                                         QualifiedName(
-                                            IdentifierName("System"), 
+                                            IdentifierName("System"),
                                             IdentifierName("Net")
-                                        ), 
+                                        ),
                                         IdentifierName("Http")
                                     )
                                 ),
                                 UsingDirective(
                                     QualifiedName(
                                         QualifiedName(
-                                            IdentifierName("System"), 
+                                            IdentifierName("System"),
                                             IdentifierName("Threading")
-                                        ), 
+                                        ),
                                         IdentifierName("Tasks")
                                     )
                                 ),
                                 UsingDirective(
                                     QualifiedName(
                                         QualifiedName(
-                                            IdentifierName("Microsoft"), 
+                                            IdentifierName("Microsoft"),
                                             IdentifierName("Azure")
-                                        ), 
+                                        ),
                                         IdentifierName("WebJobs")
                                     )
                                 ),
@@ -121,13 +121,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                                         QualifiedName(
                                             QualifiedName(
                                                 QualifiedName(
-                                                    IdentifierName("Microsoft"), 
+                                                    IdentifierName("Microsoft"),
                                                     IdentifierName("Azure")
-                                                ), 
+                                                ),
                                                 IdentifierName("WebJobs")
-                                            ), 
+                                            ),
                                             IdentifierName("Extensions")
-                                        ), 
+                                        ),
                                         IdentifierName("Http")
                                     )
                                 ),
@@ -135,11 +135,11 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                                     QualifiedName(
                                         QualifiedName(
                                             QualifiedName(
-                                                IdentifierName("Microsoft"), 
+                                                IdentifierName("Microsoft"),
                                                 IdentifierName("Azure")
-                                            ), 
+                                            ),
                                             IdentifierName("WebJobs")
-                                        ), 
+                                        ),
                                         IdentifierName("Host")
                                     )
                                 )
@@ -154,7 +154,6 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                     )
                     .NormalizeWhitespace();
         }
-
 
         private static MemberDeclarationSyntax GetContextExtensionPoint()
         {
@@ -209,42 +208,119 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                                             }
                                         )
                                     ),
-                                ClassDeclaration("DurableFunctionActivityExtensions")
-                                    .WithModifiers(TokenList(new[] {Token(SyntaxKind.PublicKeyword),Token(SyntaxKind.StaticKeyword)})
-                                    ).WithMembers(
-                                        SingletonList<MemberDeclarationSyntax>(
-                                            MethodDeclaration(
-                                                IdentifierName("DurableFunctionActivityHelpers"),
-                                                Identifier("Activities")
-                                            ).WithModifiers(TokenList(new[] { Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword) }))
-                                            .WithParameterList(
+                                ClassDeclaration("DurableFunctionSubOrchestrationHelpers")
+                                    .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)))
+                                    .WithMembers(
+                                        List(
+                                            new MemberDeclarationSyntax[]{
+                                                ConstructorDeclaration(
+                                                    Identifier("DurableFunctionSubOrchestrationHelpers"))
+                                                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)))
+                                                .WithParameterList(
                                                     ParameterList(
                                                         SingletonSeparatedList(
-                                                            Parameter(Identifier("context"))
-                                                                .WithModifiers(TokenList(Token(SyntaxKind.ThisKeyword)))
-                                                                .WithType(IdentifierName("DurableOrchestrationContext"))
+                                                            Parameter(Identifier("context")).WithType(IdentifierName("DurableOrchestrationContext")))))
+                                                .WithBody(
+                                                    Block(
+                                                        SingletonList<StatementSyntax>(
+                                                            ExpressionStatement(
+                                                                AssignmentExpression(
+                                                                    SyntaxKind.SimpleAssignmentExpression,
+                                                                    IdentifierName("Context"),
+                                                                    IdentifierName("context")))))),
+                                                PropertyDeclaration(
+                                                    IdentifierName("DurableOrchestrationContext"),
+                                                    Identifier("Context"))
+                                                .WithModifiers(
+                                                    TokenList(
+                                                        Token(SyntaxKind.PublicKeyword)))
+                                                .WithAccessorList(
+                                                    AccessorList(
+                                                        List(
+                                                            new AccessorDeclarationSyntax[]{
+                                                                AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                                                                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+                                                                AccessorDeclaration(SyntaxKind.SetAccessorDeclaration)
+                                                                    .WithModifiers(TokenList(Token(SyntaxKind.PrivateKeyword)))
+                                                                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))})))})),
+
+                                ClassDeclaration("DurableFunctionExtensions")
+                                    .WithModifiers(TokenList(new[] { Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword) }))
+                                    .WithMembers(
+                                        List(
+                                            new MemberDeclarationSyntax[]{
+                                                MethodDeclaration(
+                                                    IdentifierName("DurableFunctionActivityHelpers"),
+                                                    Identifier("Activities")
+                                                ).WithModifiers(TokenList(new[] { Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword) }))
+                                                .WithParameterList(
+                                                        ParameterList(
+                                                            SingletonSeparatedList(
+                                                                Parameter(Identifier("context"))
+                                                                    .WithModifiers(TokenList(Token(SyntaxKind.ThisKeyword)))
+                                                                    .WithType(IdentifierName("DurableOrchestrationContext"))
+                                                            )
+                                                        )
+                                                ).WithBody(
+                                                    Block(
+                                                        SingletonList<StatementSyntax>(
+                                                            ReturnStatement(
+                                                                ObjectCreationExpression(IdentifierName("DurableFunctionActivityHelpers"))
+                                                                    .WithArgumentList(
+                                                                        ArgumentList(
+                                                                            SingletonSeparatedList(Argument(IdentifierName("context")))
+                                                                        )
+                                                                    )
+                                                            )
                                                         )
                                                     )
-                                            ).WithBody(
-                                                Block(
-                                                    SingletonList<StatementSyntax>(
-                                                        ReturnStatement(
-                                                            ObjectCreationExpression(IdentifierName("DurableFunctionActivityHelpers"))
-                                                                .WithArgumentList(
-                                                                    ArgumentList(
-                                                                        SingletonSeparatedList(Argument(IdentifierName("context")))
+                                                ),
+                                                MethodDeclaration(
+                                                    IdentifierName("DurableFunctionSubOrchestrationHelpers"),
+                                                    Identifier("SubOrchestrators")
+                                                ).WithModifiers(TokenList(new[] { Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword) }))
+                                                .WithParameterList(
+                                                        ParameterList(
+                                                            SingletonSeparatedList(
+                                                                Parameter(Identifier("context"))
+                                                                    .WithModifiers(TokenList(Token(SyntaxKind.ThisKeyword)))
+                                                                    .WithType(IdentifierName("DurableOrchestrationContext"))
+                                                            )
+                                                        )
+                                                ).WithBody(
+                                                    Block(
+                                                        SingletonList<StatementSyntax>(
+                                                            ReturnStatement(
+                                                                ObjectCreationExpression(IdentifierName("DurableFunctionSubOrchestrationHelpers"))
+                                                                    .WithArgumentList(
+                                                                        ArgumentList(
+                                                                            SingletonSeparatedList(Argument(IdentifierName("context")))
+                                                                        )
                                                                     )
-                                                                )
+                                                            )
                                                         )
                                                     )
                                                 )
-                                            )
-                                        )
+                                            })
                                     )
                             }
                         )
                     );
         }
+
+        private static MemberDeclarationSyntax[] GenerateMethod((FunctionType functionType, IMethodSymbol method) m)
+        {
+            switch (m.functionType)
+            {
+                case FunctionType.Activity:
+                    return GenerateMethodForActivity(m.method);
+                case FunctionType.Orchestrator:
+                    return GenerateMethodForOrchestrator(m.method);
+                default:
+                    throw new NotSupportedException($"Unhandled function type: {m.functionType}");
+            }
+        }
+
         private static MethodDeclarationSyntax[] GenerateMethodForActivity(IMethodSymbol method)
         {
             // Ensure return type is Task/Task<T>
@@ -383,7 +459,98 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                         ),
                 };
         }
+        private static MethodDeclarationSyntax[] GenerateMethodForOrchestrator(IMethodSymbol method)
+        {
+            var returnType = GetAsyncTypeFromType(method.ReturnType);
+            var functionName = GetFunctionNameForMethod(method);
 
+            var methodName = EnsureMethodNameEndsInAsync(method);
+            var methodNameWithRetry = methodName
+                                        .Substring(0, methodName.Length - 5) // strip Async
+                                        + "WithRetryAsync";
+
+            var callSubOrchestratorAsyncSyntax = GetCallSubOrchestratorAsyncSyntax(returnType);
+            var callSubOrchestratorWithRetryAsyncSyntax = GetCallSubOrchestratorAsyncSyntax(returnType, "CallSubOrchestratorWithRetryAsync");
+
+            var identifierOrchestrationHelpers = IdentifierName("DurableFunctionSubOrchestrationHelpers");
+            return new[]
+                {
+                    MethodDeclaration(returnType, Identifier(methodName))
+                        .WithModifiers(TokenList(new []{ Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword)}))
+                        .WithParameterList(
+                            ParameterList(
+                                SeparatedList<ParameterSyntax>(
+                                    new SyntaxNodeOrToken[]{
+                                        Parameter(Identifier("orchestrationHelper"))
+                                            .WithModifiers(TokenList(Token(SyntaxKind.ThisKeyword)))
+                                            .WithType(identifierOrchestrationHelpers),
+                                        Token(SyntaxKind.CommaToken),
+                                        Parameter(Identifier("input"))
+                                            .WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))})))
+                        .WithBody(
+                            Block(
+                                SingletonList(
+                                    (StatementSyntax) ReturnStatement(
+                                        InvocationExpression(
+                                            MemberAccessExpression(
+                                                SyntaxKind.SimpleMemberAccessExpression,
+                                                MemberAccessExpression(
+                                                    SyntaxKind.SimpleMemberAccessExpression,
+                                                    IdentifierName("orchestrationHelper"),
+                                                    IdentifierName("Context")),
+                                                callSubOrchestratorAsyncSyntax))
+                                        .WithArgumentList(
+                                            ArgumentList(
+                                                SeparatedList<ArgumentSyntax>(
+                                                    new SyntaxNodeOrToken[]{
+                                                        Argument(
+                                                            LiteralExpression(
+                                                                SyntaxKind.StringLiteralExpression,
+                                                                Literal(functionName))),
+                                                        Token(SyntaxKind.CommaToken),
+                                                        Argument(
+                                                            IdentifierName("input"))}))))))),
+                    MethodDeclaration(returnType, Identifier(methodNameWithRetry))
+                        .WithModifiers(TokenList(new []{ Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword)}))
+                        .WithParameterList(
+                            ParameterList(
+                                SeparatedList<ParameterSyntax>(
+                                    new SyntaxNodeOrToken[]{
+                                        Parameter(Identifier("orchestrationHelper"))
+                                            .WithModifiers(TokenList(Token(SyntaxKind.ThisKeyword)))
+                                            .WithType(identifierOrchestrationHelpers),
+                                        Token(SyntaxKind.CommaToken),
+                                        Parameter(Identifier("retryOptions"))
+                                            .WithType(IdentifierName("RetryOptions")),
+                                        Token(SyntaxKind.CommaToken),
+                                        Parameter(Identifier("input"))
+                                            .WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))})))
+                        .WithBody(
+                            Block(
+                                SingletonList(
+                                    (StatementSyntax) ReturnStatement(
+                                        InvocationExpression(
+                                            MemberAccessExpression(
+                                                SyntaxKind.SimpleMemberAccessExpression,
+                                                MemberAccessExpression(
+                                                    SyntaxKind.SimpleMemberAccessExpression,
+                                                    IdentifierName("orchestrationHelper"),
+                                                    IdentifierName("Context")),
+                                                callSubOrchestratorWithRetryAsyncSyntax))
+                                        .WithArgumentList(
+                                            ArgumentList(
+                                                SeparatedList<ArgumentSyntax>(
+                                                    new SyntaxNodeOrToken[]{
+                                                        Argument(
+                                                            LiteralExpression(
+                                                                SyntaxKind.StringLiteralExpression,
+                                                                Literal(functionName))),
+                                                        Token(SyntaxKind.CommaToken),
+                                                        Argument(IdentifierName("retryOptions")),
+                                                        Token(SyntaxKind.CommaToken),
+                                                        Argument(IdentifierName("input"))})))))))
+            };
+        }
         private static string EnsureMethodNameEndsInAsync(IMethodSymbol method)
         {
             var methodName = method.Name;
@@ -394,6 +561,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
             return methodName;
         }
+
 
         /// <summary>
         /// Generate the Syntax for calling CallActivityAsync, including the type argument list if required
@@ -425,6 +593,16 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             }
 
             return callActivityAsyncSyntax;
+        }
+        /// <summary>
+        /// Generate the Syntax for calling CallActivityAsync, including the type argument list if required
+        /// </summary>
+        /// <param name="returnType"></param>
+        /// <returns></returns>
+        private static SimpleNameSyntax GetCallSubOrchestratorAsyncSyntax(TypeSyntax returnType, string methodName = "CallSubOrchestratorAsync")
+        {
+            // since the signatures are asligned between CallActivityAsync and CallSubOrchestratorAsync we can reuse GetCallActivityAsyncSyntax
+            return GetCallActivityAsyncSyntax(returnType, methodName);
         }
 
         /// <summary>

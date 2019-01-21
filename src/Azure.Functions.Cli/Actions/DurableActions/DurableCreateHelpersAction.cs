@@ -57,9 +57,9 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             var project = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == csproj);
 
 
-            var methodsBySemanticModel = await GetActivityFunctionMethods(project);
+            var activityAndOrchestratorMethods = await GetActivityAndOrchestratorFunctionMethods(project);
 
-            var compilationUnitSyntax = GenerateCode(project, methodsBySemanticModel);
+            var compilationUnitSyntax = GenerateCode(project, activityAndOrchestratorMethods);
 
 
             var generatedCode = compilationUnitSyntax.ToString();
@@ -70,9 +70,22 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             await FileSystemHelpers.WriteAllTextToFileAsync(generatedFilePath, generatedCode);
         }
 
-        private static bool MethodHasActivityTriggerParameter(IMethodSymbol method)
+        enum FunctionType
         {
-            return method.Parameters.Any(ParameterIsActivityTrigger);
+            Unknown,
+            Activity,
+            Orchestrator
+        }
+        private static FunctionType GetFunctionType(IMethodSymbol method)
+        {
+            foreach (var parameter in method.Parameters)
+            {
+                if (ParameterIsActivityTrigger(parameter))
+                    return FunctionType.Activity;
+                if (ParameterIsOrchestratorTrigger(parameter))
+                    return FunctionType.Orchestrator;
+            }
+            return FunctionType.Unknown;
         }
 
         private static bool ParameterIsActivityTrigger(IParameterSymbol parameter)
@@ -81,7 +94,14 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                     .Any(a => a.AttributeClass.ToString() == "Microsoft.Azure.WebJobs.ActivityTriggerAttribute");
         }
 
-        private static async Task<IEnumerable<IMethodSymbol>> GetActivityFunctionMethods(Project project)
+        private static bool ParameterIsOrchestratorTrigger(IParameterSymbol parameter)
+        {
+            return parameter.Type.ToString() == "Microsoft.Azure.WebJobs.DurableOrchestrationContext"
+                    && parameter.GetAttributes()
+                        .Any(a => a.AttributeClass.ToString() == "Microsoft.Azure.WebJobs.OrchestrationTriggerAttribute");
+        }
+
+        private static async Task<IEnumerable<(FunctionType functionType, IMethodSymbol method)>> GetActivityAndOrchestratorFunctionMethods(Project project)
         {
             var attributeType = typeof(FunctionNameAttribute);
             string[] attributeNames;
@@ -124,7 +144,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                         var root = await document.GetSyntaxRootAsync();
                         var model = await document.GetSemanticModelAsync();
 
-                        IEnumerable<IMethodSymbol> matchingMethods = root.DescendantNodes()
+                        var functionMethods = root.DescendantNodes()
                             .OfType<AttributeSyntax>()
                             .Where(attributeMatchesName)
                             // Project attribute -> attribute list -> method                    
@@ -134,9 +154,13 @@ namespace Azure.Functions.Cli.Actions.DurableActions
                             // project to method declaration
                             .Select(m => model.GetDeclaredSymbol(m))
                             // filter to just methods with attribute of the correct type
-                            .Where(m => m.GetAttributes().Any(a => a.AttributeClass.ToString() == attributeType.FullName))
-                            .Where(MethodHasActivityTriggerParameter);
-                        return matchingMethods;
+                            .Where(m => m.GetAttributes().Any(a => a.AttributeClass.ToString() == attributeType.FullName));
+
+
+                        var actvityAndOrchestratorMethods = functionMethods
+                                    .Select(m => (functionType: GetFunctionType(m), method: m ))
+                                    .Where(f => f.functionType != FunctionType.Unknown);
+                        return actvityAndOrchestratorMethods;
                     })
                     .WaitAllAndUnwrap()
                 )
