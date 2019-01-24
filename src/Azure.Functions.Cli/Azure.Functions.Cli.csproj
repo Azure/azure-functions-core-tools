@@ -27,40 +27,40 @@
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet.template">
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python.template">
+    <EmbeddedResource Include="StaticResources\Dockerfile.python">
       <LogicalName>$(AssemblyName).Dockerfile.python</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.node.template">
+    <EmbeddedResource Include="StaticResources\Dockerfile.node">
       <LogicalName>$(AssemblyName).Dockerfile.node</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\gitignore.template">
+    <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\host.json.template">
+    <EmbeddedResource Include="StaticResources\host.json">
       <LogicalName>$(AssemblyName).host.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\python_docker_build_no_bundler.sh.template">
+    <EmbeddedResource Include="StaticResources\python_docker_build_no_bundler.sh">
       <LogicalName>$(AssemblyName).python_docker_build_no_bundler.sh</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\vscode.extensions.json.template">
+    <EmbeddedResource Include="StaticResources\vscode.extensions.json">
       <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\python_docker_build.sh.template">
+    <EmbeddedResource Include="StaticResources\python_docker_build.sh">
       <LogicalName>$(AssemblyName).python_docker_build.sh</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\python_bundle_script.py.template">
+    <EmbeddedResource Include="StaticResources\python_bundle_script.py">
       <LogicalName>$(AssemblyName).python_bundle_script.py</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\profile.ps1.template">
+    <EmbeddedResource Include="StaticResources\profile.ps1">
       <LogicalName>$(AssemblyName).profile.ps1</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\templates.json.template">
+    <EmbeddedResource Include="StaticResources\templates.json">
       <LogicalName>$(AssemblyName).templates.json</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
