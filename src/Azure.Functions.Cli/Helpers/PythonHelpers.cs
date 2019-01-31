@@ -202,12 +202,15 @@ namespace Azure.Functions.Cli.Helpers
         private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool noBundler)
         {
             var appContentPath = CopyToTemp(files, functionAppRoot);
+            var dockerImage = string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting))
+                ? Constants.DockerImages.LinuxPythonImageAmd64
+                : Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting);
 
-            await DockerHelpers.DockerPull(Constants.DockerImages.LinuxPythonImageAmd64);
+            await DockerHelpers.DockerPull(dockerImage);
             var containerId = string.Empty;
             try
             {
-                containerId = await DockerHelpers.DockerRun(Constants.DockerImages.LinuxPythonImageAmd64);
+                containerId = await DockerHelpers.DockerRun(dockerImage);
                 await DockerHelpers.ExecInContainer(containerId, "mkdir -p /home/site/wwwroot/");
                 await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/home/site/wwwroot");
 
