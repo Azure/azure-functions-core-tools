@@ -26,6 +26,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
+        public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -58,7 +59,7 @@ namespace Azure.Functions.Cli.Common
 
         public static class DockerImages
         {
-            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12275";
+            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12285";
         }
 
         public static class StaticResourcesNames
