@@ -38,30 +38,22 @@ namespace Azure.Functions.Cli.Common
                 Colors.Net.ColoredConsole.WriteLine(VerboseColor($"> {Command}"));
             }
 
-            var processInfo = new ProcessStartInfo
+            Process = new Process
             {
-                FileName = _exeName,
-                Arguments = _arguments,
-                CreateNoWindow = !_visibleProcess,
-                UseShellExecute = _shareConsole,
-                RedirectStandardError = _streamOutput,
-                RedirectStandardInput = _streamOutput,
-                RedirectStandardOutput = _streamOutput,
-                WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = _exeName,
+                    Arguments = _arguments,
+                    CreateNoWindow = !_visibleProcess,
+                    UseShellExecute = _shareConsole,
+                    RedirectStandardError = _streamOutput,
+                    RedirectStandardInput = _streamOutput,
+                    RedirectStandardOutput = _streamOutput,
+                    WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
+                }
             };
 
-            try
-            {
-                Process = Process.Start(processInfo);
-            }
-            catch (Win32Exception ex)
-            {
-                if (ex.Message == "The system cannot find the file specified")
-                {
-                    throw new FileNotFoundException(ex.Message, ex);
-                }
-                throw ex;
-            }
+            var exitCodeTask = Process.CreateWaitForExitTask();
 
             if (_streamOutput)
             {
@@ -72,7 +64,6 @@ namespace Azure.Functions.Cli.Common
                         outputCallback(e.Data);
                     }
                 };
-                Process.BeginOutputReadLine();
 
                 Process.ErrorDataReceived += (s, e) =>
                 {
@@ -81,10 +72,26 @@ namespace Azure.Functions.Cli.Common
                         errorCallback(e.Data);
                     }
                 };
-                Process.BeginErrorReadLine();
                 Process.EnableRaisingEvents = true;
             }
-            var exitCodeTask = Process.WaitForExitAsync();
+
+            try
+            {
+                Process.Start();
+                if (_streamOutput)
+                {
+                    Process.BeginOutputReadLine();
+                    Process.BeginErrorReadLine();
+                }
+            }
+            catch (Win32Exception ex)
+            {
+                if (ex.Message == "The system cannot find the file specified")
+                {
+                    throw new FileNotFoundException(ex.Message, ex);
+                }
+                throw ex;
+            }
 
             if (timeout == null)
             {

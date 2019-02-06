@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 ? Process.Start("cmd")
                 : Process.Start("sh");
 
-            process.WaitForExitAsync().ContinueWith(_ =>
+            process.CreateWaitForExitTask().ContinueWith(_ =>
             {
                 calledContinueWith = true;
             }).Ignore();
