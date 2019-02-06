@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Extensions
     internal static class ProcessExtensions
     {
         // http://stackoverflow.com/a/19104345
-        public static Task<int> WaitForExitAsync(this Process process, CancellationToken cancellationToken = default(CancellationToken))
+        public static Task<int> CreateWaitForExitTask(this Process process, CancellationToken cancellationToken = default(CancellationToken))
         {
             var tcs = new TaskCompletionSource<int>();
             process.EnableRaisingEvents = true;
