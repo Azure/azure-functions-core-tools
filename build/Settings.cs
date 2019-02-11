@@ -53,7 +53,7 @@ namespace Build
 
         public static string BuildNumber => config(null, "Build.BuildId") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
 
-        public static string CommitId => config(null, "Build.SourceVersion") ?? config("N /A", "APPVEYOR_REPO_COMMIT");
+        public static string CommitId => config(null, "Build.SourceVersion") ?? config("N/A", "APPVEYOR_REPO_COMMIT");
 
         public static string BuildArtifactsStorage => config(null);
     }

@@ -10,13 +10,18 @@ namespace Build
 {
     public static class Shell
     {
-        public static void Run(string program, string arguments, bool streamOutput = true)
+        public static void Run(string program, string arguments, bool streamOutput = true, bool silent = false)
         {
             var exe = new InternalExe(program, arguments, streamOutput);
 
-            ColoredConsole.WriteLine($"> {program} {arguments}".Green());
+            if (!silent)
+            {
+                ColoredConsole.WriteLine($"> {program} {arguments}".Green());
+            }
 
-            var exitcode = exe.Run(l => ColoredConsole.Out.WriteLine(l.DarkGray()), e => ColoredConsole.Error.WriteLine(e.Red()));
+            var exitcode = silent
+                ? exe.Run()
+                : exe.Run(l => ColoredConsole.Out.WriteLine(l.DarkGray()), e => ColoredConsole.Error.WriteLine(e.Red()));
 
             if (exitcode != 0)
             {
