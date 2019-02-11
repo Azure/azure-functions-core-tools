@@ -12,6 +12,7 @@ namespace Build
             Orchestrator
                 .CreateForTarget(args)
                 .Then(Clean)
+                .Then(LogIntoAzure)
                 .Then(RestorePackages)
                 .Then(DotnetPublish)
                 .Then(AddDistLib)

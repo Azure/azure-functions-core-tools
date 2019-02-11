@@ -27,3 +27,4 @@ else {
 }
 
 Invoke-Expression -Command  "dotnet run"
+if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }

@@ -135,7 +135,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 try
                 {
                     stdout.AppendLine(line);
-                    output.WriteLine($"stdout: {line}");
+                    output?.WriteLine($"stdout: {line}");
                 }
                 catch { }
             }
@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 try
                 {
                     stderr.AppendLine(line);
-                    output.WriteLine($"stderr: {line}");
+                    output?.WriteLine($"stderr: {line}");
                 }
                 catch { }
             }

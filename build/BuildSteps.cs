@@ -75,7 +75,11 @@ namespace Build
         {
             foreach (var languageWorker in Settings.LanguageWorkers)
             {
-                Directory.Delete(Path.Combine(outputPath, "workers", languageWorker), recursive: true);
+                var path = Path.Combine(outputPath, "workers", languageWorker);
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: true);
+                }
             }
         }
 
@@ -184,7 +188,7 @@ namespace Build
                 using (var fileStream = File.OpenRead(file))
                 {
                     var sha1 = new SHA256Managed();
-                    return BitConverter.ToString(sha1.ComputeHash(fileStream));
+                    return BitConverter.ToString(sha1.ComputeHash(fileStream)).Replace("-", string.Empty);
                 }
             }
         }
@@ -242,6 +246,27 @@ namespace Build
                 var error = $"{nameof(Settings.BuildArtifactsStorage)} is null or empty. Can't run {nameof(UploadToStorage)} target";
                 ColoredConsole.Error.WriteLine(error.Red());
                 throw new Exception(error);
+            }
+        }
+
+        public static void LogIntoAzure()
+        {
+            var directoryId = Environment.GetEnvironmentVariable("AZURE_DIRECTORY_ID");
+            var appId = Environment.GetEnvironmentVariable("AZURE_SERVICE_PRINCIPAL_ID");
+            var key = Environment.GetEnvironmentVariable("AZURE_SERVICE_PRINCIPAL_KEY");
+
+            if (!string.IsNullOrEmpty(directoryId) &&
+                !string.IsNullOrEmpty(appId) &&
+                !string.IsNullOrEmpty(key))
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    Shell.Run("cmd", $"/c az login --service-principal -u {appId} -p \"{key}\" --tenant {directoryId}", silent: true);
+                }
+                else
+                {
+                    Shell.Run("az", $"login --service-principal -u {appId} -p \"{key}\" --tenant {directoryId}", silent: true);
+                }
             }
         }
     }
