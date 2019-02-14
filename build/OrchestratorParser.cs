@@ -16,7 +16,7 @@ namespace Build
                 return;
             }
 
-            var targetToRun = args.FirstOrDefault();
+            var targetToRun = args.FirstOrDefault(el => !el.StartsWith("--"));
 
             if (!string.IsNullOrWhiteSpace(targetToRun) &&
                 !targetToRun.StartsWith("skip:"))
