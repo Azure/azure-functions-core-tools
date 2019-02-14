@@ -82,7 +82,10 @@ namespace Build
         {
             while (start != null)
             {
-                ColoredConsole.Write($"{start.Name} ==> ".Magenta());
+                if (!start.Skip)
+                {
+                    ColoredConsole.Write($"{start.Name} ==> ".Magenta());
+                }
                 if (start == end)
                 {
                     break;
