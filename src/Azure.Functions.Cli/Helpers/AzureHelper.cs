@@ -281,12 +281,23 @@ namespace Azure.Functions.Cli.Helpers
                     ?["type"];
 
                 trigger = trigger ?? "No Trigger Found";
+                var showFunctionKey = showKeys;
+
+                var authLevel = function
+                    .Config?["bindings"]
+                    ?.FirstOrDefault(o => !string.IsNullOrEmpty(o["authLevel"]?.ToString()))
+                    ?["authLevel"];
+
+                if (authLevel != null && authLevel.ToString().Equals("anonymous", StringComparison.OrdinalIgnoreCase))
+                {
+                    showFunctionKey = false;
+                }
 
                 ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
                 if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
                 {
                     // If there's a key available and the key is requested, add it to the url
-                    var key = showKeys? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken) : null;
+                    var key = showFunctionKey? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken) : null;
                     if (!string.IsNullOrEmpty(key))
                     {
                         ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");

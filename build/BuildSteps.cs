@@ -2,13 +2,16 @@ using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.WindowsAzure.Storage.Queue;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 
 namespace Build
 {
@@ -75,7 +78,11 @@ namespace Build
         {
             foreach (var languageWorker in Settings.LanguageWorkers)
             {
-                Directory.Delete(Path.Combine(outputPath, "workers", languageWorker), recursive: true);
+                var path = Path.Combine(outputPath, "workers", languageWorker);
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: true);
+                }
             }
         }
 
@@ -152,6 +159,129 @@ namespace Build
             Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
         }
 
+        public static void GenerateZipToSign()
+        {
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                Directory.CreateDirectory(Path.Combine(targetDir, Settings.SignInfo.ToSignDir));
+
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
+                // Grab all the files and filter the extensions not to be signed
+                var toSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(toSignPaths).Where(file => !Settings.SignInfo.filterExtenstionsSign.Any(ext => file.EndsWith(ext)));
+                FileHelpers.CreateZipFile(toSignFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignZipName));
+
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
+                // Grab all the files and filter the extensions not to be signed
+                var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(toSignThirdPartyPaths).Where(file => !Settings.SignInfo.filterExtenstionsSign.Any(ext => file.EndsWith(ext)));
+                FileHelpers.CreateZipFile(toSignThirdPartyFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignThirdPartyName));
+            }
+        }
+
+        public static void UploadZipToSign()
+        {
+            UploadZipToSignAsync().Wait();
+        }
+
+        public static async Task UploadZipToSignAsync()
+        {
+            var storageConnection = Settings.SignInfo.AzureSigningConnectionString;
+            var storageAccount = CloudStorageAccount.Parse(storageConnection);
+            var blobClient = storageAccount.CreateCloudBlobClient();
+            var blobContainer = blobClient.GetContainerReference(Settings.SignInfo.AzureToSignContainerName);
+            await blobContainer.CreateIfNotExistsAsync();
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+
+                var toSignBlob = blobContainer.GetBlockBlobReference($"{Settings.SignInfo.ToSignZipName}-{supportedRuntime}");
+                await toSignBlob.UploadFromFileAsync(Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignZipName));
+
+                var toSignThirdPartyBlob = blobContainer.GetBlockBlobReference($"{Settings.SignInfo.ToSignThirdPartyName}-{supportedRuntime}");
+                await toSignThirdPartyBlob.UploadFromFileAsync(Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignThirdPartyName));
+            }
+        }
+
+        public static void EnqueueSignMessage()
+        {
+            EnqueueSignMessageAsync().Wait();
+        }
+
+        public static async Task EnqueueSignMessageAsync()
+        {
+            var storageConnection = Settings.SignInfo.AzureSigningConnectionString;
+            var storageAccount = CloudStorageAccount.Parse(storageConnection);
+            var queueClient = storageAccount.CreateCloudQueueClient();
+            var queue = queueClient.GetQueueReference(Settings.SignInfo.AzureSigningJobName);
+            await queue.CreateIfNotExistsAsync();
+
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+
+                var message = new CloudQueueMessage($"{Settings.SignInfo.Authenticode};{Settings.SignInfo.AzureToSignContainerName};{Settings.SignInfo.ToSignZipName}-{supportedRuntime}");
+                await queue.AddMessageAsync(message);
+
+                var thirdPartyMessage = new CloudQueueMessage($"{Settings.SignInfo.ThirdParty};{Settings.SignInfo.AzureToSignContainerName};{Settings.SignInfo.ToSignThirdPartyName}-{supportedRuntime}");
+                await queue.AddMessageAsync(thirdPartyMessage);
+            }
+        }
+
+        public static void WaitForSigning()
+        {
+            WaitForSigningAsync().Wait();
+        }
+
+        public static async Task WaitForSigningAsync()
+        {
+            var storageConnection = Settings.SignInfo.AzureSigningConnectionString;
+            var storageAccount = CloudStorageAccount.Parse(storageConnection);
+            var blobClient = storageAccount.CreateCloudBlobClient();
+            var blobContainer = blobClient.GetContainerReference(Settings.SignInfo.AzureSignedContainerName);
+            await blobContainer.CreateIfNotExistsAsync();
+
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                Directory.CreateDirectory(Path.Combine(targetDir, Settings.SignInfo.SignedDir));
+                await PollAndDownloadFile($"{Settings.SignInfo.ToSignZipName}-{supportedRuntime}", Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignZipName));
+                await PollAndDownloadFile($"{Settings.SignInfo.ToSignThirdPartyName}-{supportedRuntime}", Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignThirdPartyName));
+            }
+
+            async Task PollAndDownloadFile(string fileName, string downloadTo)
+            {
+                var watch = new Stopwatch();
+                watch.Start();
+                CloudBlockBlob blob;
+                while (!await (blob = blobContainer.GetBlockBlobReference(fileName)).ExistsAsync())
+                {
+                    // Wait for 30 minutes and timeout
+                    if (watch.ElapsedMilliseconds > 1800000)
+                    {
+                        throw new TimeoutException("Timeout waiting for the signed blob");
+                    }
+                    await Task.Delay(5000);
+                }
+                await blob.DownloadToFileAsync(downloadTo, FileMode.OpenOrCreate);
+            }
+        }
+
+        public static void ReplaceSignedZipAndCleanup()
+        {
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                var autheticodeZip = Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignZipName);
+                var thirdPartyZip = Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignThirdPartyName);
+
+                FileHelpers.ExtractZipFileForce(autheticodeZip, targetDir);
+                FileHelpers.ExtractZipFileForce(thirdPartyZip, targetDir);
+
+                Directory.Delete(Path.Combine(targetDir, Settings.SignInfo.SignedDir), recursive: true);
+                Directory.Delete(Path.Combine(targetDir, Settings.SignInfo.ToSignDir), recursive: true);
+            }
+        }
+
         public static void Zip()
         {
             var version = CurrentVersion;
@@ -184,7 +314,7 @@ namespace Build
                 using (var fileStream = File.OpenRead(file))
                 {
                     var sha1 = new SHA256Managed();
-                    return BitConverter.ToString(sha1.ComputeHash(fileStream));
+                    return BitConverter.ToString(sha1.ComputeHash(fileStream)).Replace("-", string.Empty);
                 }
             }
         }
@@ -242,6 +372,27 @@ namespace Build
                 var error = $"{nameof(Settings.BuildArtifactsStorage)} is null or empty. Can't run {nameof(UploadToStorage)} target";
                 ColoredConsole.Error.WriteLine(error.Red());
                 throw new Exception(error);
+            }
+        }
+
+        public static void LogIntoAzure()
+        {
+            var directoryId = Environment.GetEnvironmentVariable("AZURE_DIRECTORY_ID");
+            var appId = Environment.GetEnvironmentVariable("AZURE_SERVICE_PRINCIPAL_ID");
+            var key = Environment.GetEnvironmentVariable("AZURE_SERVICE_PRINCIPAL_KEY");
+
+            if (!string.IsNullOrEmpty(directoryId) &&
+                !string.IsNullOrEmpty(appId) &&
+                !string.IsNullOrEmpty(key))
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    Shell.Run("cmd", $"/c az login --service-principal -u {appId} -p \"{key}\" --tenant {directoryId}", silent: true);
+                }
+                else
+                {
+                    Shell.Run("az", $"login --service-principal -u {appId} -p \"{key}\" --tenant {directoryId}", silent: true);
+                }
             }
         }
     }

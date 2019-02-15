@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static Task DockerBuild(string tag, string dir) => RunDockerCommand($"build -t {tag} {dir}");
 
-        public static Task CopyToContainer(string containerId, string source, string target) => RunDockerCommand($"cp {source} {containerId}:{target}", containerId);
+        public static Task CopyToContainer(string containerId, string source, string target) => RunDockerCommand($"cp \"{source}\" {containerId}:\"{target}\"", containerId);
 
         public static Task ExecInContainer(string containerId, string command) => RunDockerCommand($"exec -t {containerId} {command}", containerId);
 

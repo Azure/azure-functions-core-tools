@@ -286,7 +286,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // if consumption Linux, or run from zip
             if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
             {
-                await PublishRunFromZip(functionApp, await zipStreamFactory());
+                await PublishRunFromPackage(functionApp, await zipStreamFactory());
             }
             else
             {
@@ -339,13 +339,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, retryCount: 5);
         }
 
-        private async Task PublishRunFromZip(Site functionApp, Stream zipFile)
+        private async Task PublishRunFromPackage(Site functionApp, Stream zipFile)
         {
             ColoredConsole.WriteLine("Preparing archive...");
 
             var sas = await UploadZipToStorage(zipFile, functionApp.AzureAppSettings);
 
-            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
+            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = sas;
 
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
             ColoredConsole.WriteLine("Upload completed successfully.");
