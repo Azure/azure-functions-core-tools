@@ -15,5 +15,6 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms.Models
     {
         public bool disabled { get; set; }
         public List<Binding> bindings { get; set; }
+        public string scriptFile { get; set; }
     }
 }
