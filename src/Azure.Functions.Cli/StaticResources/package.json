@@ -1,0 +1,19 @@
+{
+  "name": "",
+  "version": "",
+  "scripts": {
+    "start": "npm run build && npm run start:host & npm run watch",
+    "start:host": "func start",
+    "build": "tsc && func extensions install",
+    "build:production": "npm run clean && npm run build && npm prune --production",
+    "watch": "tsc -w",
+    "clean": "rimraf dist",
+    "test": "echo \"No tests yet...\""
+  },
+  "description": "",
+  "devDependencies": {
+    "@azure/functions": "^1.0.1-beta1",
+    "rimraf": "^2.6.3",
+    "typescript": "^3.3.3"
+  }
+}

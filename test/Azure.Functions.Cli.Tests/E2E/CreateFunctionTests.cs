@@ -1,5 +1,6 @@
 ﻿using Azure.Functions.Cli.Tests.E2E.Helpers;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
@@ -100,6 +101,34 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "The function \"testfunc2\" was created successfully from the \"http trigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_typescript_template()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node --language typescript",
+                    "new --template \"http trigger\" --name testfunc"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("testfunc", "function.json"),
+                        ContentContains = new []
+                        {
+                            "../dist/testfunc/index.js"
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
                 }
             }, _output);
         }
