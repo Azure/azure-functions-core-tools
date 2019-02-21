@@ -50,5 +50,11 @@ namespace Azure.Functions.Cli
         public static Task<string> PowerShellProfilePs1 => GetValue("profile.ps1");
 
         public static Task<string> TemplatesJson => GetValue("templates.json");
+
+        public static Task<string> FuncIgnore => GetValue("funcignore");
+
+        public static Task<string> PackageJson => GetValue("package.json");
+
+        public static Task<string> TsConfig => GetValue("tsconfig.json");
     }
 }

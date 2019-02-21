@@ -32,6 +32,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Csx { get; set; }
 
+        public string Language { get; set; }
+
         internal readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore },
@@ -74,6 +76,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("use csx dotnet functions")
                 .Callback(f => Csx = f);
 
+            Parser
+                .Setup<string>("language")
+                .SetDefault(null)
+                .WithDescription("Initialize a language specific project. Currently supported when --worker-runtime set to node. Options are - \"typescript\" and \"javascript\"")
+                .Callback(l => Language = l);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -109,10 +117,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var workerRuntimeString = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
                 workerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimeString)).Key;
                 ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
+                LanguageSelectionIfRelevant(workerRuntime);
             }
             else
             {
                 workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(WorkerRuntime);
+                Language = Language ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(WorkerRuntime);
             }
 
             if (workerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
@@ -131,6 +141,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteDockerfile(workerRuntime);
         }
 
+        private void LanguageSelectionIfRelevant(WorkerRuntime workerRuntime)
+        {
+            if (workerRuntime == Helpers.WorkerRuntime.node)
+            {
+                if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages) 
+                    && languages.Count() != 0)
+                {
+                    ColoredConsole.Write("Select a Language: ");
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(languages);
+                    ColoredConsole.WriteLine(TitleColor(Language));
+                }
+            }
+        }
+
         private async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime)
         {
             if (workerRuntime == Helpers.WorkerRuntime.python)
@@ -140,6 +164,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
                 await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
+            }
+            if (Language == Constants.Languages.TypeScript)
+            {
+                await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
+                await WriteFiles("package.json", await StaticResources.PackageJson);
+                await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
             }
         }
 

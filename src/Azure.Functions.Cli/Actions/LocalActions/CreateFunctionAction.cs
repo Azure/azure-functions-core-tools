@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Actions.DeployActions.Platforms.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Newtonsoft.Json;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -76,11 +78,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
             {
                 // validate
-                var language = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
-                if (workerRuntime != language)
+                var workerRuntimeSelected = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
+                if (workerRuntime != workerRuntimeSelected)
                 {
                     throw new CliException("Selected language doesn't match worker set in local.settings.json." +
-                        $"Selected worker is: {workerRuntime} and selected language is: {language}");
+                        $"Selected worker is: {workerRuntime} and selected language is: {workerRuntimeSelected}");
                 }
             }
             else if (string.IsNullOrWhiteSpace(Language))
@@ -103,7 +105,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     {
                         Language = displayList.First();
                     }
-                    else
+                    else if (!InferAndUpdateLanguage(workerRuntime))
                     {
                         ColoredConsole.Write("Select a language: ");
                         Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
@@ -128,7 +130,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 ColoredConsole.Write("Select a template: ");
-                var templateLanguage = WorkerRuntimeLanguageHelper.GetTemplateLanguageFromWorker(workerRuntime);
+                string templateLanguage;
+                try
+                {
+                    templateLanguage = WorkerRuntimeLanguageHelper.NormalizeLanguage(Language);
+                }
+                catch (Exception)
+                {
+                    // Ideally this should never happen.
+                    templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
+                }
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
@@ -145,9 +156,34 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     FunctionName = FunctionName ?? Console.ReadLine();
                     FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
                     await _templatesManager.Deploy(FunctionName, template);
+                    PerformPostDeployTasks(FunctionName, Language);
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
+        }
+
+        private bool InferAndUpdateLanguage(WorkerRuntime workerRuntime)
+        {
+            // If there is a tsconfig.json present, we assume that the language is typescript
+            if (workerRuntime == WorkerRuntime.node)
+            {
+                Language = FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "tsconfig.json")) ? Constants.Languages.TypeScript : Constants.Languages.JavaScript;
+                return true;
+            }
+            return false;
+        }
+
+        private void PerformPostDeployTasks(string functionName, string language)
+        {
+            if (language == Constants.Languages.TypeScript)
+            {
+                // Update typescript function.json
+                var funcJsonFile = Path.Combine(Environment.CurrentDirectory, functionName, Constants.FunctionJsonFileName);
+                var jsonStr = FileSystemHelpers.ReadAllTextFromFile(funcJsonFile);
+                var funcObj = JsonConvert.DeserializeObject<FunctionJson>(jsonStr);
+                funcObj.scriptFile = $"../dist/{functionName}/index.js";
+                FileSystemHelpers.WriteAllTextToFile(funcJsonFile, JsonConvert.SerializeObject(funcObj, Formatting.Indented));
+            }
         }
     }
 }

@@ -48,6 +48,16 @@ namespace Azure.Functions.Cli.Common
             public const string ExtensionsNeedDotnet = "Extensions command requires dotnet on your path. Please make sure to install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download";
         }
 
+        public static class Languages
+        {
+            public const string JavaScript = "javascript";
+            public const string TypeScript = "typescript";
+            public const string Python = "python";
+            public const string CSharp = "c#";
+            public const string Powershell = "powershell";
+            public const string Java = "java";
+        }
+
         public static class ArmConstants
         {
             public const string AADAuthorityBase = "https://login.microsoftonline.com";
@@ -59,7 +69,7 @@ namespace Azure.Functions.Cli.Common
 
         public static class DockerImages
         {
-            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12285";
+            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12309";
         }
 
         public static class StaticResourcesNames

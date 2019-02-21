@@ -190,5 +190,67 @@ namespace Azure.Functions.Cli.Tests.E2E
                 CommandTimeout = new TimeSpan(0, 1, 0)
             });
         }
+
+        [Fact]
+        public Task init_ts_app_using_lang()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime node --language typescript" },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "local.settings.json",
+                        ContentContains = new []
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "node"
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "Writing tsconfig.json",
+                    "Writing .funcignore",
+                    "Writing package.json",
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_ts_app_using_runtime()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime typescript" },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "local.settings.json",
+                        ContentContains = new []
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "node"
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "Writing tsconfig.json",
+                    "Writing .funcignore",
+                    "Writing package.json",
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                }
+            }, _output);
+        }
     }
 }
