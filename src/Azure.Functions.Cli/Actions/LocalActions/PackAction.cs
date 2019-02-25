@@ -98,6 +98,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     throw new CliException($"Could not delete {outputPath}");
                 }
             }
+
+            // Restore all valid extensions
+            var installExtensionAction = new InstallExtensionAction(_secretsManager);
+            await installExtensionAction.RunAsync();
+
             var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, NoBundler, additionalPackages: AdditionalPackages);
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
             await FileSystemHelpers.WriteToFile(outputPath, zipStream);
