@@ -141,6 +141,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
+            // Restore all valid extensions
+            var installExtensionAction = new InstallExtensionAction(_secretsManager);
+            await installExtensionAction.RunAsync();
+
             if (ListIncludedFiles)
             {
                 InternalListIncludedFiles(ignoreParser);
