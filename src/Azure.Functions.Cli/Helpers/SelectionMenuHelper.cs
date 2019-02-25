@@ -13,9 +13,26 @@ namespace Azure.Functions.Cli.Helpers
         public static T DisplaySelectionWizard<T>(IEnumerable<T> options)
         {
             // Console.CursorTop behaves very differently on Unix vs Windows for some reason
-            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? DisplaySelectionWizardWindows(options)
-                : DisplaySelectionWizardUnix(options);
+            if (IsEnvironmentCursorTopFriendly())
+            {
+                try
+                {
+                    return DisplaySelectionWizardWindows(options);
+                }
+                catch (Exception)
+                {
+                    // If any problem with this selection wizard, we ignore and continue with the generic selection wizard
+                }
+            }
+            return DisplaySelectionWizardUnix(options);
+        }
+
+        private static bool IsEnvironmentCursorTopFriendly()
+        {
+            // Environment is CursorTop friendly if running on Windows and not on Git bash or similar shells
+            // mingw specific varibale (used by Git Bash)
+            var mingwChost = Environment.GetEnvironmentVariable("MINGW_CHOST");
+            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && string.IsNullOrEmpty(mingwChost);
         }
 
         private static T DisplaySelectionWizardUnix<T>(IEnumerable<T> options)
