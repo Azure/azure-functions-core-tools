@@ -61,6 +61,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool NoBuild { get; set; }
 
+        public bool EnableAuth { get; set; }
+
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -122,6 +124,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .SetDefault(false)
                 .Callback(b => NoBuild = b);
 
+            Parser
+                .Setup<bool>("enableAuth")
+                .WithDescription("Enable full authentication handling pipeline.")
+                .SetDefault(false)
+                .Callback(e => EnableAuth = e);
+
             return Parser.Parse(args);
         }
 
@@ -158,7 +166,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     loggingBuilder.AddDefaultWebJobsFilters();
                     loggingBuilder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth)))
                 .Build();
         }
 
@@ -402,11 +410,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             private readonly ScriptApplicationHostOptions _hostOptions;
             private readonly string[] _corsOrigins;
             private readonly bool _corsCredentials;
+            private readonly bool _enableAuth;
 
-            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials)
+            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials, bool enableAuth)
             {
                 _builderContext = builderContext;
                 _hostOptions = hostOptions;
+                _enableAuth = enableAuth;
 
                 if (!string.IsNullOrEmpty(corsOrigins))
                 {
@@ -422,11 +432,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     services.AddCors();
                 }
 
-                services.AddAuthentication()
-                    .AddScriptJwtBearer()
-                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
-                    .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
-
+                if (_enableAuth)
+                {
+                    services.AddWebJobsScriptHostAuthentication();
+                }
+                else
+                {
+                    services.AddAuthentication()
+                        .AddScriptJwtBearer()
+                        .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
+                        .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
+                }
+                
                 services.AddWebJobsScriptHostAuthorization();
 
                 services.AddMvc()
