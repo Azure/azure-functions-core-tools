@@ -42,6 +42,24 @@ namespace Build
             }
         }
 
+        public static IEnumerable<string> ExpandFileWildCardEntries(IEnumerable<string> filesAndDirs)
+        {
+            var allEntries = new List<string>();
+            foreach (var entry in filesAndDirs)
+            {
+                if (entry.Contains("*"))
+                {
+                    var files = Directory.GetFiles(Path.GetDirectoryName(entry), Path.GetFileName(entry), SearchOption.AllDirectories);
+                    allEntries.AddRange(files);
+                }
+                else
+                {
+                    allEntries.Add(entry);
+                }
+            }
+            return allEntries;
+        }
+
         public static IEnumerable<string> GetAllFilesFromFilesAndDirs(IEnumerable<string> filesAndDirs)
         {
             var allFiles = new List<string>();

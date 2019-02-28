@@ -168,12 +168,12 @@ namespace Build
 
                 var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
                 // Grab all the files and filter the extensions not to be signed
-                var toSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(toSignPaths).Where(file => !Settings.SignInfo.filterExtenstionsSign.Any(ext => file.EndsWith(ext)));
+                var toSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths)).Where(file => !Settings.SignInfo.filterExtenstionsSign.Any(ext => file.EndsWith(ext)));
                 FileHelpers.CreateZipFile(toSignFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignZipName));
 
                 var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
                 // Grab all the files and filter the extensions not to be signed
-                var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(toSignThirdPartyPaths).Where(file => !Settings.SignInfo.filterExtenstionsSign.Any(ext => file.EndsWith(ext)));
+                var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths)).Where(file => !Settings.SignInfo.filterExtenstionsSign.Any(ext => file.EndsWith(ext)));
                 FileHelpers.CreateZipFile(toSignThirdPartyFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignThirdPartyName));
             }
         }
