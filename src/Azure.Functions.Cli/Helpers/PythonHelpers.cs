@@ -17,93 +17,53 @@ namespace Azure.Functions.Cli.Helpers
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
-        public static async Task InstallPackage()
+        public static async Task SetupPythonProject()
         {
-            VerifyVirtualEnvironment();
             await VerifyVersion();
-            await InstallPipWheel();
-            await InstallPythonAzureFunctionPackage();
-            await PipFreeze();
+            CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
-        }
-
-        public static void VerifyVirtualEnvironment()
-        {
-            if (!InVirtualEnvironment)
-            {
-                throw new CliException("For Python function apps, you have to be running in a venv. Please create and activate a Python 3.6 venv and run this command again.");
-            }
         }
 
         public static async Task EnsureVirtualEnvrionmentIgnored()
         {
-            try
+            if (InVirtualEnvironment)
             {
-                var virtualEnvName = Path.GetFileNameWithoutExtension(VirtualEnvironmentPath);
-                if (FileSystemHelpers.DirectoryExists(Path.Join(Environment.CurrentDirectory, virtualEnvName)))
+                try
                 {
-                    var funcIgnorePath = Path.Join(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
-                    // If .funcignore exists and already has the venv name, we are done here
-                    if (FileSystemHelpers.FileExists(funcIgnorePath))
+                    var virtualEnvName = Path.GetFileNameWithoutExtension(VirtualEnvironmentPath);
+                    if (FileSystemHelpers.DirectoryExists(Path.Join(Environment.CurrentDirectory, virtualEnvName)))
                     {
-                        var rawfuncIgnoreContents = await FileSystemHelpers.ReadAllTextFromFileAsync(funcIgnorePath);
-                        if (rawfuncIgnoreContents.Contains(Environment.NewLine + virtualEnvName))
+                        var funcIgnorePath = Path.Join(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
+                        // If .funcignore exists and already has the venv name, we are done here
+                        if (FileSystemHelpers.FileExists(funcIgnorePath))
                         {
-                            return;
+                            var rawfuncIgnoreContents = await FileSystemHelpers.ReadAllTextFromFileAsync(funcIgnorePath);
+                            if (rawfuncIgnoreContents.Contains(Environment.NewLine + virtualEnvName))
+                            {
+                                return;
+                            }
+                        }
+                        // Write the current env to .funcignore
+                        ColoredConsole.WriteLine($"Writing {Constants.FuncIgnoreFile}");
+                        using (var fileStream = FileSystemHelpers.OpenFile(funcIgnorePath, FileMode.Append, FileAccess.Write))
+                        using (var streamWriter = new StreamWriter(fileStream))
+                        {
+                            await streamWriter.WriteAsync(Environment.NewLine + virtualEnvName);
+                            await streamWriter.FlushAsync();
                         }
                     }
-                    // Write the current env to .funcignore
-                    ColoredConsole.WriteLine($"Writing {Constants.FuncIgnoreFile}");
-                    using (var fileStream = FileSystemHelpers.OpenFile(funcIgnorePath, FileMode.Append, FileAccess.Write))
-                    using (var streamWriter = new StreamWriter(fileStream))
-                    {
-                        await streamWriter.WriteAsync(Environment.NewLine + virtualEnvName);
-                        await streamWriter.FlushAsync();
-                    }
+                }
+                catch (Exception)
+                {
+                    // Safe execution, we aren't harmed by failures here
                 }
             }
-            catch (Exception)
-            {
-                // Safe execution, we aren't harmed by failures here
-            }
         }
 
-        private static async Task PipFreeze(string path = null)
+        private static void CreateRequirements(string path = null)
         {
-            var sb = new StringBuilder();
-            var exe = new Executable("pip", "freeze");
-            ColoredConsole.WriteLine($"Running {exe.Command}");
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l));
-
-            var filePath = string.IsNullOrEmpty(path) ? Constants.RequirementsTxt : Path.Combine(path, Constants.RequirementsTxt);
-
-            if (exitCode == 0)
-            {
-                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, sb.ToString());
-            }
-            else
-            {
-                throw new CliException($"Error running {exe.Command}");
-            }
-        }
-
-        private static Task InstallPythonAzureFunctionPackage() => PipInstallPackages(_workerPackages);
-
-        private static Task InstallPipWheel() => PipInstallPackage("wheel");
-
-        private static Task PipInstallPackages(IEnumerable<string> packageNames) => Task.WhenAll(packageNames.Select(PipInstallPackage));
-
-        private static async Task PipInstallPackage(string packageName)
-        {
-            ColoredConsole.WriteLine($"Installing {packageName} package");
-            var exe = new Executable("pip", $"install {packageName}");
-            var sb = new StringBuilder();
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
-            if (exitCode != 0)
-            {
-                throw new CliException($"Error running '{exe.Command}'. {sb.ToString()}");
-            }
-
+            var reqFile = string.IsNullOrEmpty(path) ? Constants.RequirementsTxt : Path.Combine(path, Constants.RequirementsTxt);
+            FileSystemHelpers.CreateFile(reqFile);
         }
 
         private static async Task VerifyVersion()
@@ -222,6 +182,10 @@ namespace Azure.Functions.Cli.Helpers
                 else
                 {
                     await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
+
+                    var workerPackagesFiles = Path.GetTempFileName();
+                    await FileSystemHelpers.WriteAllTextToFileAsync(workerPackagesFiles, string.Join(Environment.NewLine, Constants.PythonWorkerPackages));
+                    await DockerHelpers.CopyToContainer(containerId, workerPackagesFiles, $"/{Constants.PythonWorkerPackagesFiles}");
                 }
                 var bundleScriptFilePath = Path.GetTempFileName();
                 await FileSystemHelpers.WriteAllTextToFileAsync(bundleScriptFilePath, (await StaticResources.PythonBundleScript).Replace("\r\n", "\n"));

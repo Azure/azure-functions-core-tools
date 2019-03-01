@@ -59,20 +59,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public Task init_python_app_expect_error()
-        {
-            return CliTester.Run(new RunConfiguration
-            {
-                Commands = new[] { "init . --worker-runtime python" },
-                HasStandardError = true,
-                ErrorContains = new[]
-                {
-                    "For Python function apps, you have to be running in a venv."
-                }
-            }, _output);
-        }
-
-        [Fact]
         public Task init_dotnet_app()
         {
             return CliTester.Run(new RunConfiguration
