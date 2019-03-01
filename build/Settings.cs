@@ -79,7 +79,14 @@ namespace Build
             public static readonly string Authenticode = "SignAuthenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string[] RuntimesToSign = new[] {"min.win-x86"};
-            public static readonly string[] filterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py" };
+            public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py" };
+            public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
+
+            public static readonly string[] SkipSigcheckTest = new[] {
+                "aspnetcorev2_inprocess.dll",
+                "Microsoft.AspNetCore.Buffering.dll",
+                "Microsoft.AspNetCore.Server.IIS.dll"
+            };
 
             public static readonly string[] authentiCodeBinaries = new[] {
                 "DurableTask.AzureStorage.Internal.dll",

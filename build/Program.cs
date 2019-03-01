@@ -24,6 +24,7 @@ namespace Build
                 .Then(EnqueueSignMessage, skip: !args.Contains("--sign"))
                 .Then(WaitForSigning, skip: !args.Contains("--sign"))
                 .Then(ReplaceSignedZipAndCleanup, skip: !args.Contains("--sign"))
+                .Then(TestSignedArtifacts, skip: !args.Contains("--sign"))
                 .Then(Test)
                 .Then(Zip)
                 .Then(UploadToStorage)

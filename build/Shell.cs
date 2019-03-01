@@ -29,13 +29,13 @@ namespace Build
             }
         }
 
-        public static string GetOutput(string program, string arguments)
+        public static string GetOutput(string program, string arguments, bool ignoreExitCode = false)
         {
             var exe = new InternalExe(program, arguments);
             var sb = new StringBuilder();
             var exitCode = exe.Run(o => sb.AppendLine(o?.Trim()), e => ColoredConsole.Error.WriteLine(e.Red()));
 
-            if (exitCode != 0)
+            if (!ignoreExitCode && exitCode != 0)
             {
                 throw new Exception($"{program} exit code == {exitCode}");
             }
