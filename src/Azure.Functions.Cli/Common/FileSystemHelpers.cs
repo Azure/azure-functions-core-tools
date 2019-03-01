@@ -95,6 +95,11 @@ namespace Azure.Functions.Cli.Common
             Instance.Directory.CreateDirectory(path);
         }
 
+        public static void CreateFile(string path)
+        {
+            Instance.File.Create(path);
+        }
+
         public static string EnsureDirectory(string path)
         {
             if (!DirectoryExists(path))

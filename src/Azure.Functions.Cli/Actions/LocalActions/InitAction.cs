@@ -159,7 +159,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (workerRuntime == Helpers.WorkerRuntime.python)
             {
-                await PythonHelpers.InstallPackage();
+                await PythonHelpers.SetupPythonProject();
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {

@@ -14,10 +14,14 @@ worker_venv/bin/pip install -r requirements.txt
 # Bundle using pyinstaller
 worker_venv/bin/pip install pyinstaller==3.4
 
+if [ -f /worker_packages.txt ]; then
+	pip install --target=/worker_packages -r /worker_packages.txt
+fi
+
 pyinstaller_success=false
 
 # If pyinstaller succeeds, we deactivate and remove the venv
-if worker_venv/bin/python /python_bundle_script.py /azure-functions-host/workers/python/worker.py; then
+if worker_venv/bin/python /python_bundle_script.py /azure-functions-host/workers/python/worker.py /worker_packages; then
 	pyinstaller_success=true
 else
 	if [ -d ./worker-bundle ]; then

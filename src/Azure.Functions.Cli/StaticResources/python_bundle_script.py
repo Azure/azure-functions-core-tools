@@ -42,14 +42,19 @@ def is_python_file(a_file):
 
 def __main__():
     if len(sys.argv) < 2:
-        print("Need more arguments: Usage: python_build_template.py [starter_script]")
+        print("Need more arguments: Usage: python_build_template.py <starter_script> [woker_python_packages]")
         return 
     packages_location = get_python_lib()
     all_modules = get_possible_modules(packages_location)
+    paths_var = packages_location
+    if len(sys.argv) >= 3:
+        woker_python_packages = sys.argv[2]
+        all_modules.extend(get_possible_modules(woker_python_packages))
+        paths_var = paths_var + ':' + woker_python_packages
     entry_file = sys.argv[1]
     # Creates a list of hidden imports arguments for pyinstaller in the format - "--hidden-import=<module>"
     hidden_modules_commands = ["--hidden-import=" + module_name for module_name in all_modules]
-    run(["--paths=" + packages_location, "--distpath=.", *hidden_modules_commands, "--name=worker-bundle", entry_file])
+    run(["--paths=" + paths_var, "--distpath=.", *hidden_modules_commands, "--name=worker-bundle", entry_file])
 
 if __name__ == '__main__':
     __main__()
