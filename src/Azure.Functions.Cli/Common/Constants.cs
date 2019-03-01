@@ -179,7 +179,15 @@ namespace Azure.Functions.Cli.Common
                     { "cosmosdb",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
-                            Version =  "3.0.1"} }
+                            Version =  "3.0.1"} },
+                    { "signalr",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.SignalRService",
+                            Version =  "1.0.0"} },
+                    { "signalrconnectioninfo",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.SignalRService",
+                            Version =  "1.0.0"} }
                 });
     }
 }
