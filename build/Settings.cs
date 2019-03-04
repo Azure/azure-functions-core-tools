@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -34,6 +35,17 @@ namespace Build
 
         public static readonly string[] TargetRuntimes = new[] { "win-x86", "win-x64", "linux-x64", "osx-x64", "no-runtime", "min.win-x86", "min.win-x64" };
 
+        public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
+        {
+            { "win-x86", "Windows" },
+            { "win-x64", "Windows" },
+            { "linux-x64", "Linux" },
+            { "osx-x64", "Mac" },
+            { "no-runtime", "Linux" },
+            { "min.win-x86", "Windows" },
+            { "min.win-x64", "Windows" },
+        };
+
         public static readonly string[] LanguageWorkers = new[] { "Java", "Powershell", "Node" };
 
         public static string MinifiedVersionPrefix = "min.";
@@ -41,10 +53,6 @@ namespace Build
         public const string DistLibVersion = "distlib-15dba58a827f56195b0fa0afe80a8925a92e8bf5";
 
         public const string DistLibUrl = "https://github.com/vsajip/distlib/archive/15dba58a827f56195b0fa0afe80a8925a92e8bf5.zip";
-
-        public const string PythonWorkerUrl = "https://raw.githubusercontent.com/Azure/azure-functions-python-worker/1.0.0b4/python/worker.py";
-
-        public const string PythonWorkerConfigUrl = "https://raw.githubusercontent.com/Azure/azure-functions-python-worker/1.0.0b4/python/worker.config.json";
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
