@@ -107,17 +107,14 @@ namespace Build
 
         public static void AddPythonWorker()
         {
-            var pythonWorkerPath = Path.Combine(Settings.OutputDir, "python-worker");
-            Directory.CreateDirectory(pythonWorkerPath);
-            using (var client = new WebClient())
-            {
-                client.DownloadFile(Settings.PythonWorkerUrl, Path.Combine(pythonWorkerPath, "worker.py"));
-                client.DownloadFile(Settings.PythonWorkerConfigUrl, Path.Combine(pythonWorkerPath, "worker.config.json"));
-            }
-
             foreach (var runtime in Settings.TargetRuntimes)
             {
-                FileHelpers.RecursiveCopy(pythonWorkerPath, Path.Combine(Settings.OutputDir, runtime, "workers", "python"));
+                // Python worker's dependencies are platform dependent and need to be copied accordingly
+                var pythonDir = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
+                var allOsDirectories = Directory.GetDirectories(pythonDir);
+                var pythonPlatformSpecificWorker = Path.Combine(pythonDir, Settings.RuntimesToOS[runtime]);
+                FileHelpers.RecursiveCopy(pythonPlatformSpecificWorker, pythonDir);
+                allOsDirectories.ToList().ForEach(dir => Directory.Delete(dir, recursive: true));
             }
         }
 

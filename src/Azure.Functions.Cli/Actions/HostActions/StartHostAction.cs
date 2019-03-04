@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
@@ -248,6 +249,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             if (workerRuntime == WorkerRuntime.python)
             {
                 PythonHelpers.VerifyVirtualEnvironment();
+                // We need to update the PYTHONPATH to add worker's dependencies
+                var pythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? string.Empty;
+                var pythonWorkerDeps = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "workers", "python", "deps");
+                if (!pythonPath.Contains(pythonWorkerDeps))
+                {
+                    Environment.SetEnvironmentVariable("PYTHONPATH", $"{pythonWorkerDeps}{Path.PathSeparator}{pythonPath}", EnvironmentVariableTarget.Process);
+                }
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine($"PYTHONPATH for the process is: {Environment.GetEnvironmentVariable("PYTHONPATH")}");
+                }
             }
             else if (workerRuntime == WorkerRuntime.dotnet && !NoBuild)
             {
