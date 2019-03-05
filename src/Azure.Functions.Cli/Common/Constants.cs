@@ -45,8 +45,8 @@ namespace Azure.Functions.Cli.Common
 
         public static readonly IEnumerable<string> PythonWorkerPackages = new string[]
         {
-            "azure-functions==1.0.0b3",
-            "azure-functions-worker==1.0.0b4"
+            "azure-functions==[NEW_VERSION]",
+            "azure-functions-worker==[NEW_VERSION]"
         };
 
         public static class Errors
@@ -78,7 +78,7 @@ namespace Azure.Functions.Cli.Common
 
         public static class DockerImages
         {
-            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12309";
+            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:[NEW_DOCKER_IMAGE_VERSION]";
         }
 
         public static class StaticResourcesNames
