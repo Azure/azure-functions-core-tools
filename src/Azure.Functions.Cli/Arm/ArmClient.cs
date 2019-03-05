@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Arm
             {
                 const string jsonContentType = "application/json";
                 client.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-                client.DefaultRequestHeaders.Add("User-Agent", "functions-cli/2.0");
+                client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
                 client.DefaultRequestHeaders.Add("Accept", jsonContentType);
                 client.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
 

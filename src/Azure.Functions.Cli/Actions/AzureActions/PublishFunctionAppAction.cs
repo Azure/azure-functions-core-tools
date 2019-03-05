@@ -581,6 +581,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 Timeout = Timeout.InfiniteTimeSpan
             };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+            client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
             return client;
         }
     }
