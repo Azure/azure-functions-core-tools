@@ -31,15 +31,15 @@ namespace Azure.Functions.Cli.Tests.E2E
                         workerRuntime
                     }
                 },
-                
+
             };
-            
+
             if (workerRuntime == "powershell")
             {
                 files.Add(new FileResult
                 {
                     Name = "profile.ps1",
-                    ContentContains = new [] { "# Azure Functions profile.ps1" }
+                    ContentContains = new[] { "# Azure Functions profile.ps1" }
                 });
             }
 
@@ -249,6 +249,47 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                }
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("dotnet")]
+        [InlineData("node")]
+        public Task init_docker_only_for_existing_project(string workerRuntime)
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime {workerRuntime}",
+                    $"init . --docker-only",
+                },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:2.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_docker_only_no_project()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --docker-only"
+                },
+                HasStandardError = true,
+                ErrorContains = new[]
+                {
+                    $"Unable to find project root"
                 }
             }, _output);
         }
