@@ -4,6 +4,7 @@ import argparse
 import os
 import os.path
 import pathlib
+import platform
 import re
 import shutil
 import subprocess
@@ -26,6 +27,7 @@ _wheel_file_pattern = r"""
     \.whl)$
 """
 
+
 class ExitCode(IntEnum):
     success = 0
     general_error = 1
@@ -43,6 +45,7 @@ def run(cmd, *, verbose=False, **kwargs):
     else:
         stdout = stderr = subprocess.PIPE
 
+    cmd = [str(c) for c in cmd]
     print(' '.join(cmd))
     return subprocess.run(cmd, stdout=stdout, stderr=stderr, **kwargs)
 
@@ -63,11 +66,19 @@ def main(argv=sys.argv[1:]):
 def find_and_build_deps(args):
     app_path = pathlib.Path(args.path)
     req_txt = app_path / 'requirements.txt'
+    conda_env = app_path / 'environment.yml'
 
-    if not req_txt.exists():
-        die('missing requirements.txt file.  '
+    if req_txt.exists():
+        return build_pip_deps(args, req_txt)
+    elif conda_env.exists():
+        return build_conda_deps(args, conda_env)
+    else:
+        die('could not find requirements.txt or environment.yml. '
             'If you do not have any requirements, please pass --no-deps.')
 
+
+def build_pip_deps(args, req_txt):
+    app_path = pathlib.Path(args.path)
     packages = []
 
     # First, we need to figure out the complete list of dependencies
@@ -202,9 +213,31 @@ def build_independent_wheel(name, version, args, dest):
 
 def build_binary_wheel(name, version, args, dest):
     die(f'cannot install {name}-{version} dependency: binary dependencies '
-        f'without wheels are not supported.  Use the --build-native-deps option '
-        f'to automatically build and configure the dependencies using a Docker container. '
-        f'More information at https://aka.ms/func-python-publish', ExitCode.native_deps_error)
+        f'without wheels are not supported.  Use the --build-native-deps '
+        f'option to automatically build and configure the dependencies '
+        f'using a Docker container. '
+        f'More information at https://aka.ms/func-python-publish',
+        ExitCode.native_deps_error)
+
+
+def build_conda_deps(args, conda_env):
+    app_path = pathlib.Path(args.path)
+
+    if platform.system().lower() != args.platform:
+        require_docker_conda_build()
+
+    run([
+        'conda', 'env', 'create', '-f', conda_env,
+        '-p', app_path / args.packages_dir_name,
+    ])
+
+
+def require_docker_conda_build():
+    die(f'cannot install conda dependencies: platform not supported. '
+        f'Use the --build-native-deps option to automatically build and '
+        f'configure the dependencies using a Docker container. '
+        f'More information at https://aka.ms/func-python-publish',
+        ExitCode.native_deps_error)
 
 
 def parse_args(argv):

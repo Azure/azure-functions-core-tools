@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli.Common
         public const string FuncIgnoreFile = ".funcignore";
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string RequirementsTxt = "requirements.txt";
+        public const string EnvironmentYml = "environment.yml";
         public const string FunctionJsonFileName = "function.json";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
@@ -85,6 +86,7 @@ namespace Azure.Functions.Cli.Common
         {
             public const string PythonDockerBuild = "python_docker_build.sh";
             public const string PythonDockerBuildNoBundler = "python_docker_build_no_bundler.sh";
+            public const string PythonDockerBuildConda = "python_docker_build_conda.sh";
             public const string PythonBundleScript = "python_bundle_script.py";
         }
 

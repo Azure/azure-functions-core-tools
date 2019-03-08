@@ -45,6 +45,9 @@
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\python_docker_build_conda.sh">
+      <LogicalName>$(AssemblyName).python_docker_build_conda.sh</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\python_docker_build_no_bundler.sh">
       <LogicalName>$(AssemblyName).python_docker_build_no_bundler.sh</LogicalName>
     </EmbeddedResource>
