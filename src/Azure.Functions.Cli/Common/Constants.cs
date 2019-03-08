@@ -138,7 +138,7 @@ namespace Azure.Functions.Cli.Common
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.AuthTokens",
                             Version =  "1.0.0-beta6"} },
-                     { "excel",
+                    { "excel",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
                             Version =  "1.0.0-beta6"} },
