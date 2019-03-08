@@ -95,27 +95,27 @@ namespace Azure.Functions.Cli.Common
                     { "blobtrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "blob",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "queue",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "queuetrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "table",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "servicebustrigger",
                         new ExtensionPackage() {
