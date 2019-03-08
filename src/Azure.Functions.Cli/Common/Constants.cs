@@ -112,6 +112,11 @@ namespace Azure.Functions.Cli.Common
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
                         Version =  "3.0.0" }
                     },
+                    { "table",
+                        new ExtensionPackage() {
+                        Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
+                        Version =  "3.0.0" }
+                    },
                     { "servicebustrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.ServiceBus",
