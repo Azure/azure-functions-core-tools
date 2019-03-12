@@ -1,4 +1,4 @@
-FROM microsoft/dotnet:2.1-sdk AS installer-env
+FROM microsoft/dotnet:2.2-sdk AS installer-env
 
 COPY . /src/dotnet-function-app
 RUN cd /src/dotnet-function-app && \
