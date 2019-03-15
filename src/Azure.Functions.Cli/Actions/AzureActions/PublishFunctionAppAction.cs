@@ -351,46 +351,37 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task PublishRunFromPackage(Site functionApp, Stream zipFile)
         {
+            // Upload zip to blob storage
             ColoredConsole.WriteLine("Preparing archive...");
-
             var sas = await UploadZipToStorage(zipFile, functionApp.AzureAppSettings);
-
-            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = sas;
-
-            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
             ColoredConsole.WriteLine("Upload completed successfully.");
-            if (!result.IsSuccessful)
-            {
-                ColoredConsole
-                    .Error
-                    .WriteLine(ErrorColor("Error updating app settings:"))
-                    .WriteLine(ErrorColor(result.ErrorResult));
-            }
-            else
-            {
-                ColoredConsole.WriteLine("Deployment completed successfully.");
-            }
+
+            // Set app setting
+            await SetRunFromPackageAppSetting(functionApp, sas);
+            ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
         private async Task PublishRunFromPackageLocal(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
-            // Set app setting
-            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = "1";
-
-            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
-            
-            if (!result.IsSuccessful)
-            {
-                ColoredConsole
-                    .Error
-                    .WriteLine(ErrorColor("Error updating app settings:"))
-                    .WriteLine(ErrorColor(result.ErrorResult));
-            }
+            await SetRunFromPackageAppSetting(functionApp, "1");
 
             // Zip deploy
             await PublishZipDeploy(functionApp, zipFileFactory);
 
             ColoredConsole.WriteLine("Deployment completed successfully.");          
+        }
+
+        private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue)
+        {
+            // Set app setting
+            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = runFromPackageValue;
+
+            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
+
+            if (!result.IsSuccessful)
+            {
+                throw new CliException($"Error updating app settings: {result.ErrorResult}.");
+            }
         }
 
         public async Task PublishZipDeploy(Site functionApp, Func<Task<Stream>> zipFileFactory)
