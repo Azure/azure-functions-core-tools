@@ -271,7 +271,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
-            // For dedicated linux apps, we do not support Run from zip right now
+            // For dedicated linux apps, we do not support run from package right now
             if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromPackageDeploy)
             {
                 ColoredConsole.WriteLine("Assuming --nozip (do not run from package) for publishing to Linux dedicated plan.");
