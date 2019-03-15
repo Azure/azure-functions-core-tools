@@ -46,7 +46,7 @@ namespace Build
             { "min.win-x64", "Windows" },
         };
 
-        public static readonly string[] LanguageWorkers = new[] { "Java", "Powershell", "Node" };
+        public static readonly string[] LanguageWorkers = new[] { "Java", "Powershell", "Node", "Python" };
 
         public static string MinifiedVersionPrefix = "min.";
 
