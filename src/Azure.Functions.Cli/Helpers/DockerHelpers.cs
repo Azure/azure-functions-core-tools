@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static Task ExecInContainer(string containerId, string command) => RunDockerCommand($"exec -t {containerId} {command}", containerId);
 
-        public static Task CopyFromContainer(string containerId, string source, string target) => RunDockerCommand($"cp {containerId}:{source} {target}", containerId);
+        public static Task CopyFromContainer(string containerId, string source, string target) => RunDockerCommand($"cp {containerId}:\"{source}\" \"{target}\"", containerId);
 
         public static Task KillContainer(string containerId, bool ignoreError = false) => RunDockerCommand($"kill {containerId}", containerId, ignoreError);
 
