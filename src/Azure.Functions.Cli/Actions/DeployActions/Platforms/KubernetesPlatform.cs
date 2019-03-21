@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                             });
 
             File.WriteAllText("deployment.json", json);
-            KubernetesHelper.RunKubectl($"apply -f deployment.json");
+            await KubernetesHelper.RunKubectl($"apply -f deployment.json");
 
             ColoredConsole.WriteLine("Deployment successful");
 
