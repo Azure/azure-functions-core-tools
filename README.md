@@ -150,10 +150,22 @@ func init --docker
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server>
 ```
 
+### Deploy using a private registry
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --pull-secret <registry auth secret>
+```
+
 ### Deploy a function with a minimum of 3 instances and a maximum of 10
 
 ```bash
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --min 3 --max 10
+```
+
+### Deploy a function to a custom namespace
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --namespace <namespace-name>
 ```
 
 #### Scaling out Http Trigger
