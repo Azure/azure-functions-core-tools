@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         private const string FUNCTIONS_NAMESPACE = "azure-functions";
         private static KubeApiClient client;
 
-        public async Task DeployContainerizedFunction(string functionName, string image, int min, int max)
+        public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
             await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max);
         }
