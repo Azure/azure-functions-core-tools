@@ -154,7 +154,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new []
                         {
                             "../dist/testfunc/index.js",
-                            "queueTrigger"
+                            "blobTrigger"
                         },
                         ContentNotContains = new []
                         {
