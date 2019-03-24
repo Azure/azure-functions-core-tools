@@ -165,7 +165,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"blob trigger\" template."
+                    "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
                 }
             }, _output);
         }
