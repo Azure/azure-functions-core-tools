@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool noBundler, string additionalPackages)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, string additionalPackages)
         {
             if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
             {
@@ -111,7 +111,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
                 {
-                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages, noBundler);
+                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages);
                 }
                 else
                 {
@@ -159,7 +159,7 @@ namespace Azure.Functions.Cli.Helpers
             return packagesLocation;
         }
 
-        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool noBundler)
+        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages)
         {
             var appContentPath = CopyToTemp(files, functionAppRoot);
             var dockerImage = string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting))
@@ -175,20 +175,7 @@ namespace Azure.Functions.Cli.Helpers
                 await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/home/site/wwwroot");
 
                 var scriptFilePath = Path.GetTempFileName();
-                if (noBundler)
-                {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildNoBundler).Replace("\r\n", "\n"));
-                }
-                else
-                {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
-
-                    var workerPackagesFiles = Path.GetTempFileName();
-                    await FileSystemHelpers.WriteAllTextToFileAsync(workerPackagesFiles, string.Join(Environment.NewLine, Constants.PythonWorkerPackages));
-                    await DockerHelpers.CopyToContainer(containerId, workerPackagesFiles, $"/{Constants.PythonWorkerPackagesFiles}");
-                }
-                var bundleScriptFilePath = Path.GetTempFileName();
-                await FileSystemHelpers.WriteAllTextToFileAsync(bundleScriptFilePath, (await StaticResources.PythonBundleScript).Replace("\r\n", "\n"));
+                await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
 
                 if (!string.IsNullOrWhiteSpace(additionalPackages))
                 {
@@ -198,9 +185,7 @@ namespace Azure.Functions.Cli.Helpers
                     await DockerHelpers.ExecInContainer(containerId, $"apt-get install -y {additionalPackages}");
                 }
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
-                await DockerHelpers.CopyToContainer(containerId, bundleScriptFilePath, Constants.StaticResourcesNames.PythonBundleScript);
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
-                await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonBundleScript}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
 
                 var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());

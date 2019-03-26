@@ -27,7 +27,6 @@ namespace Azure.Functions.Cli.Common
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
         public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
-        public const string PythonWorkerPackagesFiles = "worker_packages.txt";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -41,12 +40,6 @@ namespace Azure.Functions.Cli.Common
             { WorkerRuntime.node, new [] { "mcr.microsoft.com/azure-functions/node", "microsoft/azure-functions-node8" } },
             { WorkerRuntime.python, new [] { "mcr.microsoft.com/azure-functions/python", "microsoft/azure-functions-python3.6"  } },
             { WorkerRuntime.powershell, new [] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } }
-        };
-
-        public static readonly IEnumerable<string> PythonWorkerPackages = new string[]
-        {
-            "azure-functions==1.0.0b3",
-            "azure-functions-worker==1.0.0b4"
         };
 
         public static class Errors
@@ -84,8 +77,6 @@ namespace Azure.Functions.Cli.Common
         public static class StaticResourcesNames
         {
             public const string PythonDockerBuild = "python_docker_build.sh";
-            public const string PythonDockerBuildNoBundler = "python_docker_build_no_bundler.sh";
-            public const string PythonBundleScript = "python_bundle_script.py";
         }
 
         public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.1" };
