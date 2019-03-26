@@ -100,8 +100,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // Restore all valid extensions
             var installExtensionAction = new InstallExtensionAction(_secretsManager);
             await installExtensionAction.RunAsync();
-
-            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, additionalPackages: AdditionalPackages);
+            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, noBuild: false, additionalPackages: AdditionalPackages);
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
             await FileSystemHelpers.WriteToFile(outputPath, zipStream);
         }

@@ -100,7 +100,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(csx => Csx = csx);
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Skip building dotnet functions")
+                .WithDescription("Skip building and fetching dependencies for the function project.")
                 .Callback(f => NoBuild = f);
             Parser
                 .Setup<string>("dotnet-cli-params")
@@ -284,7 +284,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // If Consumption Linux
             if ((functionApp.IsLinux && functionApp.IsDynamic))
