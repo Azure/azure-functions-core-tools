@@ -13,6 +13,7 @@ import tempfile
 import distlib.scripts
 import distlib.wheel
 
+from enum import IntEnum
 
 _platform_map = {
     'linux': 'manylinux1_x86_64',
@@ -25,10 +26,15 @@ _wheel_file_pattern = r"""
     \.whl)$
 """
 
+class ExitCode(IntEnum):
+    success = 0
+    general_error = 1
+    native_deps_error = 4
 
-def die(msg):
+
+def die(msg, exitcode=ExitCode.general_error):
     print(f'ERROR: {msg}', file=sys.stderr)
-    sys.exit(1)
+    sys.exit(int(exitcode))
 
 
 def run(cmd, *, verbose=False, **kwargs):
@@ -198,7 +204,7 @@ def build_binary_wheel(name, version, args, dest):
     die(f'cannot install {name}-{version} dependency: binary dependencies '
         f'without wheels are not supported.  Use the --build-native-deps option '
         f'to automatically build and configure the dependencies using a Docker container. '
-        f'More information at https://aka.ms/func-python-publish')
+        f'More information at https://aka.ms/func-python-publish', ExitCode.native_deps_error)
 
 
 def parse_args(argv):

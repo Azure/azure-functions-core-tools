@@ -10,13 +10,18 @@ namespace Build
 {
     public static class Shell
     {
-        public static void Run(string program, string arguments, bool streamOutput = true)
+        public static void Run(string program, string arguments, bool streamOutput = true, bool silent = false)
         {
             var exe = new InternalExe(program, arguments, streamOutput);
 
-            ColoredConsole.WriteLine($"> {program} {arguments}".Green());
+            if (!silent)
+            {
+                ColoredConsole.WriteLine($"> {program} {arguments}".Green());
+            }
 
-            var exitcode = exe.Run(l => ColoredConsole.Out.WriteLine(l.DarkGray()), e => ColoredConsole.Error.WriteLine(e.Red()));
+            var exitcode = silent
+                ? exe.Run()
+                : exe.Run(l => ColoredConsole.Out.WriteLine(l.DarkGray()), e => ColoredConsole.Error.WriteLine(e.Red()));
 
             if (exitcode != 0)
             {
@@ -24,13 +29,13 @@ namespace Build
             }
         }
 
-        public static string GetOutput(string program, string arguments)
+        public static string GetOutput(string program, string arguments, bool ignoreExitCode = false)
         {
             var exe = new InternalExe(program, arguments);
             var sb = new StringBuilder();
             var exitCode = exe.Run(o => sb.AppendLine(o?.Trim()), e => ColoredConsole.Error.WriteLine(e.Red()));
 
-            if (exitCode != 0)
+            if (!ignoreExitCode && exitCode != 0)
             {
                 throw new Exception($"{program} exit code == {exitCode}");
             }

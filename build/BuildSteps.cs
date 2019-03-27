@@ -2,13 +2,17 @@ using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.WindowsAzure.Storage.Queue;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 
 namespace Build
 {
@@ -75,7 +79,11 @@ namespace Build
         {
             foreach (var languageWorker in Settings.LanguageWorkers)
             {
-                Directory.Delete(Path.Combine(outputPath, "workers", languageWorker), recursive: true);
+                var path = Path.Combine(outputPath, "workers", languageWorker);
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: true);
+                }
             }
         }
 
@@ -100,17 +108,17 @@ namespace Build
 
         public static void AddPythonWorker()
         {
-            var pythonWorkerPath = Path.Combine(Settings.OutputDir, "python-worker");
-            Directory.CreateDirectory(pythonWorkerPath);
-            using (var client = new WebClient())
-            {
-                client.DownloadFile(Settings.PythonWorkerUrl, Path.Combine(pythonWorkerPath, "worker.py"));
-                client.DownloadFile(Settings.PythonWorkerConfigUrl, Path.Combine(pythonWorkerPath, "worker.config.json"));
-            }
-
             foreach (var runtime in Settings.TargetRuntimes)
             {
-                FileHelpers.RecursiveCopy(pythonWorkerPath, Path.Combine(Settings.OutputDir, runtime, "workers", "python"));
+                // Python worker's dependencies are platform dependent and need to be copied accordingly
+                var pythonDir = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
+                if (Directory.Exists(pythonDir))
+                {
+                    var allOsDirectories = Directory.GetDirectories(pythonDir);
+                    var pythonPlatformSpecificWorker = Path.Combine(pythonDir, Settings.RuntimesToOS[runtime]);
+                    FileHelpers.RecursiveCopy(pythonPlatformSpecificWorker, pythonDir);
+                    allOsDirectories.ToList().ForEach(dir => Directory.Delete(dir, recursive: true));
+                }
             }
         }
 
@@ -152,6 +160,185 @@ namespace Build
             Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
         }
 
+        public static void GenerateZipToSign()
+        {
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                Directory.CreateDirectory(Path.Combine(targetDir, Settings.SignInfo.ToSignDir));
+
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
+                // Grab all the files and filter the extensions not to be signed
+                var toSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths)).Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext)));
+                FileHelpers.CreateZipFile(toSignFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignZipName));
+
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
+                // Grab all the files and filter the extensions not to be signed
+                var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths)).Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext)));
+                FileHelpers.CreateZipFile(toSignThirdPartyFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignThirdPartyName));
+            }
+        }
+
+        public static void UploadZipToSign()
+        {
+            UploadZipToSignAsync().Wait();
+        }
+
+        public static async Task UploadZipToSignAsync()
+        {
+            var storageConnection = Settings.SignInfo.AzureSigningConnectionString;
+            var storageAccount = CloudStorageAccount.Parse(storageConnection);
+            var blobClient = storageAccount.CreateCloudBlobClient();
+            var blobContainer = blobClient.GetContainerReference(Settings.SignInfo.AzureToSignContainerName);
+            await blobContainer.CreateIfNotExistsAsync();
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+
+                var toSignBlob = blobContainer.GetBlockBlobReference($"{Settings.SignInfo.ToSignZipName}-{supportedRuntime}");
+                await toSignBlob.UploadFromFileAsync(Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignZipName));
+
+                var toSignThirdPartyBlob = blobContainer.GetBlockBlobReference($"{Settings.SignInfo.ToSignThirdPartyName}-{supportedRuntime}");
+                await toSignThirdPartyBlob.UploadFromFileAsync(Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignThirdPartyName));
+            }
+        }
+
+        public static void EnqueueSignMessage()
+        {
+            EnqueueSignMessageAsync().Wait();
+        }
+
+        public static async Task EnqueueSignMessageAsync()
+        {
+            var storageConnection = Settings.SignInfo.AzureSigningConnectionString;
+            var storageAccount = CloudStorageAccount.Parse(storageConnection);
+            var queueClient = storageAccount.CreateCloudQueueClient();
+            var queue = queueClient.GetQueueReference(Settings.SignInfo.AzureSigningJobName);
+            await queue.CreateIfNotExistsAsync();
+
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+
+                var message = new CloudQueueMessage($"{Settings.SignInfo.Authenticode};{Settings.SignInfo.AzureToSignContainerName};{Settings.SignInfo.ToSignZipName}-{supportedRuntime}");
+                await queue.AddMessageAsync(message);
+
+                var thirdPartyMessage = new CloudQueueMessage($"{Settings.SignInfo.ThirdParty};{Settings.SignInfo.AzureToSignContainerName};{Settings.SignInfo.ToSignThirdPartyName}-{supportedRuntime}");
+                await queue.AddMessageAsync(thirdPartyMessage);
+            }
+        }
+
+        public static void WaitForSigning()
+        {
+            WaitForSigningAsync().Wait();
+        }
+
+        public static async Task WaitForSigningAsync()
+        {
+            var storageConnection = Settings.SignInfo.AzureSigningConnectionString;
+            var storageAccount = CloudStorageAccount.Parse(storageConnection);
+            var blobClient = storageAccount.CreateCloudBlobClient();
+            var blobContainer = blobClient.GetContainerReference(Settings.SignInfo.AzureSignedContainerName);
+            await blobContainer.CreateIfNotExistsAsync();
+
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                Directory.CreateDirectory(Path.Combine(targetDir, Settings.SignInfo.SignedDir));
+                await PollAndDownloadFile($"{Settings.SignInfo.ToSignZipName}-{supportedRuntime}", Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignZipName));
+                await PollAndDownloadFile($"{Settings.SignInfo.ToSignThirdPartyName}-{supportedRuntime}", Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignThirdPartyName));
+            }
+
+            async Task PollAndDownloadFile(string fileName, string downloadTo)
+            {
+                var watch = new Stopwatch();
+                watch.Start();
+                CloudBlockBlob blob;
+                while (!await (blob = blobContainer.GetBlockBlobReference(fileName)).ExistsAsync())
+                {
+                    // Wait for 30 minutes and timeout
+                    if (watch.ElapsedMilliseconds > 1800000)
+                    {
+                        throw new TimeoutException("Timeout waiting for the signed blob");
+                    }
+                    await Task.Delay(5000);
+                }
+                await blob.DownloadToFileAsync(downloadTo, FileMode.OpenOrCreate);
+            }
+        }
+
+        public static void ReplaceSignedZipAndCleanup()
+        {
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                var totalFilesBefore = Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories).Length;
+                var autheticodeZip = Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignZipName);
+                var thirdPartyZip = Path.Combine(targetDir, Settings.SignInfo.SignedDir, Settings.SignInfo.ToSignThirdPartyName);
+
+                FileHelpers.ExtractZipFileForce(autheticodeZip, targetDir);
+                FileHelpers.ExtractZipFileForce(thirdPartyZip, targetDir);
+
+                var totalFilesAfter = Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories).Length;
+
+                // Sanity check to ensure that no files were lost during replace
+                if (totalFilesBefore != totalFilesAfter)
+                {
+                    throw new Exception("Number of files before signing and after signing mismatch.");
+                }
+
+                Directory.Delete(Path.Combine(targetDir, Settings.SignInfo.SignedDir), recursive: true);
+                Directory.Delete(Path.Combine(targetDir, Settings.SignInfo.ToSignDir), recursive: true);
+            }
+        }
+
+        public static void TestSignedArtifacts()
+        {
+            // Download sigcheck.exe
+            var sigcheckPath = Path.Combine(Settings.OutputDir, "sigcheck.exe");
+            using (var client = new WebClient())
+            {
+                client.DownloadFile(Settings.SignInfo.SigcheckDownloadURL, sigcheckPath);
+            }
+
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                // sigcheck.exe will exit with error codes if unsigned binaries present
+                var csvOutputLines = Shell.GetOutput(sigcheckPath, $" -s -u -c -q {targetDir}", ignoreExitCode: true).Split(Environment.NewLine);
+
+                // CSV separators can differ between languages and regions.
+                var csvSep = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ListSeparator;
+                var unSignedPackages = new List<string>();
+
+                foreach (var line in csvOutputLines)
+                {
+                    // Some lines contain sigcheck header info and we filter them out by making sure
+                    // there's at least six commas in each valid line.
+                    if (line.Split(csvSep).Length - 1 > 6)
+                    {
+                        // Package name is the first element in each line.
+                        var fileName = line.Split(csvSep)[0].Trim('"');
+                        unSignedPackages.Add(fileName);
+                    }
+                }
+                // The first element is simply the column heading
+                unSignedPackages = unSignedPackages.Skip(1).ToList();
+
+                // Filter out the extensions we didn't want to sign
+                unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+
+                // Filter out files we don't want to verify
+                unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.SkipSigcheckTest.Any(ext => file.EndsWith(ext))).ToList();
+                if (unSignedPackages.Count() != 0)
+                {
+                    var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
+                    ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
+                    throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
+                }
+            }
+        }
+
         public static void Zip()
         {
             var version = CurrentVersion;
@@ -184,7 +371,7 @@ namespace Build
                 using (var fileStream = File.OpenRead(file))
                 {
                     var sha1 = new SHA256Managed();
-                    return BitConverter.ToString(sha1.ComputeHash(fileStream));
+                    return BitConverter.ToString(sha1.ComputeHash(fileStream)).Replace("-", string.Empty);
                 }
             }
         }
@@ -242,6 +429,27 @@ namespace Build
                 var error = $"{nameof(Settings.BuildArtifactsStorage)} is null or empty. Can't run {nameof(UploadToStorage)} target";
                 ColoredConsole.Error.WriteLine(error.Red());
                 throw new Exception(error);
+            }
+        }
+
+        public static void LogIntoAzure()
+        {
+            var directoryId = Environment.GetEnvironmentVariable("AZURE_DIRECTORY_ID");
+            var appId = Environment.GetEnvironmentVariable("AZURE_SERVICE_PRINCIPAL_ID");
+            var key = Environment.GetEnvironmentVariable("AZURE_SERVICE_PRINCIPAL_KEY");
+
+            if (!string.IsNullOrEmpty(directoryId) &&
+                !string.IsNullOrEmpty(appId) &&
+                !string.IsNullOrEmpty(key))
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    Shell.Run("cmd", $"/c az login --service-principal -u {appId} -p \"{key}\" --tenant {directoryId}", silent: true);
+                }
+                else
+                {
+                    Shell.Run("az", $"login --service-principal -u {appId} -p \"{key}\" --tenant {directoryId}", silent: true);
+                }
             }
         }
     }

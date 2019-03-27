@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
@@ -20,6 +21,7 @@ using Fclp;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -34,11 +36,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool PublishLocalSettingsOnly { get; set; }
         public bool ListIgnoredFiles { get; set; }
         public bool ListIncludedFiles { get; set; }
-        public bool RunFromZipDeploy { get; private set; }
+        public bool RunFromPackageDeploy { get; private set; }
         public bool Force { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
-        public bool NoBundler { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
         public string DotnetCliParameters { get; set; }
@@ -73,9 +74,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(f => ListIncludedFiles = f);
             Parser
                 .Setup<bool>("nozip")
-                .WithDescription("Publish in Run-From-Zip package. Requires the app to have AzureWebJobsStorage setting defined.")
+                .WithDescription("Turns the default Run-From-Package mode off.")
                 .SetDefault(false)
-                .Callback(f => RunFromZipDeploy = !f);
+                .Callback(f => RunFromPackageDeploy = !f);
             Parser
                 .Setup<bool>("build-native-deps")
                 .SetDefault(false)
@@ -83,9 +84,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(f => BuildNativeDeps = f);
             Parser
                 .Setup<bool>("no-bundler")
-                .SetDefault(false)
-                .WithDescription("Skips generating a bundle when publishing python function apps with build-native-deps.")
-                .Callback(f => NoBundler = f);
+                .WithDescription("[Deprecated] Skips generating a bundle when publishing python function apps with build-native-deps.")
+                .Callback(nb => ColoredConsole.WriteLine(Yellow($"Warning: Argument {Cyan("--no-bundler")} is deprecated and a no-op. Python function apps are not bundled anymore.")));
             Parser
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
@@ -100,7 +100,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(csx => Csx = csx);
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Skip building dotnet functions")
+                .WithDescription("Skip building and fetching dependencies for the function project.")
                 .Callback(f => NoBuild = f);
             Parser
                 .Setup<string>("dotnet-cli-params")
@@ -139,6 +139,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
                 }
             }
+
+            // Restore all valid extensions
+            var installExtensionAction = new InstallExtensionAction(_secretsManager);
+            await installExtensionAction.RunAsync();
 
             if (ListIncludedFiles)
             {
@@ -266,9 +270,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
-            if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromZipDeploy)
+            // For dedicated linux apps, we do not support run from package right now
+            if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromPackageDeploy)
             {
-                throw new CliException("Run from package is not supported with dedicated linux apps. Please use --nozip");
+                ColoredConsole.WriteLine("Assuming --nozip (do not run from package) for publishing to Linux dedicated plan.");
+                RunFromPackageDeploy = false;
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
@@ -278,13 +284,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBundler, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
-            // if consumption Linux, or run from zip
-            if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
+            // If Consumption Linux
+            if ((functionApp.IsLinux && functionApp.IsDynamic))
             {
-                await PublishRunFromZip(functionApp, await zipStreamFactory());
+                await PublishRunFromPackage(functionApp, await zipStreamFactory());
             }
+            // If Windows default
+            else if (RunFromPackageDeploy)
+            {
+                await PublishRunFromPackageLocal(functionApp, zipStreamFactory);
+            }
+            // If Dedicated Linux or "--no-zip"
             else
             {
                 await PublishZipDeploy(functionApp, zipStreamFactory);
@@ -300,7 +312,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Syncing triggers is not required when using zipdeploy api
-            if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
+            if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromPackageDeploy)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await SyncTriggers(functionApp);
@@ -336,26 +348,38 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, retryCount: 5);
         }
 
-        private async Task PublishRunFromZip(Site functionApp, Stream zipFile)
+        private async Task PublishRunFromPackage(Site functionApp, Stream zipFile)
         {
+            // Upload zip to blob storage
             ColoredConsole.WriteLine("Preparing archive...");
-
             var sas = await UploadZipToStorage(zipFile, functionApp.AzureAppSettings);
+            ColoredConsole.WriteLine("Upload completed successfully.");
 
-            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_ZIP"] = sas;
+            // Set app setting
+            await SetRunFromPackageAppSetting(functionApp, sas);
+            ColoredConsole.WriteLine("Deployment completed successfully.");
+        }
+
+        private async Task PublishRunFromPackageLocal(Site functionApp, Func<Task<Stream>> zipFileFactory)
+        {
+            await SetRunFromPackageAppSetting(functionApp, "1");
+
+            // Zip deploy
+            await PublishZipDeploy(functionApp, zipFileFactory);
+
+            ColoredConsole.WriteLine("Deployment completed successfully.");          
+        }
+
+        private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue)
+        {
+            // Set app setting
+            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = runFromPackageValue;
 
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
-            ColoredConsole.WriteLine("Upload completed successfully.");
+
             if (!result.IsSuccessful)
             {
-                ColoredConsole
-                    .Error
-                    .WriteLine(ErrorColor("Error updating app settings:"))
-                    .WriteLine(ErrorColor(result.ErrorResult));
-            }
-            else
-            {
-                ColoredConsole.WriteLine("Deployment completed successfully.");
+                throw new CliException($"Error updating app settings: {result.ErrorResult}.");
             }
         }
 
@@ -391,37 +415,62 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
+        private static string CalculateMd5(Stream stream)
+        {
+            using (var md5 = MD5.Create())
+            {
+                var hash = md5.ComputeHash(stream);
+                var base64String = Convert.ToBase64String(hash);
+                stream.Position = 0;
+                return base64String;
+            }
+        }
+
         private async Task<string> UploadZipToStorage(Stream zip, IDictionary<string, string> appSettings)
         {
-            const string containerName = "function-releases";
-            const string blobNameFormat = "{0}-{1}.zip";
-
-            var storageConnection = appSettings["AzureWebJobsStorage"];
-            var storageAccount = CloudStorageAccount.Parse(storageConnection);
-            var blobClient = storageAccount.CreateCloudBlobClient();
-            var blobContainer = blobClient.GetContainerReference(containerName);
-            await blobContainer.CreateIfNotExistsAsync();
-
-            var releaseName = Guid.NewGuid().ToString();
-            var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
-            using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(zip.Length)}", zip.Length))
+            return await RetryHelper.Retry(async () =>
             {
-                await blob.UploadFromStreamAsync(zip,
-                    AccessCondition.GenerateEmptyCondition(),
-                    new BlobRequestOptions(),
-                    new OperationContext(),
-                    progress,
-                    new CancellationToken());
-            }
+                // Setting position to zero, in case we retry, we want to reset the stream
+                zip.Position = 0;
+                var zipMD5 = CalculateMd5(zip);
 
-            var sasConstraints = new SharedAccessBlobPolicy();
-            sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
-            sasConstraints.SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddYears(10);
-            sasConstraints.Permissions = SharedAccessBlobPermissions.Read;
+                const string containerName = "function-releases";
+                const string blobNameFormat = "{0}-{1}.zip";
 
-            var blobToken = blob.GetSharedAccessSignature(sasConstraints);
+                var storageConnection = appSettings["AzureWebJobsStorage"];
+                var storageAccount = CloudStorageAccount.Parse(storageConnection);
+                var blobClient = storageAccount.CreateCloudBlobClient();
+                var blobContainer = blobClient.GetContainerReference(containerName);
+                await blobContainer.CreateIfNotExistsAsync();
 
-            return blob.Uri + blobToken;
+                var releaseName = Guid.NewGuid().ToString();
+                var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
+                using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(zip.Length)}", zip.Length))
+                {
+                    await blob.UploadFromStreamAsync(zip,
+                        AccessCondition.GenerateEmptyCondition(),
+                        new BlobRequestOptions(),
+                        new OperationContext(),
+                        progress,
+                        new CancellationToken());
+                }
+
+                var cloudMd5 = blob.Properties.ContentMD5;
+
+                if (!cloudMd5.Equals(zipMD5))
+                {
+                    throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
+                }
+
+                var sasConstraints = new SharedAccessBlobPolicy();
+                sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
+                sasConstraints.SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddYears(10);
+                sasConstraints.Permissions = SharedAccessBlobPermissions.Read;
+
+                var blobToken = blob.GetSharedAccessSignature(sasConstraints);
+
+                return blob.Uri + blobToken;
+            }, 3, TimeSpan.FromSeconds(1), displayError: true);
         }
 
         private static void InternalListIgnoredFiles(GitIgnoreParser ignoreParser)
@@ -549,6 +598,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 Timeout = Timeout.InfiniteTimeSpan
             };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+            client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
             return client;
         }
     }

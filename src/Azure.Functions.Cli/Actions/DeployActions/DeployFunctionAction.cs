@@ -24,10 +24,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Platform { get; set; } = string.Empty;
         public int MinInstances { get; set; } = 1;
         public int MaxInstances { get; set; } = 1000;
+        public double CPU { get; set; } = 0.1;
+        public int Memory { get; set; } = 128;
+        public string Port { get; set; } = "80";
+        public string Namespace { get; set; } = "azure-functions";
         public string FolderName { get; set; } = string.Empty;
         public string ConfigPath { get; set; } = string.Empty;
+        public string PullSecret  { get; set; } = string.Empty;
 
-        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes" };
+        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes", "knative" };
         private readonly ITemplatesManager _templatesManager;
 
         public DeployAction(ITemplatesManager templatesManager)
@@ -63,6 +68,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(t => MaxInstances = t);
 
             Parser
+                .Setup<string>("pull-secret")
+                .WithDescription("[Optional] The secret holding a private registry credentials")
+                .Callback(t => PullSecret = t);
+
+            Parser
+                .Setup<string>("namespace")
+                .WithDescription("[Optional] The namespace to deploy the function to")
+                .Callback(t => Namespace = t);
+
+            Parser
                 .Setup<string>("config")
                 .WithDescription("[Optional] Config file")
                 .Callback(t => ConfigPath = t);
@@ -92,7 +107,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (!CommandChecker.CommandExists("kubectl"))
             {
-                ColoredConsole.Error.WriteLine(ErrorColor($"kubectl is required for deploying to kubernetes. Please make sure to install kubectl and try again."));
+                ColoredConsole.Error.WriteLine(ErrorColor($"kubectl is required for deploying to kubernetes and knative. Please make sure to install kubectl and try again."));
                 return;
             }
 
@@ -120,7 +135,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            await platform.DeployContainerizedFunction(Name, image, MinInstances, MaxInstances);
+            await platform.DeployContainerizedFunction(Name, image, Namespace, MinInstances, MaxInstances, CPU, Memory, Port, PullSecret);
         }
     }
 }

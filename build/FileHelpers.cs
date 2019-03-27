@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 
 namespace Build
 {
@@ -37,6 +39,70 @@ namespace Build
             {
                 var temppath = Path.Combine(destinationPath, subdir.Name);
                 RecursiveCopy(subdir.FullName, temppath);
+            }
+        }
+
+        public static IEnumerable<string> ExpandFileWildCardEntries(IEnumerable<string> filesAndDirs)
+        {
+            var allEntries = new List<string>();
+            foreach (var entry in filesAndDirs)
+            {
+                if (entry.Contains("*"))
+                {
+                    var files = Directory.GetFiles(Path.GetDirectoryName(entry), Path.GetFileName(entry), SearchOption.AllDirectories);
+                    allEntries.AddRange(files);
+                }
+                else
+                {
+                    allEntries.Add(entry);
+                }
+            }
+            return allEntries;
+        }
+
+        public static IEnumerable<string> GetAllFilesFromFilesAndDirs(IEnumerable<string> filesAndDirs)
+        {
+            var allFiles = new List<string>();
+            foreach (var entry in filesAndDirs)
+            {
+                // Just in case if the file we need to sign does not exist anymore or in this build
+                if (!Directory.Exists(entry) && !File.Exists(entry))
+                {
+                    continue;
+                }
+                FileAttributes attr = File.GetAttributes(entry);
+                if (attr.HasFlag(FileAttributes.Directory))
+                {
+                    var files = Directory.GetFiles(entry, "*", SearchOption.AllDirectories);
+                    allFiles.AddRange(files);
+                }
+                else
+                {
+                    allFiles.Add(entry);
+                }
+            }
+            return allFiles;
+        }
+
+        public static void CreateZipFile(IEnumerable<string> files, string baseDir, string zipFilePath)
+        {
+            using (var zipfile = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
+            {
+                foreach (var file in files)
+                {
+                    zipfile.CreateEntryFromFile(file, Path.GetRelativePath(baseDir, file));
+                }
+            }
+        }
+
+        public static void ExtractZipFileForce(string zipFile, string to)
+        {
+            using (var archive = ZipFile.OpenRead(zipFile))
+            {
+                foreach (ZipArchiveEntry file in archive.Entries)
+                {
+                    file.ExtractToFile(Path.Combine(to, file.FullName), overwrite: true);
+                }
             }
         }
     }

@@ -19,9 +19,9 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         private const string FUNCTIONS_NAMESPACE = "azure-functions";
         private static KubeApiClient client;
 
-        public async Task DeployContainerizedFunction(string functionName, string image, int min, int max)
+        public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
-            await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max);
+            await Deploy(functionName, image, nameSpace, min, max, cpu,  memory, port, pullSecret);
         }
 
         public KubernetesPlatform(string configFile)
@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             await client.DeploymentsV1Beta1().Delete(name, nameSpace);
         }
 
-        private async Task Deploy(string name, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80")
+        private async Task Deploy(string name, string image, string nameSpace, int min, int max, double cpu, int memory, string port, string pullSecret)
         {
             await CreateNamespace(nameSpace);
             client.DefaultNamespace = nameSpace;
@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
             ColoredConsole.WriteLine("Deploying function to Kubernetes...");
 
-            var deployment = GetDeployment(deploymentName, image, cpu, memory, port, nameSpace, min);
+            var deployment = GetDeployment(deploymentName, image, cpu, memory, port, nameSpace, min, pullSecret);
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(deployment,
                             Newtonsoft.Json.Formatting.None,
                             new Newtonsoft.Json.JsonSerializerSettings
@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                             });
 
             File.WriteAllText("deployment.json", json);
-            KubernetesHelper.RunKubectl($"apply -f deployment.json");
+            await KubernetesHelper.RunKubectl($"apply -f deployment.json");
 
             ColoredConsole.WriteLine("Deployment successful");
 
@@ -152,7 +152,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             };
         }
 
-        private Deployment GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min)
+        private Deployment GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min, string pullSecret)
         {
             var deployment = new Deployment();
             deployment.apiVersion = "apps/v1beta1";
@@ -212,6 +212,17 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                     effect = "NoSchedule"
                 }
             };
+
+            if (!string.IsNullOrEmpty(pullSecret))
+            {
+                deployment.spec.template.spec.imagePullSecrets = new List<ImagePullSecret>()
+                {
+                    new ImagePullSecret
+                    {
+                        name = pullSecret
+                    }
+                };
+            }
 
             return deployment;
         }

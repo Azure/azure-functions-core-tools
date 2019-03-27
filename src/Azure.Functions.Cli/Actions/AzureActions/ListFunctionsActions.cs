@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ShowKeys);
                 if (!ShowKeys)
                 {
-                    ColoredConsole.WriteLine("Use --show-keys to retrieve the Http-triggered URLs with appropriate keys in them");
+                    ColoredConsole.WriteLine("Use --show-keys to retrieve the Http-triggered URLs with appropriate keys in them (if enabled)");
                 }
             }
             else

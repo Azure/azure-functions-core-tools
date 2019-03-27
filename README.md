@@ -3,6 +3,7 @@
 |Branch|Status|
 |---|---|
 |master|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/master?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/master)|
+|dev|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/dev?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/dev)|
 |v1.x|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/v1.x?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/v1.x)|
 
 # Azure Functions Core Tools
@@ -59,17 +60,18 @@ brew install azure-functions-core-tools
 #### Ubuntu/Debian
 
 1. Set up package feed
+
+##### Ubuntu 18.10
+
+```bash
+wget -q https://packages.microsoft.com/config/ubuntu/18.10/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+```
+
 ##### Ubuntu 18.04
 
 ```bash
 wget -q https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb
-sudo dpkg -i packages-microsoft-prod.deb
-```
-
-##### Ubuntu 17.10
-
-```bash
-wget -q https://packages.microsoft.com/config/ubuntu/17.10/packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
 ```
 
@@ -148,11 +150,26 @@ func init --docker
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server>
 ```
 
+### Deploy using a private registry
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --pull-secret <registry auth secret>
+```
+
 ### Deploy a function with a minimum of 3 instances and a maximum of 10
 
 ```bash
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --min 3 --max 10
 ```
+
+### Deploy a function to a custom namespace
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --namespace <namespace-name>
+```
+
+#### Scaling out Http Trigger
+Currently the solution is configured to scale out using the Horizontal Pod Autoscaler when any pod reaches a CPU of 60%.
 
 ### Get function logs
 
@@ -165,6 +182,73 @@ func logs --name myfunction --platform kubernetes
 ```bash
 func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --config /mypath/config
 ```
+### Deploy a function to Knative
+
+#### Prerequisites
+
+* [Knative](https://github.com/knative/docs/tree/master/install/)
+
+Deploying Azure Functions to knative is supported with the ```--platform knative``` flag.
+The Core Tools CLI identifies non HTTP trigger functions and annotates the knative manifest with the the ```minScale``` annotation to opt out of scale-to-zero.
+
+```bash
+func deploy --platform knative --name myfunction --registry <docker-hub-id or registry-server>
+```
+
+### Deploying a function to AKS using ACR
+Using the configuration options an Azure Function app can also be deployed to a [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/) (Azure Kubernetes Service) Kubernetes cluster and use [ACR](https://azure.microsoft.com/en-us/services/container-registry/) as the registry server. Do all of the following *before* you run the deployment command.
+
+#### Create a AKS cluster
+You can create an AKS cluster using the [Azure Portal](https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough-portal) or using [Azure CLI](https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough).
+
+Once your AKS cluster is created make sure that you can access it using kubectl. To make kubectl run in the context of your cluster, configure a connection using the command below.
+```azurecli
+az aks get-credentials \
+    --name FunctionsCluster \
+    --resource-group <resource-group-name>
+```
+
+To verify the connection to your cluster run the following command
+```bash
+> kubectl get nodes
+
+NAME                       STATUS    ROLES     AGE       VERSION
+aks-agentpool-20257154-0   Ready     agent     1d        v1.11.5
+aks-agentpool-20257154-1   Ready     agent     1d        v1.11.5
+aks-agentpool-20257154-2   Ready     agent     1d        v1.11.5
+```
+#### Create a ACR Registry
+An ACR instance can be created using the Azure Portal or the [Azure CLI](https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-azure-cli#create-a-container-registry)
+
+#### Login to the ACR Registry
+Before pushing and pulling container images, you must log in to the ACR instance. 
+
+```azurecli
+az acr login --name <acrName>
+```
+
+#### Give the AKS cluster access to the ACR Registry
+The AKS cluster needs access to the ACR Registry to pull the container. Azure creates a service principal to support cluster operability with other Azure resources. This can be used for authentication with an ACR registry. See here for how to grant the right access here: [Authenticate with Azure Container Registry from Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/container-registry/container-registry-auth-aks)  
+
+#### Run the deployment 
+The deployment will build the docker container and upload the container image to your referenced ACR instance (Note: Specify the ACR Login Server in the --registry parameter this is usually of the form <container_registry_name>.azurecr.io) and then your AKS cluster will use that as a source to obtain the container and deploy it.
+
+```bash
+func deploy --platform kubernetes --name myfunction --registry <acr-registry-loginserver>
+```
+
+If the deployment is successful, you should see this:
+
+Function deployed successfully!
+Function IP: 40.121.21.192
+
+#### Verifying your deployment 
+You can verify your deployment by using the Kubernetes web dashboard. To start the Kubernetes dashboard, use the [az aks browse](https://docs.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-browse) command.
+
+```azurecli
+az aks browse --resource-group myResourceGroup --name myAKSCluster
+```
+In the Kubernetes dashboard look for the namespace "azure-functions" and make sure that a pod has been deployed sucessfully with your container.
 
 ### Deploying Azure Functions with Virtual-Kubelet
 

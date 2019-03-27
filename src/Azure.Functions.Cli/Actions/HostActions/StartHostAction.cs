@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
@@ -60,6 +61,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public string LanguageWorkerSetting { get; set; }
 
         public bool NoBuild { get; set; }
+
+        public bool EnableAuth { get; set; }
 
 
         public StartHostAction(ISecretsManager secretsManager)
@@ -122,10 +125,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .SetDefault(false)
                 .Callback(b => NoBuild = b);
 
+            Parser
+                .Setup<bool>("enableAuth")
+                .WithDescription("Enable full authentication handling pipeline.")
+                .SetDefault(false)
+                .Callback(e => EnableAuth = e);
+
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri baseAddress, X509Certificate2 certificate)
+        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(workerRuntime, LanguageWorkerSetting));
@@ -138,7 +147,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 defaultBuilder
                 .UseKestrel(options =>
                 {
-                    options.Listen(IPAddress.Loopback, baseAddress.Port, listenOptins =>
+                    options.Listen(IPAddress.Loopback, listenAddress.Port, listenOptins =>
                     {
                         listenOptins.UseHttps(certificate);
                     });
@@ -147,7 +156,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
-                .UseUrls(baseAddress.ToString())
+                .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
                 {
                     configBuilder.AddEnvironmentVariables();
@@ -158,7 +167,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     loggingBuilder.AddDefaultWebJobsFilters();
                     loggingBuilder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth)))
                 .Build();
         }
 
@@ -181,7 +190,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
-
+            settings.Add("FUNCTIONS_CORETOOLS_ENVIRONMENT", "True");
             return settings;
         }
 
@@ -220,7 +229,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, certificate);
+            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();
 
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
@@ -239,7 +248,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (workerRuntime == WorkerRuntime.python)
             {
-                PythonHelpers.VerifyVirtualEnvironment();
+                // We need to update the PYTHONPATH to add worker's dependencies
+                var pythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? string.Empty;
+                var pythonWorkerDeps = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "workers", "python", "deps");
+                if (!pythonPath.Contains(pythonWorkerDeps))
+                {
+                    Environment.SetEnvironmentVariable("PYTHONPATH", $"{pythonWorkerDeps}{Path.PathSeparator}{pythonPath}", EnvironmentVariableTarget.Process);
+                }
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine($"PYTHONPATH for the process is: {Environment.GetEnvironmentVariable("PYTHONPATH")}");
+                }
             }
             else if (workerRuntime == WorkerRuntime.dotnet && !NoBuild)
             {
@@ -402,11 +421,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             private readonly ScriptApplicationHostOptions _hostOptions;
             private readonly string[] _corsOrigins;
             private readonly bool _corsCredentials;
+            private readonly bool _enableAuth;
 
-            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials)
+            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials, bool enableAuth)
             {
                 _builderContext = builderContext;
                 _hostOptions = hostOptions;
+                _enableAuth = enableAuth;
 
                 if (!string.IsNullOrEmpty(corsOrigins))
                 {
@@ -422,11 +443,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     services.AddCors();
                 }
 
-                services.AddAuthentication()
-                    .AddScriptJwtBearer()
-                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
-                    .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
-
+                if (_enableAuth)
+                {
+                    services.AddWebJobsScriptHostAuthentication();
+                }
+                else
+                {
+                    services.AddAuthentication()
+                        .AddScriptJwtBearer()
+                        .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
+                        .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
+                }
+                
                 services.AddWebJobsScriptHostAuthorization();
 
                 services.AddMvc()

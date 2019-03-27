@@ -13,97 +13,57 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class PythonHelpers
     {
-        private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0a5", "azure-functions-worker==1.0.0a6" };
+        private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0b3", "azure-functions-worker==1.0.0b4" };
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
-        public static async Task InstallPackage()
+        public static async Task SetupPythonProject()
         {
-            VerifyVirtualEnvironment();
             await VerifyVersion();
-            await InstallPipWheel();
-            await InstallPythonAzureFunctionPackage();
-            await PipFreeze();
+            CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
-        }
-
-        public static void VerifyVirtualEnvironment()
-        {
-            if (!InVirtualEnvironment)
-            {
-                throw new CliException("For Python function apps, you have to be running in a venv. Please create and activate a Python 3.6 venv and run this command again.");
-            }
         }
 
         public static async Task EnsureVirtualEnvrionmentIgnored()
         {
-            try
+            if (InVirtualEnvironment)
             {
-                var virtualEnvName = Path.GetFileNameWithoutExtension(VirtualEnvironmentPath);
-                if (FileSystemHelpers.DirectoryExists(Path.Join(Environment.CurrentDirectory, virtualEnvName)))
+                try
                 {
-                    var funcIgnorePath = Path.Join(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
-                    // If .funcignore exists and already has the venv name, we are done here
-                    if (FileSystemHelpers.FileExists(funcIgnorePath))
+                    var virtualEnvName = Path.GetFileNameWithoutExtension(VirtualEnvironmentPath);
+                    if (FileSystemHelpers.DirectoryExists(Path.Join(Environment.CurrentDirectory, virtualEnvName)))
                     {
-                        var rawfuncIgnoreContents = await FileSystemHelpers.ReadAllTextFromFileAsync(funcIgnorePath);
-                        if (rawfuncIgnoreContents.Contains(Environment.NewLine + virtualEnvName))
+                        var funcIgnorePath = Path.Join(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
+                        // If .funcignore exists and already has the venv name, we are done here
+                        if (FileSystemHelpers.FileExists(funcIgnorePath))
                         {
-                            return;
+                            var rawfuncIgnoreContents = await FileSystemHelpers.ReadAllTextFromFileAsync(funcIgnorePath);
+                            if (rawfuncIgnoreContents.Contains(Environment.NewLine + virtualEnvName))
+                            {
+                                return;
+                            }
+                        }
+                        // Write the current env to .funcignore
+                        ColoredConsole.WriteLine($"Writing {Constants.FuncIgnoreFile}");
+                        using (var fileStream = FileSystemHelpers.OpenFile(funcIgnorePath, FileMode.Append, FileAccess.Write))
+                        using (var streamWriter = new StreamWriter(fileStream))
+                        {
+                            await streamWriter.WriteAsync(Environment.NewLine + virtualEnvName);
+                            await streamWriter.FlushAsync();
                         }
                     }
-                    // Write the current env to .funcignore
-                    ColoredConsole.WriteLine($"Writing {Constants.FuncIgnoreFile}");
-                    using (var fileStream = FileSystemHelpers.OpenFile(funcIgnorePath, FileMode.Append, FileAccess.Write))
-                    using (var streamWriter = new StreamWriter(fileStream))
-                    {
-                        await streamWriter.WriteAsync(Environment.NewLine + virtualEnvName);
-                        await streamWriter.FlushAsync();
-                    }
+                }
+                catch (Exception)
+                {
+                    // Safe execution, we aren't harmed by failures here
                 }
             }
-            catch (Exception)
-            {
-                // Safe execution, we aren't harmed by failures here
-            }
         }
 
-        private static async Task PipFreeze(string path = null)
+        private static void CreateRequirements(string path = null)
         {
-            var sb = new StringBuilder();
-            var exe = new Executable("pip", "freeze");
-            ColoredConsole.WriteLine($"Running {exe.Command}");
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l));
-
-            var filePath = string.IsNullOrEmpty(path) ? Constants.RequirementsTxt : Path.Combine(path, Constants.RequirementsTxt);
-
-            if (exitCode == 0)
-            {
-                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, sb.ToString());
-            }
-            else
-            {
-                throw new CliException($"Error running {exe.Command}");
-            }
-        }
-
-        private static Task InstallPythonAzureFunctionPackage() => PipInstallPackages(_workerPackages);
-
-        private static Task InstallPipWheel() => PipInstallPackage("wheel");
-
-        private static Task PipInstallPackages(IEnumerable<string> packageNames) => Task.WhenAll(packageNames.Select(PipInstallPackage));
-
-        private static async Task PipInstallPackage(string packageName)
-        {
-            ColoredConsole.WriteLine($"Installing {packageName} package");
-            var exe = new Executable("pip", $"install {packageName}");
-            var sb = new StringBuilder();
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
-            if (exitCode != 0)
-            {
-                throw new CliException($"Error running '{exe.Command}'. {sb.ToString()}");
-            }
-
+            var reqFile = string.IsNullOrEmpty(path) ? Constants.RequirementsTxt : Path.Combine(path, Constants.RequirementsTxt);
+            FileSystemHelpers.CreateFile(reqFile);
         }
 
         private static async Task VerifyVersion()
@@ -133,7 +93,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool noBundler, string additionalPackages)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, string additionalPackages)
         {
             if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
             {
@@ -147,11 +107,14 @@ namespace Azure.Functions.Cli.Helpers
                 FileSystemHelpers.DeleteDirectorySafe(Path.Combine(functionAppRoot, Constants.ExternalPythonPackages));
             }
 
+            var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
+            FileSystemHelpers.EnsureDirectory(packagesLocation);
+
             if (buildNativeDeps)
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
                 {
-                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages, noBundler);
+                    await RestorePythonRequirementsDocker(functionAppRoot, packagesLocation, additionalPackages);
                 }
                 else
                 {
@@ -160,60 +123,49 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                return await InternalPreparePythonDeployment(files, functionAppRoot);
+                await RestorePythonRequirementsPackapp(functionAppRoot, packagesLocation);
             }
+
+            return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
         }
 
-        private static async Task<Stream> InternalPreparePythonDeployment(IEnumerable<string> files, string functionAppRoot)
+        private static async Task RestorePythonRequirementsPackapp(string functionAppRoot, string packagesLocation)
         {
-            var packagesPath = await RestorePythonRequirements(functionAppRoot);
-            return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesPath)), functionAppRoot);
-        }
-
-        private static async Task<string> RestorePythonRequirements(string functionAppRoot)
-        {
-            var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
-            FileSystemHelpers.EnsureDirectory(packagesLocation);
-
-            var requirementsTxt = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
-
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
 
-            var exe = new Executable("python", $"{packApp} --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
+            var exe = new Executable("python", $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
             if (exitCode != 0)
             {
-                throw new CliException("There was an error restoring dependencies." + sbErrors.ToString());
+                var errorMessage = "There was an error restoring dependencies." + sbErrors.ToString();
+                // If --build-native-deps if required, we exit with this specific code to notify other toolings
+                // If this exit code changes, partner tools must be updated
+                if (exitCode == ExitCodes.BuildNativeDepsRequired)
+                {
+                    ColoredConsole.WriteLine(ErrorColor(errorMessage));
+                    Environment.Exit(ExitCodes.BuildNativeDepsRequired);
+                }
+                throw new CliException(errorMessage);
             }
-
-            return packagesLocation;
         }
 
-        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool noBundler)
+        private static async Task RestorePythonRequirementsDocker(string functionAppRoot, string packagesLocation, string additionalPackages)
         {
-            var appContentPath = CopyToTemp(files, functionAppRoot);
+            var dockerImage = string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting))
+                ? Constants.DockerImages.LinuxPythonImageAmd64
+                : Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting);
 
-            await DockerHelpers.DockerPull(Constants.DockerImages.LinuxPythonImageAmd64);
+            await DockerHelpers.DockerPull(dockerImage);
             var containerId = string.Empty;
             try
             {
-                containerId = await DockerHelpers.DockerRun(Constants.DockerImages.LinuxPythonImageAmd64);
-                await DockerHelpers.ExecInContainer(containerId, "mkdir -p /home/site/wwwroot/");
-                await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/home/site/wwwroot");
+                containerId = await DockerHelpers.DockerRun(dockerImage);
+                await DockerHelpers.CopyToContainer(containerId, Constants.RequirementsTxt, $"/{Constants.RequirementsTxt}");
 
                 var scriptFilePath = Path.GetTempFileName();
-                if (noBundler)
-                {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildNoBundler).Replace("\r\n", "\n"));
-                }
-                else
-                {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
-                }
-                var bundleScriptFilePath = Path.GetTempFileName();
-                await FileSystemHelpers.WriteAllTextToFileAsync(bundleScriptFilePath, (await StaticResources.PythonBundleScript).Replace("\r\n", "\n"));
+                await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
 
                 if (!string.IsNullOrWhiteSpace(additionalPackages))
                 {
@@ -223,16 +175,10 @@ namespace Azure.Functions.Cli.Helpers
                     await DockerHelpers.ExecInContainer(containerId, $"apt-get install -y {additionalPackages}");
                 }
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
-                await DockerHelpers.CopyToContainer(containerId, bundleScriptFilePath, Constants.StaticResourcesNames.PythonBundleScript);
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
-                await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonBundleScript}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
 
-                var tempDir = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", ""));
-                FileSystemHelpers.EnsureDirectory(tempDir);
-
-                await DockerHelpers.CopyFromContainer(containerId, $"/app.zip", tempDir);
-                return FileSystemHelpers.OpenFile(Path.Combine(tempDir, "app.zip"), FileMode.Open);
+                await DockerHelpers.CopyFromContainer(containerId, $"/{Constants.ExternalPythonPackages}/.", packagesLocation);
             }
             finally
             {
@@ -245,7 +191,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static string CopyToTemp(IEnumerable<string> files, string rootPath)
         {
-            var tmp = Path.Combine(Path.GetTempPath(), Path.GetTempFileName().Replace(".", string.Empty));
+            var tmp = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             FileSystemHelpers.EnsureDirectory(tmp);
 
             foreach (var file in files)

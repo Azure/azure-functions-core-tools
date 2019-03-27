@@ -32,12 +32,12 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             Parser
                 .Setup<DateTime>("created-after")
                 .WithDescription("(Optional) Retrieve the instances created after this date/time (UTC). All ISO 8601 formatted datetimes accepted.")
-                .SetDefault(DateTime.MinValue)
+                .SetDefault(DurableManager.CreatedAfterDefault)
                 .Callback(n => CreatedTimeFrom = n);
             Parser
                 .Setup<DateTime>("created-before")
                 .WithDescription("(Optional) Retrieve the instances created before this date/time (UTC). All ISO 8601 formatted datetimes accepted.")
-                .SetDefault(DateTime.MaxValue.AddDays(-1)) // subtract one to avoid overflow/timezone error
+                .SetDefault(DurableManager.CreatedBeforeDefault)
                 .Callback(n => CreatedTimeTo = n);
             Parser
                 .Setup<string>("runtime-status")

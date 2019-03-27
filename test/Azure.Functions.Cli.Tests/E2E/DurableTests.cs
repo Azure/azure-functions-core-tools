@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Actions.DurableActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Newtonsoft.Json;
@@ -163,7 +164,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new string[]
                 {
-                    "Purged orchestration history for all instances created between '1/1/0001 12:00:00 AM' and '12/30/9999 11:59:59 PM'"
+                    $"Purged orchestration history for all instances created between '{DurableManager.CreatedAfterDefault}' and '{DurableManager.CreatedBeforeDefault}'"
                 },
                 CommandTimeout = TimeSpan.FromSeconds(45)
             },

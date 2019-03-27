@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Diagnostics
     {
         private readonly Func<string, LogLevel, bool> _filter;
 
-        public ColoredConsoleLoggerProvider(Func<string, LogLevel, bool> filter)
+        public ColoredConsoleLoggerProvider(Func<string, LogLevel, bool> filter = null)
         {
             _filter = filter;
         }
