@@ -279,5 +279,61 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public Task init_function_app_powershell_supports_managed_dependencies()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime powershell --managed-dependencies" },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "host.json",
+                        ContentContains = new []
+                        {
+                            "managedDependency",
+                            "enabled",
+                            "true"
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = "requirements.psd1",
+                        ContentContains = new []
+                        {
+                            "Az",
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "Writing profile.ps1",
+                    "Writing requirements.psd1",
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_managed_dependencies_is_only_supported_in_powershell()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime python --managed-dependencies "
+                },
+                HasStandardError = true,
+                ErrorContains = new[]
+                {
+                    $"Managed dependencies is only supported for PowerShell"
+                }
+            }, _output);
+        }
     }
 }
