@@ -11,7 +11,6 @@ using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -36,10 +35,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string Language { get; set; }
 
+        public bool? ManagedDependencies { get; set; }
+
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
-            { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore },
-            { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), StaticResources.HostJson },
+            { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
         };
 
         private readonly ITemplatesManager _templatesManager;
@@ -95,6 +95,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(null)
                 .WithDescription("Initialize a language specific project. Currently supported when --worker-runtime set to node. Options are - \"typescript\" and \"javascript\"")
                 .Callback(l => Language = l);
+
+            Parser
+                .Setup<bool>("managed-dependencies")
+                .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
+                .Callback(f => ManagedDependencies = f);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -157,8 +162,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                await InitLanguageSpecificArtifacts(workerRuntime, language);
+                bool managedDependenciesOption = ResolveManagedDependencies(workerRuntime, ManagedDependencies);
+                await InitLanguageSpecificArtifacts(workerRuntime, language, managedDependenciesOption);
                 await WriteFiles();
+                await WriteHostJson(workerRuntime, managedDependenciesOption);
                 await WriteLocalSettingsJson(workerRuntime);
             }
 
@@ -212,7 +219,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return string.Empty;
         }
 
-        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language)
+        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language, bool managedDependenciesOption)
         {
             if (workerRuntime == Helpers.WorkerRuntime.python)
             {
@@ -221,6 +228,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
                 await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
+
+                if (managedDependenciesOption)
+                {
+                    string majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
+
+                    var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
+                    requirementsContent = requirementsContent.Replace("MAJOR_VERSION", majorVersion);
+
+                    await WriteFiles("requirements.psd1", requirementsContent);
+                }
             }
 
             if (language == Constants.Languages.TypeScript)
@@ -316,6 +333,38 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
             }
+        }
+
+        private static bool ResolveManagedDependencies(WorkerRuntime workerRuntime, bool? managedDependenciesOption)
+        {
+            if (managedDependenciesOption.HasValue)
+            {
+                if (workerRuntime != Helpers.WorkerRuntime.powershell)
+                {
+                    throw new CliException("Managed dependencies is only supported for PowerShell.");
+                }
+
+                return managedDependenciesOption.Value;
+            }
+
+            bool result = false;
+            ColoredConsole.Write("Would you like to install the Azure modules and have these automatically managed in Azure? ");
+            var answer = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.ManagedDependenciesInstallationOptions());
+            ColoredConsole.WriteLine(TitleColor(answer.ToString()));
+            if (answer.ToString().Equals(InstallManagedDependencies.Yes.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                result = true;
+            }
+            return result;
+        }
+
+        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption)
+        {
+            var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
+                ? await StaticResources.PowerShellHostJson
+                : await StaticResources.HostJson;
+
+            await WriteFiles("host.json", hostJsonContent);
         }
     }
 }

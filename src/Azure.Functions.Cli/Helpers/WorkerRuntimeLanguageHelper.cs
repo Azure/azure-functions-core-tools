@@ -65,13 +65,11 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", availableWorkersRuntime.Keys
-                .Where(k => k != WorkerRuntime.powershell)
                 .Where(k => k != WorkerRuntime.java)
                 .Select(s => s.ToString()));
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
-            .Where(k => k != WorkerRuntime.java)
-            .Where(k => k != WorkerRuntime.powershell);
+            .Where(k => k != WorkerRuntime.java);
 
         public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
         {
@@ -80,6 +78,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (wr)
                 {
+                    case WorkerRuntime.powershell:
+                        workerToDisplayStrings[wr] = "powershell (preview)";
+                        break;
                     case WorkerRuntime.python:
                         workerToDisplayStrings[wr] = "python (preview)";
                         break;
@@ -161,5 +162,16 @@ namespace Azure.Functions.Cli.Helpers
             }
             return workerToDefaultLanguageMap[worker];
         }
+
+        public static IEnumerable<InstallManagedDependencies> ManagedDependenciesInstallationOptions()
+        {
+            return Enum.GetValues(typeof(InstallManagedDependencies)).Cast<InstallManagedDependencies>();
+        }
+    }
+
+    public enum InstallManagedDependencies
+    {
+        Yes,
+        No
     }
 }
