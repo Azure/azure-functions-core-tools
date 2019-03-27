@@ -79,48 +79,48 @@ namespace Azure.Functions.Cli.Common
             public const string PythonDockerBuild = "python_docker_build.sh";
         }
 
-        public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.1" };
+        public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.2" };
 
         public static IDictionary<string, ExtensionPackage> BindingPackageMap { get; } = new ReadOnlyDictionary<string, ExtensionPackage>(
                 new Dictionary<string, ExtensionPackage> {
                     { "blobtrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "blob",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "queue",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "queuetrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.Storage",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.4" }
                     },
                     { "servicebustrigger",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.ServiceBus",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.3" }
                     },
                     { "servicebus",
                         new ExtensionPackage() {
                         Name = "Microsoft.Azure.WebJobs.Extensions.ServiceBus",
-                        Version =  "3.0.0" }
+                        Version =  "3.0.3" }
                     },
                     { "eventhubtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventHubs",
-                            Version =  "3.0.0"} },
+                            Version =  "3.0.3"} },
                     { "eventhub",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventHubs",
-                            Version =  "3.0.0"} },
+                            Version =  "3.0.3"} },
                     { "sendgrid",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.SendGrid",
@@ -152,15 +152,15 @@ namespace Azure.Functions.Cli.Common
                     { "activitytrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.6.1"} },
+                            Version =  "1.8.0"} },
                     { "orchestrationtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.6.1"} },
+                            Version =  "1.8.0"} },
                     { "orchestrationclient",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.6.1"} },
+                            Version =  "1.8.0"} },
                     { "eventgridtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventGrid",
@@ -168,11 +168,11 @@ namespace Azure.Functions.Cli.Common
                     { "cosmosdbtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
-                            Version =  "3.0.1"} },
+                            Version =  "3.0.3"} },
                     { "cosmosdb",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
-                            Version =  "3.0.1"} },
+                            Version =  "3.0.3"} },
                     { "signalr",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.SignalRService",
