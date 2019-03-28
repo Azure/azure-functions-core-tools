@@ -140,9 +140,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            // Restore all valid extensions
-            var installExtensionAction = new InstallExtensionAction(_secretsManager);
-            await installExtensionAction.RunAsync();
+            if (workerRuntime != WorkerRuntime.dotnet || Csx)
+            {
+                // Restore all valid extensions
+                var installExtensionAction = new InstallExtensionAction(_secretsManager);
+                await installExtensionAction.RunAsync();
+            }
 
             if (ListIncludedFiles)
             {
@@ -367,7 +370,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Zip deploy
             await PublishZipDeploy(functionApp, zipFileFactory);
 
-            ColoredConsole.WriteLine("Deployment completed successfully.");          
+            ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
         private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue)
