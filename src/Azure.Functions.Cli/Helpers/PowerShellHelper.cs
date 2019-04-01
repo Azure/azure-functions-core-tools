@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using System.Net.Http;
@@ -20,29 +21,37 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<string> GetLatestAzModuleMajorVersion()
         {
             Uri address = new Uri($"{PowerShellGalleryFindPackagesByIdUri}'{AzModuleName}'");
-            int numberOfRetries = 3;
+            int maxNumberOfTries = 3;
+            int tries = 1;
 
             string latestMajorVersion = null;
-            string errorMessage = $@"Fail to get module version for {AzModuleName}";
-
-            HttpResponseMessage response = null;
+            Stream stream = null;
             using (HttpClient client = new HttpClient())
             {
-                bool successfulRequest = false;
-                do
+                while (tries <= maxNumberOfTries)
                 {
-                    response = await client.GetAsync(address);
-                    successfulRequest = response.IsSuccessStatusCode;
-                    numberOfRetries--;
-                } while (!successfulRequest && numberOfRetries <= 0);
+                    try
+                    {
+                        var response = await client.GetAsync(address);
+
+                        // Throw is not a successful request
+                        response.EnsureSuccessStatusCode();
+
+                        stream = await response.Content.ReadAsStreamAsync();
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (tries == maxNumberOfTries)
+                        {
+                            var errorMsg = $@"Fail to get module version for {AzModuleName}. Errors: {ex.Message}";
+                            throw new CliException(errorMsg);
+                        }
+                        tries++;
+                    }
+                }
             }
 
-            if (response == null)
-            {
-                throw new CliException(errorMessage);
-            }
-
-            var stream = response.Content.ReadAsStreamAsync().Result;
             if (stream != null)
             {
                 // Load up the XML response
@@ -65,9 +74,9 @@ namespace Azure.Functions.Cli.Helpers
 
                 if (props != null && props.Count > 0)
                 {
-                    for (int i = 0; i < props.Count; i++)
+                    foreach (XmlNode prop in props)
                     {
-                        var currentVersion = new Version(props[i].FirstChild.Value);
+                        var currentVersion = new Version(prop.FirstChild.Value);
 
                         var result = currentVersion.CompareTo(latestVersion);
                         if (result > 0)
@@ -82,7 +91,7 @@ namespace Azure.Functions.Cli.Helpers
 
             if (string.IsNullOrEmpty(latestMajorVersion))
             {
-                throw new CliException(errorMessage);
+                throw new CliException($@"Fail to get module version for {AzModuleName}.");
             }
 
             return latestMajorVersion;

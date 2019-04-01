@@ -337,25 +337,25 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static bool ResolveManagedDependencies(WorkerRuntime workerRuntime, bool? managedDependenciesOption)
         {
-            if (managedDependenciesOption.HasValue)
+            if (workerRuntime != Helpers.WorkerRuntime.powershell)
             {
-                if (workerRuntime != Helpers.WorkerRuntime.powershell)
+                if (managedDependenciesOption.HasValue)
                 {
                     throw new CliException("Managed dependencies is only supported for PowerShell.");
                 }
 
+                return false;
+            }
+
+            if (managedDependenciesOption.HasValue)
+            {
                 return managedDependenciesOption.Value;
             }
 
-            bool result = false;
             ColoredConsole.Write("Would you like to install the Azure modules and have these automatically managed in Azure? ");
-            var answer = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.ManagedDependenciesInstallationOptions());
-            ColoredConsole.WriteLine(TitleColor(answer.ToString()));
-            if (answer.ToString().Equals(InstallManagedDependencies.Yes.ToString(), StringComparison.OrdinalIgnoreCase))
-            {
-                result = true;
-            }
-            return result;
+            var answer = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.ManagedDependenciesInstallationOptions()).ToString();
+            ColoredConsole.WriteLine(TitleColor(answer));
+            return (answer.Equals(InstallManagedDependencies.Yes.ToString(), StringComparison.OrdinalIgnoreCase));
         }
 
         private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption)
