@@ -418,24 +418,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        private static string CalculateMd5(Stream stream)
-        {
-            using (var md5 = MD5.Create())
-            {
-                var hash = md5.ComputeHash(stream);
-                var base64String = Convert.ToBase64String(hash);
-                stream.Position = 0;
-                return base64String;
-            }
-        }
-
         private async Task<string> UploadZipToStorage(Stream zip, IDictionary<string, string> appSettings)
         {
             return await RetryHelper.Retry(async () =>
             {
                 // Setting position to zero, in case we retry, we want to reset the stream
                 zip.Position = 0;
-                var zipMD5 = CalculateMd5(zip);
+                var zipMD5 = SecurityHelpers.CalculateMd5(zip);
 
                 const string containerName = "function-releases";
                 const string blobNameFormat = "{0}-{1}.zip";

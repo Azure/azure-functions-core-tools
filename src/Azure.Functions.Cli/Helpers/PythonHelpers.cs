@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -93,21 +94,41 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        private static async Task<bool> ArePackagesInSync(string requirementsTxt, string pythonPackages)
+        {
+            var md5File = Path.Combine(pythonPackages, $"{Constants.RequirementsTxt}.md5");
+            if (!FileSystemHelpers.FileExists(md5File))
+            {
+                return false;
+            }
+
+            var packagesMd5 = await FileSystemHelpers.ReadAllTextFromFileAsync(md5File);
+            var requirementsTxtMd5 = SecurityHelpers.CalculateMd5(requirementsTxt);
+
+            return packagesMd5 == requirementsTxtMd5;
+        }
+
         internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, string additionalPackages)
         {
-            if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
+            var reqTxtFile = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
+            if (!FileSystemHelpers.FileExists(reqTxtFile))
             {
                 throw new CliException($"{Constants.RequirementsTxt} is not found. " +
                 $"{Constants.RequirementsTxt} is required for python function apps. Please make sure to generate one before publishing.");
             }
-            var externalPythonPackages = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
-            if (FileSystemHelpers.DirectoryExists(externalPythonPackages))
+            var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
+            if (FileSystemHelpers.DirectoryExists(packagesLocation))
             {
+                // Only update packages if checksum of requirements.txt does not match or a sync is forced
+                if (await ArePackagesInSync(reqTxtFile, packagesLocation))
+                {
+                    ColoredConsole.WriteLine(Yellow($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
+                    return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
+                }
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
                 FileSystemHelpers.DeleteDirectorySafe(Path.Combine(functionAppRoot, Constants.ExternalPythonPackages));
             }
 
-            var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
             FileSystemHelpers.EnsureDirectory(packagesLocation);
 
             if (buildNativeDeps)
@@ -125,6 +146,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 await RestorePythonRequirementsPackapp(functionAppRoot, packagesLocation);
             }
+            // Store a checksum of requirements.txt
+            var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
+            await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
 
             return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
         }
