@@ -54,7 +54,7 @@ if (proxy) {
 
 https.get(options, response => {
 
-        const bar = new ProgressBar('[:bar] Downloading Azure Functions Cli', { 
+        const bar = new ProgressBar('[:bar] Downloading Azure Functions CLI', { 
             total: Number(response.headers['content-length']),
             width: 18
         });
