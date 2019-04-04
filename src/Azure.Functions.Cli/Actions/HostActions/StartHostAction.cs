@@ -358,17 +358,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Select(t => (filePath: t.filePath, jObject: JsonConvert.DeserializeObject<JObject>(t.content)))
                     .Where(b => b.jObject["bindings"] != null);
 
-                var allHttpTrigger = functionsJsons
+                var allNonStorageTriggers = functionsJsons
                     .Select(b => b.jObject["bindings"])
                     .SelectMany(i => i)
                     .Where(b => b?["type"] != null)
                     .Select(b => b["type"].ToString())
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
-                    .All(t => t.Equals("httpTrigger", StringComparison.OrdinalIgnoreCase));
+                    .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allHttpTrigger)
+                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
                 {
-                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. This is required for all triggers other than HTTP. "
+                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
+                        $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
                         + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
                 }
 
