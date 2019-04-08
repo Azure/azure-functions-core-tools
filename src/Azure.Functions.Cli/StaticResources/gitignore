@@ -41,3 +41,6 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Managed dependencies folder
+ManagedDependencies/
