@@ -16,6 +16,7 @@ namespace Build
                 .Then(LogIntoAzure)
                 .Then(RestorePackages)
                 .Then(DotnetPublish)
+                .Then(FilterPowershellRuntimes)
                 .Then(AddDistLib)
                 .Then(AddPythonWorker)
                 .Then(AddTemplatesNupkgs)
