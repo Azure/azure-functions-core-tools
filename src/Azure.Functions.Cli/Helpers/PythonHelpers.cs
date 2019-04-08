@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.Helpers
             FileSystemHelpers.CreateFile(reqFile);
         }
 
-        private static async Task VerifyVersion()
+        public static async Task VerifyVersion()
         {
             var exe = new Executable("python", "--version");
             var sb = new StringBuilder();
