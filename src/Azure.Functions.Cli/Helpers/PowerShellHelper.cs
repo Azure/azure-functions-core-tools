@@ -14,43 +14,37 @@ namespace Azure.Functions.Cli.Helpers
 
         // The PowerShellGallery uri to query for the latest module version.
         private const string PowerShellGalleryFindPackagesByIdUri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id=";
-        
+
         /// <summary>
         /// Gets the latest supported major version of the Az module from the PSGallery.
         /// </summary>
         public static async Task<string> GetLatestAzModuleMajorVersion()
         {
             Uri address = new Uri($"{PowerShellGalleryFindPackagesByIdUri}'{AzModuleName}'");
-            int maxNumberOfTries = 3;
-            int tries = 1;
 
             string latestMajorVersion = null;
             Stream stream = null;
-            using (HttpClient client = new HttpClient())
+
+            await RetryHelper.Retry(async () =>
             {
-                while (tries <= maxNumberOfTries)
+                using (var client = new HttpClient())
                 {
+                    client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+
                     try
                     {
                         var response = await client.GetAsync(address);
-
                         // Throw is not a successful request
                         response.EnsureSuccessStatusCode();
-
                         stream = await response.Content.ReadAsStreamAsync();
-                        break;
                     }
                     catch (Exception ex)
                     {
-                        if (tries == maxNumberOfTries)
-                        {
-                            var errorMsg = $@"Fail to get module version for {AzModuleName}. Errors: {ex.Message}";
-                            throw new CliException(errorMsg);
-                        }
-                        tries++;
+                        var errorMsg = $@"Fail to get module version for {AzModuleName}. Errors: {ex.Message}";
+                        throw new CliException(errorMsg);
                     }
                 }
-            }
+            }, retryCount: 3);
 
             if (stream != null)
             {

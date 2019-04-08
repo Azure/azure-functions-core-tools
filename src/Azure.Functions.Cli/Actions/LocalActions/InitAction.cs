@@ -352,10 +352,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return managedDependenciesOption.Value;
             }
 
-            ColoredConsole.Write("Would you like to install the Azure modules and have these automatically managed in Azure? ");
-            var answer = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.ManagedDependenciesInstallationOptions()).ToString();
-            ColoredConsole.WriteLine(TitleColor(answer));
-            return (answer.Equals(InstallManagedDependencies.Yes.ToString(), StringComparison.OrdinalIgnoreCase));
+            return SelectionMenuHelper.Confirm("Would you like to install the Azure modules and have these automatically managed in Azure?");
         }
 
         private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using static Colors.Net.StringStaticMethods;
@@ -25,6 +26,21 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             return DisplaySelectionWizardUnix(options);
+        }
+
+        public static bool Confirm(string question)
+        {
+            if (string.IsNullOrEmpty(question))
+            {
+                throw new CliException("Question cannot be null or empty.");
+            }
+
+            List<string> options = new List<string>() { "Yes", "No" };
+            ColoredConsole.Write(question);
+            var answer = DisplaySelectionWizard(options);
+            ColoredConsole.WriteLine(TitleColor(answer));
+
+            return answer.Equals("Yes", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsEnvironmentCursorTopFriendly()
