@@ -17,7 +17,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("node")]
         [InlineData("java")]
-        [InlineData("powershell")]
         public Task init_with_worker_runtime(string workerRuntime)
         {
             var files = new List<FileResult>
