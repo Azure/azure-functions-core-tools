@@ -117,7 +117,7 @@ namespace Azure.Functions.Cli.Common
         public static IEnumerable<string> GetLocalFiles(string path, GitIgnoreParser ignoreParser = null, bool returnIgnored = false)
         {
             var ignoredDirectories = new[] { ".git", ".vscode" };
-            var ignoredFiles = new[] { ".funcignore", ".gitignore", "appsettings.json", "local.settings.json", "project.lock.json" };
+            var ignoredFiles = new[] { ".funcignore", ".gitignore", "local.settings.json", "project.lock.json" };
 
             foreach (var file in FileSystemHelpers.GetFiles(path, ignoredDirectories, ignoredFiles))
             {
