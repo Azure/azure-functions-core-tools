@@ -86,14 +86,17 @@ namespace Azure.Functions.Cli.Helpers
             return csProjFiles.Count == 1;
         }
 
-        public static async Task<bool> BuildDotnetProject(string outputPath, string dotnetCliParams)
+        public static async Task<bool> BuildDotnetProject(string outputPath, string dotnetCliParams, bool showOutput = true)
         {
             if (FileSystemHelpers.DirectoryExists(outputPath))
             {
                 FileSystemHelpers.DeleteDirectorySafe(outputPath);
             }
             var exe = new Executable("dotnet", $"build --output {outputPath} {dotnetCliParams}");
-            var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e));
+            var exitCode = showOutput
+                ? await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e))
+                : await exe.RunAsync();
+
             if (exitCode != 0)
             {
                 throw new CliException("Error building project");

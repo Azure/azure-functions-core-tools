@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Actions.DeployActions.Platforms;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Kubernetes;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
@@ -20,7 +21,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         public string Name { get; set; } = string.Empty;
         public string Platform { get; set; } = string.Empty;
-        public string ConfigPath { get; set; } = string.Empty;
         private Dictionary<string, Func<string, Task>> logsHandlersMap = new Dictionary<string, Func<string, Task>>();
         private const string KUBERNETES_DEFAULT_NAMESPACE = "azure-functions";
 
@@ -46,18 +46,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Function name")
                 .Callback(t => Name = t).Required();
 
-            Parser
-                .Setup<string>("config")
-                .WithDescription("[Optional] Config file")
-                .Callback(t => ConfigPath = t);
-
             return base.ParseArgs(args);
         }
 
         public async Task GetKubernetesFunctionLogs(string functionName)
         {
             string nameSpace = KUBERNETES_DEFAULT_NAMESPACE;
-            await KubernetesHelper.RunKubectl($"logs -l app={functionName}-deployment -n {nameSpace}", true);
+            await KubectlHelper.RunKubectl($"logs -l app={functionName}-deployment -n {nameSpace}", showOutput: true);
         }
 
         public override async Task RunAsync()
@@ -66,12 +61,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 ColoredConsole.Error.WriteLine(ErrorColor($"platform {Platform} is not supported. Valid options are: {String.Join(",", logsHandlersMap.Keys)}"));
                 return;
-            }            
+            }
 
             var logsHandler = logsHandlersMap[Platform];
             ColoredConsole.WriteLine("Function logs:");
             await logsHandler(Name);
-            
+
         }
     }
 }

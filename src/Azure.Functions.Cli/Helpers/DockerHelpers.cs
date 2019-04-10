@@ -1,8 +1,11 @@
 ﻿using System;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Kubernetes.Models;
 using Colors.Net;
+using Newtonsoft.Json;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
@@ -15,18 +18,19 @@ namespace Azure.Functions.Cli.Helpers
 
         public static Task DockerBuild(string tag, string dir) => RunDockerCommand($"build -t {tag} {dir}");
 
-        public static Task CopyToContainer(string containerId, string source, string target) => RunDockerCommand($"cp \"{source}\" {containerId}:\"{target}\"", containerId);
+        public static Task CopyToContainer(string containerId, string source, string target, bool showProgress = false) => RunDockerCommand($"cp \"{source}\" {containerId}:\"{target}\"", containerId, showProgress: showProgress);
 
         public static Task ExecInContainer(string containerId, string command) => RunDockerCommand($"exec -t {containerId} {command}", containerId);
 
         public static Task CopyFromContainer(string containerId, string source, string target) => RunDockerCommand($"cp {containerId}:\"{source}\" \"{target}\"", containerId);
 
-        public static Task KillContainer(string containerId, bool ignoreError = false) => RunDockerCommand($"kill {containerId}", containerId, ignoreError);
+        public static Task KillContainer(string containerId, bool ignoreError = false, bool showProgress = true) => RunDockerCommand($"kill {containerId}", containerId, ignoreError, showProgress);
 
-        public static async Task<string> DockerRun(string image, string command = null)
+        public static async Task<string> DockerRun(string image, string entryPoint = null, string command = null)
         {
             command = command ?? string.Empty;
-            (var output, _) = await RunDockerCommand($"run --rm -d {image} {command}");
+            var args = $"run --rm -d -it {(entryPoint != null ? $"--entrypoint {entryPoint}" : string.Empty)} {image} {command}";
+            (var output, _, _) = await RunDockerCommand(args, showProgress: false);
             return output.ToString().Trim();
         }
 
@@ -42,7 +46,34 @@ namespace Azure.Functions.Cli.Helpers
             return true;
         }
 
-        private static async Task<(string output, string error)> InternalRunDockerCommand(string args, bool ignoreError)
+        internal static async Task<TriggersPayload> GetTriggersFromDockerImage(string imageName)
+        {
+            (var output, _, _) = await RunDockerCommand($"images -q {imageName}", ignoreError: true, showProgress: false);
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                await DockerPull(imageName);
+            }
+            var containerId = string.Empty;
+            try
+            {
+                containerId = await DockerRun(imageName, entryPoint: "/bin/sh");
+                var scriptFilePath = Path.GetTempFileName();
+                FileSystemHelpers.WriteAllTextToFile(scriptFilePath, (await StaticResources.PrintFunctionJson).Replace("\r\n", "\n"));
+                await CopyToContainer(containerId, scriptFilePath, "/print-functions.sh", showProgress: false);
+                await RunDockerCommand($"exec -t {containerId} chmod +x /print-functions.sh", containerId, showProgress: false);
+                (var functionsList, _, _) = await RunDockerCommand($"exec -t {containerId} /print-functions.sh", containerId, showProgress: false);
+                return JsonConvert.DeserializeObject<TriggersPayload>(functionsList);
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(containerId))
+                {
+                    await KillContainer(containerId, ignoreError: true, showProgress: false);
+                }
+            }
+        }
+
+        private static async Task<(string output, string error, int exitCode)> InternalRunDockerCommand(string args, bool ignoreError)
         {
             var docker = new Executable("docker", args);
             var sbError = new StringBuilder();
@@ -56,25 +87,33 @@ namespace Azure.Functions.Cli.Helpers
                     $"output: {sbOutput.ToString()}\n{sbError.ToString()}");
             }
 
-            return (sbOutput.ToString(), sbError.ToString());
+            return (trim(sbOutput.ToString()), trim(sbError.ToString()), exitCode);
+
+            string trim(string str) => str.Trim(new[] { ' ', '\n' });
         }
 
-        private static async Task<(string output, string error)> RunDockerCommand(string args, string containerId = null, bool ignoreError = false)
+        private static async Task<(string output, string error, int exitCode)> RunDockerCommand(string args, string containerId = null, bool ignoreError = false, bool showProgress = true)
         {
             var printArgs = string.IsNullOrWhiteSpace(containerId)
                 ? args
                 : args.Replace(containerId, containerId.Substring(0, 6));
-            ColoredConsole.Write($"Running 'docker {printArgs}'.");
+            if (showProgress || StaticSettings.IsDebug)
+            {
+                ColoredConsole.Write($"Running 'docker {printArgs}'.");
+            }
             var task = InternalRunDockerCommand(args, ignoreError);
 
-            while (!task.IsCompleted)
+            if (showProgress || StaticSettings.IsDebug)
             {
-                await Task.Delay(TimeSpan.FromSeconds(1));
-                ColoredConsole.Write(".");
+                while (!task.IsCompleted)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    ColoredConsole.Write(".");
+                }
+                ColoredConsole.WriteLine("done");
             }
-            ColoredConsole.WriteLine("done");
 
-            (var output, var error) = await task;
+            (var output, var error, var exitCode) = await task;
 
             if (StaticSettings.IsDebug)
             {
@@ -82,7 +121,7 @@ namespace Azure.Functions.Cli.Helpers
                     .WriteLine($"Output: {output}")
                     .WriteLine($"Error: {error}");
             }
-            return (output, error);
+            return (output, error, exitCode);
         }
     }
 }

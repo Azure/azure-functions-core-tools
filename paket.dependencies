@@ -1,6 +1,0 @@
-source https://nuget.org/api/v2
-
-nuget FAKE
-nuget xunit.runner.console = 2.3.0-beta4-build3742
-nuget WindowsAzure.Storage = 7.2.1
-nuget FSharp.Data

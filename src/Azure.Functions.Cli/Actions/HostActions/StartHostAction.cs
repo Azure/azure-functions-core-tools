@@ -297,7 +297,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (scriptHost != null)
             {
-                var httpFunctions = scriptHost.Functions.Where(f => f.Metadata.IsHttpFunction());
+                var httpFunctions = scriptHost.Functions.Where(f => f.Metadata.IsHttpFunction() && !f.Metadata.IsDisabled);
                 if (httpFunctions.Any())
                 {
                     ColoredConsole

@@ -408,7 +408,7 @@ namespace Build
                 using (var fileStream = File.OpenRead(file))
                 {
                     var sha1 = new SHA256Managed();
-                    return BitConverter.ToString(sha1.ComputeHash(fileStream)).Replace("-", string.Empty);
+                    return BitConverter.ToString(sha1.ComputeHash(fileStream)).Replace("-", string.Empty).ToLower();
                 }
             }
         }

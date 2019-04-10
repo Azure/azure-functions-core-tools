@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace Azure.Functions.Cli.Actions.DeployActions.Platforms.Models
+namespace Azure.Functions.Cli.Kubernetes.Models.Knative
 {
 
     public class Env
@@ -52,7 +52,14 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms.Models
     {
         public string apiVersion { get; set; }
         public string kind { get; set; }
-        public Metadata metadata { get; set; }
         public KnativeSpec spec { get; set; }
+
+        public Metadata metadata { get; set; }
+    }
+
+    public class Metadata
+    {
+        public string name { get; set; }
+        public string @namespace { get; set; }
     }
 }

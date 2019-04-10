@@ -1,17 +1,13 @@
-using System;
 using System.Linq;
 using System.IO;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
-using KubeClient;
-using KubeClient.Models;
-using Azure.Functions.Cli.Actions.DeployActions.Platforms.Models;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using Azure.Functions.Cli.Kubernetes;
+using Azure.Functions.Cli.Kubernetes.Models.Knative;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 {
@@ -19,28 +15,10 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
     {
         private string configFile = string.Empty;
         private const string FUNCTIONS_NAMESPACE = "azure-functions";
-        private static KubeApiClient client;
 
         public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
             await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max);
-        }
-
-        public KnativePlatform(string configFile)
-        {
-            this.configFile = configFile;
-            KubeClientOptions options;
-
-            if (!string.IsNullOrEmpty(configFile))
-            {
-                options = K8sConfig.Load(configFile).ToKubeClientOptions(defaultKubeNamespace: FUNCTIONS_NAMESPACE);
-            }
-            else
-            {
-                options = K8sConfig.Load().ToKubeClientOptions(defaultKubeNamespace: FUNCTIONS_NAMESPACE);
-            }
-
-            client = KubeApiClient.Create(options);
         }
 
         private async Task Deploy(string name, string image, string nameSpace, int min, int max)
@@ -48,22 +26,12 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             var isHTTP = IsHTTPTrigger(name);
 
             await CreateNamespace(nameSpace);
-            client.DefaultNamespace = nameSpace;
 
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Deploying function to Knative...");
 
             var knativeService = GetKnativeService(name, image, nameSpace, min, max, isHTTP);
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(knativeService,
-                            Newtonsoft.Json.Formatting.None,
-                            new Newtonsoft.Json.JsonSerializerSettings
-                            {
-                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
-                            });
-
-            File.WriteAllText("deployment.json", json);
-            await KubernetesHelper.RunKubectl($"apply -f deployment.json");
-            File.Delete("deployment.json");
+            await KubectlHelper.KubectlApply(knativeService, true);
 
             var endpoint = await GetIstioClusterIngressEndpoint();
             var host = GetFunctionHost(name, nameSpace);
@@ -84,7 +52,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             ColoredConsole.WriteLine("Plese note: it may take a few minutes for the knative service to be reachable");
         }
 
-        private string GetFunctionHost(string functionName, string nameSpace) 
+        private string GetFunctionHost(string functionName, string nameSpace)
         {
             return string.Format("{0}.{1}.example.com", functionName, nameSpace);
         }
@@ -92,8 +60,8 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         private bool IsHTTPTrigger(string functionName)
         {
             var str = File.ReadAllText(string.Format("{0}/function.json", functionName));
-            var jObj = JsonConvert.DeserializeObject<FunctionJson>(str);
-            return jObj.bindings.Any(d=> d.type == "httpTrigger");
+            var jObj = JsonConvert.DeserializeObject<JObject>(str);
+            return jObj["bindings"].Any(d => d["type"]?.ToString() == "httpTrigger");
         }
 
         private KnativeService GetKnativeService(string name, string image, string nameSpace, int min, int max, bool isHTTP)
@@ -117,12 +85,12 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations = new Dictionary<string, string>();
 
             // opt out of knative scale-to-zero for non-http triggers
-            if (!isHTTP) 
+            if (!isHTTP)
             {
                 knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations.Add("autoscaling.knative.dev/minScale", min.ToString());
             }
 
-            if (max > 0) 
+            if (max > 0)
             {
                 knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations.Add("autoscaling.knative.dev/maxScale", max.ToString());
             }
@@ -132,24 +100,24 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         private async Task<string> GetIstioClusterIngressEndpoint()
         {
-            var gateway = await client.ServicesV1().Get("istio-ingressgateway", "istio-system");
+            var gateway = await KubectlHelper.KubectlGet<JObject>("service istio-ingressgateway --namespace istio-system");
             if (gateway == null)
             {
-                return "";
+                return string.Empty;
             }
 
-            var endpoint = gateway.Status.LoadBalancer.Ingress[0].Hostname;
+            var endpoint = gateway.SelectToken("Status.LoadBalancer.Ingress[0].Hostname")?.ToString();
             if (!string.IsNullOrEmpty(endpoint))
             {
                 return endpoint;
             }
 
-            return gateway.Status.LoadBalancer.Ingress[0].Ip;
+            return gateway.SelectToken("Status.LoadBalancer.Ingress[0].Ip")?.ToString();
         }
 
         private async Task CreateNamespace(string name)
         {
-            await KubernetesHelper.RunKubectl($"create ns {name}");
+            await KubectlHelper.RunKubectl($"create namespace {name}");
         }
     }
 }

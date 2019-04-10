@@ -252,7 +252,7 @@ namespace Azure.Functions.Cli.Common
             {
                 await _orchestrationService.RewindTaskOrchestrationAsync(instanceId, reason);
             }
-            catch
+            catch (ArgumentOutOfRangeException)
             {
                 // DurableTask.AzureStorage throws this error when it cannot find an orchestration instance matching the query
                 throw new CliException("Orchestration instance not rewound. Must have a status of 'Failed', or an EventType of 'TaskFailed' or 'SubOrchestrationInstanceFailed' to be rewound.");

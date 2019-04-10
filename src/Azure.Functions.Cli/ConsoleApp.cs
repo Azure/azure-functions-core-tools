@@ -10,6 +10,7 @@ using Autofac;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -167,6 +168,8 @@ namespace Azure.Functions.Cli
                 .Where(t => typeof(IAction).IsAssignableFrom(t) && !t.IsAbstract)
                 .Select(type => type.GetCustomAttributes<ActionAttribute>().Select(a => new TypeAttributePair { Type = type, Attribute = a }))
                 .SelectMany(i => i);
+
+            GlobalCoreToolsSettings.Init(container.Resolve<ISecretsManager>(), args);
         }
 
         /// <summary>

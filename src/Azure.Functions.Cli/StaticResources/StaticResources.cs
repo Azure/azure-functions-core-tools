@@ -35,6 +35,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileNode => GetValue("Dockerfile.node");
 
+        public static Task<string> DockerIgnoreFile => GetValue("dockerignore");
+
         public static Task<string> VsCodeExtensionsJson => GetValue("vscode.extensions.json");
 
         public static Task<string> LocalSettingsJson => GetValue("local.settings.json");
@@ -60,5 +62,9 @@ namespace Azure.Functions.Cli
         public static Task<string> TsConfig => GetValue("tsconfig.json");
 
         public static Task<string> PowerShellRequirementsPsd1 => GetValue("requirements.psd1");
+
+        public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
+
+        public static Task<string> OsirisTemplate => GetValue("osiris.yaml");
     }
 }

@@ -90,6 +90,11 @@ namespace Azure.Functions.Cli.Common
             Instance.File.Delete(path);
         }
 
+        internal static void WriteAllTextToFile(string scriptFilePath, object p)
+        {
+            throw new NotImplementedException();
+        }
+
         public static void CreateDirectory(string path)
         {
             Instance.Directory.CreateDirectory(path);
@@ -158,11 +163,6 @@ namespace Azure.Functions.Cli.Common
                     }
                 }
             }
-        }
-
-        internal static bool FileExists(object funcIgnoreFile)
-        {
-            throw new NotImplementedException();
         }
 
         internal static IEnumerable<string> GetDirectories(string path)

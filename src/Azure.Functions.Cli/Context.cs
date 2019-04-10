@@ -37,7 +37,10 @@ namespace Azure.Functions.Cli
         Extensions,
 
         [Description("Commands for working with Durable Functions")]
-        Durable
+        Durable,
+
+        [Description("Commands for working with Kubernetes and Azure Functions")]
+        Kubernetes,
     }
 
     internal static class ContextEnumExtensions
