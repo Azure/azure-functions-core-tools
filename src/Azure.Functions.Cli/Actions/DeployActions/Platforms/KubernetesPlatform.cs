@@ -7,9 +7,9 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
-using KubeClient;
-using KubeClient.Models;
-using Azure.Functions.Cli.Actions.DeployActions.Platforms.Models;
+using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Azure.Functions.Cli.Kubernetes;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 {
@@ -17,39 +17,20 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
     {
         private string configFile = string.Empty;
         private const string FUNCTIONS_NAMESPACE = "azure-functions";
-        private static KubeApiClient client;
 
         public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
             await Deploy(functionName, image, nameSpace, min, max, cpu, memory, port, pullSecret);
         }
 
-        public KubernetesPlatform(string configFile)
-        {
-            this.configFile = configFile;
-            KubeClientOptions options;
-
-            if (!string.IsNullOrEmpty(configFile))
-            {
-                options = K8sConfig.Load(configFile).ToKubeClientOptions(defaultKubeNamespace: FUNCTIONS_NAMESPACE);
-            }
-            else
-            {
-                options = K8sConfig.Load().ToKubeClientOptions(defaultKubeNamespace: FUNCTIONS_NAMESPACE);
-            }
-
-            client = KubeApiClient.Create(options);
-        }
-
         private async Task DeleteDeploymentIfExists(string name, string nameSpace)
         {
-            await client.DeploymentsV1Beta1().Delete(name, nameSpace);
+            await KubectlHelper.RunKubectl($"delete deployment {name} --namespace {nameSpace}");
         }
 
         private async Task Deploy(string name, string image, string nameSpace, int min, int max, double cpu, int memory, string port, string pullSecret)
         {
             await CreateNamespace(nameSpace);
-            client.DefaultNamespace = nameSpace;
 
             var deploymentName = $"{name}-deployment";
 
@@ -65,8 +46,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                                 NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
                             });
 
-            File.WriteAllText("deployment.json", json);
-            await KubernetesHelper.RunKubectl($"apply -f deployment.json");
+            await KubectlHelper.RunKubectl($"apply -f deployment.json --namespace {nameSpace}");
 
             ColoredConsole.WriteLine("Deployment successful");
 
@@ -75,7 +55,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             try
             {
                 // we can safely ignore the error here
-                await client.ServicesV1().Create(service);
+                await KubectlHelper.KubectlApply(service, showOutput: false);
             }
             catch { }
 
@@ -88,27 +68,25 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
             while (string.IsNullOrEmpty(externalIP))
             {
-                var svc = await client.ServicesV1().Get($"{deploymentName}-service", nameSpace);
+                var svc = await KubectlHelper.KubectlGet<JObject>($"{deploymentName}-service --namespace {nameSpace}");
                 if (svc != null)
                 {
-                    if (svc.Status.LoadBalancer.Ingress.Count > 0)
+                    var obj = svc.SelectToken("Status.LoadBalancer.Ingress[0].Ip");
+                    if (obj != null)
                     {
-                        externalIP = svc.Status.LoadBalancer.Ingress[0].Ip;
+                        externalIP = obj.ToString();
                     }
                 }
             }
 
-            File.Delete("deployment.json");
-
-            ColoredConsole.WriteLine("");
-
+            ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Function deployed successfully!");
             ColoredConsole.WriteLine($"Function IP: {externalIP}");
         }
 
         private async Task TryRemoveAutoscaler(string deploymentName, string nameSpace)
         {
-            await KubernetesHelper.RunKubectl($"delete hpa {deploymentName} -n {nameSpace}");
+            await KubectlHelper.RunKubectl($"delete hpa {deploymentName} -n {nameSpace}");
         }
 
         private async Task CreateAutoscaler(string deploymentName, string nameSpace, int minInstances, int maxInstances, int cpuPercentage = 60)
@@ -120,14 +98,14 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 cmd += $" --kubeconfig {configFile}";
             }
 
-            await KubernetesHelper.RunKubectl(cmd);
+            await KubectlHelper.RunKubectl(cmd);
         }
 
         private ServiceV1 GetService(string name, string nameSpace, string port = "80")
         {
             var service = new ServiceV1()
             {
-                Metadata = new ObjectMetaV1()
+                Metadata = new ObjectMetadataV1()
                 {
                     Name = $"{name}-service",
                     Namespace = nameSpace
@@ -147,84 +125,87 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             return service;
         }
 
-        private Deployment GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min, string pullSecret)
+        private DeploymentV1Apps GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min, string pullSecret)
         {
-            var deployment = new Deployment();
-            deployment.apiVersion = "apps/v1beta1";
-            deployment.kind = "Deployment";
-
-            var metadata = new Metadata();
-            metadata.@namespace = nameSpace;
-            metadata.name = name;
-            metadata.labels = new Labels();
-            metadata.labels.app = name;
-
-            deployment.metadata = metadata;
-            deployment.spec = new Spec();
-            deployment.spec.replicas = min;
-            deployment.spec.selector = new Selector();
-
-            deployment.spec.selector.matchLabels = new MatchLabels();
-            deployment.spec.selector.matchLabels.app = name;
-
-            deployment.spec.template = new Models.Template();
-            deployment.spec.template.metadata = new Metadata();
-            deployment.spec.template.metadata.labels = new Labels();
-            deployment.spec.template.metadata.labels.app = name;
-
-            deployment.spec.template.spec = new TemplateSpec();
-            deployment.spec.template.spec.containers = new List<Container>();
-            deployment.spec.template.spec.containers.Add(new Container()
+            var deployment = new DeploymentV1Apps
             {
-                name = name,
-                image = image,
-                resources = new Resources()
+
+                ApiVersion = "apps/v1beta1",
+                Kind = "Deployment",
+
+                Metadata = new ObjectMetadataV1
                 {
-                    requests = new Requests()
+                    Namespace = nameSpace,
+                    Name = name,
+                    Labels = new Dictionary<string, string>
                     {
-                        cpu = cpu.ToString(),
-                        memory = $"{memory}Mi"
+                       { "app", name }
                     }
-                }
-            });
-
-            if (!string.IsNullOrEmpty(port))
-            {
-                deployment.spec.template.spec.containers[0].ports = new List<Port>()
+                },
+                Spec = new DeploymentSpecV1Apps
                 {
-                    new Port()
+                    Replicas = min,
+                    Selector = new SelectorV1
                     {
-                        containerPort = int.Parse(port)
-                    }
-                };
-            }
+                        MatchLabels = new Dictionary<string, string>
+                        {
+                            { "app", name }
+                        }
+                    },
 
-            deployment.spec.template.spec.tolerations = new List<Toleration>()
-            {
-                new Toleration()
-                {
-                    key = "azure.com/aci",
-                    effect = "NoSchedule"
+                    Template = new PodTemplateV1
+                    {
+                        Metadata = new ObjectMetadataV1
+                        {
+                            Labels = new Dictionary<string, string>
+                            {
+                                { "app", name }
+                            }
+                        },
+                        Spec = new PodTemplateSpecV1
+                        {
+                            Containers = new ContainerV1[]
+                            {
+                                new ContainerV1
+                                {
+                                    Name = name,
+                                    Image = image,
+                                    Resources = new ContainerResourcesV1()
+                                    {
+                                        Requests = new ContainerResourceRequestsV1()
+                                        {
+                                            Cpu = cpu.ToString(),
+                                            Memory = $"{memory}Mi"
+                                        }
+                                    },
+                                    Ports = string.IsNullOrEmpty(port)
+                                        ? Array.Empty<ContainerPortV1>()
+                                        : new ContainerPortV1[] { new ContainerPortV1 { ContainerPort = int.Parse(port) } },
+
+                                }
+                            },
+                            Tolerations = new PodTolerationV1[]
+                            {
+                                new PodTolerationV1
+                                {
+                                    Key = "azure.com/aci",
+                                    Effect = "NoSchedule"
+                                }
+                            },
+                            ImagePullSecrets = string.IsNullOrEmpty(pullSecret)
+                                ? null
+                                : new ImagePullSecretV1[] { new ImagePullSecretV1 { Name = pullSecret } }
+                        }
+                    }
                 }
             };
-
-            if (!string.IsNullOrEmpty(pullSecret))
-            {
-                deployment.spec.template.spec.imagePullSecrets = new List<ImagePullSecret>()
-                {
-                    new ImagePullSecret
-                    {
-                        name = pullSecret
-                    }
-                };
-            }
 
             return deployment;
         }
 
         private async Task CreateNamespace(string name)
         {
-            await KubernetesHelper.RunKubectl($"create ns {name}");
+            await KubectlHelper.RunKubectl($"create ns {name}");
         }
     }
 }

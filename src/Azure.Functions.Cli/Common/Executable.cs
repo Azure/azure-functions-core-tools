@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.Common
 
         public Process Process { get; private set; }
 
-        public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null, TimeSpan? timeout = null)
+        public async Task<int> RunAsync(Action<string> outputCallback = null, Action<string> errorCallback = null, TimeSpan? timeout = null, string stdIn = null)
         {
             if (StaticSettings.IsDebug)
             {
@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Common
                     CreateNoWindow = !_visibleProcess,
                     UseShellExecute = _shareConsole,
                     RedirectStandardError = _streamOutput,
-                    RedirectStandardInput = _streamOutput,
+                    RedirectStandardInput = _streamOutput || !string.IsNullOrEmpty(stdIn),
                     RedirectStandardOutput = _streamOutput,
                     WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
                 }
@@ -82,6 +82,12 @@ namespace Azure.Functions.Cli.Common
                 {
                     Process.BeginOutputReadLine();
                     Process.BeginErrorReadLine();
+                }
+                
+                if (!string.IsNullOrEmpty(stdIn))
+                {
+                    Process.StandardInput.WriteLine(stdIn);
+                    Process.StandardInput.Close();
                 }
             }
             catch (Win32Exception ex)

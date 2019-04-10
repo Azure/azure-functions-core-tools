@@ -1,0 +1,496 @@
+# Source: osiris-edge/templates/endpoints-hijacker-webhook-config.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: osiris-osiris-edge-endpoints-hijacker-cert
+  labels:
+    app.kubernetes.io/name: osiris-edge-endpoints-hijacker
+    app.kubernetes.io/instance: osiris
+data:
+  tls.crt: TLS_CERT_FOR_EDGE_ENDPOINTS_HIJACKER
+  tls.key: TLS_KEY_FOR_EDGE_ENDPOINTS_HIJACKER
+---
+# Source: osiris-edge/templates/image-pull-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: osiris-osiris-edge
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: eyJhdXRocyI6eyJvc2lyaXMuYXp1cmVjci5pbyI6eyJ1c2VybmFtZSI6ImVhZTk3NDlhLWZjY2YtNGEyNC1hYzBkLTY1MDZmZTJhNmFiMyIsInBhc3N3b3JkIjoiMmZjNmE3MjEtODVlNC00MWNhLTkzM2QtMmNhMDJlMTM5NGM0IiwiYXV0aCI6IlpXRmxPVGMwT1dFdFptTmpaaTAwWVRJMExXRmpNR1F0TmpVd05tWmxNbUUyWVdJek9qSm1ZelpoTnpJeExUZzFaVFF0TkRGallTMDVNek5rTFRKallUQXlaVEV6T1RSak5BPT0ifX19
+---
+# Source: osiris-edge/templates/proxy-injector-webhook-config.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: osiris-osiris-edge-proxy-injector-cert
+  labels:
+    app.kubernetes.io/name: osiris-edge-proxy-injector
+    app.kubernetes.io/instance: osiris
+data:
+  tls.crt: TLS_CERT_FOR_EDGE_PROXY_INJECTOR
+  tls.key: TLS_KEY_FOR_EDGE_PROXY_INJECTOR
+---
+# Source: osiris-edge/templates/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: osiris-osiris-edge
+  labels:
+    app.kubernetes.io/name: osiris-edge
+    app.kubernetes.io/instance: osiris
+---
+# Source: osiris-edge/templates/cluster-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: osiris-osiris-edge
+  labels:
+    app.kubernetes.io/name: osiris-edge
+    app.kubernetes.io/instance: osiris
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+# Source: osiris-edge/templates/cluster-role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: osiris-osiris-edge
+  labels:
+    app.kubernetes.io/name: osiris-edge
+    app.kubernetes.io/instance: osiris
+subjects:
+- kind: ServiceAccount
+  name: osiris-osiris-edge
+  namespace: OSIRIS_NAMESPACE_PLACEHOLDER
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: osiris-osiris-edge
+---
+# Source: osiris-edge/templates/endpoints-hijacker-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: osiris-osiris-edge-endpoints-hijacker
+  labels:
+    app.kubernetes.io/name: osiris-edge-endpoints-hijacker
+    app.kubernetes.io/instance: osiris
+spec:
+  type: ClusterIP
+  ports:
+  - port: 443
+    targetPort: https
+    protocol: TCP
+    name: https
+  selector:
+    app.kubernetes.io/name: osiris-edge-endpoints-hijacker
+    app.kubernetes.io/instance: osiris
+---
+# Source: osiris-edge/templates/proxy-injector-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: osiris-osiris-edge-proxy-injector
+  labels:
+    app.kubernetes.io/name: osiris-edge-proxy-injector
+    app.kubernetes.io/instance: osiris
+spec:
+  type: ClusterIP
+  ports:
+  - port: 443
+    targetPort: https
+    protocol: TCP
+    name: https
+  selector:
+    app.kubernetes.io/name: osiris-edge-proxy-injector
+    app.kubernetes.io/instance: osiris
+---
+# Source: osiris-edge/templates/activator-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osiris-osiris-edge-activator
+  labels:
+    app.kubernetes.io/name: osiris-edge-activator
+    app.kubernetes.io/instance: osiris
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osiris-edge-activator
+      app.kubernetes.io/instance: osiris
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osiris-edge-activator
+        app.kubernetes.io/instance: osiris
+    spec:
+      serviceAccountName: osiris-osiris-edge
+      imagePullSecrets:
+      - name: osiris-osiris-edge
+      containers:
+      - name: activator
+        image: osiris.azurecr.io/osiris:6b69328
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 1000
+        command:
+        - /osiris/bin/osiris
+        args:
+        - --logtostderr=true
+        - activator
+        ports:
+        - name: proxy
+          containerPort: 5000
+          protocol: TCP
+        - name: healthz
+          containerPort: 5001
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            port: healthz
+            path: /healthz
+        readinessProbe:
+          httpGet:
+            port: healthz
+            path: /healthz
+        resources:
+            {}
+---
+# Source: osiris-edge/templates/endpoints-controller-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osiris-osiris-edge-endpoints-controller
+  labels:
+    app.kubernetes.io/name: osiris-edge-endpoints-controller
+    app.kubernetes.io/instance: osiris
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osiris-edge-endpoints-controller
+      app.kubernetes.io/instance: osiris
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osiris-edge-endpoints-controller
+        app.kubernetes.io/instance: osiris
+    spec:
+      serviceAccountName: osiris-osiris-edge
+      imagePullSecrets:
+      - name: osiris-osiris-edge
+      containers:
+      - name: endpoints-controller
+        image: osiris.azurecr.io/osiris:6b69328
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 1000
+        command:
+        - /osiris/bin/osiris
+        args:
+        - --logtostderr=true
+        - endpoints-controller
+        env:
+        - name: OSIRIS_NAMESPACE
+          value: OSIRIS_NAMESPACE_PLACEHOLDER
+        - name: ACTIVATOR_POD_LABEL_SELECTOR_KEY
+          value: app.kubernetes.io/name
+        - name: ACTIVATOR_POD_LABEL_SELECTOR_VALUE
+          value: osiris-edge-activator
+        ports:
+        - name: healthz
+          containerPort: 5000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            port: healthz
+            path: /healthz
+        readinessProbe:
+          httpGet:
+            port: healthz
+            path: /healthz
+        resources:
+            {}
+---
+# Source: osiris-edge/templates/endpoints-hijacker-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osiris-osiris-edge-endpoints-hijacker
+  labels:
+    app.kubernetes.io/name: osiris-edge-endpoints-hijacker
+    app.kubernetes.io/instance: osiris
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osiris-edge-endpoints-hijacker
+      app.kubernetes.io/instance: osiris
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osiris-edge-endpoints-hijacker
+        app.kubernetes.io/instance: osiris
+        releaseRevision: "1"
+    spec:
+      serviceAccountName: osiris-osiris-edge
+      imagePullSecrets:
+      - name: osiris-osiris-edge
+      containers:
+      - name: endpoints-hijacker
+        image: osiris.azurecr.io/osiris:6b69328
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 1000
+        command:
+        - /osiris/bin/osiris
+        args:
+        - --logtostderr=true
+        - endpoints-hijacker
+        env:
+        - name: TLS_CERT_FILE
+          value: /osiris/cert/tls.crt
+        - name: TLS_KEY_FILE
+          value: /osiris/cert/tls.key
+        ports:
+        - name: https
+          containerPort: 5000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            port: https
+            scheme: HTTPS
+            path: /healthz
+        readinessProbe:
+          httpGet:
+            port: https
+            scheme: HTTPS
+            path: /healthz
+        volumeMounts:
+          - name: cert
+            mountPath: /osiris/cert
+            readOnly: true
+        resources:
+            {}
+
+      volumes:
+      - name: cert
+        secret:
+          secretName: osiris-osiris-edge-endpoints-hijacker-cert
+---
+# Source: osiris-edge/templates/proxy-injector-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osiris-osiris-edge-proxy-injector
+  labels:
+    app.kubernetes.io/name: osiris-edge-proxy-injector
+    app.kubernetes.io/instance: osiris
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osiris-edge-proxy-injector
+      app.kubernetes.io/instance: osiris
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osiris-edge-proxy-injector
+        app.kubernetes.io/instance: osiris
+        releaseRevision: "1"
+    spec:
+      serviceAccountName: osiris-osiris-edge
+      imagePullSecrets:
+      - name: osiris-osiris-edge
+      containers:
+      - name: proxy-injector
+        image: osiris.azurecr.io/osiris:6b69328
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 1000
+        command:
+        - /osiris/bin/osiris
+        args:
+        - --logtostderr=true
+        - proxy-injector
+        env:
+        - name: TLS_CERT_FILE
+          value: /osiris/cert/tls.crt
+        - name: TLS_KEY_FILE
+          value: /osiris/cert/tls.key
+        - name: PROXY_IMAGE
+          value: osiris.azurecr.io/osiris:6b69328
+        - name: PROXY_IMAGE_PULL_POLICY
+          value: IfNotPresent
+        ports:
+        - name: https
+          containerPort: 5000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            port: https
+            scheme: HTTPS
+            path: /healthz
+        readinessProbe:
+          httpGet:
+            port: https
+            scheme: HTTPS
+            path: /healthz
+        volumeMounts:
+        - name: cert
+          mountPath: /osiris/cert
+          readOnly: true
+        resources:
+            {}
+
+      volumes:
+      - name: cert
+        secret:
+          secretName: osiris-osiris-edge-proxy-injector-cert
+---
+# Source: osiris-edge/templates/zeroscaler-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osiris-osiris-edge-zeroscaler
+  labels:
+    app.kubernetes.io/name: osiris-edge-zeroscaler
+    app.kubernetes.io/instance: osiris
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osiris-edge-zeroscaler
+      app.kubernetes.io/instance: osiris
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osiris-edge-zeroscaler
+        app.kubernetes.io/instance: osiris
+    spec:
+      serviceAccountName: osiris-osiris-edge
+      imagePullSecrets:
+      - name: osiris-osiris-edge
+      containers:
+      - name: zeroscaler
+        image: osiris.azurecr.io/osiris:6b69328
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 1000
+        command:
+        - /osiris/bin/osiris
+        args:
+        - --logtostderr=true
+        - zeroscaler
+        env:
+        - name: METRICS_CHECK_INTERVAL
+          value: "150"
+        ports:
+        - name: healthz
+          containerPort: 5000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            port: healthz
+            path: /healthz
+        readinessProbe:
+          httpGet:
+            port: healthz
+            path: /healthz
+        resources:
+            {}
+---
+# Source: osiris-edge/templates/endpoints-hijacker-webhook-config.yaml
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: osiris-osiris-edge-endpoints-hijacker
+  labels:
+    app.kubernetes.io/name: osiris-edge-endpoints-hijacker
+    app.kubernetes.io/instance: osiris
+webhooks:
+- name: endpoints-hijacker.osiris.deislabs.io
+  clientConfig:
+    service:
+      namespace: OSIRIS_NAMESPACE_PLACEHOLDER
+      name: osiris-osiris-edge-endpoints-hijacker
+      path: "/mutate"
+    caBundle: CA_CERT_FOR_EDGE_ENDPOINT_HIJACKER
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    resources:
+    - services
+    operations:
+    - CREATE
+    - UPDATE
+  failurePolicy: Ignore
+---
+# Source: osiris-edge/templates/proxy-injector-webhook-config.yaml
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: osiris-osiris-edge-proxy-injector
+  labels:
+    app.kubernetes.io/name: osiris-edge-proxy-injector
+    app.kubernetes.io/instance: osiris
+webhooks:
+- name: proxy-injector.osiris.deislabs.io
+  clientConfig:
+    service:
+      namespace: OSIRIS_NAMESPACE_PLACEHOLDER
+      name: osiris-osiris-edge-proxy-injector
+      path: "/mutate"
+    caBundle: CA_CERT_FOR_EDGE_PROXY_INJECTOR
+  rules:
+  - apiGroups:
+    - apps
+    apiVersions:
+    - v1
+    resources:
+    - deployments
+    operations:
+    - CREATE
+    - UPDATE
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    resources:
+    - pods
+    operations:
+    - CREATE
+  failurePolicy: Ignore

@@ -16,7 +16,7 @@ using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "deploy", HelpText = "Deploy a function app to custom hosting backends")]
+    [Action(Name = "deploy", ShowInHelp = false)]
     internal class DeployAction : BaseAction
     {
         public string Registry { get; set; }
@@ -29,7 +29,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Port { get; set; } = "80";
         public string Namespace { get; set; } = "azure-functions";
         public string FolderName { get; set; } = string.Empty;
-        public string ConfigPath { get; set; } = string.Empty;
         public string PullSecret  { get; set; } = string.Empty;
 
         public List<string> Platforms { get; set; } = new List<string>() { "kubernetes", "knative" };
@@ -77,11 +76,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("[Optional] The namespace to deploy the function to")
                 .Callback(t => Namespace = t);
 
-            Parser
-                .Setup<string>("config")
-                .WithDescription("[Optional] Config file")
-                .Callback(t => ConfigPath = t);
-
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -127,7 +121,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             ColoredConsole.WriteLine("Pushing function image to registry...");
             await DockerHelpers.DockerPush(image);
 
-            var platform = PlatformFactory.CreatePlatform(Platform, ConfigPath);
+            var platform = PlatformFactory.CreatePlatform(Platform);
 
             if (platform == null)
             {
