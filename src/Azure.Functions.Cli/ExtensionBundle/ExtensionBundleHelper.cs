@@ -29,7 +29,10 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static ExtensionBundleManager GetExtensionBundleManager()
         {
             var extensionBundleOption = GetExtensionBundleOptions();
-            extensionBundleOption.DownloadPath = Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, extensionBundleOption.Id);
+            if (!string.IsNullOrEmpty(extensionBundleOption.Id))
+            {
+                extensionBundleOption.DownloadPath = Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, extensionBundleOption.Id);
+            }
             return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance);
         }
 
