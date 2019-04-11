@@ -36,9 +36,8 @@ namespace Azure.Functions.Cli.Common
             string templatesJson;
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
-                var bundlePath = await extensionBundleManager.GetExtensionBundlePath();
-                var templatesJsonFilePath = Path.Combine(bundlePath, "StaticContent", "v1", "Templates", "templates.json");
-                templatesJson = await FileSystemHelpers.ReadAllTextFromFileAsync(templatesJsonFilePath);
+                var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+                templatesJson = await contentProvider.GetTemplates();
             }
             else
             {

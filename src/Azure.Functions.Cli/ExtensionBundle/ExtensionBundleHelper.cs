@@ -32,5 +32,10 @@ namespace Azure.Functions.Cli.ExtensionBundle
             extensionBundleOption.DownloadPath = Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, extensionBundleOption.Id);
             return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance);
         }
+
+        public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()
+        {
+            return new ExtensionBundleContentProvider(GetExtensionBundleManager(), NullLogger<ExtensionBundleContentProvider>.Instance);
+        }
     }
 }
