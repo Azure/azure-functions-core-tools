@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
 using Newtonsoft.Json.Linq;
 using Azure.Functions.Cli.Actions.LocalActions;
+using Azure.Functions.Cli.ExtensionBundle;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -30,7 +31,19 @@ namespace Azure.Functions.Cli.Common
 
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
-            var templatesJson = await StaticResources.TemplatesJson;
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+
+            string templatesJson;
+            if (extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                var bundlePath = await extensionBundleManager.GetExtensionBundlePath();
+                var templatesJsonFilePath = Path.Combine(bundlePath, "StaticContent", "v1", "Templates", "templates.json");
+                templatesJson = await FileSystemHelpers.ReadAllTextFromFileAsync(templatesJsonFilePath);
+            }
+            else
+            {
+                templatesJson = await StaticResources.TemplatesJson;
+            }
             return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
         }
 

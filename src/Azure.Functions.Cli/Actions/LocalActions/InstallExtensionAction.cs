@@ -74,12 +74,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            var hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
-            var extensionBundleOption = ExtensionBundleHelper.GetExtensionBundleOptions(hostOptions);
-            var extensionBundleManager = new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance);
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
-                var hostFilePath = Path.Combine(hostOptions.ScriptPath, ScriptConstants.HostMetadataFileName);
+                var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
                 ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
                 return;
             }
