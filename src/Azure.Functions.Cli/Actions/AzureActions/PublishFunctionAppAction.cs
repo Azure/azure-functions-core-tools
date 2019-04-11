@@ -143,7 +143,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (workerRuntime != WorkerRuntime.dotnet || Csx)
             {
                 // Restore all valid extensions
-                var installExtensionAction = new InstallExtensionAction(_secretsManager);
+                var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
                 await installExtensionAction.RunAsync();
             }
 

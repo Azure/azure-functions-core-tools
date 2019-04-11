@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     internal class InstallExtensionAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
+        private readonly bool _showExtensionBundleWarning;
 
         public string Package { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
@@ -25,9 +26,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public bool Csx { get; set; }
         public bool Force { get; set; } = false;
 
-        public InstallExtensionAction(ISecretsManager secretsManager)
+        public InstallExtensionAction(ISecretsManager secretsManager, bool showExtensionBundleWarning = true)
         {
             _secretsManager = secretsManager;
+            _showExtensionBundleWarning = showExtensionBundleWarning;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -76,7 +78,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
                 var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
-                ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
+                if (_showExtensionBundleWarning)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
+                }
                 return;
             }
 
@@ -113,7 +118,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     );
                 }
 
-                var syncAction = new SyncExtensionsAction(_secretsManager)
+                var syncAction = new SyncExtensionsAction(_secretsManager, false)
                 {
                     OutputPath = OutputPath,
                     ConfigPath = ConfigPath

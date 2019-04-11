@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli.Common
             {
                 foreach (var extension in template.Metadata.Extensions)
                 {
-                    var installAction = new InstallExtensionAction(_secretsManager)
+                    var installAction = new InstallExtensionAction(_secretsManager, false)
                     {
                         Package = extension.Id,
                         Version = extension.Version
