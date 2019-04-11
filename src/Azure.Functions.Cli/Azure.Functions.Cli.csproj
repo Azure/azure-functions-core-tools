@@ -24,6 +24,9 @@
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="StaticResources\bundleConfig.json">
+      <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
