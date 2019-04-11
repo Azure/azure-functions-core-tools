@@ -10,13 +10,8 @@ namespace Azure.Functions.Cli.ExtensionBundle
 {
     class ExtensionBundleHelper
     {
-        public static ExtensionBundleOptions GetExtensionBundleOptions(string scriptPath)
+        public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions)
         {
-            var hostOptions = new ScriptApplicationHostOptions()
-            {
-                ScriptPath = scriptPath
-            };
-
             IConfigurationBuilder builder = new ConfigurationBuilder();
             builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance));
             var configuration = builder.Build();

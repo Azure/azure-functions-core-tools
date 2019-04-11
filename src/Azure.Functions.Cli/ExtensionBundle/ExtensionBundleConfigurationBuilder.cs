@@ -10,16 +10,16 @@ namespace Azure.Functions.Cli.ExtensionBundle
 {
     internal class ExtensionBundleConfigurationBuilder : IConfigureBuilder<IConfigurationBuilder>
     {
-        private readonly string _scriptPath;
+        private readonly ScriptApplicationHostOptions _hostOptions;
 
-        public ExtensionBundleConfigurationBuilder(string scriptPath)
+        public ExtensionBundleConfigurationBuilder(ScriptApplicationHostOptions hostOptions)
         {
-            _scriptPath = scriptPath;
+            _hostOptions = hostOptions;
         }
 
         public void Configure(IConfigurationBuilder builder)
         {
-            var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_scriptPath).Id;
+            var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
             if (!string.IsNullOrEmpty(bundleId))
             {
                 builder.AddInMemoryCollection(new Dictionary<string, string>

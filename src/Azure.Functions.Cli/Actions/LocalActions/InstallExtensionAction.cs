@@ -2,10 +2,14 @@
 using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
+using Microsoft.Extensions.Logging.Abstractions;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -70,6 +74,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
+            var hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
+            var extensionBundleOption = ExtensionBundleHelper.GetExtensionBundleOptions(hostOptions);
+            var extensionBundleManager = new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance);
+            if (extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                var hostFilePath = Path.Combine(hostOptions.ScriptPath, ScriptConstants.HostMetadataFileName);
+                ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
+                return;
+            }
+
             if (CommandChecker.CommandExists("dotnet"))
             {
                 if (!string.IsNullOrEmpty(ConfigPath) && !FileSystemHelpers.DirectoryExists(ConfigPath))
