@@ -104,6 +104,8 @@ namespace Azure.Functions.Cli.Helpers
 
             var packagesMd5 = await FileSystemHelpers.ReadAllTextFromFileAsync(md5File);
             var requirementsTxtMd5 = SecurityHelpers.CalculateMd5(requirementsTxt);
+            ColoredConsole.WriteLine(Yellow($"MD5 from .md5 file: {packagesMd5}"));
+            ColoredConsole.WriteLine(Yellow($"MD5 from req.txt file: {requirementsTxtMd5}"));
 
             return packagesMd5 == requirementsTxtMd5;
         }
@@ -123,6 +125,7 @@ namespace Azure.Functions.Cli.Helpers
                 if (await ArePackagesInSync(reqTxtFile, packagesLocation))
                 {
                     ColoredConsole.WriteLine(Yellow($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
+                    ColoredConsole.WriteLine(Yellow($"req.txt file contents = {FileSystemHelpers.ReadAllTextFromFile(reqTxtFile)}"));
                     return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
                 }
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
