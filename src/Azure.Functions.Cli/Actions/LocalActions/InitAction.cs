@@ -10,6 +10,8 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -32,6 +34,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public bool Force { get; set; }
 
         public bool Csx { get; set; }
+
+        public bool ExtensionBundle { get; set; }
 
         public string Language { get; set; }
 
@@ -101,6 +105,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
                 .Callback(f => ManagedDependencies = f);
 
+            Parser
+                .Setup<bool>("extension-bundle")
+                //.WithDescription("use default extension bundle configuration in host.json")
+                .Callback(e => ExtensionBundle = e);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -165,7 +174,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 bool managedDependenciesOption = ResolveManagedDependencies(workerRuntime, ManagedDependencies);
                 await InitLanguageSpecificArtifacts(workerRuntime, language, managedDependenciesOption);
                 await WriteFiles();
-                await WriteHostJson(workerRuntime, managedDependenciesOption);
+                await WriteHostJson(workerRuntime, managedDependenciesOption, ExtensionBundle);
                 await WriteLocalSettingsJson(workerRuntime);
             }
 
@@ -355,13 +364,27 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return true;
         }
 
-        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption)
+        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle)
         {
             var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
                 ? await StaticResources.PowerShellHostJson
                 : await StaticResources.HostJson;
 
+            if (extensionBundle)
+            {
+                hostJsonContent = await AddBundleConfig(hostJsonContent);
+            }
+
             await WriteFiles("host.json", hostJsonContent);
+        }
+
+        private static async Task<string> AddBundleConfig(string hostJsonContent)
+        {
+            var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
+            var bundleConfigContent = await StaticResources.BundleConfig;
+            var bundleConfig = JsonConvert.DeserializeObject<JToken>(bundleConfigContent);
+            hostJsonObj.Add("extensionBundle", bundleConfig);
+            return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
         }
     }
 }
