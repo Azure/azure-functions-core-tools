@@ -366,7 +366,9 @@ namespace Azure.Functions.Cli
         internal IAction CreateAction(Type type)
         {
             var ctor = type.GetConstructors()?.SingleOrDefault();
-            var args = ctor?.GetParameters()?.Select(p => _container.Resolve(p.ParameterType)).ToArray();
+            var args = ctor?.GetParameters()?.Select(p =>
+                p.Attributes == (ParameterAttributes.HasDefault | ParameterAttributes.Optional) ? p.DefaultValue : _container.Resolve(p.ParameterType)
+            ).ToArray();
             return args == null || args.Length == 0
                 ? (IAction)Activator.CreateInstance(type)
                 : (IAction)Activator.CreateInstance(type, args);

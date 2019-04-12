@@ -3,10 +3,12 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Script;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -15,14 +17,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     internal class SyncExtensionsAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
+        private readonly bool _showExtensionBundleWarning;
 
         public string ConfigPath { get; set; } = string.Empty;
         public string OutputPath { get; set; } = Path.GetFullPath("bin");
         public bool Csx { get; set; }
 
-        public SyncExtensionsAction(ISecretsManager secretsManager)
+        public SyncExtensionsAction(ISecretsManager secretsManager, bool showExtensionBundleWarning = true)
         {
             _secretsManager = secretsManager;
+            _showExtensionBundleWarning = showExtensionBundleWarning;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -47,6 +51,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+            if (extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
+                if (_showExtensionBundleWarning)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
+                }
+                return;
+            }
+
             if (CommandChecker.CommandExists("dotnet"))
             {
                 var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);

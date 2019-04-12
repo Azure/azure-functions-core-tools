@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -456,7 +457,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
                         .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
                 }
-                
+
                 services.AddWebJobsScriptHostAuthorization();
 
                 services.AddMvc()
@@ -472,6 +473,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     o.SecretsPath = _hostOptions.SecretsPath;
                 });
 
+
+                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
 

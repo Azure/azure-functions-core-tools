@@ -41,6 +41,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> HostJson => GetValue("host.json");
 
+        public static Task<string> BundleConfig => GetValue("bundleConfig.json");
+
         public static Task<string> PowerShellHostJson => GetValue("powershell.host.json");
 
         public static Task<string> PythonDockerBuildScript => GetValue(Constants.StaticResourcesNames.PythonDockerBuild);

@@ -2,10 +2,12 @@
 using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Script;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -14,6 +16,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     internal class InstallExtensionAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
+        private readonly bool _showExtensionBundleWarning;
 
         public string Package { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
@@ -23,9 +26,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public bool Csx { get; set; }
         public bool Force { get; set; } = false;
 
-        public InstallExtensionAction(ISecretsManager secretsManager)
+        public InstallExtensionAction(ISecretsManager secretsManager, bool showExtensionBundleWarning = true)
         {
             _secretsManager = secretsManager;
+            _showExtensionBundleWarning = showExtensionBundleWarning;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -70,6 +74,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+            if (extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
+                if (_showExtensionBundleWarning)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
+                }
+                return;
+            }
+
             if (CommandChecker.CommandExists("dotnet"))
             {
                 if (!string.IsNullOrEmpty(ConfigPath) && !FileSystemHelpers.DirectoryExists(ConfigPath))
@@ -103,7 +118,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     );
                 }
 
-                var syncAction = new SyncExtensionsAction(_secretsManager)
+                var syncAction = new SyncExtensionsAction(_secretsManager, false)
                 {
                     OutputPath = OutputPath,
                     ConfigPath = ConfigPath
