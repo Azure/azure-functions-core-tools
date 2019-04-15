@@ -38,6 +38,9 @@ namespace Azure.Functions.Cli.Arm.Models
         public bool IsDynamic
             => Sku?.Equals("dynamic", StringComparison.OrdinalIgnoreCase) == true;
 
+        public bool IsElasticPremium
+            => Sku?.Equals("elasticpremium", StringComparison.OrdinalIgnoreCase) == true;
+
         public Site(string siteId)
         {
             SiteId = siteId;
