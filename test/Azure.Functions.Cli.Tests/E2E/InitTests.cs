@@ -79,7 +79,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = Path.Combine("dotnet-funcs", "dotnet-funcs.csproj"),
                         ContentContains = new[]
                         {
-                            "Microsoft.NET.Sdk.Functions"
+                            "Microsoft.NET.Sdk.Functions",
+                            "v2"
                         }
                     }
                 }
