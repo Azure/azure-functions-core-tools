@@ -249,7 +249,7 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(string name, string imageName, string @namespace, TriggersPayload triggers, IDictionary<string, string> secrets, string pullSecret = null, string secretsCollectionName = null, string configMapName = null, bool useConfigMap = false, int? pollingInterval = null, int? cooldownPeriod = null)
+        internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(string name, string imageName, string @namespace, TriggersPayload triggers, IDictionary<string, string> secrets, string pullSecret = null, string secretsCollectionName = null, string configMapName = null, bool useConfigMap = false, int? pollingInterval = null, int? cooldownPeriod = null, string serviceType = "LoadBalancer")
         {
             var result = new List<IKubernetesResource>();
             var deployments = new List<DeploymentV1Apps>();
@@ -266,7 +266,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     { "osiris.deislabs.io/minReplicas", "1" }
                 }, port: 80);
                 deployments.Add(deployment);
-                var service = GetService(name + "-http", @namespace, deployment, new Dictionary<string, string>
+                var service = GetService(name + "-http", @namespace, deployment, serviceType, new Dictionary<string, string>
                 {
                     { "osiris.deislabs.io/enabled", "true" },
                     { "osiris.deislabs.io/deployment", deployment.Metadata.Name }
@@ -466,7 +466,7 @@ namespace Azure.Functions.Cli.Kubernetes
             return deployment;
         }
 
-        private static ServiceV1 GetService(string name, string @namespace, DeploymentV1Apps deployment, IDictionary<string, string> annotations = null)
+        private static ServiceV1 GetService(string name, string @namespace, DeploymentV1Apps deployment, string serviceType, IDictionary<string, string> annotations = null)
         {
             return new ServiceV1
             {
@@ -480,7 +480,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 },
                 Spec = new ServiceSpecV1
                 {
-                    Type = "LoadBalancer",
+                    Type = serviceType,
                     Ports = new ServicePortV1[]
                     {
                         new ServicePortV1
