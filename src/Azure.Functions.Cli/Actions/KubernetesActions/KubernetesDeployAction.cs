@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -26,12 +27,13 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public bool NoDocker { get; set; }
         public bool UseConfigMap { get; set; }
         public bool DryRun { get; private set; }
-        // public OutputSerializationOptions OutputFormat { get; private set; }
         public string ImageName { get; private set; }
         public string ConfigMapName { get; private set; }
         public string SecretsCollectionName { get; private set; }
         public int? PollingInterval { get; private set; }
         public int? CooldownPeriod { get; private set; }
+        public string ServiceType { get; set; } = "LoadBalancer";
+        public IEnumerable<string> ServiceTypes { get; set; } = new string[] { "ClusterIP", "NodePort", "LoadBalancer" };
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -49,10 +51,17 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<int>("cooldown-period", "The cooldown period for the deployment before scaling back to 0 after all triggers are no longer active. Default: 300 (seconds)", p => CooldownPeriod = p);
             SetFlag<string>("secrets-name", "The name of a secrets collection to use in the deployment instead of generating one based on local.settings.json", sn => SecretsCollectionName = sn);
             SetFlag<string>("config-map-name", "The name of a config map to use in the deployment", cm => ConfigMapName = cm);
+            SetFlag<string>("service-type", "Kubernetes Service Type. Default LoadBalancer  Valid options: " + string.Join(",", ServiceTypes), s =>
+            {
+                if (!string.IsNullOrEmpty(s) && !ServiceTypes.Contains(s))
+                {
+                    throw new CliArgumentsException($"serviceType {ServiceType} is not supported. Valid options are: {string.Join(",", ServiceTypes)}");
+                }
+                ServiceType = s;
+            });
             SetFlag<bool>("no-docker", "with --image-name, the core-tools will inspect the functions inside the image. This will require mounting the image filesystem. Passing --no-docker uses current directory for functions.", nd => NoDocker = nd);
             SetFlag<bool>("use-config-map", "local.settings.json will be creates as Secret/V1 object. This will create is as a ConfigMap instead.", c => UseConfigMap = c);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
-            // SetFlag<OutputSerializationOptions>("output", "With --dry-run. Prints deployment in json, yaml or helm. Default: yaml", o => OutputFormat = o);
             return base.ParseArgs(args);
         }
 
@@ -83,7 +92,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
 
-            var resources = KubernetesHelper.GetFunctionsDeploymentResources(Name, resolvedImageName, Namespace, triggers, _secretsManager.GetSecrets(), PullSecret, SecretsCollectionName, ConfigMapName, UseConfigMap, PollingInterval, CooldownPeriod);
+            var resources = KubernetesHelper.GetFunctionsDeploymentResources(Name, resolvedImageName, Namespace, triggers, _secretsManager.GetSecrets(), PullSecret, SecretsCollectionName, ConfigMapName, UseConfigMap, PollingInterval, CooldownPeriod, ServiceType);
 
             if (DryRun)
             {
