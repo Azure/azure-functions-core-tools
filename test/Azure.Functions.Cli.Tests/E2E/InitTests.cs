@@ -207,6 +207,35 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
+                [Fact]
+        public Task javascript_adds_packagejson()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime node" },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "local.settings.json",
+                        ContentContains = new []
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "node"
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "Writing package.json",
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                }
+            }, _output);
+        }
+
         [Fact]
         public Task init_ts_app_using_runtime()
         {

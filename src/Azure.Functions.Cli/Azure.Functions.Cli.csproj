@@ -66,6 +66,9 @@
     <EmbeddedResource Include="StaticResources\package.json">
       <LogicalName>$(AssemblyName).package.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\javascriptPackage.json">
+      <LogicalName>$(AssemblyName).package.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\tsconfig.json">
       <LogicalName>$(AssemblyName).tsconfig.json</LogicalName>
     </EmbeddedResource>
