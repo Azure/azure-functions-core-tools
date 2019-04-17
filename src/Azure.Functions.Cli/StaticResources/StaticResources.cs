@@ -55,6 +55,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PackageJson => GetValue("package.json");
 
+        public static Task<string> JavascriptPackageJson => GetValue("javascriptPackage.json");
+
         public static Task<string> TsConfig => GetValue("tsconfig.json");
 
         public static Task<string> PowerShellRequirementsPsd1 => GetValue("requirements.psd1");

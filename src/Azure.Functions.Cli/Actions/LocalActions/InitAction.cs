@@ -248,12 +248,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     await WriteFiles("requirements.psd1", requirementsContent);
                 }
             }
-
-            if (language == Constants.Languages.TypeScript)
+            else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
-                await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
-                await WriteFiles("package.json", await StaticResources.PackageJson);
-                await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
+                if (language == Constants.Languages.TypeScript)
+                {
+                    await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
+                    await WriteFiles("package.json", await StaticResources.PackageJson);
+                    await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
+                }
+                else
+                {
+                    await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
+                }
             }
         }
 
