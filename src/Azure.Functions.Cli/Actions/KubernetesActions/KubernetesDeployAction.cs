@@ -44,12 +44,12 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         {
             SetFlag<string>("name", "The name used for the deployment and other artifacts in kubernetes", n => Name = n, isRequired: true);
             SetFlag<string>("image-name", "Image to use for the pod deployment and to read functions from", n => ImageName = n);
-            SetFlag<string>("registry", "When set, a docker build is run and an image is pused to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
+            SetFlag<string>("registry", "When set, a docker build is run and the image is pushed to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: default", ns => Namespace = ns);
             SetFlag<string>("pull-secret", "The secret holding a private registry credentials", s => PullSecret = s);
             SetFlag<int>("polling-interval", "The polling interval for checking non-http triggers. Default: 30 (seconds)", p => PollingInterval = p);
             SetFlag<int>("cooldown-period", "The cooldown period for the deployment before scaling back to 0 after all triggers are no longer active. Default: 300 (seconds)", p => CooldownPeriod = p);
-            SetFlag<string>("secrets-name", "The name of a secrets collection to use in the deployment instead of generating one based on local.settings.json", sn => SecretsCollectionName = sn);
+            SetFlag<string>("secret-name", "The name of a kubernetes secret collection to use in the deployment instead of generating one based on local.settings.json", sn => SecretsCollectionName = sn);
             SetFlag<string>("config-map-name", "The name of a config map to use in the deployment", cm => ConfigMapName = cm);
             SetFlag<string>("service-type", "Kubernetes Service Type. Default LoadBalancer  Valid options: " + string.Join(",", ServiceTypes), s =>
             {
@@ -59,8 +59,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 ServiceType = s;
             });
-            SetFlag<bool>("no-docker", "with --image-name, the core-tools will inspect the functions inside the image. This will require mounting the image filesystem. Passing --no-docker uses current directory for functions.", nd => NoDocker = nd);
-            SetFlag<bool>("use-config-map", "local.settings.json will be creates as Secret/V1 object. This will create is as a ConfigMap instead.", c => UseConfigMap = c);
+            SetFlag<bool>("no-docker", "With --image-name, the core-tools will inspect the functions inside the image. This will require mounting the image filesystem. Passing --no-docker uses current directory for functions.", nd => NoDocker = nd);
+            SetFlag<bool>("use-config-map", "Use a ConfigMap/V1 instead of a Secret/V1 object.", c => UseConfigMap = c);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             return base.ParseArgs(args);
         }

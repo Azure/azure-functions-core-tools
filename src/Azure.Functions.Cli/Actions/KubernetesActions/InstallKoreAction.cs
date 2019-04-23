@@ -27,7 +27,6 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: default", s => Namespace = s);
             SetFlag<bool>("kore-only", "Install Kore only. By default both kore (non-http scale to zero) and osiris (http scale to zero) are installed", f => KoreOnly = f);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
-            // SetFlag<OutputSerializationOptions>("output", "With --dry-run. Prints deployment in json, yaml or helm. Default: yaml", o => OutputFormat = o);
             return base.ParseArgs(args);
         }
 
