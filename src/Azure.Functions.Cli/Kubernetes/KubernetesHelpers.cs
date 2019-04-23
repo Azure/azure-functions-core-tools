@@ -251,6 +251,7 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(string name, string imageName, string @namespace, TriggersPayload triggers, IDictionary<string, string> secrets, string pullSecret = null, string secretsCollectionName = null, string configMapName = null, bool useConfigMap = false, int? pollingInterval = null, int? cooldownPeriod = null, string serviceType = "LoadBalancer")
         {
+            ScaledObjectV1Alpha1 scaledobject = null;
             var result = new List<IKubernetesResource>();
             var deployments = new List<DeploymentV1Apps>();
             var httpFunctions = triggers.FunctionsJson
@@ -280,7 +281,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
                 var deployment = GetDeployment(name, @namespace, imageName, pullSecret, 0, enabledFunctions);
                 deployments.Add(deployment);
-                result.Add(GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod));
+                scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod);
             }
 
             if (useConfigMap)
@@ -351,7 +352,12 @@ namespace Azure.Functions.Cli.Kubernetes
                     };
                 }
             }
-            return result.Concat(deployments);
+
+            result = result.Concat(deployments).ToList();
+
+            return scaledobject != null
+                ? result.Append(scaledobject)
+                : result;
         }
 
         internal static async Task RemoveKore(string @namespace)
@@ -384,7 +390,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         .Build();
                     var writer = new StringWriter();
                     yaml.Serialize(writer, resource);
-                    sb.AppendLine(writer.ToString());
+                    sb.AppendLine(writer.ToString().Trim());
                     sb.AppendLine("---");
                 }
             }
@@ -504,7 +510,11 @@ namespace Azure.Functions.Cli.Kubernetes
                 Metadata = new ObjectMetadataV1
                 {
                     Name = name,
-                    Namespace = @namespace
+                    Namespace = @namespace,
+                    Labels = new Dictionary<string, string>
+                    {
+                        { "deploymaneName" , deployment.Metadata.Name }
+                    }
                 },
                 Spec = new ScaledObjectSpecV1Alpha1
                 {
@@ -525,13 +535,41 @@ namespace Azure.Functions.Cli.Kubernetes
                         .Where(b => b["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) == -1)
                         .Select(t => new ScaledObjectTriggerV1Alpha1
                         {
-                            Type = t["type"].ToString() == "queueTrigger" ? "azure-queue" : t["type"].ToString(),
+                            Type = GetKoreTrigger(t["type"]?.ToString()),
                             Metadata = t.ToObject<Dictionary<string, JToken>>()
                                     .Where(i => i.Value.Type == JTokenType.String)
                                     .ToDictionary(k => k.Key, v => v.Value.ToString())
                         })
                 }
             };
+        }
+
+        private static string GetKoreTrigger(string triggerType)
+        {
+            if (string.IsNullOrEmpty(triggerType))
+            {
+                throw new ArgumentNullException(nameof(triggerType));
+            }
+
+            triggerType = triggerType.ToLower();
+
+            switch (triggerType)
+            {
+                case "queuetrigger":
+                    return "azure-queue";
+
+                case "kafkatrigger":
+                    return "kafka";
+
+                case "blobtrigger":
+                    return "azure-blob";
+
+                case "servicebustrigger":
+                    return "azure-servicebus";
+
+                default:
+                    return triggerType;
+            }
         }
 
         private static async Task<bool> HasKore()

@@ -6,7 +6,7 @@
     <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>
 
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>2.6</MajorMinorProductVersion>
+    <MajorMinorProductVersion>2.7</MajorMinorProductVersion>
     <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
     <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
     <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
