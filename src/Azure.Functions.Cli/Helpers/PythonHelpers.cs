@@ -123,7 +123,7 @@ namespace Azure.Functions.Cli.Helpers
                 if (await ArePackagesInSync(reqTxtFile, packagesLocation))
                 {
                     ColoredConsole.WriteLine(Yellow($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
-                    return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
+                    return ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
                 }
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
                 FileSystemHelpers.DeleteDirectorySafe(Path.Combine(functionAppRoot, Constants.ExternalPythonPackages));
@@ -150,7 +150,7 @@ namespace Azure.Functions.Cli.Helpers
             var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
             await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
 
-            return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
+            return ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
         }
 
         private static async Task RestorePythonRequirementsPackapp(string functionAppRoot, string packagesLocation)
