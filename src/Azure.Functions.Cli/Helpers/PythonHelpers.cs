@@ -185,7 +185,7 @@ namespace Azure.Functions.Cli.Helpers
             var containerId = string.Empty;
             try
             {
-                containerId = await DockerHelpers.DockerRun(dockerImage);
+                containerId = await DockerHelpers.DockerRun(dockerImage, "sleep infinity");
                 await DockerHelpers.CopyToContainer(containerId, Constants.RequirementsTxt, $"/{Constants.RequirementsTxt}");
 
                 var scriptFilePath = Path.GetTempFileName();
