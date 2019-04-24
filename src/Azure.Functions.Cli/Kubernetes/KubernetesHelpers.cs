@@ -22,11 +22,11 @@ namespace Azure.Functions.Cli.Kubernetes
 {
     public static class KubernetesHelper
     {
-        const string KoreDeploymentName = "kore-deployment";
-        const string KoreClusterRoleBindingName = "kore-cluster-role-binding";
-        const string KoreServiceAccountName = "kore-service-account";
-        const string KoreSecretName = "kore-docker-auth";
-        const string KoreScaledObjectCrdName = "scaledobjects.kore.k8s.io";
+        const string KedaDeploymentName = "keda-deployment";
+        const string KedaClusterRoleBindingName = "keda-cluster-role-binding";
+        const string KedaServiceAccountName = "keda-service-account";
+        const string KedaSecretName = "keda-docker-auth";
+        const string KedaScaledObjectCrdName = "scaledobjects.keda.k8s.io";
         private static readonly IEnumerable<string> _osirisNames = new[]
         {
             "secret/osiris-osiris-edge-endpoints-hijacker-cert",
@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Kubernetes
         internal static Task CreateNamespace(string @namespace)
             => KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
 
-        internal static IEnumerable<IKubernetesResource> GetKoreResources(string @namespace)
+        internal static IEnumerable<IKubernetesResource> GetKedaResources(string @namespace)
         {
             return new IKubernetesResource[]
             {
@@ -109,15 +109,15 @@ namespace Azure.Functions.Cli.Kubernetes
                     Kind = "CustomResourceDefinition",
                     Metadata = new ObjectMetadataV1
                     {
-                        Name = KoreScaledObjectCrdName,
+                        Name = KedaScaledObjectCrdName,
                         Labels = new Dictionary<string, string>
                         {
-                            { "app", KoreDeploymentName }
+                            { "app", KedaDeploymentName }
                         }
                     },
                     Spec = new CustomResourceDefinitionSpecV1Beta1
                     {
-                        Group = "kore.k8s.io",
+                        Group = "keda.k8s.io",
                         Version = "v1alpha1",
                         Names = new CustomResourceDefinitionNamesV1Beta1
                         {
@@ -133,11 +133,11 @@ namespace Azure.Functions.Cli.Kubernetes
                     Kind = "Secret",
                     Metadata = new ObjectMetadataV1
                     {
-                        Name = KoreSecretName,
+                        Name = KedaSecretName,
                         Namespace = @namespace,
                         Labels = new Dictionary<string, string>
                         {
-                            { "app", KoreDeploymentName }
+                            { "app", KedaDeploymentName }
                         }
                     },
                     Data = new Dictionary<string, string>
@@ -152,11 +152,11 @@ namespace Azure.Functions.Cli.Kubernetes
                     Kind = "ServiceAccount",
                     Metadata = new ObjectMetadataV1
                     {
-                        Name = KoreServiceAccountName,
+                        Name = KedaServiceAccountName,
                         Namespace = @namespace,
                         Labels = new Dictionary<string, string>
                         {
-                            { "app", KoreDeploymentName }
+                            { "app", KedaDeploymentName }
                         },
                     }
                 },
@@ -168,9 +168,9 @@ namespace Azure.Functions.Cli.Kubernetes
                     {
                         Labels = new Dictionary<string, string>
                         {
-                            { "app", KoreDeploymentName }
+                            { "app", KedaDeploymentName }
                         },
-                        Name = KoreClusterRoleBindingName,
+                        Name = KedaClusterRoleBindingName,
                         Namespace = @namespace,
                     },
                     RoleRef = new ClusterRoleBindingRoleRefV1
@@ -184,7 +184,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         new ClusterRoleBindingSubjectsV1
                         {
                             Kind = "ServiceAccount",
-                            Name = KoreServiceAccountName,
+                            Name = KedaServiceAccountName,
                             Namespace = @namespace,
                         }
                     }
@@ -197,9 +197,9 @@ namespace Azure.Functions.Cli.Kubernetes
                     {
                         Labels = new Dictionary<string, string>
                         {
-                            { "app", "kore" }
+                            { "app", "keda" }
                         },
-                        Name = KoreDeploymentName,
+                        Name = KedaDeploymentName,
                         Namespace = @namespace,
                     },
                     Spec = new DeploymentSpecV1Apps
@@ -209,8 +209,8 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             MatchLabels = new Dictionary<string, string>
                             {
-                                { "name", KoreDeploymentName },
-                                { "instance", $"{KoreDeploymentName}-instance" }
+                                { "name", KedaDeploymentName },
+                                { "instance", $"{KedaDeploymentName}-instance" }
                             }
                         },
                         Template = new PodTemplateV1
@@ -219,18 +219,18 @@ namespace Azure.Functions.Cli.Kubernetes
                             {
                                 Labels = new Dictionary<string, string>
                                 {
-                                    { "name", KoreDeploymentName },
-                                    { "instance", $"{KoreDeploymentName}-instance" }
+                                    { "name", KedaDeploymentName },
+                                    { "instance", $"{KedaDeploymentName}-instance" }
                                 }
                             },
                             Spec = new PodTemplateSpecV1
                             {
-                                ServiceAccountName = KoreServiceAccountName,
+                                ServiceAccountName = KedaServiceAccountName,
                                 Containers = new ContainerV1[]
                                 {
                                     new ContainerV1
                                     {
-                                    Name = "kore",
+                                    Name = "keda",
                                     Image = "projectkore.azurecr.io/kore:master",
                                     ImagePullPolicy = "Always",
                                     }
@@ -239,7 +239,7 @@ namespace Azure.Functions.Cli.Kubernetes
                                 {
                                     new ImagePullSecretV1
                                     {
-                                        Name = KoreSecretName
+                                        Name = KedaSecretName
                                     }
                                 }
                             }
@@ -360,13 +360,13 @@ namespace Azure.Functions.Cli.Kubernetes
                 : result;
         }
 
-        internal static async Task RemoveKore(string @namespace)
+        internal static async Task RemoveKeda(string @namespace)
         {
-            await KubectlHelper.RunKubectl($"delete deployment.apps/{KoreDeploymentName} --namespace {@namespace}", ignoreError: false, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete clusterrolebinding/{KoreClusterRoleBindingName} --namespace {@namespace}", ignoreError: true, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete serviceaccount/{KoreServiceAccountName} --namespace {@namespace}", ignoreError: false, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete secrets/{KoreSecretName} --namespace {@namespace}", ignoreError: false, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete customresourcedefinition/{KoreScaledObjectCrdName}", ignoreError: false, showOutput: true);
+            await KubectlHelper.RunKubectl($"delete deployment.apps/{KedaDeploymentName} --namespace {@namespace}", ignoreError: false, showOutput: true);
+            await KubectlHelper.RunKubectl($"delete clusterrolebinding/{KedaClusterRoleBindingName} --namespace {@namespace}", ignoreError: true, showOutput: true);
+            await KubectlHelper.RunKubectl($"delete serviceaccount/{KedaServiceAccountName} --namespace {@namespace}", ignoreError: false, showOutput: true);
+            await KubectlHelper.RunKubectl($"delete secrets/{KedaSecretName} --namespace {@namespace}", ignoreError: false, showOutput: true);
+            await KubectlHelper.RunKubectl($"delete customresourcedefinition/{KedaScaledObjectCrdName}", ignoreError: false, showOutput: true);
             foreach (var name in _osirisNames)
             {
                 await KubectlHelper.RunKubectl($"delete {name} --namespace {@namespace}", ignoreError: true, showOutput: true);
@@ -505,7 +505,7 @@ namespace Azure.Functions.Cli.Kubernetes
         {
             return new ScaledObjectV1Alpha1
             {
-                ApiVersion = "kore.k8s.io/v1alpha1",
+                ApiVersion = "keda.k8s.io/v1alpha1",
                 Kind = "ScaledObject",
                 Metadata = new ObjectMetadataV1
                 {
@@ -535,7 +535,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         .Where(b => b["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) == -1)
                         .Select(t => new ScaledObjectTriggerV1Alpha1
                         {
-                            Type = GetKoreTrigger(t["type"]?.ToString()),
+                            Type = GetKedaTrigger(t["type"]?.ToString()),
                             Metadata = t.ToObject<Dictionary<string, JToken>>()
                                     .Where(i => i.Value.Type == JTokenType.String)
                                     .ToDictionary(k => k.Key, v => v.Value.ToString())
@@ -544,7 +544,7 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        private static string GetKoreTrigger(string triggerType)
+        private static string GetKedaTrigger(string triggerType)
         {
             if (string.IsNullOrEmpty(triggerType))
             {
@@ -572,17 +572,17 @@ namespace Azure.Functions.Cli.Kubernetes
             }
         }
 
-        private static async Task<bool> HasKore()
+        private static async Task<bool> HasKeda()
         {
-            var koreEdgeResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=kore-edge --all-namespaces");
-            var koreResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=kore --all-namespaces");
-            return koreResult.Items.Any() || koreEdgeResult.Items.Any();
+            var kedaEdgeResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda-edge --all-namespaces");
+            var kedaResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda --all-namespaces");
+            return kedaResult.Items.Any() || kedaEdgeResult.Items.Any();
         }
 
         private static async Task<bool> HasScaledObjectCrd()
         {
             var crdResult = await KubectlHelper.KubectlGet<SearchResultV1<CustomResourceDefinitionV1Beta1>>("crd");
-            return crdResult.Items.Any(i => i.Metadata.Name == "scaledobjects.kore.k8s.io");
+            return crdResult.Items.Any(i => i.Metadata.Name == "scaledobjects.keda.k8s.io");
         }
 
 
