@@ -14,29 +14,29 @@ using YamlDotNet.Serialization;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
-    [Action(Name = "install", Context = Context.Kubernetes, HelpText = "Install Kore (non-http scale to zero) and Osiris (http scale to zero) in the kubernetes cluster from kubectl config")]
-    internal class DeployKoreAction : BaseAction
+    [Action(Name = "install", Context = Context.Kubernetes, HelpText = "Install Keda (non-http scale to zero) and Osiris (http scale to zero) in the kubernetes cluster from kubectl config")]
+    internal class DeployKedaAction : BaseAction
     {
         public string Namespace { get; private set; } = "default";
-        public bool KoreOnly { get; private set; }
+        public bool KedaOnly { get; private set; }
         public bool DryRun { get; private set; }
         // public OutputSerializationOptions OutputFormat { get; private set; } = OutputSerializationOptions.Yaml;
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: default", s => Namespace = s);
-            SetFlag<bool>("kore-only", "Install Kore only. By default both kore (non-http scale to zero) and osiris (http scale to zero) are installed", f => KoreOnly = f);
+            SetFlag<bool>("keda-only", "Install Keda only. By default both keda (non-http scale to zero) and osiris (http scale to zero) are installed", f => KedaOnly = f);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             return base.ParseArgs(args);
         }
 
         public async override Task RunAsync()
         {
-            var resources = KubernetesHelper.GetKoreResources(Namespace);
+            var resources = KubernetesHelper.GetKedaResources(Namespace);
             if (DryRun)
             {
                 ColoredConsole.WriteLine(KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml));
-                if (!KoreOnly)
+                if (!KedaOnly)
                 {
                     ColoredConsole.WriteLine(KubernetesHelper.GetOsirisResources(Namespace));
                 }
@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             {
                 var sb = new StringBuilder();
                 sb.AppendLine(KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml));
-                if (!KoreOnly)
+                if (!KedaOnly)
                 {
                     sb.AppendLine(KubernetesHelper.GetOsirisResources(Namespace));
                 }
