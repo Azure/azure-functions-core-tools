@@ -71,7 +71,15 @@ namespace Azure.Functions.Cli.Helpers
         {
             var exe = new Executable("python", "--version");
             var sb = new StringBuilder();
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
+            int exitCode = -1;
+            try
+            {
+                exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
+            }
+            catch (Exception)
+            {
+                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.6 installed.");
+            }
             if (exitCode == 0)
             {
                 var trials = 0;
