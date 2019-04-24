@@ -274,7 +274,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
             // For dedicated linux apps, we do not support run from package right now
-            if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromPackageDeploy)
+            var isFunctionAppDedicated = !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            if (functionApp.IsLinux && isFunctionAppDedicated && RunFromPackageDeploy)
             {
                 ColoredConsole.WriteLine("Assuming --nozip (do not run from package) for publishing to Linux dedicated plan.");
                 RunFromPackageDeploy = false;
@@ -289,7 +290,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
-            // If Consumption Linux
+            // If Consumption Linux or Elastic Premium Linux
             if (functionApp.IsLinux && (functionApp.IsDynamic || functionApp.IsElasticPremium))
             {
                 await PublishRunFromPackage(functionApp, await zipStreamFactory());
@@ -321,14 +322,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await SyncTriggers(functionApp);
             }
-            await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, showKeys: true);
+
+            // Linux Elastic Premium functions take longer to deploy. Right now, we cannot guarantee that functions info will be most up to date.
+            // So, we only show the info, if Function App is not Linux Elastic Premium
+            if (!(functionApp.IsLinux && functionApp.IsElasticPremium))
+            {
+                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, showKeys: true);
+            }
         }
 
         private async Task SyncTriggers(Site functionApp)
         {
             await RetryHelper.Retry(async () =>
             {
-                if (functionApp.IsDynamic)
+                if (functionApp.IsDynamic || functionApp.IsElasticPremium)
                 {
                     ColoredConsole.WriteLine("Syncing triggers...");
                     HttpResponseMessage response = null;
