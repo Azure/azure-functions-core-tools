@@ -335,26 +335,23 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             await RetryHelper.Retry(async () =>
             {
-                if (functionApp.IsDynamic || functionApp.IsElasticPremium)
+                ColoredConsole.WriteLine("Syncing triggers...");
+                HttpResponseMessage response = null;
+                if (functionApp.IsLinux)
                 {
-                    ColoredConsole.WriteLine("Syncing triggers...");
-                    HttpResponseMessage response = null;
-                    if (functionApp.IsLinux)
+                    response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
+                }
+                else
+                {
+                    using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
                     {
-                        response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
+                        response = await client.PostAsync("api/functions/synctriggers", content: null);
                     }
-                    else
-                    {
-                        using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
-                        {
-                            response = await client.PostAsync("api/functions/synctriggers", content: null);
-                        }
-                    }
+                }
 
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
-                    }
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
                 }
             }, retryCount: 5);
         }
