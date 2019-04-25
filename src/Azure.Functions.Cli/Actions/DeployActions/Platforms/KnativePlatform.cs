@@ -66,18 +66,19 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             File.Delete("deployment.json");
 
             var endpoint = await GetIstioClusterIngressEndpoint();
-            if (string.IsNullOrEmpty(endpoint))
-            {
-                ColoredConsole.WriteLine("Couldn't find Istio Cluster Ingress External IP");
-                return;
-            }
-
             var host = GetFunctionHost(name, nameSpace);
 
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Function deployed successfully!");
             ColoredConsole.WriteLine();
-            ColoredConsole.WriteLine($"Function URL: http://{endpoint}");
+            if (string.IsNullOrEmpty(endpoint))
+            {
+                ColoredConsole.WriteLine($"Function URL: http://{endpoint}");
+            }
+            else
+            {
+                ColoredConsole.WriteLine("Couldn't identify Function URL: Couldn't find Istio Cluster Ingress endpoint");
+            }
             ColoredConsole.WriteLine($"Function Host: {host}");
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Plese note: it may take a few minutes for the knative service to be reachable");
