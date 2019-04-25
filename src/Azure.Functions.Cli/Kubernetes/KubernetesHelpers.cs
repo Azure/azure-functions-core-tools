@@ -513,7 +513,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     Namespace = @namespace,
                     Labels = new Dictionary<string, string>
                     {
-                        { "deploymaneName" , deployment.Metadata.Name }
+                        { "deploymentName" , deployment.Metadata.Name }
                     }
                 },
                 Spec = new ScaledObjectSpecV1Alpha1
