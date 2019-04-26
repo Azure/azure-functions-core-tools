@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli
         {
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
-            Environment.SetEnvironmentVariable("FUNCTIONS_CORETOOLS_ENVIRONMENT", "True");
+            SetCoreToolsEnvironmentVaraibles();
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
         }
 
@@ -39,6 +39,14 @@ namespace Azure.Functions.Cli
             {
                 //ColoredConsole.WriteLine("Welcome to Azure Functions CLI");
                 //settings.RunFirstTimeCliExperience = false;
+            }
+        }
+
+        private static void SetCoreToolsEnvironmentVaraibles()
+        {
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.FunctionsCoreToolsEnvironment)))
+            {
+                Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsEnvironment, "True");
             }
         }
 
