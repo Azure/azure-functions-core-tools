@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class PythonHelpers
     {
-        private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0b3", "azure-functions-worker==1.0.0b4" };
+        private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0b4", "azure-functions-worker==1.0.0b5" };
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
