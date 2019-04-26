@@ -33,8 +33,6 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 extensionBundleOption.DownloadPath = Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, extensionBundleOption.Id);
             }
-
-            Environment.SetEnvironmentVariable("FUNCTIONS_CORETOOLS_ENVIRONMENT", "True");
             return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance);
         }
 
