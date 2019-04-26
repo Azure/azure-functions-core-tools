@@ -14,6 +14,7 @@ namespace Azure.Functions.Cli
         {
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
+            Environment.SetEnvironmentVariable("FUNCTIONS_CORETOOLS_ENVIRONMENT", "True");
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
         }
 
