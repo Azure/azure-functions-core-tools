@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Interfaces;
 using Newtonsoft.Json.Linq;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
+using System.Linq;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -70,7 +71,7 @@ namespace Azure.Functions.Cli.Common
 
             FileSystemHelpers.EnsureDirectory(path);
 
-            foreach (var file in template.Files)
+            foreach (var file in template.Files.Where(kv => !kv.Key.EndsWith(".dat")))
             {
                 var filePath = Path.Combine(path, file.Key);
                 ColoredConsole.WriteLine($"Writing {filePath}");
