@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Tests.E2E
     {
         public PackFunctionTests(ITestOutputHelper output) : base(output) { }
 
-        [Fact]
+        // [Fact]
         public Task pack_python_from_cache()
         {
             var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
