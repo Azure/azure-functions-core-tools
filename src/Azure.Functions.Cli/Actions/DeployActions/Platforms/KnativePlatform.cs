@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
-            await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max);
+            await Deploy(functionName, image, nameSpace, min, max);
         }
 
         private async Task Deploy(string name, string image, string nameSpace, int min, int max)
@@ -117,7 +117,10 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         private async Task CreateNamespace(string name)
         {
-            await KubectlHelper.RunKubectl($"create namespace {name}");
+            if (!await KubernetesHelper.NamespaceExists(name))
+            {
+                await KubernetesHelper.CreateNamespace(name);
+            }
         }
     }
 }
