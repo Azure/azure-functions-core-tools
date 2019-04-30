@@ -162,16 +162,5 @@ namespace Azure.Functions.Cli.Helpers
             }
             return workerToDefaultLanguageMap[worker];
         }
-
-        public static IEnumerable<InstallManagedDependencies> ManagedDependenciesInstallationOptions()
-        {
-            return Enum.GetValues(typeof(InstallManagedDependencies)).Cast<InstallManagedDependencies>();
-        }
-    }
-
-    public enum InstallManagedDependencies
-    {
-        Yes,
-        No
     }
 }
