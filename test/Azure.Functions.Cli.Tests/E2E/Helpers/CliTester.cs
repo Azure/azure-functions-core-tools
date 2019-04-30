@@ -63,6 +63,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 stdout.Clear();
                 stderr.Clear();
                 var exitError = false;
+                runConfiguration.PreTest?.Invoke(workingDir);
 
                 for (var i = 0; i < runConfiguration.Commands.Length; i++)
                 {

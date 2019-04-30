@@ -19,13 +19,14 @@ namespace Azure.Functions.Cli.Helpers
 
         public static Task ExecInContainer(string containerId, string command) => RunDockerCommand($"exec -t {containerId} {command}", containerId);
 
-        public static Task CopyFromContainer(string containerId, string source, string target) => RunDockerCommand($"cp {containerId}:{source} {target}", containerId);
+        public static Task CopyFromContainer(string containerId, string source, string target) => RunDockerCommand($"cp {containerId}:\"{source}\" \"{target}\"", containerId);
 
         public static Task KillContainer(string containerId, bool ignoreError = false) => RunDockerCommand($"kill {containerId}", containerId, ignoreError);
 
-        public static async Task<string> DockerRun(string image)
+        public static async Task<string> DockerRun(string image, string command = null)
         {
-            (var output, _) = await RunDockerCommand($"run --rm -d {image}");
+            command = command ?? string.Empty;
+            (var output, _) = await RunDockerCommand($"run --rm -d {image} {command}");
             return output.ToString().Trim();
         }
 

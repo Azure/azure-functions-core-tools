@@ -20,8 +20,8 @@ namespace Build
                 : value;
         }
 
-        public const string ItemTemplatesVersion = "2.0.10328";
-        public const string ProjectTemplatesVersion = "2.0.10328";
+        public const string ItemTemplatesVersion = "2.0.10344";
+        public const string ProjectTemplatesVersion = "2.0.10344";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
@@ -46,7 +46,21 @@ namespace Build
             { "min.win-x64", "Windows" },
         };
 
-        public static readonly string[] LanguageWorkers = new[] { "Java", "Powershell", "Node" };
+        public static readonly Dictionary<string, string[]> ToolsRuntimeToPowershellRuntimes = new Dictionary<string, string[]>
+        {
+            { "win-x86", new [] { "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86" } },
+            { "win-x64", new [] { "win-x64", "win", "win10-x64", "win8-x64", "win81-x64", "win7-x64" } },
+            { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
+            { "osx-x64", new [] { "osx", "unix" } },
+            { "no-runtime", new [] {
+                "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86",
+                "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64", "linux",
+                "linux-x64", "unix", "linux-musl-x64",
+                "osx", "win-arm64", "win-arm", "linux-arm", "linux-arm64"
+            } }
+        };
+
+        public static readonly string[] LanguageWorkers = new[] { "java", "powershell", "node", "python" };
 
         public static string MinifiedVersionPrefix = "min.";
 

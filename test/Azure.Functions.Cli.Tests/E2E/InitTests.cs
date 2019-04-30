@@ -17,7 +17,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("node")]
         [InlineData("java")]
-        [InlineData("powershell")]
         public Task init_with_worker_runtime(string workerRuntime)
         {
             var files = new List<FileResult>
@@ -80,7 +79,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = Path.Combine("dotnet-funcs", "dotnet-funcs.csproj"),
                         ContentContains = new[]
                         {
-                            "Microsoft.NET.Sdk.Functions"
+                            "Microsoft.NET.Sdk.Functions",
+                            "v2"
                         }
                     }
                 }
@@ -208,6 +208,35 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
+                [Fact]
+        public Task javascript_adds_packagejson()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime node" },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "local.settings.json",
+                        ContentContains = new []
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "node"
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "Writing package.json",
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                }
+            }, _output);
+        }
+
         [Fact]
         public Task init_ts_app_using_runtime()
         {
@@ -276,6 +305,62 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = new[]
                 {
                     $"Unable to find project root"
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_function_app_powershell_supports_managed_dependencies()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime powershell --managed-dependencies" },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "host.json",
+                        ContentContains = new []
+                        {
+                            "managedDependency",
+                            "enabled",
+                            "true"
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = "requirements.psd1",
+                        ContentContains = new []
+                        {
+                            "Az",
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "Writing profile.ps1",
+                    "Writing requirements.psd1",
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_managed_dependencies_is_only_supported_in_powershell()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime python --managed-dependencies "
+                },
+                HasStandardError = true,
+                ErrorContains = new[]
+                {
+                    $"Managed dependencies is only supported for PowerShell"
                 }
             }, _output);
         }

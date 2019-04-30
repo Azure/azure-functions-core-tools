@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -248,6 +249,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (workerRuntime == WorkerRuntime.python)
             {
+                await PythonHelpers.VerifyVersion();
                 // We need to update the PYTHONPATH to add worker's dependencies
                 var pythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? string.Empty;
                 var pythonWorkerDeps = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "workers", "python", "deps");
@@ -358,17 +360,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Select(t => (filePath: t.filePath, jObject: JsonConvert.DeserializeObject<JObject>(t.content)))
                     .Where(b => b.jObject["bindings"] != null);
 
-                var allHttpTrigger = functionsJsons
+                var allNonStorageTriggers = functionsJsons
                     .Select(b => b.jObject["bindings"])
                     .SelectMany(i => i)
                     .Where(b => b?["type"] != null)
                     .Select(b => b["type"].ToString())
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
-                    .All(t => t.Equals("httpTrigger", StringComparison.OrdinalIgnoreCase));
+                    .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allHttpTrigger)
+                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
                 {
-                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. This is required for all triggers other than HTTP. "
+                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
+                        $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
                         + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
                 }
 
@@ -454,7 +457,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
                         .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
                 }
-                
+
                 services.AddWebJobsScriptHostAuthorization();
 
                 services.AddMvc()
@@ -470,6 +473,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     o.SecretsPath = _hostOptions.SecretsPath;
                 });
 
+
+                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
 

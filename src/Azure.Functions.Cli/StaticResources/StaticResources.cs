@@ -41,11 +41,11 @@ namespace Azure.Functions.Cli
 
         public static Task<string> HostJson => GetValue("host.json");
 
+        public static Task<string> BundleConfig => GetValue("bundleConfig.json");
+
+        public static Task<string> PowerShellHostJson => GetValue("powershell.host.json");
+
         public static Task<string> PythonDockerBuildScript => GetValue(Constants.StaticResourcesNames.PythonDockerBuild);
-
-        public static Task<string> PythonBundleScript => GetValue(Constants.StaticResourcesNames.PythonBundleScript);
-
-        public static Task<string> PythonDockerBuildNoBundler => GetValue(Constants.StaticResourcesNames.PythonDockerBuildNoBundler);
 
         public static Task<string> PowerShellProfilePs1 => GetValue("profile.ps1");
 
@@ -55,6 +55,10 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PackageJson => GetValue("package.json");
 
+        public static Task<string> JavascriptPackageJson => GetValue("javascriptPackage.json");
+
         public static Task<string> TsConfig => GetValue("tsconfig.json");
+
+        public static Task<string> PowerShellRequirementsPsd1 => GetValue("requirements.psd1");
     }
 }

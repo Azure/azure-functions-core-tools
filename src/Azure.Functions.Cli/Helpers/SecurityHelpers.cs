@@ -10,6 +10,7 @@ using Colors.Net;
 using static Colors.Net.StringStaticMethods;
 using System.Text;
 using System.Threading.Tasks;
+using System.Security.Cryptography;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -140,6 +141,25 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return new X509Certificate2($"{certFileNames}certificate.pfx", DEFAULT_PASSWORD);
+        }
+
+        public static string CalculateMd5(Stream stream)
+        {
+            using (var md5 = MD5.Create())
+            {
+                var hash = md5.ComputeHash(stream);
+                var base64String = Convert.ToBase64String(hash);
+                stream.Position = 0;
+                return base64String;
+            }
+        }
+
+        public static string CalculateMd5(string file)
+        {
+            using (var stream = FileSystemHelpers.OpenFile(file, FileMode.Open))
+            {
+                return CalculateMd5(stream);
+            }
         }
     }
 }

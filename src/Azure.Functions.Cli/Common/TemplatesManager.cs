@@ -8,6 +8,8 @@ using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
 using Newtonsoft.Json.Linq;
 using Azure.Functions.Cli.Actions.LocalActions;
+using Azure.Functions.Cli.ExtensionBundle;
+using System.Linq;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -30,7 +32,18 @@ namespace Azure.Functions.Cli.Common
 
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
-            var templatesJson = await StaticResources.TemplatesJson;
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+
+            string templatesJson;
+            if (extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+                templatesJson = await contentProvider.GetTemplates();
+            }
+            else
+            {
+                templatesJson = await StaticResources.TemplatesJson;
+            }
             return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
         }
 
@@ -58,7 +71,7 @@ namespace Azure.Functions.Cli.Common
 
             FileSystemHelpers.EnsureDirectory(path);
 
-            foreach (var file in template.Files)
+            foreach (var file in template.Files.Where(kv => !kv.Key.EndsWith(".dat")))
             {
                 var filePath = Path.Combine(path, file.Key);
                 ColoredConsole.WriteLine($"Writing {filePath}");
@@ -71,7 +84,7 @@ namespace Azure.Functions.Cli.Common
             {
                 foreach (var extension in template.Metadata.Extensions)
                 {
-                    var installAction = new InstallExtensionAction(_secretsManager)
+                    var installAction = new InstallExtensionAction(_secretsManager, false)
                     {
                         Package = extension.Id,
                         Version = extension.Version

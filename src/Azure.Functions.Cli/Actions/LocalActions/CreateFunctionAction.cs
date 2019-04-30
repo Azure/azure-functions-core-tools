@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -180,8 +181,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 // Update typescript function.json
                 var funcJsonFile = Path.Combine(Environment.CurrentDirectory, functionName, Constants.FunctionJsonFileName);
                 var jsonStr = FileSystemHelpers.ReadAllTextFromFile(funcJsonFile);
-                var funcObj = JsonConvert.DeserializeObject<FunctionJson>(jsonStr);
-                funcObj.scriptFile = $"../dist/{functionName}/index.js";
+                var funcObj = JsonConvert.DeserializeObject<JObject>(jsonStr);
+                funcObj.Add("scriptFile", $"../dist/{functionName}/index.js");
                 FileSystemHelpers.WriteAllTextToFile(funcJsonFile, JsonConvert.SerializeObject(funcObj, Formatting.Indented));
             }
         }

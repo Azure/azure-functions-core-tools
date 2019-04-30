@@ -122,13 +122,50 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = Path.Combine("testfunc", "function.json"),
                         ContentContains = new []
                         {
-                            "../dist/testfunc/index.js"
+                            "../dist/testfunc/index.js",
+                            "authLevel",
+                            "methods",
+                            "httpTrigger"
                         }
                     }
                 },
                 OutputContains = new[]
                 {
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_typescript_template_blob()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node --language typescript",
+                    "new --template \"azure Blob Storage trigger\" --name testfunc"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("testfunc", "function.json"),
+                        ContentContains = new []
+                        {
+                            "../dist/testfunc/index.js",
+                            "blobTrigger"
+                        },
+                        ContentNotContains = new []
+                        {
+                            "authLevel",
+                            "methods"
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
                 }
             }, _output);
         }

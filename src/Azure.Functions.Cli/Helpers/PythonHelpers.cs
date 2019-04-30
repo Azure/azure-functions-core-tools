@@ -8,12 +8,13 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
 {
     public static class PythonHelpers
     {
-        private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0b3", "azure-functions-worker==1.0.0b4" };
+        private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0b4", "azure-functions-worker==1.0.0b5" };
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
@@ -66,11 +67,19 @@ namespace Azure.Functions.Cli.Helpers
             FileSystemHelpers.CreateFile(reqFile);
         }
 
-        private static async Task VerifyVersion()
+        public static async Task VerifyVersion()
         {
             var exe = new Executable("python", "--version");
             var sb = new StringBuilder();
-            var exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
+            int exitCode = -1;
+            try
+            {
+                exitCode = await exe.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
+            }
+            catch (Exception)
+            {
+                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.6 installed.");
+            }
             if (exitCode == 0)
             {
                 var trials = 0;
@@ -81,7 +90,7 @@ namespace Azure.Functions.Cli.Helpers
                     await Task.Delay(TimeSpan.FromMilliseconds(200));
                 }
 
-                var output = sb.ToString();
+                var output = sb.ToString().Trim();
                 if (output.IndexOf("3.6") == -1)
                 {
                     throw new CliException($"Python 3.6 is required. Current python version is '{output}'");
@@ -93,25 +102,48 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool noBundler, string additionalPackages)
+        private static async Task<bool> ArePackagesInSync(string requirementsTxt, string pythonPackages)
         {
-            if (!FileSystemHelpers.FileExists(Path.Combine(functionAppRoot, Constants.RequirementsTxt)))
+            var md5File = Path.Combine(pythonPackages, $"{Constants.RequirementsTxt}.md5");
+            if (!FileSystemHelpers.FileExists(md5File))
+            {
+                return false;
+            }
+
+            var packagesMd5 = await FileSystemHelpers.ReadAllTextFromFileAsync(md5File);
+            var requirementsTxtMd5 = SecurityHelpers.CalculateMd5(requirementsTxt);
+
+            return packagesMd5 == requirementsTxtMd5;
+        }
+
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, string additionalPackages)
+        {
+            var reqTxtFile = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
+            if (!FileSystemHelpers.FileExists(reqTxtFile))
             {
                 throw new CliException($"{Constants.RequirementsTxt} is not found. " +
                 $"{Constants.RequirementsTxt} is required for python function apps. Please make sure to generate one before publishing.");
             }
-            var externalPythonPackages = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
-            if (FileSystemHelpers.DirectoryExists(externalPythonPackages))
+            var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
+            if (FileSystemHelpers.DirectoryExists(packagesLocation))
             {
+                // Only update packages if checksum of requirements.txt does not match or a sync is forced
+                if (await ArePackagesInSync(reqTxtFile, packagesLocation))
+                {
+                    ColoredConsole.WriteLine(Yellow($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
+                    return ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
+                }
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
                 FileSystemHelpers.DeleteDirectorySafe(Path.Combine(functionAppRoot, Constants.ExternalPythonPackages));
             }
+
+            FileSystemHelpers.EnsureDirectory(packagesLocation);
 
             if (buildNativeDeps)
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
                 {
-                    return await InternalPreparePythonDeploymentInDocker(files, functionAppRoot, additionalPackages, noBundler);
+                    await RestorePythonRequirementsDocker(functionAppRoot, packagesLocation, additionalPackages);
                 }
                 else
                 {
@@ -120,23 +152,17 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                return await InternalPreparePythonDeployment(files, functionAppRoot);
+                await RestorePythonRequirementsPackapp(functionAppRoot, packagesLocation);
             }
+            // Store a checksum of requirements.txt
+            var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
+            await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
+
+            return ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
         }
 
-        private static async Task<Stream> InternalPreparePythonDeployment(IEnumerable<string> files, string functionAppRoot)
+        private static async Task RestorePythonRequirementsPackapp(string functionAppRoot, string packagesLocation)
         {
-            var packagesPath = await RestorePythonRequirements(functionAppRoot);
-            return ZipHelper.CreateZip(files.Concat(FileSystemHelpers.GetFiles(packagesPath)), functionAppRoot);
-        }
-
-        private static async Task<string> RestorePythonRequirements(string functionAppRoot)
-        {
-            var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
-            FileSystemHelpers.EnsureDirectory(packagesLocation);
-
-            var requirementsTxt = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
-
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
 
             var exe = new Executable("python", $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
@@ -155,13 +181,10 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 throw new CliException(errorMessage);
             }
-
-            return packagesLocation;
         }
 
-        private static async Task<Stream> InternalPreparePythonDeploymentInDocker(IEnumerable<string> files, string functionAppRoot, string additionalPackages, bool noBundler)
+        private static async Task RestorePythonRequirementsDocker(string functionAppRoot, string packagesLocation, string additionalPackages)
         {
-            var appContentPath = CopyToTemp(files, functionAppRoot);
             var dockerImage = string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting))
                 ? Constants.DockerImages.LinuxPythonImageAmd64
                 : Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting);
@@ -170,25 +193,11 @@ namespace Azure.Functions.Cli.Helpers
             var containerId = string.Empty;
             try
             {
-                containerId = await DockerHelpers.DockerRun(dockerImage);
-                await DockerHelpers.ExecInContainer(containerId, "mkdir -p /home/site/wwwroot/");
-                await DockerHelpers.CopyToContainer(containerId, $"{appContentPath}/.", "/home/site/wwwroot");
+                containerId = await DockerHelpers.DockerRun(dockerImage, "sleep infinity");
+                await DockerHelpers.CopyToContainer(containerId, Constants.RequirementsTxt, $"/{Constants.RequirementsTxt}");
 
                 var scriptFilePath = Path.GetTempFileName();
-                if (noBundler)
-                {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildNoBundler).Replace("\r\n", "\n"));
-                }
-                else
-                {
-                    await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
-
-                    var workerPackagesFiles = Path.GetTempFileName();
-                    await FileSystemHelpers.WriteAllTextToFileAsync(workerPackagesFiles, string.Join(Environment.NewLine, Constants.PythonWorkerPackages));
-                    await DockerHelpers.CopyToContainer(containerId, workerPackagesFiles, $"/{Constants.PythonWorkerPackagesFiles}");
-                }
-                var bundleScriptFilePath = Path.GetTempFileName();
-                await FileSystemHelpers.WriteAllTextToFileAsync(bundleScriptFilePath, (await StaticResources.PythonBundleScript).Replace("\r\n", "\n"));
+                await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.PythonDockerBuildScript).Replace("\r\n", "\n"));
 
                 if (!string.IsNullOrWhiteSpace(additionalPackages))
                 {
@@ -198,16 +207,10 @@ namespace Azure.Functions.Cli.Helpers
                     await DockerHelpers.ExecInContainer(containerId, $"apt-get install -y {additionalPackages}");
                 }
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
-                await DockerHelpers.CopyToContainer(containerId, bundleScriptFilePath, Constants.StaticResourcesNames.PythonBundleScript);
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
-                await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonBundleScript}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
 
-                var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-                FileSystemHelpers.EnsureDirectory(tempDir);
-
-                await DockerHelpers.CopyFromContainer(containerId, $"/app.zip", tempDir);
-                return FileSystemHelpers.OpenFile(Path.Combine(tempDir, "app.zip"), FileMode.Open);
+                await DockerHelpers.CopyFromContainer(containerId, $"/{Constants.ExternalPythonPackages}/.", packagesLocation);
             }
             finally
             {

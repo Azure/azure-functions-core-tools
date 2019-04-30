@@ -61,6 +61,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms.Models
         public List<Container> containers { get; set; }
         public string dnsPolicy { get; set; }
         public List<Toleration> tolerations { get; set; }
+        public List<ImagePullSecret> imagePullSecrets { get; set; }
     }
 
     public class Template
@@ -74,6 +75,11 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms.Models
         public int replicas { get; set; }
         public Selector selector { get; set; }
         public Template template { get; set; }
+    }
+
+    public class ImagePullSecret
+    {
+        public string name { get; set; }
     }
 
     public class Deployment

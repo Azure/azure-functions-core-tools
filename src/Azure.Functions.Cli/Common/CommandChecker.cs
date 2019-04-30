@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Common
             ? CheckExitCode("where", command)
             : CheckExitCode("bash", $"-c \"command -v {command}\"");
 
-        public async static Task<bool> PowerShellModuleExistsAsync(string powershellExecutable, string module)
+        public static async Task<bool> PowerShellModuleExistsAsync(string powershellExecutable, string module)
         {
             // Attempt to get the specified module. If it cannot be found, throw.
             var exe = new Executable(powershellExecutable,
@@ -38,8 +38,8 @@ namespace Azure.Functions.Cli.Common
                 CreateNoWindow = true
             };
             var process = Process.Start(processStartInfo);
-            process.WaitForExit();
-            return process.ExitCode == 0;
+            process?.WaitForExit();
+            return process?.ExitCode == 0;
         }
     }
 }

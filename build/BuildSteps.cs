@@ -75,6 +75,43 @@ namespace Build
             }
         }
 
+        public static void FilterPowershellRuntimes()
+        {
+            var minifiedRuntimes = Settings.TargetRuntimes.Where(r => r.StartsWith(Settings.MinifiedVersionPrefix));
+            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
+            {
+                var powershellRuntimePath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell", "runtimes");
+
+                var allKnownPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes.Values.SelectMany(x => x).Distinct().ToList();
+                var allFoundPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
+
+                // Check to make sure any new runtime is categorizied properly and all the expected runtimes are available
+                if (allFoundPowershellRuntimes.Count != allKnownPowershellRuntimes.Count || !allKnownPowershellRuntimes.All(allFoundPowershellRuntimes.Contains))
+                {
+                    throw new Exception($"Mismatch between classified Powershell runtimes and Powershell runtimes found. Classified runtimes are ${string.Join(", ", allKnownPowershellRuntimes)}." +
+                        $"{Environment.NewLine}Found runtimes are ${string.Join(", ", allFoundPowershellRuntimes)}");
+                }
+
+                // Delete all the runtimes that should not belong to the current runtime
+                var powershellForCurrentRuntime = Settings.ToolsRuntimeToPowershellRuntimes[runtime];
+                allFoundPowershellRuntimes.Except(powershellForCurrentRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
+            }
+
+            // Small test to ensure we have all the right runtimes at the right places
+            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
+            {
+                var powershellRuntimePath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell", "runtimes");
+                var currentPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
+                var requiredPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes[runtime].Distinct().ToList();
+
+                if (currentPowershellRuntimes.Count != requiredPowershellRuntimes.Count() || !requiredPowershellRuntimes.All(currentPowershellRuntimes.Contains))
+                {
+                    throw new Exception($"Mismatch between Expected Powershell runtimes ({string.Join(", ", requiredPowershellRuntimes)}) and Found Powershell runtimes " +
+                        $"({string.Join(", ", currentPowershellRuntimes)}) in the path {powershellRuntimePath}");
+                }
+            }
+        }
+
         private static void RemoveLanguageWorkers(string outputPath)
         {
             foreach (var languageWorker in Settings.LanguageWorkers)
@@ -112,10 +149,13 @@ namespace Build
             {
                 // Python worker's dependencies are platform dependent and need to be copied accordingly
                 var pythonDir = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
-                var allOsDirectories = Directory.GetDirectories(pythonDir);
-                var pythonPlatformSpecificWorker = Path.Combine(pythonDir, Settings.RuntimesToOS[runtime]);
-                FileHelpers.RecursiveCopy(pythonPlatformSpecificWorker, pythonDir);
-                allOsDirectories.ToList().ForEach(dir => Directory.Delete(dir, recursive: true));
+                if (Directory.Exists(pythonDir))
+                {
+                    var allOsDirectories = Directory.GetDirectories(pythonDir);
+                    var pythonPlatformSpecificWorker = Path.Combine(pythonDir, Settings.RuntimesToOS[runtime]);
+                    FileHelpers.RecursiveCopy(pythonPlatformSpecificWorker, pythonDir);
+                    allOsDirectories.ToList().ForEach(dir => Directory.Delete(dir, recursive: true));
+                }
             }
         }
 

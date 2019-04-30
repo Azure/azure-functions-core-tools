@@ -21,6 +21,7 @@ using Fclp;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -35,11 +36,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool PublishLocalSettingsOnly { get; set; }
         public bool ListIgnoredFiles { get; set; }
         public bool ListIncludedFiles { get; set; }
-        public bool RunFromZipDeploy { get; private set; }
+        public bool RunFromPackageDeploy { get; private set; }
         public bool Force { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
-        public bool NoBundler { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
         public string DotnetCliParameters { get; set; }
@@ -76,7 +76,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("nozip")
                 .WithDescription("Turns the default Run-From-Package mode off.")
                 .SetDefault(false)
-                .Callback(f => RunFromZipDeploy = !f);
+                .Callback(f => RunFromPackageDeploy = !f);
             Parser
                 .Setup<bool>("build-native-deps")
                 .SetDefault(false)
@@ -84,9 +84,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(f => BuildNativeDeps = f);
             Parser
                 .Setup<bool>("no-bundler")
-                .SetDefault(false)
-                .WithDescription("Skips generating a bundle when publishing python function apps with build-native-deps.")
-                .Callback(f => NoBundler = f);
+                .WithDescription("[Deprecated] Skips generating a bundle when publishing python function apps with build-native-deps.")
+                .Callback(nb => ColoredConsole.WriteLine(Yellow($"Warning: Argument {Cyan("--no-bundler")} is deprecated and a no-op. Python function apps are not bundled anymore.")));
             Parser
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
@@ -101,7 +100,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(csx => Csx = csx);
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Skip building dotnet functions")
+                .WithDescription("Skip building and fetching dependencies for the function project.")
                 .Callback(f => NoBuild = f);
             Parser
                 .Setup<string>("dotnet-cli-params")
@@ -141,9 +140,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            // Restore all valid extensions
-            var installExtensionAction = new InstallExtensionAction(_secretsManager);
-            await installExtensionAction.RunAsync();
+            if (workerRuntime != WorkerRuntime.dotnet || Csx)
+            {
+                // Restore all valid extensions
+                var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
+                await installExtensionAction.RunAsync();
+            }
 
             if (ListIncludedFiles)
             {
@@ -271,11 +273,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Getting site publishing info...");
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
-            // For dedicated linux apps, we do not support Run from zip right now
-            if (functionApp.IsLinux && !functionApp.IsDynamic && RunFromZipDeploy)
+            // For dedicated linux apps, we do not support run from package right now
+            var isFunctionAppDedicated = !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            if (functionApp.IsLinux && isFunctionAppDedicated && RunFromPackageDeploy)
             {
                 ColoredConsole.WriteLine("Assuming --nozip (do not run from package) for publishing to Linux dedicated plan.");
-                RunFromZipDeploy = false;
+                RunFromPackageDeploy = false;
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
@@ -285,13 +288,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBundler, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
-            // if consumption Linux, or run from zip
-            if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
+            // If Consumption Linux or Elastic Premium Linux
+            if (functionApp.IsLinux && (functionApp.IsDynamic || functionApp.IsElasticPremium))
             {
                 await PublishRunFromPackage(functionApp, await zipStreamFactory());
             }
+            // If Windows default
+            else if (RunFromPackageDeploy)
+            {
+                await PublishRunFromPackageLocal(functionApp, zipStreamFactory);
+            }
+            // If Dedicated Linux or "--no-zip"
             else
             {
                 await PublishZipDeploy(functionApp, zipStreamFactory);
@@ -307,62 +316,78 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Syncing triggers is not required when using zipdeploy api
-            if ((functionApp.IsLinux && functionApp.IsDynamic) || RunFromZipDeploy)
+            if ((functionApp.IsLinux && (functionApp.IsDynamic || functionApp.IsElasticPremium))
+                || RunFromPackageDeploy)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await SyncTriggers(functionApp);
             }
-            await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, showKeys: true);
+
+            // Linux Elastic Premium functions take longer to deploy. Right now, we cannot guarantee that functions info will be most up to date.
+            // So, we only show the info, if Function App is not Linux Elastic Premium
+            if (!(functionApp.IsLinux && functionApp.IsElasticPremium))
+            {
+                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, showKeys: true);
+            }
         }
 
         private async Task SyncTriggers(Site functionApp)
         {
             await RetryHelper.Retry(async () =>
             {
-                if (functionApp.IsDynamic)
+                ColoredConsole.WriteLine("Syncing triggers...");
+                HttpResponseMessage response = null;
+                if (functionApp.IsLinux)
                 {
-                    ColoredConsole.WriteLine("Syncing triggers...");
-                    HttpResponseMessage response = null;
-                    if (functionApp.IsLinux)
+                    response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
+                }
+                else
+                {
+                    using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
                     {
-                        response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
+                        response = await client.PostAsync("api/functions/synctriggers", content: null);
                     }
-                    else
-                    {
-                        using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
-                        {
-                            response = await client.PostAsync("api/functions/synctriggers", content: null);
-                        }
-                    }
+                }
 
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
-                    }
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
                 }
             }, retryCount: 5);
         }
 
         private async Task PublishRunFromPackage(Site functionApp, Stream zipFile)
         {
+            // Upload zip to blob storage
             ColoredConsole.WriteLine("Preparing archive...");
-
             var sas = await UploadZipToStorage(zipFile, functionApp.AzureAppSettings);
+            ColoredConsole.WriteLine("Upload completed successfully.");
 
-            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = sas;
+            // Set app setting
+            await SetRunFromPackageAppSetting(functionApp, sas);
+            ColoredConsole.WriteLine("Deployment completed successfully.");
+        }
+
+        private async Task PublishRunFromPackageLocal(Site functionApp, Func<Task<Stream>> zipFileFactory)
+        {
+            await SetRunFromPackageAppSetting(functionApp, "1");
+
+            // Zip deploy
+            await PublishZipDeploy(functionApp, zipFileFactory);
+
+            ColoredConsole.WriteLine("Deployment completed successfully.");
+        }
+
+        private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue)
+        {
+            // Set app setting
+            functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = runFromPackageValue;
 
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
-            ColoredConsole.WriteLine("Upload completed successfully.");
+
             if (!result.IsSuccessful)
             {
-                ColoredConsole
-                    .Error
-                    .WriteLine(ErrorColor("Error updating app settings:"))
-                    .WriteLine(ErrorColor(result.ErrorResult));
-            }
-            else
-            {
-                ColoredConsole.WriteLine("Deployment completed successfully.");
+                throw new CliException($"Error updating app settings: {result.ErrorResult}.");
             }
         }
 
@@ -398,24 +423,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        private static string CalculateMd5(Stream stream)
-        {
-            using (var md5 = MD5.Create())
-            {
-                var hash = md5.ComputeHash(stream);
-                var base64String = Convert.ToBase64String(hash);
-                stream.Position = 0;
-                return base64String;
-            }
-        }
-
         private async Task<string> UploadZipToStorage(Stream zip, IDictionary<string, string> appSettings)
         {
             return await RetryHelper.Retry(async () =>
             {
                 // Setting position to zero, in case we retry, we want to reset the stream
                 zip.Position = 0;
-                var zipMD5 = CalculateMd5(zip);
+                var zipMD5 = SecurityHelpers.CalculateMd5(zip);
 
                 const string containerName = "function-releases";
                 const string blobNameFormat = "{0}-{1}.zip";

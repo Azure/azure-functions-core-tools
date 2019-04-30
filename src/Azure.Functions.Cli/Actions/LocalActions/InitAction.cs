@@ -10,8 +10,9 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
@@ -34,12 +35,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Csx { get; set; }
 
+        public bool ExtensionBundle { get; set; }
+
         public string Language { get; set; }
+
+        public bool? ManagedDependencies { get; set; }
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
-            { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore },
-            { new Lazy<string>(() => ScriptConstants.HostMetadataFileName), StaticResources.HostJson },
+            { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
         };
 
         private readonly ITemplatesManager _templatesManager;
@@ -95,6 +99,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .SetDefault(null)
                 .WithDescription("Initialize a language specific project. Currently supported when --worker-runtime set to node. Options are - \"typescript\" and \"javascript\"")
                 .Callback(l => Language = l);
+
+            Parser
+                .Setup<bool>("managed-dependencies")
+                .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
+                .Callback(f => ManagedDependencies = f);
+
+            Parser
+                .Setup<bool>("extension-bundle")
+                //.WithDescription("use default extension bundle configuration in host.json")
+                .Callback(e => ExtensionBundle = e);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -157,8 +171,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                await InitLanguageSpecificArtifacts(workerRuntime, language);
+                bool managedDependenciesOption = ResolveManagedDependencies(workerRuntime, ManagedDependencies);
+                await InitLanguageSpecificArtifacts(workerRuntime, language, managedDependenciesOption);
                 await WriteFiles();
+                await WriteHostJson(workerRuntime, managedDependenciesOption, ExtensionBundle);
                 await WriteLocalSettingsJson(workerRuntime);
             }
 
@@ -212,7 +228,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return string.Empty;
         }
 
-        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language)
+        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language, bool managedDependenciesOption)
         {
             if (workerRuntime == Helpers.WorkerRuntime.python)
             {
@@ -221,13 +237,29 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
                 await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
-            }
 
-            if (language == Constants.Languages.TypeScript)
+                if (managedDependenciesOption)
+                {
+                    string majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
+
+                    var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
+                    requirementsContent = requirementsContent.Replace("MAJOR_VERSION", majorVersion);
+
+                    await WriteFiles("requirements.psd1", requirementsContent);
+                }
+            }
+            else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
-                await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
-                await WriteFiles("package.json", await StaticResources.PackageJson);
-                await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
+                if (language == Constants.Languages.TypeScript)
+                {
+                    await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
+                    await WriteFiles("package.json", await StaticResources.PackageJson);
+                    await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
+                }
+                else
+                {
+                    await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
+                }
             }
         }
 
@@ -316,6 +348,49 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
             }
+        }
+
+        private static bool ResolveManagedDependencies(WorkerRuntime workerRuntime, bool? managedDependenciesOption)
+        {
+            if (workerRuntime != Helpers.WorkerRuntime.powershell)
+            {
+                if (managedDependenciesOption.HasValue)
+                {
+                    throw new CliException("Managed dependencies is only supported for PowerShell.");
+                }
+
+                return false;
+            }
+
+            if (managedDependenciesOption.HasValue)
+            {
+                return managedDependenciesOption.Value;
+            }
+
+            return true;
+        }
+
+        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle)
+        {
+            var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
+                ? await StaticResources.PowerShellHostJson
+                : await StaticResources.HostJson;
+
+            if (extensionBundle)
+            {
+                hostJsonContent = await AddBundleConfig(hostJsonContent);
+            }
+
+            await WriteFiles("host.json", hostJsonContent);
+        }
+
+        private static async Task<string> AddBundleConfig(string hostJsonContent)
+        {
+            var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
+            var bundleConfigContent = await StaticResources.BundleConfig;
+            var bundleConfig = JsonConvert.DeserializeObject<JToken>(bundleConfigContent);
+            hostJsonObj.Add("extensionBundle", bundleConfig);
+            return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
         }
     }
 }

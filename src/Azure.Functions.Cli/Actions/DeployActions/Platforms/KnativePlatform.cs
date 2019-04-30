@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         private const string FUNCTIONS_NAMESPACE = "azure-functions";
         private static KubeApiClient client;
 
-        public async Task DeployContainerizedFunction(string functionName, string image, int min, int max)
+        public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
             await Deploy(functionName, image, FUNCTIONS_NAMESPACE, min, max);
         }
@@ -65,19 +65,20 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             await KubernetesHelper.RunKubectl($"apply -f deployment.json");
             File.Delete("deployment.json");
 
-            var externalIP = await GetIstioClusterIngressIP();
-            if (string.IsNullOrEmpty(externalIP))
-            {
-                ColoredConsole.WriteLine("Couldn't find Istio Cluster Ingress External IP");
-                return;
-            }
-
+            var endpoint = await GetIstioClusterIngressEndpoint();
             var host = GetFunctionHost(name, nameSpace);
 
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Function deployed successfully!");
             ColoredConsole.WriteLine();
-            ColoredConsole.WriteLine($"Function URL: http://{externalIP}");
+            if (string.IsNullOrEmpty(endpoint))
+            {
+                ColoredConsole.WriteLine($"Function URL: http://{endpoint}");
+            }
+            else
+            {
+                ColoredConsole.WriteLine("Couldn't identify Function URL: Couldn't find Istio Cluster Ingress endpoint");
+            }
             ColoredConsole.WriteLine($"Function Host: {host}");
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Plese note: it may take a few minutes for the knative service to be reachable");
@@ -129,12 +130,18 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             return knativeService;
         }
 
-        private async Task<string> GetIstioClusterIngressIP()
+        private async Task<string> GetIstioClusterIngressEndpoint()
         {
             var gateway = await client.ServicesV1().Get("istio-ingressgateway", "istio-system");
             if (gateway == null)
             {
                 return "";
+            }
+
+            var endpoint = gateway.Status.LoadBalancer.Ingress[0].Hostname;
+            if (!string.IsNullOrEmpty(endpoint))
+            {
+                return endpoint;
             }
 
             return gateway.Status.LoadBalancer.Ingress[0].Ip;

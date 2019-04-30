@@ -5,12 +5,14 @@ using System.IO.Compression;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
+using Colors.Net;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, bool noBundler, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
+        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -18,11 +20,16 @@ namespace Azure.Functions.Cli.Helpers
                 ignoreParser = new GitIgnoreParser(await FileSystemHelpers.ReadAllTextFromFileAsync(gitIgnorePath));
             }
 
-            if (workerRuntime == WorkerRuntime.python)
+            if (noBuild)
             {
-                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, noBundler, additionalPackages);
+                ColoredConsole.WriteLine(Yellow("Skipping build event for functions project (--no-build)."));
             }
-            else if (workerRuntime == WorkerRuntime.dotnet && !ignoreDotNetCheck)
+
+            if (workerRuntime == WorkerRuntime.python && !noBuild)
+            {
+                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, additionalPackages);
+            }
+            else if (workerRuntime == WorkerRuntime.dotnet && !ignoreDotNetCheck && !noBuild)
             {
                 throw new CliException("Pack command doesn't work for dotnet functions");
             }
