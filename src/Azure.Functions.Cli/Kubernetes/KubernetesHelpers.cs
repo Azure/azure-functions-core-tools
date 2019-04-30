@@ -22,13 +22,17 @@ namespace Azure.Functions.Cli.Kubernetes
 {
     public static class KubernetesHelper
     {
-        const string KedaDeploymentName = "keda-deployment";
-        const string KedaClusterRoleBindingName = "keda-cluster-role-binding";
-        const string KedaServiceAccountName = "keda-service-account";
-        const string KedaSecretName = "keda-docker-auth";
-        const string KedaScaledObjectCrdName = "scaledobjects.keda.k8s.io";
-        private static readonly IEnumerable<string> _osirisNames = new[]
+        private static readonly IEnumerable<string> _allResourceNames = new[]
         {
+            "customresourcedefinition.apiextensions.k8s.io/scaledobjects.keda.k8s.io",
+            "secret/keda-docker-auth",
+            "serviceaccount/keda",
+            "clusterrolebinding.rbac.authorization.k8s.io/keda",
+            "clusterrolebinding.rbac.authorization.k8s.io/keda-hpa-role-binding",
+            "service/keda",
+            "deployment.apps/keda",
+            "apiservice.apiregistration.k8s.io/v1beta1.custom.metrics.k8s.io",
+            "apiservice.apiregistration.k8s.io/v1beta1.external.metrics.k8s.io",
             "secret/osiris-osiris-edge-endpoints-hijacker-cert",
             "secret/osiris-osiris-edge",
             "secret/osiris-osiris-edge-proxy-injector-cert",
@@ -99,154 +103,12 @@ namespace Azure.Functions.Cli.Kubernetes
         internal static Task CreateNamespace(string @namespace)
             => KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
 
-        internal static IEnumerable<IKubernetesResource> GetKedaResources(string @namespace)
+        internal static string GetKedaResources(string @namespace)
         {
-            return new IKubernetesResource[]
-            {
-                new CustomResourceDefinitionV1Beta1
-                {
-                    ApiVersion = "apiextensions.k8s.io/v1beta1",
-                    Kind = "CustomResourceDefinition",
-                    Metadata = new ObjectMetadataV1
-                    {
-                        Name = KedaScaledObjectCrdName,
-                        Labels = new Dictionary<string, string>
-                        {
-                            { "app", KedaDeploymentName }
-                        }
-                    },
-                    Spec = new CustomResourceDefinitionSpecV1Beta1
-                    {
-                        Group = "keda.k8s.io",
-                        Version = "v1alpha1",
-                        Names = new CustomResourceDefinitionNamesV1Beta1
-                        {
-                            Kind = "ScaledObject",
-                            Plural = "scaledobjects",
-                        },
-                        Scope = "Namespaced"
-                    }
-                },
-                new SecretsV1
-                {
-                    ApiVersion = "v1",
-                    Kind = "Secret",
-                    Metadata = new ObjectMetadataV1
-                    {
-                        Name = KedaSecretName,
-                        Namespace = @namespace,
-                        Labels = new Dictionary<string, string>
-                        {
-                            { "app", KedaDeploymentName }
-                        }
-                    },
-                    Data = new Dictionary<string, string>
-                    {
-                        { ".dockerconfigjson", "eyJhdXRocyI6eyJwcm9qZWN0a29yZS5henVyZWNyLmlvIjp7InVzZXJuYW1lIjoiYjUxNGI2MGMtNjhjYy00ZjEyLWIzNjEtMzg1ODg3OGIyNDc5IiwicGFzc3dvcmQiOiI0alg1dmtQVFNyVVE5NlVCYlUvQjdDUXJCb0p3VDYyV1NzNVdmWnRGYkI4PSIsImF1dGgiOiJZalV4TkdJMk1HTXROamhqWXkwMFpqRXlMV0l6TmpFdE16ZzFPRGczT0dJeU5EYzVPalJxV0RWMmExQlVVM0pWVVRrMlZVSmlWUzlDTjBOUmNrSnZTbmRVTmpKWFUzTTFWMlphZEVaaVFqZzkifX19" }
-                    },
-                    Type = "kubernetes.io/dockerconfigjson"
-                },
-                new ServiceAccountV1
-                {
-                    ApiVersion = "v1",
-                    Kind = "ServiceAccount",
-                    Metadata = new ObjectMetadataV1
-                    {
-                        Name = KedaServiceAccountName,
-                        Namespace = @namespace,
-                        Labels = new Dictionary<string, string>
-                        {
-                            { "app", KedaDeploymentName }
-                        },
-                    }
-                },
-                new ClusterRoleBindingV1
-                {
-                    ApiVersion = "rbac.authorization.k8s.io/v1",
-                    Kind = "ClusterRoleBinding",
-                    Metadata = new ObjectMetadataV1
-                    {
-                        Labels = new Dictionary<string, string>
-                        {
-                            { "app", KedaDeploymentName }
-                        },
-                        Name = KedaClusterRoleBindingName,
-                        Namespace = @namespace,
-                    },
-                    RoleRef = new ClusterRoleBindingRoleRefV1
-                    {
-                        Kind = "ClusterRole",
-                        Name = "cluster-admin",
-                        ApiGroup = "rbac.authorization.k8s.io"
-                    },
-                    Subjects = new ClusterRoleBindingSubjectsV1[]
-                    {
-                        new ClusterRoleBindingSubjectsV1
-                        {
-                            Kind = "ServiceAccount",
-                            Name = KedaServiceAccountName,
-                            Namespace = @namespace,
-                        }
-                    }
-                },
-                new DeploymentV1Apps
-                {
-                    ApiVersion = "apps/v1",
-                    Kind = "Deployment",
-                    Metadata = new ObjectMetadataV1
-                    {
-                        Labels = new Dictionary<string, string>
-                        {
-                            { "app", "keda" }
-                        },
-                        Name = KedaDeploymentName,
-                        Namespace = @namespace,
-                    },
-                    Spec = new DeploymentSpecV1Apps
-                    {
-                        Replicas = 1,
-                        Selector = new SelectorV1
-                        {
-                            MatchLabels = new Dictionary<string, string>
-                            {
-                                { "name", KedaDeploymentName },
-                                { "instance", $"{KedaDeploymentName}-instance" }
-                            }
-                        },
-                        Template = new PodTemplateV1
-                        {
-                            Metadata = new ObjectMetadataV1
-                            {
-                                Labels = new Dictionary<string, string>
-                                {
-                                    { "name", KedaDeploymentName },
-                                    { "instance", $"{KedaDeploymentName}-instance" }
-                                }
-                            },
-                            Spec = new PodTemplateSpecV1
-                            {
-                                ServiceAccountName = KedaServiceAccountName,
-                                Containers = new ContainerV1[]
-                                {
-                                    new ContainerV1
-                                    {
-                                    Name = "keda",
-                                    Image = "projectkore.azurecr.io/kore:master",
-                                    ImagePullPolicy = "Always",
-                                    }
-                                },
-                                ImagePullSecrets = new ImagePullSecretV1[]
-                                {
-                                    new ImagePullSecretV1
-                                    {
-                                        Name = KedaSecretName
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
+            return StaticResources
+                .KedaTemplate
+                .Result
+                .Replace("KEDA_NAMESPACE", @namespace);
         }
 
         internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(string name, string imageName, string @namespace, TriggersPayload triggers, IDictionary<string, string> secrets, string pullSecret = null, string secretsCollectionName = null, string configMapName = null, bool useConfigMap = false, int? pollingInterval = null, int? cooldownPeriod = null, string serviceType = "LoadBalancer")
@@ -362,12 +224,7 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static async Task RemoveKeda(string @namespace)
         {
-            await KubectlHelper.RunKubectl($"delete deployment.apps/{KedaDeploymentName} --namespace {@namespace}", ignoreError: false, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete clusterrolebinding/{KedaClusterRoleBindingName} --namespace {@namespace}", ignoreError: true, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete serviceaccount/{KedaServiceAccountName} --namespace {@namespace}", ignoreError: false, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete secrets/{KedaSecretName} --namespace {@namespace}", ignoreError: false, showOutput: true);
-            await KubectlHelper.RunKubectl($"delete customresourcedefinition/{KedaScaledObjectCrdName}", ignoreError: false, showOutput: true);
-            foreach (var name in _osirisNames)
+            foreach (var name in _allResourceNames)
             {
                 await KubectlHelper.RunKubectl($"delete {name} --namespace {@namespace}", ignoreError: true, showOutput: true);
             }

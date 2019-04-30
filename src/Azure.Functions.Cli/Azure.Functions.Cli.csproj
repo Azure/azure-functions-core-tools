@@ -87,6 +87,9 @@
     <EmbeddedResource Include="StaticResources\osiris.yaml">
       <LogicalName>$(AssemblyName).osiris.yaml</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\keda.yaml">
+      <LogicalName>$(AssemblyName).keda.yaml</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\tools\python\packapp\__main__.py">
