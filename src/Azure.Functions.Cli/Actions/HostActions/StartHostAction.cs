@@ -200,14 +200,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             foreach (var secret in secrets)
             {
                 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)) &&
-                    !string.IsNullOrEmpty(secret.Key) &&
-                    !string.IsNullOrEmpty(secret.Value))
+                    !string.IsNullOrEmpty(secret.Key) && secret.Value != null)
                 {
                     Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
                 }
-                else
+                else if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' from local settings as it's already defined in current environment variables."));
+                }
+                else
+                {
+                    ColoredConsole.WriteLine(WarningColor($"SKipping '{secret.Key}' because value is null"));
                 }
             }
         }

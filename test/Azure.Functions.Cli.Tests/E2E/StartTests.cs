@@ -166,5 +166,62 @@ namespace Azure.Functions.Cli.Tests.E2E
                 tcpListner.Stop();
             }
         }
+
+        [Fact]
+        public async Task start_handles_empty_envvars_correctly()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime node",
+                        "new --template \"Http trigger\" --name HttpTrigger",
+                        "settings add emptySetting EMPTY_VALUE",
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var settingsFile = Path.Combine(workingDir, "local.settings.json");
+                        var content = File.ReadAllText(settingsFile);
+                        content = content.Replace("EMPTY_VALUE", "");
+                        File.WriteAllText(settingsFile,content);
+                    }
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start --port 6543"
+                    },
+                    ExpectExit = false,
+                    Test = async (w, p) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:6543/") })
+                        {
+                            client.Timeout = TimeSpan.FromSeconds(2);
+                            for (var i = 0; i < 10; i++)
+                            {
+                                try
+                                {
+                                    var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                                    response.EnsureSuccessStatusCode();
+                                    break;
+                                }
+                                catch
+                                {
+                                    await Task.Delay(TimeSpan.FromSeconds(2));
+                                }
+                            }
+                        }
+                        p.Kill();
+                    },
+                    OutputDoesntContain = new string[]
+                    {
+                        "Skipping 'emptySetting' from local settings as it's already defined in current environment variables."
+                    }
+                }
+            }, _output);
+        }
     }
 }
