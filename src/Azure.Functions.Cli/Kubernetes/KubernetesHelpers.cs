@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -49,6 +50,25 @@ namespace Azure.Functions.Cli.Kubernetes
             "mutatingwebhookconfiguration.admissionregistration.k8s.io/osiris-osiris-edge-endpoints-hijacker",
             "mutatingwebhookconfiguration.admissionregistration.k8s.io/osiris-osiris-edge-proxy-injector"
         };
+
+        internal static void ValidateKubernetesName(string name)
+        {
+            var regExValue = "^[a-z0-9\\-\\.]*$";
+            var regEx = new Regex(regExValue);
+            const string kNameDoc = "See: https://kubernetes.io/docs/concepts/overview/working-with-objects/names";
+            if (name.Length > 253)
+            {
+                throw new CliException("Kubernetes name must be < 253 characters.\n" + kNameDoc);
+            }
+            else if (!name.All(Char.IsLower))
+            {
+                throw new CliException("Kubernetes name must all lowercase.\n" + kNameDoc);
+            }
+            else if (!regEx.IsMatch(name))
+            {
+                throw new CliException($"Kubernetes namemust match {regExValue}.\n" + kNameDoc);
+            }
+        }
 
         internal static string GetOsirisResources(string @namespace)
         {

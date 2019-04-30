@@ -42,7 +42,11 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            SetFlag<string>("name", "The name used for the deployment and other artifacts in kubernetes", n => Name = n, isRequired: true);
+            SetFlag<string>("name", "The name used for the deployment and other artifacts in kubernetes", n =>
+            {
+                KubernetesHelper.ValidateKubernetesName(n);
+                Name = n;
+            }, isRequired: true);
             SetFlag<string>("image-name", "Image to use for the pod deployment and to read functions from", n => ImageName = n);
             SetFlag<string>("registry", "When set, a docker build is run and the image is pushed to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: default", ns => Namespace = ns);
