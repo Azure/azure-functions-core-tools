@@ -20,7 +20,6 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public string Namespace { get; private set; } = "default";
         public bool KedaOnly { get; private set; }
         public bool DryRun { get; private set; }
-        // public OutputSerializationOptions OutputFormat { get; private set; } = OutputSerializationOptions.Yaml;
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -32,10 +31,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public async override Task RunAsync()
         {
-            var resources = KubernetesHelper.GetKedaResources(Namespace);
             if (DryRun)
             {
-                ColoredConsole.WriteLine(KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml));
+                ColoredConsole.WriteLine(KubernetesHelper.GetKedaResources(Namespace));
                 if (!KedaOnly)
                 {
                     ColoredConsole.WriteLine(KubernetesHelper.GetOsirisResources(Namespace));
@@ -44,7 +42,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             else
             {
                 var sb = new StringBuilder();
-                sb.AppendLine(KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml));
+                sb.AppendLine(KubernetesHelper.GetKedaResources(Namespace));
                 if (!KedaOnly)
                 {
                     sb.AppendLine(KubernetesHelper.GetOsirisResources(Namespace));
