@@ -103,7 +103,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         private ServiceV1 GetService(string name, string nameSpace, string port = "80")
         {
-            var service = new ServiceV1()
+            return new ServiceV1()
             {
                 Metadata = new ObjectMetadataV1()
                 {
@@ -112,17 +112,22 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 },
                 Spec = new ServiceSpecV1()
                 {
+                    Selector = new Dictionary<string, string>()
+                    {
+                        {"app", name}
+                    },
+                    Ports = new List<ServicePortV1>()
+                    {
+                        new ServicePortV1()
+                        {
+                            Name = "http",
+                            Protocol = "TCP",
+                            Port = int.Parse(port)
+                        }
+                    },
                     Type = "LoadBalancer"
                 }
             };
-            service.Spec.Selector.Add("app", name);
-            service.Spec.Ports.Add(new ServicePortV1()
-            {
-                Name = "http",
-                Protocol = "TCP",
-                Port = int.Parse(port)
-            });
-            return service;
         }
 
         private DeploymentV1Apps GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min, string pullSecret)
