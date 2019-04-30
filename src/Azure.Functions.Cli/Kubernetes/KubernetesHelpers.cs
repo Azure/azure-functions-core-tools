@@ -26,7 +26,6 @@ namespace Azure.Functions.Cli.Kubernetes
         private static readonly IEnumerable<string> _allResourceNames = new[]
         {
             "customresourcedefinition.apiextensions.k8s.io/scaledobjects.keda.k8s.io",
-            "secret/keda-docker-auth",
             "serviceaccount/keda",
             "clusterrolebinding.rbac.authorization.k8s.io/keda",
             "clusterrolebinding.rbac.authorization.k8s.io/keda-hpa-role-binding",

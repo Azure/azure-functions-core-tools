@@ -11,17 +11,6 @@ spec:
   scope: Namespaced
 ---
 apiVersion: v1
-kind: Secret
-metadata:
-  labels:
-    app: keda
-  name: keda-docker-auth
-  namespace: KEDA_NAMESPACE
-type: kubernetes.io/dockerconfigjson
-data:
-  .dockerconfigjson: eyJhdXRocyI6IHsicHJvamVjdGtvcmUuYXp1cmVjci5pbyI6IHsiYXV0aCI6ICJZalV4TkdJMk1HTXROamhqWXkwMFpqRXlMV0l6TmpFdE16ZzFPRGczT0dJeU5EYzVPalJxV0RWMmExQlVVM0pWVVRrMlZVSmlWUzlDTjBOUmNrSnZTbmRVTmpKWFUzTTFWMlphZEVaaVFqZzkifX19
----
-apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
@@ -99,8 +88,7 @@ spec:
       serviceAccountName: keda
       containers:
       - name: keda
-        # image: "projectkore.azurecr.io/kore:master"
-        image: "ahmelsayed/contcont:latest"
+        image: kedacore/keda:latest
         imagePullPolicy: Always
         args:
         - --log-level=debug
@@ -113,8 +101,6 @@ spec:
           name: https
         - containerPort: 8080
           name: http
-      imagePullSecrets:
-      - name: keda-docker-auth
 ---
 apiVersion: apiregistration.k8s.io/v1beta1
 kind: APIService
