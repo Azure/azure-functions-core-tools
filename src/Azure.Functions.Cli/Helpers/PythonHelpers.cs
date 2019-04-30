@@ -90,7 +90,7 @@ namespace Azure.Functions.Cli.Helpers
                     await Task.Delay(TimeSpan.FromMilliseconds(200));
                 }
 
-                var output = sb.ToString();
+                var output = sb.ToString().Trim();
                 if (output.IndexOf("3.6") == -1)
                 {
                     throw new CliException($"Python 3.6 is required. Current python version is '{output}'");
