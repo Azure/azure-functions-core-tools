@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
-            await Deploy(functionName, image, nameSpace, min, max, cpu,  memory, port, pullSecret);
+            await Deploy(functionName, image, nameSpace, min, max, cpu, memory, port, pullSecret);
         }
 
         public KubernetesPlatform(string configFile)
@@ -125,7 +125,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 
         private ServiceV1 GetService(string name, string nameSpace, string port = "80")
         {
-            return new ServiceV1()
+            var service = new ServiceV1()
             {
                 Metadata = new ObjectMetaV1()
                 {
@@ -134,22 +134,17 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 },
                 Spec = new ServiceSpecV1()
                 {
-                    Selector = new Dictionary<string, string>()
-                    {
-                        {"app", name}
-                    },
-                    Ports = new List<ServicePortV1>()
-                    {
-                        new ServicePortV1()
-                        {
-                            Name = "http",
-                            Protocol = "TCP",
-                            Port = int.Parse(port)
-                        }
-                    },
                     Type = "LoadBalancer"
                 }
             };
+            service.Spec.Selector.Add("app", name);
+            service.Spec.Ports.Add(new ServicePortV1()
+            {
+                Name = "http",
+                Protocol = "TCP",
+                Port = int.Parse(port)
+            });
+            return service;
         }
 
         private Deployment GetDeployment(string name, string image, double cpu, int memory, string port, string nameSpace, int min, string pullSecret)

@@ -90,7 +90,7 @@ namespace Azure.Functions.Cli.Common
             {
                 ColoredConsole.WriteLine(Yellow($"Exception thrown while attempting to parse override connection string and task hub name from '{ScriptConstants.HostMetadataFileName}':"));
                 ColoredConsole.WriteLine(Yellow(e.Message));
-            }     
+            }
         }
 
         private void SetStorageServiceAndTaskHubClient(out AzureStorageOrchestrationService orchestrationService, out TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
@@ -128,7 +128,7 @@ namespace Azure.Functions.Cli.Common
         {
             // Retrieve list of DurableTask.AzureStorage DLL files
             var assemblyFilePaths = Directory.GetFiles(Environment.CurrentDirectory, DurableAzureStorageExtensionName, SearchOption.AllDirectories);
-            
+
             if (assemblyFilePaths.Count() == 0)
             {
                 ColoredConsole.WriteLine(Yellow($"Could not find {DurableAzureStorageExtensionName}. The functions host must be running a" +
@@ -145,8 +145,8 @@ namespace Azure.Functions.Cli.Common
 
             if (mostRecentAssemblyVersion < minimumExtensionVersion)
             {
-                 throw new CliException($"Durable Functions CLI commands must be used with {DurableAzureStorageExtensionName} versions greater than or equal to {MinimumDurableAzureStorageExtensionVersion}" +
-                     $"{Environment.NewLine}Your version: '{mostRecentAssemblyVersion}'. Path of DLL in question: {mostRecentAssembly.FullName}");
+                throw new CliException($"Durable Functions CLI commands must be used with {DurableAzureStorageExtensionName} versions greater than or equal to {MinimumDurableAzureStorageExtensionVersion}" +
+                    $"{Environment.NewLine}Your version: '{mostRecentAssemblyVersion}'. Path of DLL in question: {mostRecentAssembly.FullName}");
             }
         }
 
@@ -205,10 +205,10 @@ namespace Azure.Functions.Cli.Common
             {
                 status.Output = (showOutput) ? status.Output : null;
                 ColoredConsole.WriteLine(JsonConvert.SerializeObject(status, Formatting.Indented));
-            }            
+            }
         }
 
-         public async Task PurgeHistory(string connectionStringKey, string taskHubName, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses)
+        public async Task PurgeHistory(string connectionStringKey, string taskHubName, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses)
         {
             Initialize(out _orchestrationService, out _client, connectionStringKey, taskHubName);
 
@@ -252,7 +252,7 @@ namespace Azure.Functions.Cli.Common
             {
                 await _orchestrationService.RewindTaskOrchestrationAsync(instanceId, reason);
             }
-            catch (ArgumentOutOfRangeException e)
+            catch
             {
                 // DurableTask.AzureStorage throws this error when it cannot find an orchestration instance matching the query
                 throw new CliException("Orchestration instance not rewound. Must have a status of 'Failed', or an EventType of 'TaskFailed' or 'SubOrchestrationInstanceFailed' to be rewound.");
@@ -351,7 +351,7 @@ namespace Azure.Functions.Cli.Common
                 {
                     return JsonConvert.DeserializeObject(contents);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     throw new CliException($"Could not deserialize the input to the orchestration instance into a valid JSON object.", e);
                 }
