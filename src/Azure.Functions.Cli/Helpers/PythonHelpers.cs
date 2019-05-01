@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task SetupPythonProject()
         {
-            await VerifyVersion();
+            await VerifyPythonVersions();
             CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
         }
@@ -67,9 +67,50 @@ namespace Azure.Functions.Cli.Helpers
             FileSystemHelpers.CreateFile(reqFile);
         }
 
-        public static async Task VerifyVersion()
+        public static async Task VerifyPythonVersions(bool setWorkerExecutable = false)
         {
-            var exe = new Executable("python", "--version");
+            var pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
+
+            // If users are overriding this value, we don't have to worry about verification
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pythonDefaultExecutableVar)))
+            {
+                return;
+            }
+            // If we get an exception here, we don't need to check for python3
+            var pythonVersion = await VerifyVersion("python");
+            if (pythonVersion.IndexOf("3.6") == -1)
+            {
+                string python3Version = string.Empty;
+                try
+                {
+                    python3Version = await VerifyVersion("python3");
+                }
+                // Exception here means "python3" didn't run, we can assume that they don't have this binary,
+                // and use the result of "python" for the Exception
+                catch (Exception)
+                {
+                    throw new CliException($"Python 3.6 is required. Current python version is '{pythonVersion}'");
+                }
+
+                if (python3Version.IndexOf("3.6") == -1)
+                {
+                    throw new CliException($"Python 3.6 is required. Found python versions are '{pythonVersion}', '{python3Version}'");
+                }
+
+                if (setWorkerExecutable)
+                {
+                    Environment.SetEnvironmentVariable(pythonDefaultExecutableVar, "python3", EnvironmentVariableTarget.Process);
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.WriteLine($"{pythonDefaultExecutableVar} set to python3");
+                    }
+                }
+            }
+        }
+
+        public static async Task<string> VerifyVersion(string pythonExe = "python")
+        {
+            var exe = new Executable(pythonExe, "--version");
             var sb = new StringBuilder();
             int exitCode = -1;
             try
@@ -89,12 +130,7 @@ namespace Azure.Functions.Cli.Helpers
                     trials++;
                     await Task.Delay(TimeSpan.FromMilliseconds(200));
                 }
-
-                var output = sb.ToString().Trim();
-                if (output.IndexOf("3.6") == -1)
-                {
-                    throw new CliException($"Python 3.6 is required. Current python version is '{output}'");
-                }
+                return sb.ToString().Trim();
             }
             else
             {
