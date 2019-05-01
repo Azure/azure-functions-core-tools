@@ -1,0 +1,270 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using Azure.Functions.Cli.Helpers;
+using Microsoft.Azure.WebJobs.Logging;
+using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Configuration;
+using Microsoft.Azure.WebJobs.Script.Rpc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using static System.Environment;
+
+namespace Azure.Functions.Cli.ExtensionBundle
+{
+    public class JsonFileConfigurationSource : IConfigurationSource
+    {
+        private readonly ILogger _logger;
+
+        public JsonFileConfigurationSource(ScriptApplicationHostOptions applicationHostOptions, IEnvironment environment, ILoggerFactory loggerFactory)
+        {
+            if (loggerFactory == null)
+            {
+                throw new ArgumentNullException(nameof(loggerFactory));
+            }
+
+            HostOptions = applicationHostOptions;
+            Environment = environment;
+            _logger = loggerFactory.CreateLogger(LogCategories.Startup);
+        }
+
+        public ScriptApplicationHostOptions HostOptions { get; }
+
+        public IEnvironment Environment { get; }
+
+        public IConfigurationProvider Build(IConfigurationBuilder builder)
+        {
+            return new HostJsonFileConfigurationProvider(this, _logger, HostOptions);
+        }
+
+        private class HostJsonFileConfigurationProvider : ConfigurationProvider
+        {
+            private static readonly string[] WellKnownHostJsonProperties = new[]
+            {
+                "version", "functionTimeout", "functions", "http", "watchDirectories", "queues", "serviceBus",
+                "eventHub", "singleton", "logging", "aggregator", "healthMonitor", "extensionBundle", "managedDependencies"
+            };
+
+            private readonly JsonFileConfigurationSource _configurationSource;
+            private readonly Stack<string> _path;
+            private readonly ILogger _logger;
+            private readonly ScriptApplicationHostOptions _hostOptions;
+
+            public HostJsonFileConfigurationProvider(JsonFileConfigurationSource configurationSource, ILogger logger, ScriptApplicationHostOptions hostOptions)
+            {
+                _configurationSource = configurationSource;
+                _path = new Stack<string>();
+                _logger = logger;
+                _hostOptions = hostOptions;
+            }
+
+            public override void Load()
+            {
+                JObject hostJson = LoadHostConfigurationFile();
+                ProcessObject(hostJson);
+                var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
+                if (!string.IsNullOrEmpty(bundleId))
+                {
+                    var packages = ExtensionsHelper.GetExtensionPackages();
+                    if (packages.Count() <= 1)
+                    {
+                        var keysToRemove = Data.Where((keyValue) => keyValue.Key.Contains("extensionBundle"))
+                        .Select(keyValue => keyValue.Key)
+                        .ToList();
+
+                        foreach (var key in keysToRemove)
+                        {
+                            Data.Remove(key);
+                        }
+                    }
+                    else
+                    {
+                        Data["AzureFunctionsJobHost:extensionBundle:downloadPath"] = Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
+                    }
+                }
+            }
+
+            private void ProcessObject(JObject hostJson)
+            {
+                foreach (var property in hostJson.Properties())
+                {
+                    _path.Push(property.Name);
+                    ProcessProperty(property);
+                    _path.Pop();
+                }
+            }
+
+            private void ProcessProperty(JProperty property)
+            {
+                ProcessToken(property.Value);
+            }
+
+            private void ProcessToken(JToken token)
+            {
+                switch (token.Type)
+                {
+                    case JTokenType.Object:
+                        ProcessObject(token.Value<JObject>());
+                        break;
+                    case JTokenType.Array:
+                        ProcessArray(token.Value<JArray>());
+                        break;
+
+                    case JTokenType.Integer:
+                    case JTokenType.Float:
+                    case JTokenType.String:
+                    case JTokenType.Boolean:
+                    case JTokenType.Null:
+                    case JTokenType.Date:
+                    case JTokenType.Raw:
+                    case JTokenType.Bytes:
+                    case JTokenType.TimeSpan:
+                        string key = ConfigurationSectionNames.JobHost + ConfigurationPath.KeyDelimiter + ConfigurationPath.Combine(_path.Reverse());
+                        Data[key] = token.Value<JValue>().ToString(CultureInfo.InvariantCulture);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            private void ProcessArray(JArray jArray)
+            {
+                for (int i = 0; i < jArray.Count; i++)
+                {
+                    _path.Push(i.ToString());
+                    ProcessToken(jArray[i]);
+                    _path.Pop();
+                }
+            }
+
+            /// <summary>
+            /// Read and apply host.json configuration.
+            /// </summary>
+            private JObject LoadHostConfigurationFile()
+            {
+                // Before configuration has been fully read, configure a default logger factory
+                // to ensure we can log any configuration errors. There's no filters at this point,
+                // but that's okay since we can't build filters until we apply configuration below.
+                // We'll recreate the loggers after config is read. We initialize the public logger
+                // to the startup logger until we've read configuration settings and can create the real logger.
+                // The "startup" logger is used in this class for startup related logs. The public logger is used
+                // for all other logging after startup.
+
+                ScriptApplicationHostOptions options = _configurationSource.HostOptions;
+                string hostFilePath = Path.Combine(options.ScriptPath, ScriptConstants.HostMetadataFileName);
+                string readingFileMessage = string.Format(CultureInfo.InvariantCulture, "Reading host configuration file '{0}'", hostFilePath);
+                JObject hostConfigObject = LoadHostConfig(hostFilePath);
+                InitializeHostConfig(hostFilePath, hostConfigObject);
+                string sanitizedJson = SanitizeHostJson(hostConfigObject);
+                string readFileMessage = $"Host configuration file read:{NewLine}{sanitizedJson}";
+
+                _logger.LogDebug("Host configuration applied.");
+
+                // Do not log these until after all the configuration is done so the proper filters are applied.
+                _logger.LogInformation(readingFileMessage);
+                _logger.LogInformation(readFileMessage);
+
+                return hostConfigObject;
+            }
+
+            private void InitializeHostConfig(string hostJsonPath, JObject hostConfigObject)
+            {
+                // If the object is empty, initialize it to include the version and write the file.
+                if (!hostConfigObject.HasValues)
+                {
+                    _logger.LogInformation($"Empty host configuration file found. Creating a default {ScriptConstants.HostMetadataFileName} file.");
+
+                    hostConfigObject = GetDefaultHostConfigObject();
+                    TryWriteHostJson(hostJsonPath, hostConfigObject);
+                }
+
+                if (hostConfigObject["version"]?.Value<string>() != "2.0")
+                {
+                    throw new HostConfigurationException($"The {ScriptConstants.HostMetadataFileName} file is missing the required 'version' property. See https://aka.ms/functions-hostjson for steps to migrate the configuration file.");
+                }
+            }
+
+            internal JObject LoadHostConfig(string configFilePath)
+            {
+                JObject hostConfigObject;
+                try
+                {
+                    string json = File.ReadAllText(configFilePath);
+                    hostConfigObject = JObject.Parse(json);
+                }
+                catch (JsonException ex)
+                {
+                    throw new FormatException($"Unable to parse host configuration file '{configFilePath}'.", ex);
+                }
+                catch (Exception ex) when (ex is FileNotFoundException || ex is DirectoryNotFoundException)
+                {
+                    // if no file exists we default the config
+                    _logger.LogInformation($"No host configuration file found. Creating a default {ScriptConstants.HostMetadataFileName} file.");
+
+                    hostConfigObject = GetDefaultHostConfigObject();
+                    TryWriteHostJson(configFilePath, hostConfigObject);
+                }
+
+                return hostConfigObject;
+            }
+
+            private JObject GetDefaultHostConfigObject()
+            {
+                var hostJsonJObj = JObject.Parse("{'version': '2.0'}");
+                if (string.Equals(_configurationSource.Environment.GetEnvironmentVariable(LanguageWorkerConstants.FunctionWorkerRuntimeSettingName), "powershell", StringComparison.InvariantCultureIgnoreCase)
+                    && FileSystemIsReadOnly())
+                {
+                    hostJsonJObj.Add("managedDependency", JToken.Parse("{'Enabled': true}"));
+                }
+
+                return hostJsonJObj;
+            }
+
+            private void TryWriteHostJson(string filePath, JObject content)
+            {
+                if (FileSystemIsReadOnly())
+                {
+                    try
+                    {
+                        File.WriteAllText(filePath, content.ToString(Formatting.Indented));
+                    }
+                    catch
+                    {
+                        _logger.LogInformation($"Failed to create {ScriptConstants.HostMetadataFileName} file. Host execution will continue.");
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation($"File system is read-only. Skipping {ScriptConstants.HostMetadataFileName} creation.");
+                }
+            }
+
+            public static bool FileSystemIsReadOnly()
+            {
+                return !string.IsNullOrEmpty(GetEnvironmentVariable(EnvironmentSettingNames.AzureWebsiteZipDeployment)) ||
+                    !string.IsNullOrEmpty(GetEnvironmentVariable(EnvironmentSettingNames.AzureWebsiteAltZipDeployment)) ||
+                    !string.IsNullOrEmpty(GetEnvironmentVariable(EnvironmentSettingNames.AzureWebsiteRunFromPackage));
+            }
+
+            internal static string SanitizeHostJson(JObject hostJsonObject)
+            {
+                JObject sanitizedObject = new JObject();
+
+                foreach (var propName in WellKnownHostJsonProperties)
+                {
+                    var propValue = hostJsonObject[propName];
+                    if (propValue != null)
+                    {
+                        sanitizedObject[propName] = propValue;
+                    }
+                }
+
+                return sanitizedObject.ToString();
+            }
+        }
+    }
+}
