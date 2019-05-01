@@ -383,6 +383,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Set app setting
             functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = runFromPackageValue;
 
+            // If it has the old app setting, remove it.
+            if (functionApp.AzureAppSettings.ContainsKey("WEBSITE_RUN_FROM_ZIP"))
+            {
+                functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_ZIP");
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(Yellow("Removing WEBSITE_RUN_FROM_ZIP App Setting"));
+                }
+            }
+
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
 
             if (!result.IsSuccessful)
