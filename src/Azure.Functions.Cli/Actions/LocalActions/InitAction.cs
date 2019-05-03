@@ -144,12 +144,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
-            if (workerRuntime == Helpers.WorkerRuntime.None)
-            {
-                (workerRuntime, _) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
-            }
-            await WriteDockerfile(workerRuntime);
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime);
         }
 
         private async Task InitFunctionAppProject()
@@ -194,7 +189,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             WorkerRuntime workerRuntime;
             string language;
-            if (string.IsNullOrEmpty(workerRuntimeString))
+            if (!string.IsNullOrEmpty(workerRuntimeString))
+            {
+                workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeString);
+                language = languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntimeString);
+            }
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
                 ColoredConsole.Write("Select a worker runtime: ");
                 IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
@@ -205,8 +205,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                workerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeString);
-                language = languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntimeString);
+                workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+                language = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntime.ToString());
             }
 
             return (workerRuntime, language);

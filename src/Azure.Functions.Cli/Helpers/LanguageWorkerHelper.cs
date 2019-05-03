@@ -20,13 +20,13 @@ namespace Azure.Functions.Cli.Helpers
             : new KeyValuePair<WorkerRuntime, string>(p.Key, p.Value.Replace(":", "__")))
         .ToDictionary(k => k.Key, v => v.Value);
 
-        public static IReadOnlyDictionary<string, string> GetWorkerConfiguration(WorkerRuntime workerRuntime, string value)
+        public static IReadOnlyDictionary<string, string> GetWorkerConfiguration(string value)
         {
-            if (_map.ContainsKey(workerRuntime) && !string.IsNullOrWhiteSpace(value))
+            if (_map.ContainsKey(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !string.IsNullOrWhiteSpace(value))
             {
                 return new Dictionary<string, string>
                 {
-                    { _map[workerRuntime], value }
+                    { _map[GlobalCoreToolsSettings.CurrentWorkerRuntime], value }
                 };
             }
             else
