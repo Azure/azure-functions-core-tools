@@ -223,5 +223,32 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public async Task start_powershell()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime powershell",
+                    "new --template \"Http trigger\" --name HttpTrigger",
+                    "start"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10));
+
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                    {
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
+                        result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
+                    }
+                },
+            }, _output);
+        }
     }
 }
