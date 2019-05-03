@@ -92,7 +92,7 @@ namespace Azure.Functions.Cli.Helpers
             string trim(string str) => str.Trim(new[] { ' ', '\n' });
         }
 
-        private static async Task<(string output, string error, int exitCode)> RunDockerCommand(string args, string containerId = null, bool ignoreError = false, bool showProgress = true)
+        internal static async Task<(string output, string error, int exitCode)> RunDockerCommand(string args, string containerId = null, bool ignoreError = false, bool showProgress = true)
         {
             var printArgs = string.IsNullOrWhiteSpace(containerId)
                 ? args

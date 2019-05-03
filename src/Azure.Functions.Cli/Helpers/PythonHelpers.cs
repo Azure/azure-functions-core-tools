@@ -221,15 +221,34 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task RestorePythonRequirementsDocker(string functionAppRoot, string packagesLocation, string additionalPackages)
         {
-            var dockerImage = string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting))
-                ? Constants.DockerImages.LinuxPythonImageAmd64
-                : Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting);
+            // Configurable settings
+            var pythonDockerImageSetting = Environment.GetEnvironmentVariable(Constants.PythonDockerImageVersionSetting);
+            var dockerSkipPullFlagSetting = Environment.GetEnvironmentVariable(Constants.PythonDockerImageSkipPull);
+            var dockerRunSetting = Environment.GetEnvironmentVariable(Constants.PythonDockerRunCommand);
 
-            await DockerHelpers.DockerPull(dockerImage);
+            var dockerImage = string.IsNullOrEmpty(pythonDockerImageSetting)
+                ? Constants.DockerImages.LinuxPythonImageAmd64
+                : pythonDockerImageSetting;
+
+            if (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
+                !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) || dockerSkipPullFlagSetting == "1"))
+            {
+                await DockerHelpers.DockerPull(dockerImage);
+            }
+
             var containerId = string.Empty;
             try
             {
-                containerId = await DockerHelpers.DockerRun(dockerImage, command: "sleep infinity");
+                if (string.IsNullOrEmpty(dockerRunSetting))
+                {
+                    containerId = await DockerHelpers.DockerRun(dockerImage, command: "sleep infinity");
+                }
+                else
+                {
+                    (var output, _, _) = await DockerHelpers.RunDockerCommand(dockerRunSetting);
+                    containerId = output.ToString().Trim();
+                }
+
                 await DockerHelpers.CopyToContainer(containerId, Constants.RequirementsTxt, $"/{Constants.RequirementsTxt}");
 
                 var scriptFilePath = Path.GetTempFileName();
