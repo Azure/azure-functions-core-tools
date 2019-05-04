@@ -88,7 +88,7 @@ spec:
       serviceAccountName: keda
       containers:
       - name: keda
-        image: kedacore/keda:latest
+        image: kedacore/keda:v1alpha1
         imagePullPolicy: Always
         args:
         - --log-level=debug
