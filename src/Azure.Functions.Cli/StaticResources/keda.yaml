@@ -88,10 +88,10 @@ spec:
       serviceAccountName: keda
       containers:
       - name: keda
-        image: kedacore/keda:v1alpha1
+        image: kedacore/keda:latest
         imagePullPolicy: Always
         args:
-        - --log-level=debug
+        - --log-level=info
         - /adapter
         - --secure-port=6443
         - --logtostderr=false
