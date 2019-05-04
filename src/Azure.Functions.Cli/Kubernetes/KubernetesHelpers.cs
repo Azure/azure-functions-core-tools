@@ -130,7 +130,21 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Replace("KEDA_NAMESPACE", @namespace);
         }
 
-        internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(string name, string imageName, string @namespace, TriggersPayload triggers, IDictionary<string, string> secrets, string pullSecret = null, string secretsCollectionName = null, string configMapName = null, bool useConfigMap = false, int? pollingInterval = null, int? cooldownPeriod = null, string serviceType = "LoadBalancer")
+        internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(
+            string name,
+            string imageName,
+            string @namespace,
+            TriggersPayload triggers,
+            IDictionary<string, string> secrets,
+            string pullSecret = null,
+            string secretsCollectionName = null,
+            string configMapName = null,
+            bool useConfigMap = false,
+            int? pollingInterval = null,
+            int? cooldownPeriod = null,
+            string serviceType = "LoadBalancer",
+            int? minReplicas = null,
+            int? maxReplicas = null)
         {
             ScaledObjectV1Alpha1 scaledobject = null;
             var result = new List<IKubernetesResource>();
@@ -160,9 +174,9 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 int position = 0;
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, 0, enabledFunctions);
+                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
                 deployments.Add(deployment);
-                scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod);
+                scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
             }
 
             if (useConfigMap)
@@ -377,7 +391,7 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        private static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod)
+        private static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
         {
             return new ScaledObjectV1Alpha1
             {
@@ -400,6 +414,8 @@ namespace Azure.Functions.Cli.Kubernetes
                     },
                     PollingInterval = pollingInterval,
                     CooldownPeriod = cooldownPeriod,
+                    MinReplicaCount = minReplicas,
+                    MaxReplicaCount = maxReplicas,
                     Triggers = triggers
                         .FunctionsJson
                         .Select(kv => kv.Value)

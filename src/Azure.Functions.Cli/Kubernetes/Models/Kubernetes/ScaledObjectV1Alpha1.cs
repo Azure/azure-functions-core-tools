@@ -19,6 +19,12 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
         [JsonProperty("cooldownPeriod")]
         public int? CooldownPeriod { get; set; }
 
+        [JsonProperty("minReplicaCount")]
+        public int? MinReplicaCount { get; set; }
+
+        [JsonProperty("maxReplicaCount")]
+        public int? MaxReplicaCount { get; set; }
+
         [JsonProperty("triggers")]
         public IEnumerable<ScaledObjectTriggerV1Alpha1> Triggers { get; internal set; }
     }

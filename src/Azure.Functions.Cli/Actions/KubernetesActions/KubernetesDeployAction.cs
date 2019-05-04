@@ -34,6 +34,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public int? CooldownPeriod { get; private set; }
         public string ServiceType { get; set; } = "LoadBalancer";
         public IEnumerable<string> ServiceTypes { get; set; } = new string[] { "ClusterIP", "NodePort", "LoadBalancer" };
+        public bool IgnoreErrors { get; private set; } = false;
+        public int? MaxReplicaCount { get; private set; }
+        public int? MinReplicaCount { get; private set; }
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -53,6 +56,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<string>("pull-secret", "The secret holding a private registry credentials", s => PullSecret = s);
             SetFlag<int>("polling-interval", "The polling interval for checking non-http triggers. Default: 30 (seconds)", p => PollingInterval = p);
             SetFlag<int>("cooldown-period", "The cooldown period for the deployment before scaling back to 0 after all triggers are no longer active. Default: 300 (seconds)", p => CooldownPeriod = p);
+            SetFlag<int>("min-replicas", "Minimum replica count", m => MinReplicaCount = m);
+            SetFlag<int>("max-replicas", "Maximum replica count to scale to by HPA", m => MaxReplicaCount = m);
             SetFlag<string>("secret-name", "The name of a kubernetes secret collection to use in the deployment instead of generating one based on local.settings.json", sn => SecretsCollectionName = sn);
             SetFlag<string>("config-map-name", "The name of a config map to use in the deployment", cm => ConfigMapName = cm);
             SetFlag<string>("service-type", "Kubernetes Service Type. Default LoadBalancer  Valid options: " + string.Join(",", ServiceTypes), s =>
@@ -66,6 +71,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("no-docker", "With --image-name, the core-tools will inspect the functions inside the image. This will require mounting the image filesystem. Passing --no-docker uses current directory for functions.", nd => NoDocker = nd);
             SetFlag<bool>("use-config-map", "Use a ConfigMap/V1 instead of a Secret/V1 object.", c => UseConfigMap = c);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
+            SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             return base.ParseArgs(args);
         }
 
@@ -96,7 +102,21 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
 
-            var resources = KubernetesHelper.GetFunctionsDeploymentResources(Name, resolvedImageName, Namespace, triggers, _secretsManager.GetSecrets(), PullSecret, SecretsCollectionName, ConfigMapName, UseConfigMap, PollingInterval, CooldownPeriod, ServiceType);
+            var resources = KubernetesHelper.GetFunctionsDeploymentResources(
+                Name,
+                resolvedImageName,
+                Namespace,
+                triggers,
+                _secretsManager.GetSecrets(),
+                PullSecret,
+                SecretsCollectionName,
+                ConfigMapName,
+                UseConfigMap,
+                PollingInterval,
+                CooldownPeriod,
+                ServiceType,
+                MinReplicaCount,
+                MaxReplicaCount);
 
             if (DryRun)
             {
@@ -116,7 +136,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
                 foreach (var resource in resources)
                 {
-                    await KubectlHelper.KubectlApply(resource, showOutput: true, @namespace: Namespace);
+                    await KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
                 }
             }
         }

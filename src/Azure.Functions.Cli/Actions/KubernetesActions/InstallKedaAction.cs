@@ -24,7 +24,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: default", s => Namespace = s);
-            SetFlag<bool>("keda-only", "Install Keda only. By default both keda (non-http scale to zero) and osiris (http scale to zero) are installed", f => KedaOnly = f);
+            SetFlag<bool>("keda", "Install Keda only. By default both keda (non-http scale to zero) and osiris (http scale to zero) are installed", f => KedaOnly = f);
+            SetFlag<bool>("keda-only", string.Empty, f => KedaOnly = f);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             return base.ParseArgs(args);
         }
