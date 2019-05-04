@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Kubernetes
             "mutatingwebhookconfiguration.admissionregistration.k8s.io/osiris-osiris-edge-proxy-injector"
         };
 
-        internal static void ValidateKubernetesName(string name)
+        public static void ValidateKubernetesName(string name)
         {
             var regExValue = "^[a-z0-9\\-\\.]*$";
             var regEx = new Regex(regExValue);
@@ -58,10 +58,6 @@ namespace Azure.Functions.Cli.Kubernetes
             if (name.Length > 253)
             {
                 throw new CliException("Kubernetes name must be < 253 characters.\n" + kNameDoc);
-            }
-            else if (!name.All(Char.IsLower))
-            {
-                throw new CliException("Kubernetes name must all lowercase.\n" + kNameDoc);
             }
             else if (!regEx.IsMatch(name))
             {
