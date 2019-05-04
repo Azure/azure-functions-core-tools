@@ -67,14 +67,14 @@ namespace Azure.Functions.Cli.Helpers
             FileSystemHelpers.CreateFile(reqFile);
         }
 
-        public static async Task VerifyPythonVersions(bool setWorkerExecutable = false)
+        public static async Task<string> VerifyPythonVersions(bool setWorkerExecutable = false)
         {
             var pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
 
             // If users are overriding this value, we don't have to worry about verification
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pythonDefaultExecutableVar)))
             {
-                return;
+                return Environment.GetEnvironmentVariable(pythonDefaultExecutableVar);
             }
             // If we get an exception here, we don't need to check for python3
             var pythonVersion = await VerifyVersion("python");
@@ -105,7 +105,9 @@ namespace Azure.Functions.Cli.Helpers
                         ColoredConsole.WriteLine($"{pythonDefaultExecutableVar} set to python3");
                     }
                 }
+                return "python3";
             }
+            return "python";
         }
 
         public static async Task<string> VerifyVersion(string pythonExe = "python")
@@ -201,7 +203,8 @@ namespace Azure.Functions.Cli.Helpers
         {
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
 
-            var exe = new Executable("python", $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
+            var pythonExe = await VerifyPythonVersions();
+            var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
