@@ -61,7 +61,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
             else if (!regEx.IsMatch(name))
             {
-                throw new CliException($"Kubernetes namemust match {regExValue}.\n" + kNameDoc);
+                throw new CliException($"Kubernetes name must match {regExValue}.\n" + kNameDoc);
             }
         }
 
