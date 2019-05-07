@@ -4,7 +4,6 @@
     <IsPackable>false</IsPackable>
     <AssemblyName>Azure.Functions.Cli.Tests</AssemblyName>
     <RootNamespace>Azure.Functions.Cli.Tests</RootNamespace>
-    <NoWarn>$(NoWarn);NU1605</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Resources\**" />
@@ -22,7 +21,7 @@
     <PackageReference Include="xunit" Version="2.4.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.3.6" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="0.1.95-preview" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="0.1.102-preview" />
   </ItemGroup>
 
   <ItemGroup>

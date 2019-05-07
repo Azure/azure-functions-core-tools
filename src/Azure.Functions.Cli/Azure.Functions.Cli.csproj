@@ -22,7 +22,6 @@
     <RepositoryType>git</RepositoryType>
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
-    <NoWarn>$(NoWarn);NU1605</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
