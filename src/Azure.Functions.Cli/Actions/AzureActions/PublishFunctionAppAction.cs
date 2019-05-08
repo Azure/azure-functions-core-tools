@@ -337,18 +337,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 ColoredConsole.WriteLine("Syncing triggers...");
                 HttpResponseMessage response = null;
-                if (functionApp.IsLinux)
-                {
-                    response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
-                }
-                else
-                {
-                    using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
-                    {
-                        response = await client.PostAsync("api/functions/synctriggers", content: null);
-                    }
-                }
-
+                // This SyncTriggers function calls the endpoint for linux syncTriggers
+                response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
