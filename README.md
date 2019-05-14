@@ -61,6 +61,14 @@ brew install azure-functions-core-tools
 
 1. Set up package feed
 
+
+##### Ubuntu 19.04
+
+```bash
+wget -q https://packages.microsoft.com/config/ubuntu/19.04/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+```
+
 ##### Ubuntu 18.10
 
 ```bash
