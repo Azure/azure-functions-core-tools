@@ -190,7 +190,11 @@ namespace Azure.Functions.Cli.Common
                     { "signalrconnectioninfo",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.SignalRService",
-                            Version =  "1.0.0"} }
+                            Version =  "1.0.0"} },
+                    { "twiliosms",
+                        new ExtensionPackage() {
+                            Name = "Microsoft.Azure.WebJobs.Extensions.Twilio",
+                            Version =  "3.0.0"} }
                 });
     }
 }
