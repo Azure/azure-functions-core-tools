@@ -210,7 +210,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 }
                 else
                 {
-                    ColoredConsole.WriteLine(WarningColor($"SKipping '{secret.Key}' because value is null"));
+                    ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' because value is null"));
                 }
             }
         }
