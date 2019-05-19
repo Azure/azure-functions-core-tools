@@ -364,5 +364,30 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public Task init_python_app_twice()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init \"anapp\" --worker-runtime python",
+                    "init \"anapp\" --worker-runtime python"
+                },
+                OutputContains = new[]
+                {
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    "requirements.txt already exists. Skipped!",
+                    ".gitignore already exists. Skipped!",
+                    "host.json already exists. Skipped!",
+                    "local.settings.json already exists. Skipped!",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
+                }
+            }, _output);
+        }
     }
 }

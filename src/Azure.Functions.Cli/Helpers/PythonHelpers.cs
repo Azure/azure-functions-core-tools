@@ -61,10 +61,16 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static void CreateRequirements(string path = null)
+        private static void CreateRequirements()
         {
-            var reqFile = string.IsNullOrEmpty(path) ? Constants.RequirementsTxt : Path.Combine(path, Constants.RequirementsTxt);
-            FileSystemHelpers.CreateFile(reqFile);
+            if (!FileSystemHelpers.FileExists(Constants.RequirementsTxt))
+            {
+                FileSystemHelpers.CreateFile(Constants.RequirementsTxt);
+            }
+            else
+            {
+                ColoredConsole.WriteLine($"{Constants.RequirementsTxt} already exists. Skipped!");
+            }
         }
 
         public static async Task<string> VerifyPythonVersions(bool setWorkerExecutable = false)
