@@ -20,6 +20,7 @@ using Colors.Net;
 using Fclp;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using Newtonsoft.Json;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using static Colors.Net.StringStaticMethods;
 
@@ -361,11 +362,55 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task PublishRunFromPackageLocal(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             await SetRunFromPackageAppSetting(functionApp, "1");
+            await WaitForAppSettingUpdateSCM(functionApp, new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } }, timeOutSeconds: 300);
 
             // Zip deploy
             await PublishZipDeploy(functionApp, zipFileFactory);
 
             ColoredConsole.WriteLine("Deployment completed successfully.");
+        }
+
+        private async Task WaitForAppSettingUpdateSCM(Site functionApp, IDictionary<string, string> settings, int timeOutSeconds)
+        {
+            const int retryTimeoutSeconds = 5;
+
+            var waitUntil = DateTime.Now + TimeSpan.FromSeconds(timeOutSeconds);
+
+            while (DateTime.Now < waitUntil)
+            {
+                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                using (var request = new HttpRequestMessage(HttpMethod.Get, new Uri("api/settings", UriKind.Relative)))
+                {
+                    var response = await client.SendAsync(request);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var settingsResponse = await response.Content.ReadAsStringAsync();
+                        var scmSettingsDict = JsonConvert.DeserializeObject<IDictionary<string, string>>(settingsResponse);
+
+                        if (StaticSettings.IsDebug)
+                        {
+                            ColoredConsole.WriteLine(VerboseColor("SCM settings values:"));
+                            foreach (KeyValuePair<string, string> kvp in scmSettingsDict)
+                            {
+                                ColoredConsole.WriteLine(VerboseColor($"\"{kvp.Key}\" : \"{kvp.Value}\""));
+                            }
+                            ColoredConsole.WriteLine(Environment.NewLine);
+                        }
+
+                        if (settings.Intersect(scmSettingsDict).Count() == settings.Count())
+                        {
+                            // All settings are updated in scm
+                            return;
+                        }
+                    }
+                }
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(VerboseColor("SCM update poll timed out. Retrying..."));
+                }
+                await Task.Delay(TimeSpan.FromSeconds(retryTimeoutSeconds));
+            }
+            throw new CliException("Timed out waiting for SCM to update the Environment Settings");
         }
 
         private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue)
