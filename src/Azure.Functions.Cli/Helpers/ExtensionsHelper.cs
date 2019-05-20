@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Helpers
                 extensionsDir = Environment.CurrentDirectory;
             }
 
-            var extensionsProj = Path.Combine(extensionsDir, "extensions.csproj");
+            var extensionsProj = Path.Combine(extensionsDir, Constants.ExtenstionsCsProjFile);
             if (!FileSystemHelpers.FileExists(extensionsProj))
             {
                 FileSystemHelpers.EnsureDirectory(extensionsDir);
@@ -63,7 +63,12 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
 
-            packages.Add("ExtensionsMetadataGeneratorPackage", Constants.ExtensionsMetadataGeneratorPackage);
+            // We only need extensionsMetadatGeneratorPackage, if there is a binding that requires an extension
+            // So, if we didn't find any extension packages, we don't need to add this.
+            if (packages.Count != 0)
+            {
+                packages.Add("ExtensionsMetadataGeneratorPackage", Constants.ExtensionsMetadataGeneratorPackage);
+            }
 
             return packages.Values;
         }

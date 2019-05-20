@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
@@ -16,7 +17,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     internal class InstallExtensionAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
-        private readonly bool _showExtensionBundleWarning;
+        private readonly bool _showNoActionWarning;
 
         public string Package { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
@@ -26,10 +27,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public bool Csx { get; set; }
         public bool Force { get; set; } = false;
 
-        public InstallExtensionAction(ISecretsManager secretsManager, bool showExtensionBundleWarning = true)
+        public InstallExtensionAction(ISecretsManager secretsManager, bool showNoActionWarning = true)
         {
             _secretsManager = secretsManager;
-            _showExtensionBundleWarning = showExtensionBundleWarning;
+            _showNoActionWarning = showNoActionWarning;
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -78,20 +79,25 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
                 var hostFilePath = Path.Combine(Environment.CurrentDirectory, ScriptConstants.HostMetadataFileName);
-                if (_showExtensionBundleWarning)
+                if (_showNoActionWarning)
                 {
-                    ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
+                    ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}."));
                 }
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(ConfigPath) && !FileSystemHelpers.DirectoryExists(ConfigPath))
+            {
+                throw new CliArgumentsException("Invalid config path, please verify directory exists");
+            }
+
+            if (!NeedsExtensionsInstall())
+            {
                 return;
             }
 
             if (CommandChecker.CommandExists("dotnet"))
             {
-                if (!string.IsNullOrEmpty(ConfigPath) && !FileSystemHelpers.DirectoryExists(ConfigPath))
-                {
-                    throw new CliArgumentsException("Invalid config path, please verify directory exists");
-                }
-
                 var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
 
                 if (string.IsNullOrEmpty(Package) && string.IsNullOrEmpty(Version))
@@ -128,13 +134,66 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                ColoredConsole.Error.WriteLine(ErrorColor(Constants.Errors.ExtensionsNeedDotnet));
+                throw new CliException(Constants.Errors.ExtensionsNeedDotnet);
             }
         }
 
-        private async Task AddPackage(string extensionsProj, string pacakgeName, string version)
+        private bool NeedsExtensionsInstall()
         {
-            var args = $"add \"{extensionsProj}\" package {pacakgeName} --version {version}";
+            string warningMessage = "No action performed because no functions in your app require extensions.";
+
+            var anyExtensionsToBeInstalled = ExtensionsHelper.GetExtensionPackages().Count() > 0;
+
+            // CASE 1: If there are any bindings that need to install extensions
+            if (anyExtensionsToBeInstalled)
+            {
+                return true;
+            }
+
+
+            var extensionsProjDir = string.IsNullOrEmpty(ConfigPath) ? Environment.CurrentDirectory : ConfigPath;
+            var extensionsProjFile = Path.Combine(extensionsProjDir, Constants.ExtenstionsCsProjFile);
+
+            // CASE 2: No extensions.csproj
+            if (!FileSystemHelpers.FileExists(extensionsProjFile))
+            {
+                if (_showNoActionWarning)
+                {
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+                return false;
+            }
+
+            // CASE 3: extensions.csproj present with only ExtensionsMetaDataGenerator in it
+            // We look for this special case because we had added ExtensionsMetaDataGenerator to all function apps.
+            // These apps do not need to do a restore, so if only ExtensionsMetaDataGenerator is present, we don't need to continue
+            var extensionsProject = ProjectHelpers.GetProject(extensionsProjFile);
+            var extensionsInProject = extensionsProject.Items
+                    .Where(item => item.ItemType.Equals(Constants.PackageReferenceElementName, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            if (extensionsInProject.Count == 1 &&
+                extensionsInProject.FirstOrDefault(item =>
+                item.Include.Equals(Constants.ExtensionsMetadataGeneratorPackage.Name, StringComparison.OrdinalIgnoreCase)) != null)
+            {
+                if (_showNoActionWarning)
+                {
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"InstallExtensionAction: No action performed because only {Constants.ExtensionsMetadataGeneratorPackage.Name} reference was found." +
+                    $" This extension package does not require and extension install by itself." +
+                    $" No other required extensions were found."));
+                }
+                return false;
+            }
+
+            return true;
+        }
+
+        private async Task AddPackage(string extensionsProj, string packageName, string version)
+        {
+            var args = $"add \"{extensionsProj}\" package {packageName} --version {version}";
             if (!string.IsNullOrEmpty(Source))
             {
                 args += $" --source {Source}";

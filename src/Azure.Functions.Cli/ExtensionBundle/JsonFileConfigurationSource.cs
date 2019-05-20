@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 if (!string.IsNullOrEmpty(bundleId))
                 {
                     var packages = ExtensionsHelper.GetExtensionPackages();
-                    if (packages.Count() <= 1)
+                    if (packages.Count() == 0)
                     {
                         var keysToRemove = Data.Where((keyValue) => keyValue.Key.Contains("extensionBundle"))
                         .Select(keyValue => keyValue.Key)

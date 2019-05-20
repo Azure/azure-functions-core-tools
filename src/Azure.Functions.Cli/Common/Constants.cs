@@ -19,6 +19,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string RequirementsTxt = "requirements.txt";
         public const string FunctionJsonFileName = "function.json";
+        public const string ExtenstionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
         public const string FunctionsExtensionVersion = "FUNCTIONS_EXTENSION_VERSION";
