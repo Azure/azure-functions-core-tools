@@ -113,7 +113,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public override async Task RunAsync()
         {
             // Get function app
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL);
 
             // Get the GitIgnoreParser from the functionApp root
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
@@ -248,7 +248,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         {
                             [Constants.LinuxFxVersion] = $"DOCKER|{Constants.WorkerRuntimeImages.GetValueOrDefault(workerRuntime).FirstOrDefault()}"
                         };
-                        var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken);
+                        var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken, ManagementURL);
 
                         if (!settingsResult.IsSuccessful)
                         {
@@ -327,7 +327,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // So, we only show the info, if Function App is not Linux Elastic Premium
             if (!(functionApp.IsLinux && functionApp.IsElasticPremium))
             {
-                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, showKeys: true);
+                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
             }
         }
 
@@ -338,7 +338,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 ColoredConsole.WriteLine("Syncing triggers...");
                 HttpResponseMessage response = null;
                 // This SyncTriggers function calls the endpoint for linux syncTriggers
-                response = await AzureHelper.SyncTriggers(functionApp, AccessToken);
+                response = await AzureHelper.SyncTriggers(functionApp, AccessToken, ManagementURL);
                 if (!response.IsSuccessStatusCode)
                 {
                     throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
@@ -383,7 +383,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
+            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
 
             if (!result.IsSuccessful)
             {
@@ -507,7 +507,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
             functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
-            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken);
+            var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
             if (!result.IsSuccessful)
             {
                 ColoredConsole

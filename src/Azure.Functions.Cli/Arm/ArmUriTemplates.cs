@@ -9,9 +9,8 @@ namespace Azure.Functions.Cli.Arm
         public const string ArmApiVersion = "2018-09-01";
         public const string WebsitesApiVersion = "2015-08-01";
         public const string SyncTriggersApiVersion = "2016-08-01";
-        public const string ArmUrl = "https://management.azure.com";
 
-        public static readonly ArmUriTemplate SubscriptionResourceByNameAndType = new ArmUriTemplate($"{ArmUrl}/resources?$filter=(SubscriptionId eq '{{subscriptionId}}' and name eq '{{resourceName}}' and resourceType eq '{{resourceType}}')", ArmApiVersion);
+        public static readonly ArmUriTemplate SubscriptionResourceByNameAndType = new ArmUriTemplate($"resources?$filter=(SubscriptionId eq '{{subscriptionId}}' and name eq '{{resourceName}}' and resourceType eq '{{resourceType}}')", ArmApiVersion);
     }
 
     public class ArmUriTemplate
@@ -24,11 +23,12 @@ namespace Azure.Functions.Cli.Arm
             this.apiVersion = "api-version=" + apiVersion;
         }
 
-        public Uri Bind(object obj)
+        public Uri Bind(string managementURL, object obj)
         {
-            var dataBindings = Regex.Matches(this.TemplateUrl, "\\{(.*?)\\}").Cast<Match>().Where(m => m.Success).Select(m => m.Groups[1].Value).ToList();
+            var completeTemplateUrl = $"{managementURL}/{this.TemplateUrl}";
+            var dataBindings = Regex.Matches(completeTemplateUrl, "\\{(.*?)\\}").Cast<Match>().Where(m => m.Success).Select(m => m.Groups[1].Value).ToList();
             var type = obj.GetType();
-            var uriBuilder = new UriBuilder(dataBindings.Aggregate(this.TemplateUrl, (a, b) =>
+            var uriBuilder = new UriBuilder(dataBindings.Aggregate(completeTemplateUrl, (a, b) =>
             {
                 var property = type.GetProperties().FirstOrDefault(p => p.Name.Equals(b, StringComparison.OrdinalIgnoreCase));
                 if (property != null && property.CanRead)

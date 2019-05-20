@@ -11,6 +11,7 @@ using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -28,8 +29,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         // Windows PowerShell is PowerShell version 5.1 and lower that only works on Windows
         private const string _windowsPowerShellExecutable = "powershell";
 
+        private const string _defaultManagementURL = "https://management.azure.com/";
+
         public string AccessToken { get; set; }
         public bool ReadStdin { get; set; }
+        public string ManagementURL { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -41,13 +45,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("access-token-stdin")
                 .WithDescription("Read access token from stdin e.g: az account get-access-token | func ... --access-token-stdin")
                 .Callback(f => ReadStdin = f);
+            Parser
+                .Setup<string>("management-url")
+                .WithDescription("Management URL for Azure Cloud e.g: --management-url https://management.azure.com.")
+                .Callback(t => ManagementURL = t);
 
             return base.ParseArgs(args);
         }
 
         public async Task Initialize()
         {
-            if (!string.IsNullOrEmpty(AccessToken))
+            if (!string.IsNullOrEmpty(AccessToken) && !string.IsNullOrEmpty(ManagementURL))
             {
                 return;
             }
@@ -74,7 +82,50 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                AccessToken = await GetAccessToken();
+                Task<string> accessTokenTask = Task.FromResult<string>(AccessToken);
+                Task<string> managementURLTask = Task.FromResult<string>(ManagementURL);
+
+                if (string.IsNullOrEmpty(AccessToken))
+                {
+                    accessTokenTask = GetAccessToken();
+                }
+                if (string.IsNullOrEmpty(ManagementURL))
+                {
+                    managementURLTask = GetManagementURL();
+                }
+
+                AccessToken = await accessTokenTask;
+                ManagementURL = await managementURLTask;
+            }
+        }
+
+        private async Task<string> GetManagementURL()
+        {
+            (bool azCliSucceeded, string managementURL) = await TryGetAzCLIManagementURL();
+            if (!azCliSucceeded)
+            {
+                // TODO: Try with Poweshell if az is non-existent or if the call fails
+                // For now, let's default this out
+                managementURL = _defaultManagementURL;
+            }
+            // Having a trailing slash could cause issues later when we attach it to function IDs
+            // It's easier to remove now, than to do that before every ARM call.
+            return managementURL.EndsWith("/") ? managementURL.Substring(0, managementURL.Length - 1) : managementURL;
+        }
+
+        private async Task<(bool, string)> TryGetAzCLIManagementURL()
+        {
+            try
+            {
+                return (true, await RunAzCLICommand($"cloud list --query \"[?isActive].endpoints.resourceManager | [0]\" --output json"));
+            }
+            catch (Exception)
+            {
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(Yellow("Unable to retrieve the resource manager URL from az CLI"));
+                }
+                return (false, null);
             }
         }
 
@@ -91,28 +142,45 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task<(bool succeeded, string token)> TryGetAzCliToken()
         {
-            if (CommandChecker.CommandExists("az"))
+            try
             {
-                var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? new Executable("cmd", "/c az account get-access-token --query \"accessToken\" --output json")
-                    : new Executable("az", "account get-access-token --query \"accessToken\" --output json");
-
-                var stdout = new StringBuilder();
-                var stderr = new StringBuilder();
-                var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
-                if (exitCode == 0)
-                {
-                    return (true, stdout.ToString().Trim(' ', '\n', '\r', '"'));
-                }
-                else
-                {
-                    if (StaticSettings.IsDebug)
-                    {
-                        ColoredConsole.WriteLine(VerboseColor($"Unable to fetch access token from az cli. Error: {stderr.ToString().Trim(' ', '\n', '\r')}"));
-                    }
-                }
+                return (true, await RunAzCLICommand("account get-access-token --query \"accessToken\" --output json"));
             }
-            return (false, null);
+            catch (Exception)
+            {
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(Yellow("Unable to fetch access token from az CLI"));
+                }
+                return (false, null);
+            }
+        }
+
+        private async Task<string> RunAzCLICommand(string param)
+        {
+            if (!CommandChecker.CommandExists("az"))
+            {
+                throw new CliException("az CLI not found");
+            }
+            var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? new Executable("cmd", $"/c az {param}")
+                : new Executable("az", param);
+
+            var stdout = new StringBuilder();
+            var stderr = new StringBuilder();
+            var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
+            if (exitCode == 0)
+            {
+                return stdout.ToString().Trim(' ', '\n', '\r', '"');
+            }
+            else
+            {
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Unable to run az CLI command `az {param}`. Error: {stderr.ToString().Trim(' ', '\n', '\r')}"));
+                }
+                throw new CliException("Error running Az CLI command");
+            }
         }
 
         private async Task<(bool succeeded, string token)> TryGetAzPowerShellToken()
