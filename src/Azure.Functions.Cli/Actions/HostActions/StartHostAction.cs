@@ -191,7 +191,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
-            settings.Add("FUNCTIONS_CORETOOLS_ENVIRONMENT", "True");
             return settings;
         }
 
@@ -200,17 +199,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             foreach (var secret in secrets)
             {
                 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)) &&
-                    !string.IsNullOrEmpty(secret.Key) && secret.Value != null)
+                    !string.IsNullOrEmpty(secret.Key) && !string.IsNullOrEmpty(secret.Value))
                 {
                     Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
                 }
-                else if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
+                else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' from local settings as it's already defined in current environment variables."));
                 }
                 else
                 {
-                    ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' because value is null"));
+                    ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' because value is either empty or is null"));
                 }
             }
         }
