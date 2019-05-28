@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             "api/httpwithkey?code=",
                             "api/httpwithoutkey?code="
                         },
-                        CommandTimeout = TimeSpan.FromSeconds(40)
+                        CommandTimeout = TimeSpan.FromMinutes(2)
                     },
                     new RunConfiguration
                     {
@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
                             "api/httpwithoutkey?code="
                         },
-                        CommandTimeout = TimeSpan.FromSeconds(40)
+                        CommandTimeout = TimeSpan.FromMinutes(2)
                     }
                 });
             }
