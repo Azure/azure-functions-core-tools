@@ -479,11 +479,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 const string containerName = "function-releases";
                 const string blobNameFormat = "{0}-{1}.zip";
 
-                var storageConnection = appSettings["AzureWebJobsStorage"];
-                var storageAccount = CloudStorageAccount.Parse(storageConnection);
-                var blobClient = storageAccount.CreateCloudBlobClient();
-                var blobContainer = blobClient.GetContainerReference(containerName);
-                await blobContainer.CreateIfNotExistsAsync();
+                CloudBlobContainer blobContainer = null;
+
+                try
+                {
+                    var storageConnection = appSettings["AzureWebJobsStorage"];
+                    var storageAccount = CloudStorageAccount.Parse(storageConnection);
+                    var blobClient = storageAccount.CreateCloudBlobClient();
+                    blobContainer = blobClient.GetContainerReference(containerName);
+                    await blobContainer.CreateIfNotExistsAsync();
+                }
+                catch (Exception ex)
+                {
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
+                    }
+                    throw new CliException($"Error creating a Blob container reference. Please make sure your connection string in \"AzureWebJobsStorage\" is valid");
+                }
 
                 var releaseName = Guid.NewGuid().ToString();
                 var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
