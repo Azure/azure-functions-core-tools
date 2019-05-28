@@ -142,19 +142,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             string warningMessage = "No action performed because no functions in your app require extensions.";
 
-            var anyExtensionsToBeInstalled = ExtensionsHelper.GetExtensionPackages().Count() > 0;
-
-            // CASE 1: If there are any bindings that need to install extensions
-            if (anyExtensionsToBeInstalled)
+            // CASE 1: If users need a package to be installed
+            if (!string.IsNullOrEmpty(Package) || !string.IsNullOrEmpty(Version))
             {
                 return true;
             }
 
+            // CASE 2: If there are any bindings that need to install extensions
+            if (ExtensionsHelper.GetExtensionPackages().Count() > 0)
+            {
+                return true;
+            }
 
             var extensionsProjDir = string.IsNullOrEmpty(ConfigPath) ? Environment.CurrentDirectory : ConfigPath;
             var extensionsProjFile = Path.Combine(extensionsProjDir, Constants.ExtenstionsCsProjFile);
 
-            // CASE 2: No extensions.csproj
+            // CASE 3: No extensions.csproj
             if (!FileSystemHelpers.FileExists(extensionsProjFile))
             {
                 if (_showNoActionWarning)
@@ -164,7 +167,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return false;
             }
 
-            // CASE 3: extensions.csproj present with only ExtensionsMetaDataGenerator in it
+            // CASE 4: extensions.csproj present with only ExtensionsMetaDataGenerator in it
             // We look for this special case because we had added ExtensionsMetaDataGenerator to all function apps.
             // These apps do not need to do a restore, so if only ExtensionsMetaDataGenerator is present, we don't need to continue
             var extensionsProject = ProjectHelpers.GetProject(extensionsProjFile);
