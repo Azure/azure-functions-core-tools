@@ -82,20 +82,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                Task<string> accessTokenTask = Task.FromResult<string>(AccessToken);
-                Task<string> managementURLTask = Task.FromResult<string>(ManagementURL);
-
                 if (string.IsNullOrEmpty(AccessToken))
                 {
-                    accessTokenTask = GetAccessToken();
+                    AccessToken = await GetAccessToken();
                 }
                 if (string.IsNullOrEmpty(ManagementURL))
                 {
-                    managementURLTask = GetManagementURL();
+                    ManagementURL = await GetManagementURL();
                 }
-
-                AccessToken = await accessTokenTask;
-                ManagementURL = await managementURLTask;
             }
         }
 
