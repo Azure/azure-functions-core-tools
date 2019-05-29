@@ -18,14 +18,14 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static string _storageApiVersion = "2018-02-01";
 
-        public static async Task<Site> GetFunctionApp(string name, string accessToken)
+        public static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL)
         {
-            var subscriptions = await GetSubscriptions(accessToken);
+            var subscriptions = await GetSubscriptions(accessToken, managementURL);
             foreach (var subscription in subscriptions.value)
             {
                 var functionApps = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
                 HttpMethod.Get,
-                ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(new
+                ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(managementURL, new
                 {
                     subscriptionId = subscription.subscriptionId,
                     resourceType = "Microsoft.Web/sites",
@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Helpers
                 if (functionApps.value.Any())
                 {
                     var app = new Site(functionApps.value.First().id);
-                    await LoadFunctionApp(app, accessToken);
+                    await LoadFunctionApp(app, accessToken, managementURL);
                     return app;
                 }
             }
@@ -58,20 +58,20 @@ namespace Azure.Functions.Cli.Helpers
             throw new ArmResourceNotFoundException($"Can't find app with name \"{name}\"");
         }
 
-        internal static Task<IEnumerable<FunctionInfo>> GetFunctions(Site functionApp, string accessToken)
+        internal static Task<IEnumerable<FunctionInfo>> GetFunctions(Site functionApp, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{functionApp.SiteId}/hostruntime/admin/functions?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/functions?api-version={ArmUriTemplates.WebsitesApiVersion}");
             return ArmHttpAsync<IEnumerable<FunctionInfo>>(HttpMethod.Get, url, accessToken);
         }
 
-        internal static async Task<string> GetFunctionKey(string functionName, string appId, string accessToken)
+        internal static async Task<string> GetFunctionKey(string functionName, string appId, string accessToken, string managementURL)
         {
             // If anything goes wrong anywhere, simply return null and let the caller take care of it.
             if (string.IsNullOrEmpty(functionName) || string.IsNullOrEmpty(accessToken))
             {
                 return null;
             }
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{appId}/hostruntime/admin/functions/{functionName}/keys?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{appId}/hostruntime/admin/functions/{functionName}/keys?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var key = string.Empty;
             try
             {
@@ -85,40 +85,40 @@ namespace Azure.Functions.Cli.Helpers
             return key;
         }
 
-        private static async Task<Site> LoadFunctionApp(Site site, string accessToken)
+        private static async Task<Site> LoadFunctionApp(Site site, string accessToken, string managementURL)
         {
             await new[]
             {
-                LoadSiteObjectAsync(site, accessToken),
-                LoadSitePublishingCredentialsAsync(site, accessToken),
-                LoadSiteConfigAsync(site, accessToken),
-                LoadAppSettings(site, accessToken),
-                LoadConnectionStrings(site, accessToken)
+                LoadSiteObjectAsync(site, accessToken, managementURL),
+                LoadSitePublishingCredentialsAsync(site, accessToken, managementURL),
+                LoadSiteConfigAsync(site, accessToken, managementURL),
+                LoadAppSettings(site, accessToken, managementURL),
+                LoadConnectionStrings(site, accessToken, managementURL)
             }
             //.IgnoreFailures()
             .WhenAll();
             return site;
         }
 
-        private async static Task<Site> LoadConnectionStrings(Site site, string accessToken)
+        private async static Task<Site> LoadConnectionStrings(Site site, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/ConnectionStrings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{site.SiteId}/config/ConnectionStrings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, AppServiceConnectionString>>>(HttpMethod.Post, url, accessToken);
             site.ConnectionStrings = armResponse.properties;
             return site;
         }
 
-        private async static Task<Site> LoadAppSettings(Site site, string accessToken)
+        private async static Task<Site> LoadAppSettings(Site site, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AppSettings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{site.SiteId}/config/AppSettings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, string>>>(HttpMethod.Post, url, accessToken);
             site.AzureAppSettings = armResponse.properties;
             return site;
         }
 
-        public static async Task<Site> LoadSitePublishingCredentialsAsync(Site site, string accessToken)
+        public static async Task<Site> LoadSitePublishingCredentialsAsync(Site site, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/PublishingCredentials/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{site.SiteId}/config/PublishingCredentials/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
             return site.MergeWith(
                         await ArmHttpAsync<ArmWrapper<ArmWebsitePublishingCredentials>>(
                             HttpMethod.Post,
@@ -128,15 +128,15 @@ namespace Azure.Functions.Cli.Helpers
                     );
         }
 
-        public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken)
+        public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken, string managementURL)
         {
-            var subscriptions = await GetSubscriptions(accessToken);
+            var subscriptions = await GetSubscriptions(accessToken, managementURL);
             foreach (var subscription in subscriptions.value)
             {
                 var storageAccount =
                     await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
                         HttpMethod.Get,
-                        ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(new
+                        ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(managementURL, new
                         {
                             subscriptionId = subscription.subscriptionId,
                             resourceName = storageAccountName,
@@ -146,18 +146,18 @@ namespace Azure.Functions.Cli.Helpers
 
                 if (storageAccount.value.Any())
                 {
-                    return await GetStorageAccount(storageAccount.value.First(), accessToken);
+                    return await GetStorageAccount(storageAccount.value.First(), accessToken, managementURL);
                 }
             }
 
             throw new ArmResourceNotFoundException($"Cannot find storage account with name {storageAccountName}");
         }
 
-        private static async Task<StorageAccount> GetStorageAccount(ArmWrapper<ArmGenericResource> armWrapper, string accessToken)
+        private static async Task<StorageAccount> GetStorageAccount(ArmWrapper<ArmGenericResource> armWrapper, string accessToken, string managementURL)
         {
             try
             {
-                var url = new Uri($"{ArmUriTemplates.ArmUrl}{armWrapper.id}/listKeys?api-version={_storageApiVersion}");
+                var url = new Uri($"{managementURL}{armWrapper.id}/listKeys?api-version={_storageApiVersion}");
                 var keys = await ArmHttpAsync<ArmStorageKeysArray>(HttpMethod.Post, url, accessToken);
                 return new StorageAccount
                 {
@@ -176,33 +176,33 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static Task<ArmSubscriptionsArray> GetSubscriptions(string accessToken)
+        internal static Task<ArmSubscriptionsArray> GetSubscriptions(string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}/subscriptions?api-version={ArmUriTemplates.ArmApiVersion}");
+            var url = new Uri($"{managementURL}/subscriptions?api-version={ArmUriTemplates.ArmApiVersion}");
             return ArmHttpAsync<ArmSubscriptionsArray>(
                 HttpMethod.Get,
                 url,
                 accessToken);
         }
 
-        public static async Task<Site> LoadSiteConfigAsync(Site site, string accessToken)
+        public static async Task<Site> LoadSiteConfigAsync(Site site, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/web?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{site.SiteId}/config/web?api-version={ArmUriTemplates.WebsitesApiVersion}");
             return site.MergeWith(
                   await ArmHttpAsync<ArmWrapper<ArmWebsiteConfig>>(HttpMethod.Get, url, accessToken),
                   t => t.properties
               );
         }
 
-        public static Task<HttpResponseMessage> SyncTriggers(Site functionApp, string accessToken)
+        public static Task<HttpResponseMessage> SyncTriggers(Site functionApp, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{functionApp.SiteId}/hostruntime/admin/host/synctriggers?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/host/synctriggers?api-version={ArmUriTemplates.WebsitesApiVersion}");
             return ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken);
         }
 
-        public static async Task<Site> LoadSiteObjectAsync(Site site, string accessToken)
+        public static async Task<Site> LoadSiteObjectAsync(Site site, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armSite = await ArmHttpAsync<ArmWrapper<ArmWebsite>>(HttpMethod.Get, url, accessToken);
 
             site.HostName = armSite.properties.enabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
@@ -228,9 +228,9 @@ namespace Azure.Functions.Cli.Helpers
             response.EnsureSuccessStatusCode();
         }
 
-        public static async Task<HttpResult<string, string>> UpdateWebSettings(Site site, Dictionary<string, string> webSettings, string accessToken)
+        public static async Task<HttpResult<string, string>> UpdateWebSettings(Site site, Dictionary<string, string> webSettings, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/web?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{site.SiteId}/config/web?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = webSettings });
             if (response.IsSuccessStatusCode)
             {
@@ -249,9 +249,9 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, string accessToken)
+        public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, string accessToken, string managementURL)
         {
-            var url = new Uri($"{ArmUriTemplates.ArmUrl}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAppSettings });
             if (response.IsSuccessStatusCode)
             {
@@ -269,9 +269,9 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, bool showKeys)
+        public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
         {
-            var functions = await GetFunctions(functionApp, accessToken);
+            var functions = await GetFunctions(functionApp, accessToken, managementURL);
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
             foreach (var function in functions)
             {
@@ -297,7 +297,7 @@ namespace Azure.Functions.Cli.Helpers
                 if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
                 {
                     // If there's a key available and the key is requested, add it to the url
-                    var key = showFunctionKey? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken) : null;
+                    var key = showFunctionKey? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken, managementURL) : null;
                     if (!string.IsNullOrEmpty(key))
                     {
                         ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");

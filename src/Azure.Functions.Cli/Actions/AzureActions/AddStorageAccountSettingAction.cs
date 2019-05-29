@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            var storageAccount = await AzureHelper.GetStorageAccount(StorageAccountName, AccessToken);
+            var storageAccount = await AzureHelper.GetStorageAccount(StorageAccountName, AccessToken, ManagementURL);
 
             var name = $"{storageAccount.StorageAccountName}_STORAGE";
             _secretsManager.SetSecret(name, storageAccount.ConnectionString);

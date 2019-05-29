@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     {
         public override async Task RunAsync()
         {
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL);
 
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {

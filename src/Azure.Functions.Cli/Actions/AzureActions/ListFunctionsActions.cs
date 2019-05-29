@@ -33,10 +33,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL);
             if (functionApp != null)
             {
-                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ShowKeys);
+                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, ShowKeys);
                 if (!ShowKeys)
                 {
                     ColoredConsole.WriteLine("Use --show-keys to retrieve the Http-triggered URLs with appropriate keys in them (if enabled)");
