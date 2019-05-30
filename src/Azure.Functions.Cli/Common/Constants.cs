@@ -162,15 +162,15 @@ namespace Azure.Functions.Cli.Common
                     { "activitytrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.8.0"} },
+                            Version =  "1.8.2"} },
                     { "orchestrationtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.8.0"} },
+                            Version =  "1.8.2"} },
                     { "orchestrationclient",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask",
-                            Version =  "1.8.0"} },
+                            Version =  "1.8.2"} },
                     { "eventgridtrigger",
                         new ExtensionPackage() {
                             Name = "Microsoft.Azure.WebJobs.Extensions.EventGrid",
