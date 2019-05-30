@@ -291,19 +291,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
-            // If Consumption Linux or Elastic Premium Linux
+            bool shouldSyncTriggers = true;
             if (functionApp.IsLinux && (functionApp.IsDynamic || functionApp.IsElasticPremium))
             {
+                // Consumption Linux or Elastic Premium Linux
                 await PublishRunFromPackage(functionApp, await zipStreamFactory());
             }
-            // If Windows default
             else if (RunFromPackageDeploy)
             {
+                // Windows default
                 await PublishRunFromPackageLocal(functionApp, zipStreamFactory);
             }
-            // If Dedicated Linux or "--no-zip"
             else
             {
+                // ZipDeploy takes care of the SyncTriggers operation so we don't
+                // need to perform one
+                shouldSyncTriggers = false;
+
+                // Dedicated Linux or "--no-zip"
                 await PublishZipDeploy(functionApp, zipStreamFactory);
             }
 
@@ -316,9 +321,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishAppSettings(functionApp, new Dictionary<string, string>(), additionalAppSettings);
             }
 
-            // Syncing triggers is not required when using zipdeploy api
-            if ((functionApp.IsLinux && (functionApp.IsDynamic || functionApp.IsElasticPremium))
-                || RunFromPackageDeploy)
+            if (shouldSyncTriggers)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await SyncTriggers(functionApp);
