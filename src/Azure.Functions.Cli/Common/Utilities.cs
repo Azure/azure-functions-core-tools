@@ -8,6 +8,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli
 {
@@ -141,6 +142,18 @@ namespace Azure.Functions.Cli
             else
             {
                 Process.Start("xdg-open", url);
+            }
+        }
+
+        internal static async Task<T> SafeExecution<T>(Func<Task<T>> action)
+        {
+            try
+            {
+                return await action();
+            }
+            catch
+            {
+                return default(T);
             }
         }
     }

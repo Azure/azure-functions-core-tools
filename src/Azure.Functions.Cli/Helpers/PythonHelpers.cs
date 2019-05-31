@@ -15,12 +15,13 @@ namespace Azure.Functions.Cli.Helpers
     public static class PythonHelpers
     {
         private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.0b4", "azure-functions-worker==1.0.0b7" };
+        private static readonly string _pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
         public static async Task SetupPythonProject()
         {
-            await VerifyPythonVersions();
+            await ValidatePythonVersion(errorOutIfOld: false);
             CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
         }
@@ -73,47 +74,83 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task<string> VerifyPythonVersions(bool setWorkerExecutable = false)
+        public static async Task<string> ValidatePythonVersion(bool setWorkerExecutable = false, bool errorOutIfOld = true)
         {
-            var pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
-
             // If users are overriding this value, we don't have to worry about verification
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(pythonDefaultExecutableVar)))
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar)))
             {
-                return Environment.GetEnvironmentVariable(pythonDefaultExecutableVar);
+                return Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar);
             }
-            // If we get an exception here, we don't need to check for python3
-            var pythonVersion = await VerifyVersion("python");
-            if (pythonVersion.IndexOf("3.6") == -1)
+
+            const string pythonStr = "python";
+            const string python3Str = "python3";
+            const string python36Str = "python3.6";
+            const string py36Str = "3.6";
+            const string py3Str = "3.";
+            const string warningMessage = "Python 3.6.x is recommended, and used in Azure Functions. You are using Python version {0}.";
+            const string errorMessageOldPy = "Python 3.x (recommended version 3.6.x) is required. Found python versions ({0}).";
+            const string errorMessageNoPy = "Python 3.x (recommended 3.6.x) is required. No Python versions were found.";
+
+            var pythonExeVersionTask = VerifyVersion(pythonStr);
+            var python3ExeVersionTask = VerifyVersion(python3Str);
+            var python36ExeVersionTask = VerifyVersion(python36Str);
+
+            var pythonExeVersion = await Utilities.SafeExecution(async () => await pythonExeVersionTask) ?? string.Empty;
+            var python3ExeVersion = await Utilities.SafeExecution(async () => await python3ExeVersionTask) ?? string.Empty;
+            var python36ExeVersion = await Utilities.SafeExecution(async () => await python36ExeVersionTask) ?? string.Empty;
+
+            var exeToVersion = new Dictionary<string, string>()
             {
-                string python3Version = string.Empty;
-                try
-                {
-                    python3Version = await VerifyVersion("python3");
-                }
-                // Exception here means "python3" didn't run, we can assume that they don't have this binary,
-                // and use the result of "python" for the Exception
-                catch (Exception)
-                {
-                    throw new CliException($"Python 3.6 is required. Current python version is '{pythonVersion}'");
-                }
+                { pythonStr, pythonExeVersion },
+                { python3Str, python3ExeVersion },
+                { python36Str, python36ExeVersion }
+            };
 
-                if (python3Version.IndexOf("3.6") == -1)
-                {
-                    throw new CliException($"Python 3.6 is required. Found python versions are '{pythonVersion}', '{python3Version}'");
-                }
-
-                if (setWorkerExecutable)
-                {
-                    Environment.SetEnvironmentVariable(pythonDefaultExecutableVar, "python3", EnvironmentVariableTarget.Process);
-                    if (StaticSettings.IsDebug)
-                    {
-                        ColoredConsole.WriteLine($"{pythonDefaultExecutableVar} set to python3");
-                    }
-                }
-                return "python3";
+            // If any of the possible python executables had 3.6, we are good.
+            var exeWith36KeyPair = exeToVersion.Where(kv => kv.Value.Contains(py36Str)).ToList();
+            if (exeWith36KeyPair.Count() != 0)
+            {
+                SetWorkerPathIfNeeded(setWorkerExecutable, exeWith36KeyPair[0].Key);
+                return exeWith36KeyPair[0].Key;
             }
-            return "python";
+
+            // If any of the possible python exectuables are 3.x, we warn them and go ahead.
+            var exeWith3KeyPair = exeToVersion.Where(kv => kv.Value.Contains(py3Str)).ToList();
+            if (exeWith3KeyPair.Count() != 0)
+            {
+                SetWorkerPathIfNeeded(setWorkerExecutable, exeWith3KeyPair[0].Key);
+                ColoredConsole.WriteLine(WarningColor(string.Format(warningMessage, exeWith3KeyPair[0].Value)));
+                return exeWith3KeyPair[0].Key;
+            }
+
+            // If we found any python versions at all, we warn or error out if flag enabled.
+            var anyPyVersions = exeToVersion.Where(kv => !string.IsNullOrEmpty(kv.Value)).Select(kv => kv.Value).ToList();
+            if (anyPyVersions.Count != 0)
+            {
+                if (errorOutIfOld) throw new CliException(string.Format(errorMessageOldPy, string.Join(", ", anyPyVersions)));
+                else ColoredConsole.WriteLine(WarningColor(string.Format(errorMessageOldPy, string.Join(", ", anyPyVersions))));
+            }
+
+            // If we didn't find python at all, we warn or error out if flag enabled.
+            else
+            {
+                if (errorOutIfOld) throw new CliException(errorMessageNoPy);
+                else ColoredConsole.WriteLine(WarningColor(errorMessageNoPy));
+            }
+
+            return null;
+        }
+
+        private static void SetWorkerPathIfNeeded(bool setWorker, string pyExe)
+        {
+            if (setWorker)
+            {
+                Environment.SetEnvironmentVariable(_pythonDefaultExecutableVar, pyExe, EnvironmentVariableTarget.Process);
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"{_pythonDefaultExecutableVar} set to {pyExe}"));
+                }
+            }
         }
 
         public static async Task<string> VerifyVersion(string pythonExe = "python")
@@ -248,7 +285,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
 
-            var pythonExe = await VerifyPythonVersions();
+            var pythonExe = await ValidatePythonVersion(errorOutIfOld: true);
             var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
