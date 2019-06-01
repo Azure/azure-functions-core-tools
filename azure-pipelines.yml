@@ -1,13 +1,15 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
+name: $(Build.SourceBranchName)_$(Build.Reason)_$(devops_buildNumber)
 
 pool:
-  vmImage: 'Ubuntu 16.04'
+  vmImage: 'vs2017-win2016'
+
+variables:
+  devops_buildNumber: $[counter(format(''), 1300)]
+  APPVEYOR_REPO_BRANCH: $(Build.SourceBranchName)
+  APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
 
 steps:
-- script: |
-    cd build
-    dotnet run
-  displayName: 'Run Build'
+- task: PowerShell@2
+  inputs:
+    filePath: '.\build.ps1'
+  displayName: 'Executing build script'
