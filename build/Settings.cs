@@ -75,7 +75,7 @@ namespace Build
 
         public static readonly string ProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{ProjectTemplatesVersion}";
 
-        public static string BuildNumber => config(null, "Build.BuildId") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
+        public static string BuildNumber => config(null, "devops_buildNumber") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
 
         public static string CommitId => config(null, "Build.SourceVersion") ?? config("N/A", "APPVEYOR_REPO_COMMIT");
 
