@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Helpers
             const string py3Str = "3.";
             const string warningMessage = "Python 3.6.x is recommended, and used in Azure Functions. You are using Python version {0}.";
             const string errorMessageOldPy = "Python 3.x (recommended version 3.6.x) is required. Found python versions ({0}).";
-            const string errorMessageNoPy = "Python 3.x (recommended 3.6.x) is required. No Python versions were found.";
+            const string errorMessageNoPy = "Python 3.x (recommended version 3.6.x) is required. No Python versions were found.";
 
             var pythonExeVersionTask = VerifyVersion(pythonStr);
             var python3ExeVersionTask = VerifyVersion(python3Str);
