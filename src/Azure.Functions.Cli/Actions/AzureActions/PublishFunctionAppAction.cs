@@ -459,7 +459,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task PublishZipDeploy(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
-            (var content, var length) = CreateStreamContentZip(await zipFileFactory());
             await RetryHelper.Retry(async () =>
             {
                 using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
@@ -470,6 +469,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                     ColoredConsole.WriteLine("Creating archive for current directory...");
 
+                    (var content, var length) = CreateStreamContentZip(await zipFileFactory());
                     request.Content = content;
 
                     HttpResponseMessage response = null;
