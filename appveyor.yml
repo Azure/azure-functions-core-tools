@@ -1,4 +1,9 @@
 version: "{build}"
+
+branches:
+  only:
+    - v1.x
+
 pull_requests:
   do_not_increment_build_number: true
 image: Visual Studio 2017

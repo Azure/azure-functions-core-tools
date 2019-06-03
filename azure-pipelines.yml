@@ -16,11 +16,14 @@ pool:
   vmImage: 'vs2017-win2016'
 
 variables:
-  devops_buildNumber: $[counter(format(''), 1300)]
-  APPVEYOR_REPO_BRANCH: $(Build.SourceBranchName)
+  devops_buildNumber: $[counter(format(''), 1500)]
+  APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
   APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
 
 steps:
+- task: NuGetToolInstaller@1
+  inputs:
+    versionSpec: 
 - task: PowerShell@2
   inputs:
     filePath: '.\build.ps1'
