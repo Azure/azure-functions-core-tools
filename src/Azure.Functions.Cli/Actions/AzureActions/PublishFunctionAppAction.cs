@@ -460,7 +460,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                     if (response == null || !response.IsSuccessStatusCode)
                     {
-                        throw new CliException($"Error uploading archive ({response.StatusCode}).");
+                        var responseContent = await response.Content.ReadAsStringAsync();
+                        var errorMessage = $"Error uploading archive ({response.StatusCode}).";
+
+                        if (!string.IsNullOrEmpty(responseContent))
+                        {
+                            errorMessage += $"{Environment.NewLine}Server Response: {responseContent}";
+                        }
+
+                        throw new CliException(errorMessage);
                     }
 
                     ColoredConsole.WriteLine("Upload completed successfully.");
