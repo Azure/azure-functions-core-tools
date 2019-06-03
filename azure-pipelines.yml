@@ -1,5 +1,17 @@
 name: $(Build.SourceBranchName)_$(Build.Reason)_$(devops_buildNumber)
 
+pr:
+  branches:
+    include:
+    - master
+    - dev
+
+trigger:
+  branches:
+    include:
+    - dev
+    - master
+
 pool:
   vmImage: 'vs2017-win2016'
 
