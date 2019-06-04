@@ -18,16 +18,39 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static string _storageApiVersion = "2018-02-01";
 
-        public static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL)
+        public static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string defaultSubscription = null)
         {
+            if (!string.IsNullOrEmpty(defaultSubscription))
+            {
+                var result = await TryGetFunctionApp(name, accessToken, managementURL, defaultSubscription);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
             foreach (var subscription in subscriptions.value)
+            {
+                var result = await TryGetFunctionApp(name, accessToken, managementURL, subscription.subscriptionId);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            throw new ArmResourceNotFoundException($"Can't find app with name \"{name}\"");
+        }
+
+        private static async Task<Site> TryGetFunctionApp(string name, string accessToken, string managementURL, string subscription)
+        {
+            try
             {
                 var functionApps = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
                 HttpMethod.Get,
                 ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(managementURL, new
                 {
-                    subscriptionId = subscription.subscriptionId,
+                    subscriptionId = subscription,
                     resourceType = "Microsoft.Web/sites",
                     resourceName = name
                 }),
@@ -54,8 +77,9 @@ namespace Azure.Functions.Cli.Helpers
                     return app;
                 }
             }
+            catch { }
 
-            throw new ArmResourceNotFoundException($"Can't find app with name \"{name}\"");
+            return null;
         }
 
         internal static Task<IEnumerable<FunctionInfo>> GetFunctions(Site functionApp, string accessToken, string managementURL)
@@ -297,7 +321,7 @@ namespace Azure.Functions.Cli.Helpers
                 if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
                 {
                     // If there's a key available and the key is requested, add it to the url
-                    var key = showFunctionKey? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken, managementURL) : null;
+                    var key = showFunctionKey ? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken, managementURL) : null;
                     if (!string.IsNullOrEmpty(key))
                     {
                         ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");
