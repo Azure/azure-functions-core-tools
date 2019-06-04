@@ -34,6 +34,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public string AccessToken { get; set; }
         public bool ReadStdin { get; set; }
         public string ManagementURL { get; set; }
+        public string Subscription { get; private set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -49,17 +50,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<string>("management-url")
                 .WithDescription("Management URL for Azure Cloud e.g: --management-url https://management.azure.com.")
                 .Callback(t => ManagementURL = t);
+            Parser
+                .Setup<string>("subscription")
+                .WithDescription("Default subscription to use")
+                .Callback(s => Subscription = s);
 
             return base.ParseArgs(args);
         }
 
         public async Task Initialize()
         {
-            if (!string.IsNullOrEmpty(AccessToken) && !string.IsNullOrEmpty(ManagementURL))
-            {
-                return;
-            }
-            else if (ReadStdin && System.Console.In != null)
+            if (ReadStdin && System.Console.In != null)
             {
                 var accessToken = System.Console.In.ReadToEnd().Trim(' ', '\n', '\r', '"');
                 if (accessToken.StartsWith("{"))
@@ -80,16 +81,32 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 throw new CliException("Stdin unavailable");
             }
-            else
+
+            if (string.IsNullOrEmpty(AccessToken))
             {
-                if (string.IsNullOrEmpty(AccessToken))
-                {
-                    AccessToken = await GetAccessToken();
-                }
-                if (string.IsNullOrEmpty(ManagementURL))
-                {
-                    ManagementURL = await GetManagementURL();
-                }
+                AccessToken = await GetAccessToken();
+            }
+
+            if (string.IsNullOrEmpty(ManagementURL))
+            {
+                ManagementURL = await GetManagementURL();
+            }
+
+            if (string.IsNullOrEmpty(Subscription))
+            {
+                Subscription = await GetDefaultSubscription();
+            }
+        }
+
+        private async Task<string> GetDefaultSubscription()
+        {
+            try
+            {
+                return await RunAzCLICommand("account show --query \"id\" --output json");
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
 
@@ -130,7 +147,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             (bool powershellSucceeded, string psToken) = await TryGetAzPowerShellToken();
             if (powershellSucceeded) return psToken;
-            
+
             throw new CliException($"Unable to connect to Azure. Make sure you have the `az` CLI or `{_azProfileModuleName}` PowerShell module installed and logged in and try again");
         }
 
@@ -247,7 +264,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         }
 
         // Sets the prefix of the script in case they have Az.Profile or AzureRM.Profile
-        private static string GetPowerShellAccessTokenScript (string module)
+        private static string GetPowerShellAccessTokenScript(string module)
         {
             string prefix;
             if (module == _azProfileModuleName)
