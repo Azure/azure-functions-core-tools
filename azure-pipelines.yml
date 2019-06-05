@@ -25,12 +25,12 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      '$branch = "$(APPVEYOR_REPO_BRANCH)"
+      $branch = "$(APPVEYOR_REPO_BRANCH)"
       Write-Host "Target branch: ''$branch''"
       $parts = $branch.Split("/")
       $branchName = $parts[$parts.Length - 1]
       Write-Host "Adjusted target branch: ''$branchName''"
-      Write-Host "##vso[task.setvariable variable=APPVEYOR_REPO_BRANCH]$branchName"'
+      Write-Host "##vso[task.setvariable variable=APPVEYOR_REPO_BRANCH]$branchName"
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: 
