@@ -68,5 +68,7 @@ namespace Azure.Functions.Cli
         public static Task<string> OsirisTemplate => GetValue("osiris.yaml");
 
         public static Task<string> KedaTemplate => GetValue("keda.yaml");
+
+        public static Task<string> ZipToSquashfsScript => GetValue("ziptofs.sh");
     }
 }

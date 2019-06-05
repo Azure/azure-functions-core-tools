@@ -90,6 +90,9 @@
     <EmbeddedResource Include="StaticResources\keda.yaml">
       <LogicalName>$(AssemblyName).keda.yaml</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource  Include="StaticResources\ziptofs.sh">
+        <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\tools\python\packapp\__main__.py">

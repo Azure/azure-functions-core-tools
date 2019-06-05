@@ -292,10 +292,23 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
-            if (functionApp.IsLinux && (functionApp.IsDynamic || functionApp.IsElasticPremium))
+            var fileNameNoExtension = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
+            if (functionApp.IsLinux && functionApp.IsDynamic)
             {
-                // Consumption Linux or Elastic Premium Linux
-                await PublishRunFromPackage(functionApp, await zipStreamFactory());
+                // Consumption Linux, try squashfs as a package format.
+                if (workerRuntimeEnum == WorkerRuntime.python && !NoBuild && BuildNativeDeps)
+                {
+                    await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipStreamFactory()), $"{fileNameNoExtension}.squashfs");
+                }
+                else
+                {
+                    await PublishRunFromPackage(functionApp, await zipStreamFactory(), $"{fileNameNoExtension}.zip");
+                }
+            }
+            else if (functionApp.IsLinux && functionApp.IsElasticPremium)
+            {
+                // Elastic Premium Linux
+                await PublishRunFromPackage(functionApp, await zipStreamFactory(), $"{fileNameNoExtension}.zip");
             }
             else if (RunFromPackageDeploy)
             {
@@ -350,11 +363,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, retryCount: 5);
         }
 
-        private async Task PublishRunFromPackage(Site functionApp, Stream zipFile)
+        private async Task PublishRunFromPackage(Site functionApp, Stream packageStream, string fileName)
         {
             // Upload zip to blob storage
-            ColoredConsole.WriteLine("Preparing archive...");
-            var sas = await UploadZipToStorage(zipFile, functionApp.AzureAppSettings);
+            ColoredConsole.WriteLine("Uploading package...");
+            var sas = await UploadPackageToStorage(packageStream, fileName, functionApp.AzureAppSettings);
             ColoredConsole.WriteLine("Upload completed successfully.");
 
             // Set app setting
@@ -431,6 +444,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
+            if (functionApp.IsDynamic && functionApp.IsLinux && !functionApp.AzureAppSettings.ContainsKey("WEBSITE_MOUNT_ENABLED"))
+            {
+                functionApp.AzureAppSettings["WEBSITE_MOUNT_ENABLED"] = "1";
+            }
+
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
 
             if (!result.IsSuccessful)
@@ -479,16 +497,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        private async Task<string> UploadZipToStorage(Stream zip, IDictionary<string, string> appSettings)
+        private async Task<string> UploadPackageToStorage(Stream package, string blobName, IDictionary<string, string> appSettings)
         {
             return await RetryHelper.Retry(async () =>
             {
                 // Setting position to zero, in case we retry, we want to reset the stream
-                zip.Position = 0;
-                var zipMD5 = SecurityHelpers.CalculateMd5(zip);
+                package.Position = 0;
+                var packageMD5 = SecurityHelpers.CalculateMd5(package);
 
                 const string containerName = "function-releases";
-                const string blobNameFormat = "{0}-{1}.zip";
 
                 CloudBlobContainer blobContainer = null;
 
@@ -509,11 +526,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException($"Error creating a Blob container reference. Please make sure your connection string in \"AzureWebJobsStorage\" is valid");
                 }
 
-                var releaseName = Guid.NewGuid().ToString();
-                var blob = blobContainer.GetBlockBlobReference(string.Format(blobNameFormat, DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), releaseName));
-                using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(zip.Length)}", zip.Length))
+                var blob = blobContainer.GetBlockBlobReference(blobName);
+                using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(package.Length)}", package.Length))
                 {
-                    await blob.UploadFromStreamAsync(zip,
+                    await blob.UploadFromStreamAsync(package,
                         AccessCondition.GenerateEmptyCondition(),
                         new BlobRequestOptions(),
                         new OperationContext(),
@@ -523,7 +539,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 var cloudMd5 = blob.Properties.ContentMD5;
 
-                if (!cloudMd5.Equals(zipMD5))
+                if (!cloudMd5.Equals(packageMD5))
                 {
                     throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
                 }
