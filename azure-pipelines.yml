@@ -21,7 +21,7 @@ variables:
   APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
 
 steps:
-- task: PowerShell@2
+- pwsh:
   inputs:
     targetType: 'inline'
     script: |      
@@ -29,7 +29,11 @@ steps:
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: 
-- task: PowerShell@2
+- pwsh:
   inputs:
     filePath: '.\build.ps1'
+    env:
+      AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+      BuildArtifactsStorage: $(BuildArtifactsStorage)
+      DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
   displayName: 'Executing build script'
