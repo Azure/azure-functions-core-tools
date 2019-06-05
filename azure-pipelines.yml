@@ -16,12 +16,31 @@ pool:
   vmImage: 'vs2017-win2016'
 
 variables:
-  devops_buildNumber: $[counter(format(''), 1300)]
-  APPVEYOR_REPO_BRANCH: $(Build.SourceBranchName)
+  devops_buildNumber: $[counter(format(''), 1500)]
+  APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
   APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
 
 steps:
-- task: PowerShell@2
+- pwsh: |
+    Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+- task: NuGetToolInstaller@1
   inputs:
-    filePath: '.\build.ps1'
+    versionSpec: 
+- pwsh: |
+    .\build.ps1
+  env:
+    AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+    BuildArtifactsStorage: $(BuildArtifactsStorage)
+    DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
   displayName: 'Executing build script'
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(Build.Repository.LocalPath)\artifacts'
+    Contents: 'Azure.Functions.Cli.*'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    CleanTargetFolder: true
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
