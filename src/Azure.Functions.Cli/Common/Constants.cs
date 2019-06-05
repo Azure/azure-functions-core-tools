@@ -76,12 +76,13 @@ namespace Azure.Functions.Cli.Common
 
         public static class DockerImages
         {
-            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12410-python3.6-buildenv";
+            public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12493-python3.6-buildenv";
         }
 
         public static class StaticResourcesNames
         {
             public const string PythonDockerBuild = "python_docker_build.sh";
+            public const string ZipToSquashfs = "ziptofs.sh";
         }
 
         public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator", Version = "1.0.2" };

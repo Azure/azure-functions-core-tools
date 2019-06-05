@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string OutputPath { get; set; }
         public bool BuildNativeDeps { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
+        public bool Squashfs { get; private set; }
 
         public PackAction(ISecretsManager secretsManager)
         {
@@ -49,6 +50,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
                 .Callback(p => AdditionalPackages = p);
+            Parser
+                .Setup<bool>("squashfs")
+                .Callback(f => Squashfs = f);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -67,14 +71,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string outputPath;
             if (string.IsNullOrEmpty(OutputPath))
             {
-                outputPath = Path.Combine(Environment.CurrentDirectory, $"{Path.GetFileName(functionAppRoot)}.zip");
+                outputPath = Path.Combine(Environment.CurrentDirectory, $"{Path.GetFileName(functionAppRoot)}");
             }
             else
             {
                 outputPath = Path.Combine(Environment.CurrentDirectory, OutputPath);
                 if (FileSystemHelpers.DirectoryExists(outputPath))
                 {
-                    outputPath = Path.Combine(outputPath, $"{Path.GetFileName(functionAppRoot)}.zip");
+                    outputPath = Path.Combine(outputPath, $"{Path.GetFileName(functionAppRoot)}");
                 }
             }
 
@@ -84,6 +88,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+            outputPath += Squashfs ? ".squashfs" : ".zip";
             if (FileSystemHelpers.FileExists(outputPath))
             {
                 ColoredConsole.WriteLine($"Deleting the old package {outputPath}");
@@ -100,9 +105,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // Restore all valid extensions
             var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
             await installExtensionAction.RunAsync();
-            var zipStream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, noBuild: false, additionalPackages: AdditionalPackages);
+            var stream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, noBuild: false, additionalPackages: AdditionalPackages);
+
+            if (Squashfs)
+            {
+                stream = await PythonHelpers.ZipToSquashfsStream(stream);
+            }
+
             ColoredConsole.WriteLine($"Creating a new package {outputPath}");
-            await FileSystemHelpers.WriteToFile(outputPath, zipStream);
+            await FileSystemHelpers.WriteToFile(outputPath, stream);
         }
     }
 }

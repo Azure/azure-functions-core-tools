@@ -146,6 +146,45 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        public static async Task<Stream> ZipToSquashfsStream(Stream stream)
+        {
+            var tmpFile = Path.GetTempFileName();
+
+            using (stream)
+            using (var fileStream = FileSystemHelpers.OpenFile(tmpFile, FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                stream.Seek(0, SeekOrigin.Begin);
+                await stream.CopyToAsync(fileStream);
+            }
+
+            string containerId = null;
+            try
+            {
+                containerId = await DockerHelpers.DockerRun(Constants.DockerImages.LinuxPythonImageAmd64, command: "sleep infinity");
+
+                await DockerHelpers.CopyToContainer(containerId, tmpFile, $"/file.zip");
+
+                var scriptFilePath = Path.GetTempFileName();
+                await FileSystemHelpers.WriteAllTextToFileAsync(scriptFilePath, (await StaticResources.ZipToSquashfsScript).Replace("\r\n", "\n"));
+
+                await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.ZipToSquashfs);
+                await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.ZipToSquashfs}");
+                await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.ZipToSquashfs}");
+
+                await DockerHelpers.CopyFromContainer(containerId, $"/file.squashfs", tmpFile);
+
+                const int defaultBufferSize = 4096;
+                return new FileStream(tmpFile, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, defaultBufferSize, FileOptions.DeleteOnClose);
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(containerId))
+                {
+                    await DockerHelpers.KillContainer(containerId, ignoreError: true);
+                }
+            }
+        }
+
         private static async Task<bool> ArePackagesInSync(string requirementsTxt, string pythonPackages)
         {
             var md5File = Path.Combine(pythonPackages, $"{Constants.RequirementsTxt}.md5");
