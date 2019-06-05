@@ -24,6 +24,10 @@ steps:
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: 
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '2.2.203'
 - task: PowerShell@2
   inputs:
     filePath: '.\build.ps1'
