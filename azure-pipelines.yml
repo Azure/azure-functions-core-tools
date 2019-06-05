@@ -21,15 +21,15 @@ variables:
   APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
 
 steps:
-- powershell: Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+- pwsh: |
+    Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: 
-- task: PowerShell@2
-  inputs:
-    filePath: '.\build.ps1'
-    env:
-      AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
-      BuildArtifactsStorage: $(BuildArtifactsStorage)
-      DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+- pwsh: |
+    .\build.ps1
+  env:
+    AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+    BuildArtifactsStorage: $(BuildArtifactsStorage)
+    DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
   displayName: 'Executing build script'
