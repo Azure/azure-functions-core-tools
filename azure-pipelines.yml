@@ -21,15 +21,11 @@ variables:
   APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
 
 steps:
-- pwsh:
-  inputs:
-    targetType: 'inline'
-    script: |      
-      Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+- powershell: Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: 
-- pwsh:
+- task: PowerShell@2
   inputs:
     filePath: '.\build.ps1'
     env:
