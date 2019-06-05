@@ -1,4 +1,3 @@
-msbuild /version
 dotnet -v
 
 Set-Location ".\build"
