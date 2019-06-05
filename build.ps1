@@ -1,5 +1,3 @@
-dotnet -v
-
 Set-Location ".\build"
 
 if ($env:APPVEYOR_REPO_BRANCH -eq "master") {
