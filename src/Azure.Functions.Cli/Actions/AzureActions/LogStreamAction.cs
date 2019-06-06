@@ -37,6 +37,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public override async Task RunAsync()
         {
             var subscriptions = await AzureHelper.GetSubscriptions(AccessToken, ManagementURL);
+            ColoredConsole.WriteLine("Retrieving Function App...");
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, allSubs: subscriptions);
             if (UseBrowser)
             {
@@ -83,15 +84,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Invalid Instrumentation Key found. Please make sure that the Application Insights is configured correctly.");
             }
 
+            ColoredConsole.WriteLine("Retrieving Application Insights information...");
             var appId = await AzureHelper.GetApplicationInsightIDFromIKey(iKey, AccessToken, ManagementURL, allSubs: allSubscriptions);
             var armResourceId = AzureHelper.ParseResourceId(appId);
             var componentId = $@"{{""Name"":""{armResourceId.Name}"",""SubscriptionId"":""{armResourceId.Subscription}"",""ResourceGroup"":""{armResourceId.ResourceGroup}""}}";
 
             var liveMetricsUrl = string.Format(LiveMetricsUriTemplate, WebUtility.UrlEncode(componentId), WebUtility.UrlEncode(appId));
 
+            ColoredConsole.WriteLine("Launching web browser...");
             if (StaticSettings.IsDebug)
             {
-                ColoredConsole.WriteLine(VerboseColor($"Opening browser with URL- {liveMetricsUrl}"));
+                ColoredConsole.WriteLine(VerboseColor($"Launching browser with URL- {liveMetricsUrl}"));
             }
 
             Utilities.OpenBrowser(liveMetricsUrl);
