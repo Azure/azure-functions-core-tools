@@ -84,6 +84,8 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static async Task<string> GetApplicationInsightIDFromIKey(string iKey, string accessToken, string managementURL, ArmSubscriptionsArray allSubs = null)
         {
+            const string appInsightsError = "Could not find the Application Insights using the configured Instrumentation Key.";
+
             var allArmSubscriptions = (allSubs ?? await GetSubscriptions(accessToken, managementURL)).value;
             var allSubscriptionIds = allArmSubscriptions.Select(sub => sub.subscriptionId);
 
@@ -95,14 +97,17 @@ namespace Azure.Functions.Cli.Helpers
             };
 
             var response = await ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken, objectPayload: bodyObject);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new CliException(appInsightsError);
+            }
 
             var result = await response.Content.ReadAsStringAsync();
             var argResponse = JsonConvert.DeserializeObject<ArgResponse>(result);
 
             // we need the first item of the first row
             return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
-                ?? throw new CliException("Could not find the Application Insights using the configured Instrumentation Key.");
+                ?? throw new CliException(appInsightsError);
         }
 
         internal static ArmResourceId ParseResourceId(string resourceId)
