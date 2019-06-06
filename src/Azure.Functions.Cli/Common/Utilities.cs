@@ -3,7 +3,9 @@ using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Script;
 using System;
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -123,6 +125,23 @@ namespace Azure.Functions.Cli
             // Adjust the format string to your preferences. For example "{0:0.#}{1}" would
             // show a single decimal place, and no space.
             return string.Format("{0:0.##} {1}", length, sizes[order]);
+        }
+
+        // https://github.com/dotnet/corefx/issues/10361
+        internal static void OpenBrowser(string url)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Process.Start(new ProcessStartInfo("cmd", $"/c start {url}"));
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Process.Start("open", url);
+            }
+            else
+            {
+                Process.Start("xdg-open", url);
+            }
         }
     }
 }

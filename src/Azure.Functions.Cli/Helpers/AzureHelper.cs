@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static string _storageApiVersion = "2018-02-01";
 
-        public static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string defaultSubscription = null)
+        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string defaultSubscription = null, ArmSubscriptionsArray allSubs = null)
         {
             if (!string.IsNullOrEmpty(defaultSubscription))
             {
@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
 
-            var subscriptions = await GetSubscriptions(accessToken, managementURL);
+            var subscriptions = allSubs ?? await GetSubscriptions(accessToken, managementURL);
             foreach (var subscription in subscriptions.value)
             {
                 var result = await TryGetFunctionApp(name, accessToken, managementURL, subscription.subscriptionId);
@@ -80,6 +80,53 @@ namespace Azure.Functions.Cli.Helpers
             catch { }
 
             return null;
+        }
+
+        internal static async Task<string> GetApplicationInsightIDFromIKey(string iKey, string accessToken, string managementURL, ArmSubscriptionsArray allSubs = null)
+        {
+            var allArmSubscriptions = (allSubs ?? await GetSubscriptions(accessToken, managementURL)).value;
+            var allSubscriptionIds = allArmSubscriptions.Select(sub => sub.subscriptionId);
+
+            var url = new Uri($"{managementURL}/{ArmUriTemplates.ArgUri}?api-version={ArmUriTemplates.ArgApiVersion}");
+            var bodyObject = new
+            {
+                subscriptions = allSubscriptionIds,
+                query = $"where type =~ 'Microsoft.Insights/components' and properties.InstrumentationKey == '{iKey}' | project id"
+            };
+
+            var response = await ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken, objectPayload: bodyObject);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadAsStringAsync();
+            var argResponse = JsonConvert.DeserializeObject<ArgResponse>(result);
+
+            // we need the first item of the first row
+            return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
+                ?? throw new CliException("Could not find the Application Insights using the configured Instrumentation Key.");
+        }
+
+        internal static ArmResourceId ParseResourceId(string resourceId)
+        {
+            if (string.IsNullOrEmpty(resourceId))
+            {
+                throw new ArgumentNullException(nameof(resourceId));
+            }
+
+            // Example Resource Id: /subscriptions/0000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/microsoft.insights/components/my-appinsights
+            // This format is very unlikely to change, and it is ok to hold a dependency on it.
+            var resourceElements = resourceId.Split('/');
+            if (resourceElements.Length != 9)
+            {
+                throw new ArgumentException($"{nameof(resourceId)} ({resourceId}) is an invalid resource Id. Expected 9 resource elements. Found {resourceElements.Length}");
+            }
+
+            return new ArmResourceId
+            {
+                Subscription = resourceElements[2],
+                ResourceGroup = resourceElements[4],
+                Provider = resourceElements[6],
+                Name = resourceElements[8]
+            };
         }
 
         internal static Task<IEnumerable<FunctionInfo>> GetFunctions(Site functionApp, string accessToken, string managementURL)

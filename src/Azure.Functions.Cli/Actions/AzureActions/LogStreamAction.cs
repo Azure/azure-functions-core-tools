@@ -1,27 +1,53 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using Colors.Net;
-using Azure.Functions.Cli.Arm;
-using Azure.Functions.Cli.Helpers;
+using Fclp;
+using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Show interactive streaming logs for an Azure-hosted Function App")]
     class LogStreamAction : BaseFunctionAppAction
     {
+        private const string ApplicationInsightsIKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
+        private const string LiveMetricsUriTemplate = "https://ms.portal.azure.com/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/{0}/ResourceId/{1}";
+
+        public bool UseBrowser { get; set; }
+
+        public override ICommandLineParserResult ParseArgs(string[] args)
+        {
+            Parser
+                .Setup<bool>("browser")
+                .WithDescription("Open Azure Application Insights Live Stream in a browser.")
+                .SetDefault(false)
+                .Callback(s => UseBrowser = s);
+
+            return base.ParseArgs(args);
+        }
+
         public override async Task RunAsync()
         {
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL);
+            var subscriptions = await AzureHelper.GetSubscriptions(AccessToken, ManagementURL);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, allSubs: subscriptions);
+            if (UseBrowser)
+            {
+                await OpenLiveStreamInBrowser(functionApp, subscriptions);
+                return;
+            }
 
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {
-                throw new CliException("Log stream is not currently supported in Linux Consumption Apps. Please use Azure Application Insights Live Stream in the Azure portal.");
+                throw new CliException("Log stream is not currently supported in Linux Consumption Apps. " +
+                    "Please use --browser to open Azure Application Insights Live Stream in the Azure portal.");
             }
             var basicHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{functionApp.PublishingUserName}:{functionApp.PublishingPassword}"));
 
@@ -41,6 +67,34 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     } while (count != 0);
                 }
             }
+        }
+
+        public async Task OpenLiveStreamInBrowser(Site functionApp, ArmSubscriptionsArray allSubscriptions)
+        {
+            if (!functionApp.AzureAppSettings.ContainsKey(ApplicationInsightsIKeySetting))
+            {
+                throw new CliException($"Missing {ApplicationInsightsIKeySetting} App Setting. " +
+                    $"Please make sure you have Application Insights configured with you function app.");
+            }
+
+            var iKey = functionApp.AzureAppSettings[ApplicationInsightsIKeySetting];
+            if (string.IsNullOrEmpty(iKey))
+            {
+                throw new CliException("Invalid Instrumentation Key found. Please make sure that the Application Insights is configured correctly.");
+            }
+
+            var appId = await AzureHelper.GetApplicationInsightIDFromIKey(iKey, AccessToken, ManagementURL, allSubs: allSubscriptions);
+            var armResourceId = AzureHelper.ParseResourceId(appId);
+            var componentId = $@"{{""Name"":""{armResourceId.Name}"",""SubscriptionId"":""{armResourceId.Subscription}"",""ResourceGroup"":""{armResourceId.ResourceGroup}""}}";
+
+            var liveMetricsUrl = string.Format(LiveMetricsUriTemplate, WebUtility.UrlEncode(componentId), WebUtility.UrlEncode(appId));
+
+            if (StaticSettings.IsDebug)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"Opening browser with URL- {liveMetricsUrl}"));
+            }
+
+            Utilities.OpenBrowser(liveMetricsUrl);
         }
     }
 }
