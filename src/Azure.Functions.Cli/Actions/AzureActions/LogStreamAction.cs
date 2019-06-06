@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     class LogStreamAction : BaseFunctionAppAction
     {
         private const string ApplicationInsightsIKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
-        private const string LiveMetricsUriTemplate = "https://ms.portal.azure.com/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/{0}/ResourceId/{1}";
+        private const string LiveMetricsUriTemplate = "https://portal.azure.com/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/{0}/ResourceId/{1}";
 
         public bool UseBrowser { get; set; }
 
