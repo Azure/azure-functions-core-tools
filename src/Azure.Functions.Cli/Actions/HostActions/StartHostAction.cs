@@ -23,7 +23,6 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
 using Microsoft.Azure.WebJobs.Script.WebHost.Controllers;
-using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
@@ -480,8 +479,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
 
-                // Temporarily mute dependency failures in CLI
-                services.AddSingleton<IDependencyValidator, NullDependencyValidator>();
 
                 return services.BuildServiceProvider();
             }
@@ -506,13 +503,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .GetRequiredService<IApplicationLifetime>();
 
                 app.UseWebJobsScriptHost(applicationLifetime);
-            }
-
-            private class NullDependencyValidator : IDependencyValidator
-            {
-                public void Validate(IServiceCollection services)
-                {
-                }
             }
         }
     }
