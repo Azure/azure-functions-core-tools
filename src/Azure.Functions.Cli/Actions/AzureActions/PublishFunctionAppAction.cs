@@ -371,7 +371,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Upload completed successfully.");
 
             // Set app setting
-            await SetRunFromPackageAppSetting(functionApp, sas);
+            await SetRunFromPackageAppSetting(functionApp, sas, enableMount: fileName.EndsWith("squashfs"));
             ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
@@ -429,7 +429,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             throw new CliException("Timed out waiting for SCM to update the Environment Settings");
         }
 
-        private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue)
+        private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue, bool enableMount = false)
         {
             // Set app setting
             functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = runFromPackageValue;
@@ -444,7 +444,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (functionApp.IsDynamic && functionApp.IsLinux && !functionApp.AzureAppSettings.ContainsKey("WEBSITE_MOUNT_ENABLED"))
+            if (functionApp.IsDynamic && functionApp.IsLinux && enableMount && !functionApp.AzureAppSettings.ContainsKey("WEBSITE_MOUNT_ENABLED"))
             {
                 functionApp.AzureAppSettings["WEBSITE_MOUNT_ENABLED"] = "1";
             }
