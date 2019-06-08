@@ -90,7 +90,8 @@ wget -q https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-pr
 sudo dpkg -i packages-microsoft-prod.deb
 ```
 
-#### Debian 9
+##### Debian 9
+
 ```bash
 wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.asc.gpg
 sudo mv microsoft.asc.gpg /etc/apt/trusted.gpg.d/
