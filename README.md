@@ -150,57 +150,48 @@ func
 
 ## Getting Started on Kubernetes
 
-Using the Core Tools, you can easily run Azure Functions on 1.7+ Kubernetes clusters.
-The Core Tools will build and push a Docker image of the function to a given registry and create corresponding Kubernetes objects including a Deployment, Service and Horizontal Pod Autoscaler.
+Using the Core Tools, you can easily configure a Kubernetes cluster and run Azure Functions on it.
 
-First, make sure you init a Docker file.
-
-```bash
-func init --docker
-```
 ### Prerequisites
 
 * [Docker](https://docs.docker.com/install/)
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 
-### Deploy a function to Kubernetes
+### Installing Kubernetes scalers
+
+This deploys [KEDA](https://github.com/kedacore/keda) and [Osiris](https://github.com/deislabs/osiris) to your cluster which allows you to deploy your functions in a scale-to-zero by default.
 
 ```bash
-func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server>
+func kubernetes install --namespace {namespace}
 ```
+
+**KEDA:** Handles monitoring polling event sources currently QueueTrigger and ServiceBusTrigger.
+**Osiris:**: Handles Http traffic monitoring and on demand scale your deployment to and from 0
+
+### Deploy to Kubernetes
+
+**First make sure you have Dockerfile for your project.** You can generate one using 
+```bash
+func init --docker # or --docker-only (for existing projects)
+```
+Then to deploy to kubernetes
+
+```bash
+func kubernetes deploy \
+    --name myfunction \
+    --namespace functions-ns \
+    --registry <docker-hub-id or registry-server>
+```
+
+This will build the current `Dockerfile` and push the image to the registry specified, then deploys a `Secret`, `Deployment`, and `ScaledObject`. If your functions have httpTrigger, you'll get an additional `Deployment` and `Service`.
 
 ### Deploy using a private registry
 
 ```bash
-func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --pull-secret <registry auth secret>
-```
-
-### Deploy a function with a minimum of 3 instances and a maximum of 10
-
-```bash
-func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --min 3 --max 10
-```
-
-### Deploy a function to a custom namespace
-
-```bash
-func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --namespace <namespace-name>
-```
-
-#### Scaling out Http Trigger
-Currently the solution is configured to scale out using the Horizontal Pod Autoscaler when any pod reaches a CPU of 60%.
-
-### Get function logs
+func kubernetes deploy --name myfunction --registry <docker-hub-id or registry-server> --pull-secret <registry auth secret>
 
 ```
-func logs --name myfunction --platform kubernetes
-```
 
-### Provide a kubeconfig file
-
-```bash
-func deploy --platform kubernetes --name myfunction --registry <docker-hub-id or registry-server> --config /mypath/config
-```
 ### Deploy a function to Knative
 
 #### Prerequisites
@@ -253,7 +244,7 @@ The AKS cluster needs access to the ACR Registry to pull the container. Azure cr
 The deployment will build the docker container and upload the container image to your referenced ACR instance (Note: Specify the ACR Login Server in the --registry parameter this is usually of the form <container_registry_name>.azurecr.io) and then your AKS cluster will use that as a source to obtain the container and deploy it.
 
 ```bash
-func deploy --platform kubernetes --name myfunction --registry <acr-registry-loginserver>
+func kubernetes deploy --name myfunction --registry <acr-registry-loginserver>
 ```
 
 If the deployment is successful, you should see this:
