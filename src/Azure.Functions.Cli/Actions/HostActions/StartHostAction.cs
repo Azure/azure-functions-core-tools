@@ -250,7 +250,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (workerRuntime == WorkerRuntime.python)
             {
-                await PythonHelpers.ValidatePythonVersion(setWorkerExecutable: true, errorOutIfOld: true);
+                await PythonHelpers.ValidatePythonVersion(setWorkerExecutable: true, errorIfNoExactMatch: true, errorOutIfOld: true);
                 // We need to update the PYTHONPATH to add worker's dependencies
                 var pythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? string.Empty;
                 var pythonWorkerDeps = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "workers", "python", "deps");
