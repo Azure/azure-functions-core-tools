@@ -290,13 +290,13 @@ namespace Azure.Functions.Cli.Helpers
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
 
             var pythonExe = await ValidatePythonVersion(errorOutIfOld: true);
-            var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\"");
+            var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\" --verbose");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
             if (exitCode != 0)
             {
-                var errorMessage = "There was an error restoring dependencies." + sbErrors.ToString();
+                var errorMessage = "There was an error restoring dependencies. " + sbErrors.ToString();
                 // If --build-native-deps if required, we exit with this specific code to notify other toolings
                 // If this exit code changes, partner tools must be updated
                 if (exitCode == ExitCodes.BuildNativeDepsRequired)

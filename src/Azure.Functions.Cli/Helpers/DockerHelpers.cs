@@ -39,9 +39,15 @@ namespace Azure.Functions.Cli.Helpers
             var docker = new Executable("docker", "ps");
             var sb = new StringBuilder();
             var exitCode = await docker.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
-            if (exitCode != 0 && sb.ToString().IndexOf("permission denied", StringComparison.OrdinalIgnoreCase) != 0)
+
+            if (exitCode != 0)
             {
-                throw new CliException("Got permission denied trying to run docker. Make sure the user you are running the cli from is in docker group or is root");
+                var errorStr = sb.ToString();
+                if (errorStr.IndexOf("permission denied", StringComparison.OrdinalIgnoreCase) != -1)
+                {
+                    throw new CliException("Got permission denied trying to run docker. Make sure the user you are running the cli from is in docker group or is root");
+                }
+                throw new CliException($"Could not connect to Docker.{Environment.NewLine}Error: {errorStr}");
             }
             return true;
         }
