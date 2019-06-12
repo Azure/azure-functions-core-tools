@@ -256,7 +256,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var pythonWorkerDeps = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "workers", "python", "deps");
                 if (!pythonPath.Contains(pythonWorkerDeps))
                 {
-                    Environment.SetEnvironmentVariable("PYTHONPATH", $"{pythonWorkerDeps}{Path.PathSeparator}{pythonPath}", EnvironmentVariableTarget.Process);
+                    Environment.SetEnvironmentVariable("PYTHONPATH", $"{pythonPath}{Path.PathSeparator}{pythonWorkerDeps}", EnvironmentVariableTarget.Process);
                 }
                 if (StaticSettings.IsDebug)
                 {
