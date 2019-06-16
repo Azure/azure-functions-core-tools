@@ -30,6 +30,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start"
                 },
                 ExpectExit = false,
+                OutputContains = new[]
+                {
+                    "Http Functions:",
+                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
+                },
                 Test = async (workingDir, p) =>
                 {
                     await Task.Delay(TimeSpan.FromSeconds(10));
