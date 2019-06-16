@@ -65,7 +65,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public bool NoBuild { get; set; }
 
         public bool EnableAuth { get; set; }
-
+        public List<string> EnabledFunctions { get; private set; }
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -132,6 +132,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription("Enable full authentication handling pipeline.")
                 .SetDefault(false)
                 .Callback(e => EnableAuth = e);
+
+            Parser
+                .Setup<List<string>>("functions")
+                .WithDescription("A space seperated list of functions to load.")
+                .Callback(f => EnabledFunctions = f);
 
             return Parser.Parse(args);
         }
@@ -216,6 +221,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 else
                 {
                     ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' because value is null"));
+                }
+            }
+
+            if (EnabledFunctions != null && EnabledFunctions.Count > 0)
+            {
+                for (var i = 0; i < EnabledFunctions.Count; i++)
+                {
+                    Environment.SetEnvironmentVariable($"AzureFunctionsJobHost__functions__{i}", EnabledFunctions[i]);
                 }
             }
         }
