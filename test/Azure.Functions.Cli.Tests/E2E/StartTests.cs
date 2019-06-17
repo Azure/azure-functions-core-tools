@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 {
     public class StartTests : BaseE2ETest
     {
+        private const string _serverNotReady = "Host was not ready after 10 seconds";
         public StartTests(ITestOutputHelper output) : base(output) { }
 
         [Fact]
@@ -37,10 +38,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 Test = async (workingDir, p) =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(10));
-
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                     {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
@@ -89,9 +89,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(15));
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
@@ -243,10 +243,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(10));
-
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                     {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
@@ -254,6 +253,60 @@ namespace Azure.Functions.Cli.Tests.E2E
                     }
                 },
             }, _output);
+        }
+
+        [Fact]
+        public async Task only_run_some_functions()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime javascript",
+                    "new --template \"Http trigger\" --name http1",
+                    "new --template \"Http trigger\" --name http2",
+                    "new --template \"Http trigger\" --name http3",
+                    "start --functions http2 http1"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/http1?name=Test");
+                        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+                        response = await client.GetAsync("/api/http2?name=Test");
+                        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+                        response = await client.GetAsync("/api/http3?name=Test");
+                        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+                        p.Kill();
+                    }
+                },
+            }, _output);
+        }
+
+        private async Task<bool> WaitUntilReady(HttpClient client)
+        {
+            for (var limit = 0; limit < 10; limit++)
+            {
+                try
+                {
+                    var response = await client.GetAsync("/admin/host/ping");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        return true;
+                    }
+                    await Task.Delay(1000);
+                }
+                catch
+                {
+                    await Task.Delay(1000);
+                }
+            }
+            return false;
         }
     }
 }
