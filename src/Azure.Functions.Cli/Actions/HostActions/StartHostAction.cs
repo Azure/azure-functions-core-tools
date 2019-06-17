@@ -14,6 +14,7 @@ using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.NativeMethods;
 using Colors.Net;
 using Fclp;
 using Microsoft.AspNetCore.Builder;
@@ -198,18 +199,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var secret in secrets)
             {
-                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)) &&
-                    !string.IsNullOrEmpty(secret.Key) && !string.IsNullOrEmpty(secret.Value))
-                {
-                    Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
-                }
-                else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
+                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' from local settings as it's already defined in current environment variables."));
                 }
+                else if (!string.IsNullOrEmpty(secret.Value))
+                {
+                    ColoredConsole.WriteLine(DarkGray($".NET Setting {secret.Key} = {secret.Value}"));
+                    Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
+                }
+                else if (secret.Value == string.Empty)
+                {
+                    ColoredConsole.WriteLine(DarkGray($"Windows Setting {secret.Key} = {secret.Value}"));
+                    EnvironmentNativeMethods.SetEnvironmentVariable(secret.Key, secret.Value);
+                }
                 else
                 {
-                    ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' because value is either empty or is null"));
+                    ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' because value is null"));
                 }
             }
         }
