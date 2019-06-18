@@ -240,7 +240,7 @@ namespace Azure.Functions.Cli.Helpers
             return packagesMd5 == requirementsTxtMd5;
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, string additionalPackages)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, string additionalPackages)
         {
             var reqTxtFile = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
             if (!FileSystemHelpers.FileExists(reqTxtFile))
@@ -263,6 +263,12 @@ namespace Azure.Functions.Cli.Helpers
 
             FileSystemHelpers.EnsureDirectory(packagesLocation);
 
+            // Only one of the remote build or build-native-deps flag can be chosen
+            if (buildNativeDeps && buildOption == BuildOption.Remote)
+            {
+                throw new CliException("Cannot perform '--build-native-deps' along with '--build remote'");
+            }
+
             if (buildNativeDeps)
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
@@ -274,13 +280,22 @@ namespace Azure.Functions.Cli.Helpers
                     throw new CliException("Docker is required to build native dependencies for python function apps");
                 }
             }
+            else if (buildOption == BuildOption.Remote)
+            {
+                // No-ops, python packages will be resolved on the server side
+            }
             else
             {
                 await RestorePythonRequirementsPackapp(functionAppRoot, packagesLocation);
             }
-            // Store a checksum of requirements.txt
-            var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
-            await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
+
+            // No need to generate and compare .md5 when using remote build
+            if (buildOption != BuildOption.Remote)
+            {
+                // Store a checksum of requirements.txt
+                var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
+                await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
+            }
 
             return ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
         }
