@@ -105,7 +105,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // Restore all valid extensions
             var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
             await installExtensionAction.RunAsync();
-            var stream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, noBuild: false, additionalPackages: AdditionalPackages);
+            var stream = await ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, noBuild: false, serverSideBuild: false, additionalPackages: AdditionalPackages);
 
             if (Squashfs)
             {

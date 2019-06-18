@@ -140,6 +140,12 @@ namespace Azure.Functions.Cli.Helpers
             return ArmHttpAsync<IEnumerable<FunctionInfo>>(HttpMethod.Get, url, accessToken);
         }
 
+        internal static Task<string> GetSiteRestrictedToken(Site functionApp, string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/getsitetoken?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            return ArmHttpAsync<string>(HttpMethod.Get, url, accessToken);
+        }
+
         internal static async Task<string> GetFunctionKey(string functionName, string appId, string accessToken, string managementURL)
         {
             // If anything goes wrong anywhere, simply return null and let the caller take care of it.

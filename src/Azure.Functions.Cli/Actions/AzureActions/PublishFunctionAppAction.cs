@@ -18,6 +18,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using System.Net;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -41,6 +42,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool Force { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
+        public bool ServerSideBuild { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
         public string DotnetCliParameters { get; set; }
@@ -83,6 +85,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .SetDefault(false)
                 .WithDescription("Skips generating .wheels folder when publishing python function apps.")
                 .Callback(f => BuildNativeDeps = f);
+            Parser
+                .Setup<bool>("server-side-build")
+                .SetDefault(false)
+                .WithDescription("Enable server side build for Linux Consumption python function apps.")
+                .Callback(f => ServerSideBuild = f);
             Parser
                 .Setup<bool>("no-bundler")
                 .WithDescription("[Deprecated] Skips generating a bundle when publishing python function apps with build-native-deps.")
@@ -282,6 +289,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 RunFromPackageDeploy = false;
             }
 
+            // For consumption linux apps, we allow user to define --server-side-build flag
+            if (ServerSideBuild && BuildNativeDeps)
+            {
+                throw new CliException("Cannot use --build-native-deps along with --server-side-build");
+            }
+
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
             var workerRuntimeEnum = string.IsNullOrEmpty(workerRuntime) ? WorkerRuntime.None : WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
             if (workerRuntimeEnum == WorkerRuntime.python && !functionApp.IsLinux)
@@ -289,16 +302,25 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ServerSideBuild, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
             var fileNameNoExtension = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {
                 // Consumption Linux, try squashfs as a package format.
-                if (workerRuntimeEnum == WorkerRuntime.python && !NoBuild && BuildNativeDeps)
+                if (workerRuntimeEnum == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || ServerSideBuild))
                 {
-                    await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipStreamFactory()), $"{fileNameNoExtension}.squashfs");
+                    if (BuildNativeDeps)
+                    {
+                        await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipStreamFactory()), $"{fileNameNoExtension}.squashfs");
+                    }
+
+                    if (ServerSideBuild)
+                    {
+                        shouldSyncTriggers = false;
+                        await PerformServerSideBuild(functionApp, zipStreamFactory);
+                    }
                 }
                 else
                 {
@@ -493,6 +515,69 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
 
                     ColoredConsole.WriteLine("Upload completed successfully.");
+                }
+            }, 2);
+        }
+
+        public async Task PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory)
+        {
+            await RetryHelper.Retry(async () =>
+            {
+                using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
+                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
+                using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
+                    $"api/zipdeploy?isAsync=true&author={Environment.MachineName}", UriKind.Relative)))
+                {
+                    ColoredConsole.WriteLine("Creating archive for current directory...");
+
+                    request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+
+                    // Attach x-ms-site-restricted-token for Linux Dynamic Server Side Build
+                    string restrictedToken = await AzureHelper.GetSiteRestrictedToken(functionApp, AccessToken, ManagementURL);
+                    request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
+
+                    (var content, var length) = CreateStreamContentZip(await zipFileFactory());
+                    request.Content = content;
+
+                    HttpResponseMessage response = null;
+                    using (var pb = new SimpleProgressBar($"Uploading {Utilities.BytesToHumanReadable(length)}"))
+                    {
+                        handler.HttpSendProgress += (s, e) => pb.Report(e.ProgressPercentage);
+                        response = await client.SendAsync(request);
+                    }
+
+                    // Handle deployment response
+                    if (response == null || !response.IsSuccessStatusCode)
+                    {
+                        var responseContent = await response.Content.ReadAsStringAsync();
+                        var errorMessage = $"Error uploading archive ({response.StatusCode}).";
+
+                        if (!string.IsNullOrEmpty(responseContent))
+                        {
+                            errorMessage += $"{Environment.NewLine}Server Response: {responseContent}";
+                        }
+
+                        ColoredConsole.WriteLine(Red(errorMessage));
+
+                        switch (response.StatusCode)
+                        {
+                            case HttpStatusCode.Conflict:
+                                return;
+                            default:
+                                throw new CliException(errorMessage);
+                        }
+                    }
+
+                    // Streaming deployment status for Linux Dynamic Server Side Build
+                    DeployStatus status = await KuduLiteDeploymentHelpers.WaitForServerSideBuild(client, functionApp, restrictedToken);
+                    if (status == DeployStatus.Success)
+                    {
+                        ColoredConsole.WriteLine(Green("Server side build succeeded!"));
+                    }
+                    else if (status == DeployStatus.Failed)
+                    {
+                        ColoredConsole.WriteLine(Red("Server side build failed!"));
+                    }
                 }
             }, 2);
         }

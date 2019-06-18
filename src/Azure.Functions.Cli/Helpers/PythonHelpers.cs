@@ -240,7 +240,7 @@ namespace Azure.Functions.Cli.Helpers
             return packagesMd5 == requirementsTxtMd5;
         }
 
-        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, string additionalPackages)
+        internal static async Task<Stream> GetPythonDeploymentPackage(IEnumerable<string> files, string functionAppRoot, bool buildNativeDeps, bool serverSideBuild, string additionalPackages)
         {
             var reqTxtFile = Path.Combine(functionAppRoot, Constants.RequirementsTxt);
             if (!FileSystemHelpers.FileExists(reqTxtFile))
@@ -263,6 +263,12 @@ namespace Azure.Functions.Cli.Helpers
 
             FileSystemHelpers.EnsureDirectory(packagesLocation);
 
+            // Only one of the server-side-build or build-native-deps flag can be chosen
+            if (buildNativeDeps && serverSideBuild)
+            {
+                throw new CliException("Cannot perform --server-side-build along with --build-native-deps");
+            }
+
             if (buildNativeDeps)
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
@@ -273,6 +279,10 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException("Docker is required to build native dependencies for python function apps");
                 }
+            }
+            else if (serverSideBuild)
+            {
+                // No-ops, python packages will be resolved on the server side
             }
             else
             {

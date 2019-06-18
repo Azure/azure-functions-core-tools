@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class ZipHelper
     {
-        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
+        public static async Task<Stream> GetAppZipFile(WorkerRuntime workerRuntime, string functionAppRoot, bool buildNativeDeps, bool serverSideBuild, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
         {
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
@@ -23,13 +23,16 @@ namespace Azure.Functions.Cli.Helpers
             if (noBuild)
             {
                 ColoredConsole.WriteLine(Yellow("Skipping build event for functions project (--no-build)."));
+            } else if (serverSideBuild)
+            {
+                ColoredConsole.WriteLine(Yellow("Skipping build event for functions project (--server-side-build)."));
             }
 
-            if (workerRuntime == WorkerRuntime.python && !noBuild)
+            if (workerRuntime == WorkerRuntime.python && !noBuild && !serverSideBuild)
             {
-                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, additionalPackages);
+                return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, serverSideBuild, additionalPackages);
             }
-            else if (workerRuntime == WorkerRuntime.dotnet && !ignoreDotNetCheck && !noBuild)
+            else if (workerRuntime == WorkerRuntime.dotnet && !ignoreDotNetCheck && !noBuild && !serverSideBuild)
             {
                 throw new CliException("Pack command doesn't work for dotnet functions");
             }
