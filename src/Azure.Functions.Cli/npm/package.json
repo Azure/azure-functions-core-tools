@@ -3,7 +3,8 @@
     "version": "2.4.290",
     "description": "Azure Functions Core Tools",
     "scripts": {
-        "postinstall": "node lib/install.js"
+        "postinstall": "node lib/install.js",
+        "prepublishOnly": "node lib/copy-metadata.js"
     },
     "author": "Microsoft",
     "license": "MIT",
