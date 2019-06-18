@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Linq;
 using Azure.Functions.Cli.Helpers;
+using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Extensions.Configuration;
@@ -8,13 +9,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.ExtensionBundle
 {
-    public class JsonFileConfigurationSource : HostJsonFileConfigurationSource
+    public class JsonFileConfigurationSource : HostJsonFileConfigurationSource, IConfigurationSource
     {
         private readonly ILogger _logger;
 
         public JsonFileConfigurationSource(ScriptApplicationHostOptions options, IEnvironment environment, ILoggerFactory loggerFactory) :
             base(options, environment, loggerFactory)
         {
+            _logger = loggerFactory.CreateLogger(LogCategories.Startup);
         }
 
         public new IConfigurationProvider Build(IConfigurationBuilder builder)
