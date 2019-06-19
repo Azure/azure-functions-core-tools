@@ -494,26 +494,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     (var content, var length) = CreateStreamContentZip(await zipFileFactory());
                     request.Content = content;
 
-                    HttpResponseMessage response = null;
-                    using (var pb = new SimpleProgressBar($"Uploading {Utilities.BytesToHumanReadable(length)}"))
-                    {
-                        handler.HttpSendProgress += (s, e) => pb.Report(e.ProgressPercentage);
-                        response = await client.SendAsync(request);
-                    }
-
-                    if (response == null || !response.IsSuccessStatusCode)
-                    {
-                        var responseContent = await response.Content.ReadAsStringAsync();
-                        var errorMessage = $"Error uploading archive ({response.StatusCode}).";
-
-                        if (!string.IsNullOrEmpty(responseContent))
-                        {
-                            errorMessage += $"{Environment.NewLine}Server Response: {responseContent}";
-                        }
-
-                        throw new CliException(errorMessage);
-                    }
-
+                    HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
+                    await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
                     ColoredConsole.WriteLine("Upload completed successfully.");
                 }
             }, 2);
@@ -539,34 +521,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     (var content, var length) = CreateStreamContentZip(await zipFileFactory());
                     request.Content = content;
 
-                    HttpResponseMessage response = null;
-                    using (var pb = new SimpleProgressBar($"Uploading {Utilities.BytesToHumanReadable(length)}"))
-                    {
-                        handler.HttpSendProgress += (s, e) => pb.Report(e.ProgressPercentage);
-                        response = await client.SendAsync(request);
-                    }
-
-                    // Handle deployment response
-                    if (response == null || !response.IsSuccessStatusCode)
-                    {
-                        var responseContent = await response.Content.ReadAsStringAsync();
-                        var errorMessage = $"Error uploading archive ({response.StatusCode}).";
-
-                        if (!string.IsNullOrEmpty(responseContent))
-                        {
-                            errorMessage += $"{Environment.NewLine}Server Response: {responseContent}";
-                        }
-
-                        ColoredConsole.WriteLine(Red(errorMessage));
-
-                        switch (response.StatusCode)
-                        {
-                            case HttpStatusCode.Conflict:
-                                return;
-                            default:
-                                throw new CliException(errorMessage);
-                        }
-                    }
+                    HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
+                    await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
 
                     // Streaming deployment status for Linux Dynamic Server Side Build
                     DeployStatus status = await KuduLiteDeploymentHelpers.WaitForServerSideBuild(client, functionApp, restrictedToken);

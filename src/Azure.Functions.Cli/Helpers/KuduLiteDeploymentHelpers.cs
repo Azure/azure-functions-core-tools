@@ -7,11 +7,29 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Azure.Functions.Cli.Helpers
 {
     internal class KuduLiteDeploymentHelpers
     {
+        public static Uri GetZipDeployUri(bool? isAsync=null, string author=null)
+        {
+            var uriBuilder = new UriBuilder("api/zipdeploy");
+            var uriQueryParams = HttpUtility.ParseQueryString(string.Empty);
+            if (isAsync != null)
+            {
+                uriQueryParams["isAsync"] = isAsync.ToString();
+            }
+            if (author != null)
+            {
+                uriQueryParams["author"] = author;
+            }
+
+            uriBuilder.Query = uriQueryParams.ToString();
+            return uriBuilder.Uri;
+        }
+
         public static async Task<DeployStatus> WaitForServerSideBuild(HttpClient client, Site functionApp, string restrictedToken)
         {
             ColoredConsole.WriteLine("Server side build in progress, please wait");
