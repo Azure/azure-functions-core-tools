@@ -20,27 +20,13 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 ### Windows
 
-Both v1 and v2 of the runtime can be installed on Windows.
-
-To install v1 with npm:
-
-```bash
-npm i -g azure-functions-core-tools@1
-```
-
-To install v1 with chocolatey:
-
-```bash
-choco install azure-functions-core-tools --version 1.0.15 
-```
-
-To install v2 with npm:
+To install runtime with npm:
 
 ```bash
 npm i -g azure-functions-core-tools --unsafe-perm true
 ```
 
-To install v2 with chocolatey:
+To install with chocolatey:
 
 ```bash
 choco install azure-functions-core-tools
