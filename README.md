@@ -2,8 +2,8 @@
 
 |Branch|Status|
 |---|---|
-|master|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/master?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/master)|
-|dev|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/dev?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/dev)|
+|master|[![Build Status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=master)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=master)
+|dev|[![Build Status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=dev)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=dev)
 |v1.x|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/v1.x?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/v1.x)|
 
 # Azure Functions Core Tools
