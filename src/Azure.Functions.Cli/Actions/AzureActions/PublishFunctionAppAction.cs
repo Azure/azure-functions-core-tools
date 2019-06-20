@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool Force { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
-        public bool ServerSideBuild { get; set; }
+        public BuildOption PublishBuildOption { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
         public string DotnetCliParameters { get; set; }
@@ -86,10 +86,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("Skips generating .wheels folder when publishing python function apps.")
                 .Callback(f => BuildNativeDeps = f);
             Parser
-                .Setup<bool>("server-side-build")
-                .SetDefault(false)
-                .WithDescription("Enable server side build for Linux Consumption python function apps.")
-                .Callback(f => ServerSideBuild = f);
+                .Setup<BuildOption>('b', "build")
+                .SetDefault(BuildOption.None)
+                .WithDescription("Enable build action for Linux Consumption python function apps. (accepts: remote)")
+                .Callback(bo => PublishBuildOption = bo);
             Parser
                 .Setup<bool>("no-bundler")
                 .WithDescription("[Deprecated] Skips generating a bundle when publishing python function apps with build-native-deps.")
@@ -289,10 +289,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 RunFromPackageDeploy = false;
             }
 
-            // For consumption linux apps, we allow user to define --server-side-build flag
-            if (ServerSideBuild && BuildNativeDeps)
+            // For consumption linux apps, we do not support --build remote with --build-native-deps flag
+            if (PublishBuildOption == BuildOption.Remote && BuildNativeDeps)
             {
-                throw new CliException("Cannot use --build-native-deps along with --server-side-build");
+                throw new CliException("Cannot use '--build remote' along with '--build-native-deps'");
+            } else if (PublishBuildOption == BuildOption.Local || PublishBuildOption == BuildOption.Container)
+            {
+                throw new CliException("Only support '--build remote'");
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
@@ -302,23 +305,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, ServerSideBuild, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
             var fileNameNoExtension = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {
                 // Consumption Linux, try squashfs as a package format.
-                if (workerRuntimeEnum == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || ServerSideBuild))
+                if (workerRuntimeEnum == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || PublishBuildOption == BuildOption.Remote))
                 {
                     if (BuildNativeDeps)
                     {
                         await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipStreamFactory()), $"{fileNameNoExtension}.squashfs");
                     }
 
-                    if (ServerSideBuild)
+                    if (PublishBuildOption == BuildOption.Remote)
                     {
                         shouldSyncTriggers = false;
+                        await RemoveWebsiteRunFromPackage(functionApp);
                         await PerformServerSideBuild(functionApp, zipStreamFactory);
                     }
                 }
@@ -479,6 +483,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
+        private async Task RemoveWebsiteRunFromPackage(Site functionApp)
+        {
+            if (functionApp.AzureAppSettings.ContainsKey("WEBSITE_RUN_FROM_PACKAGE"))
+            {
+                // WEBSITE_RUN_FROM_PACKAGE only accepts "1" or "<url>", so we can remove it instead of setting it to "0"
+                functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_PACKAGE");
+
+                var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+
+                if (!result.IsSuccessful)
+                {
+                    throw new CliException($"Error remove WEBSITE_RUN_FROM_PACKAGE: {result.ErrorResult}.");
+                }
+            }
+        }
+
         public async Task PublishZipDeploy(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             await RetryHelper.Retry(async () =>
@@ -514,18 +534,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                     request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
 
-                    // Attach x-ms-site-restricted-token for Linux Dynamic Server Side Build
+                    // Attach x-ms-site-restricted-token for Linux Consumption remote build
                     string restrictedToken = await AzureHelper.GetSiteRestrictedToken(functionApp, AccessToken, ManagementURL);
-                    request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
 
                     (var content, var length) = CreateStreamContentZip(await zipFileFactory());
                     request.Content = content;
+                    request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
 
                     HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
                     await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
 
                     // Streaming deployment status for Linux Dynamic Server Side Build
-                    DeployStatus status = await KuduLiteDeploymentHelpers.WaitForServerSideBuild(client, functionApp, restrictedToken);
+                    DeployStatus status = await KuduLiteDeploymentHelpers.WaitForServerSideBuild(client, functionApp, AccessToken, ManagementURL);
                     if (status == DeployStatus.Success)
                     {
                         ColoredConsole.WriteLine(Green("Server side build succeeded!"));

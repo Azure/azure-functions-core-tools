@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Helpers
             return uriBuilder.Uri;
         }
 
-        public static async Task<DeployStatus> WaitForServerSideBuild(HttpClient client, Site functionApp, string restrictedToken)
+        public static async Task<DeployStatus> WaitForServerSideBuild(HttpClient client, Site functionApp, string accessToken, string managementUrl)
         {
             ColoredConsole.WriteLine("Server side build in progress, please wait");
             DeployStatus statusCode = DeployStatus.Pending;
@@ -39,12 +39,14 @@ namespace Azure.Functions.Cli.Helpers
 
             while (string.IsNullOrEmpty(id))
             {
+                string restrictedToken = await AzureHelper.GetSiteRestrictedToken(functionApp, accessToken, managementUrl);
                 id = await GetLatestDeploymentId(client, functionApp, restrictedToken);
                 await Task.Delay(TimeSpan.FromSeconds(3));
             }
 
             while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed)
             {
+                string restrictedToken = await AzureHelper.GetSiteRestrictedToken(functionApp, accessToken, managementUrl);
                 statusCode = await GetDeploymentStatusById(client, functionApp, restrictedToken, id);
                 logLastUpdate = await DisplayDeploymentLog(client, functionApp, restrictedToken, id, logLastUpdate);
                 await Task.Delay(TimeSpan.FromSeconds(3));
