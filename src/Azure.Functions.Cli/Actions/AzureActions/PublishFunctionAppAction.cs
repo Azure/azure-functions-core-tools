@@ -87,7 +87,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(f => BuildNativeDeps = f);
             Parser
                 .Setup<BuildOption>('b', "build")
-                .SetDefault(BuildOption.None)
+                .SetDefault(BuildOption.Default)
                 .WithDescription("Enable build action for Linux Consumption python function apps. (accepts: remote)")
                 .Callback(bo => PublishBuildOption = bo);
             Parser
@@ -293,9 +293,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (PublishBuildOption == BuildOption.Remote && BuildNativeDeps)
             {
                 throw new CliException("Cannot use '--build remote' along with '--build-native-deps'");
-            } else if (PublishBuildOption == BuildOption.Local || PublishBuildOption == BuildOption.Container)
+            } else if (PublishBuildOption == BuildOption.Local || PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.None)
             {
-                throw new CliException("Only support '--build remote'");
+                throw new CliException("The --build flag only supports '--build remote'");
             }
 
             var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
