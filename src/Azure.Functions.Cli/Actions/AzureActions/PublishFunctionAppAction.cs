@@ -293,7 +293,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (PublishBuildOption == BuildOption.Remote && BuildNativeDeps)
             {
                 throw new CliException("Cannot use '--build remote' along with '--build-native-deps'");
-            } else if (PublishBuildOption == BuildOption.Local || PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.None)
+            } else if (PublishBuildOption == BuildOption.Local ||
+                PublishBuildOption == BuildOption.Container ||
+                PublishBuildOption == BuildOption.None)
             {
                 throw new CliException("The --build flag only supports '--build remote'");
             }
@@ -311,25 +313,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var fileNameNoExtension = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {
-                // Consumption Linux, try squashfs as a package format.
-                if (workerRuntimeEnum == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || PublishBuildOption == BuildOption.Remote))
-                {
-                    if (BuildNativeDeps)
-                    {
-                        await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipStreamFactory()), $"{fileNameNoExtension}.squashfs");
-                    }
-
-                    if (PublishBuildOption == BuildOption.Remote)
-                    {
-                        shouldSyncTriggers = false;
-                        await RemoveWebsiteRunFromPackage(functionApp);
-                        await PerformServerSideBuild(functionApp, zipStreamFactory);
-                    }
-                }
-                else
-                {
-                    await PublishRunFromPackage(functionApp, await zipStreamFactory(), $"{fileNameNoExtension}.zip");
-                }
+                // Consumption Linux
+                shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionApp, workerRuntimeEnum, zipStreamFactory, fileNameNoExtension);
             }
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
@@ -387,6 +372,44 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
                 }
             }, retryCount: 5);
+        }
+
+        /// <summary>
+        /// Handler for Linux Consumption publish event
+        /// </summary>
+        /// <param name="functionApp">Function App in Azure</param>
+        /// <param name="workerRuntime">Function App worker runtime</param>
+        /// <param name="zipStreamFactory">ZipStream creator for publish content</param>
+        /// <param name="fileNameNoExtension">Name of the file to be uploaded</param>
+        /// <returns>ShouldSyncTrigger value</returns>
+        private async Task<bool> HandleLinuxConsumptionPublish(Site functionApp, WorkerRuntime workerRuntime, Func<Task<Stream>> zipStreamFactory, string fileNameNoExtension)
+        {
+            // Choose if the content need to use remote build
+            BuildOption buildOption = PublishHelper.UpdateLinuxConsumptionBuildOption(PublishBuildOption, workerRuntime);
+
+            // Consumption Linux, try squashfs as a package format.
+            if (workerRuntime == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || buildOption == BuildOption.Remote))
+            {
+                if (BuildNativeDeps)
+                {
+                    await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipStreamFactory()), $"{fileNameNoExtension}.squashfs");
+                    return true;
+                }
+
+                // Remote build don't need sync trigger, container will be deallocated once the build is finished
+                if (buildOption == BuildOption.Remote)
+                {
+                    await RemoveFunctionAppAppSetting(functionApp, "WEBSITE_RUN_FROM_PACKAGE");
+                    await PerformServerSideBuild(functionApp, zipStreamFactory);
+                    return false;
+                }
+            }
+            else
+            {
+                await PublishRunFromPackage(functionApp, await zipStreamFactory(), $"{fileNameNoExtension}.zip");
+                return true;
+            }
+            return true;
         }
 
         private async Task PublishRunFromPackage(Site functionApp, Stream packageStream, string fileName)
@@ -483,18 +506,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task RemoveWebsiteRunFromPackage(Site functionApp)
+        private async Task RemoveFunctionAppAppSetting(Site functionApp, string appSettingName)
         {
-            if (functionApp.AzureAppSettings.ContainsKey("WEBSITE_RUN_FROM_PACKAGE"))
+            if (functionApp.AzureAppSettings.ContainsKey(appSettingName))
             {
-                // WEBSITE_RUN_FROM_PACKAGE only accepts "1" or "<url>", so we can remove it instead of setting it to "0"
-                functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_PACKAGE");
-
+                ColoredConsole.WriteLine(Yellow($"Removing {appSettingName} App Setting"));
+                functionApp.AzureAppSettings.Remove(appSettingName);
                 var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
-
                 if (!result.IsSuccessful)
                 {
-                    throw new CliException($"Error remove WEBSITE_RUN_FROM_PACKAGE: {result.ErrorResult}.");
+                    throw new CliException($"Error remove {appSettingName}: {result.ErrorResult}.");
                 }
             }
         }
@@ -523,39 +544,36 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
-            await RetryHelper.Retry(async () =>
+            using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
+            using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
+                $"api/zipdeploy?isAsync=true&author={Environment.MachineName}", UriKind.Relative)))
             {
-                using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
-                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
-                using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
-                    $"api/zipdeploy?isAsync=true&author={Environment.MachineName}", UriKind.Relative)))
+                ColoredConsole.WriteLine("Creating archive for current directory...");
+
+                request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+
+                // Attach x-ms-site-restricted-token for Linux Consumption remote build
+                string restrictedToken = await AzureHelper.GetSiteRestrictedToken(functionApp, AccessToken, ManagementURL);
+
+                (var content, var length) = CreateStreamContentZip(await zipFileFactory());
+                request.Content = content;
+                request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
+
+                HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
+                await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
+
+                // Streaming deployment status for Linux Dynamic Server Side Build
+                DeployStatus status = await KuduLiteDeploymentHelpers.WaitForServerSideBuild(client, functionApp, AccessToken, ManagementURL);
+                if (status == DeployStatus.Success)
                 {
-                    ColoredConsole.WriteLine("Creating archive for current directory...");
-
-                    request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
-
-                    // Attach x-ms-site-restricted-token for Linux Consumption remote build
-                    string restrictedToken = await AzureHelper.GetSiteRestrictedToken(functionApp, AccessToken, ManagementURL);
-
-                    (var content, var length) = CreateStreamContentZip(await zipFileFactory());
-                    request.Content = content;
-                    request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
-
-                    HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
-                    await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
-
-                    // Streaming deployment status for Linux Dynamic Server Side Build
-                    DeployStatus status = await KuduLiteDeploymentHelpers.WaitForServerSideBuild(client, functionApp, AccessToken, ManagementURL);
-                    if (status == DeployStatus.Success)
-                    {
-                        ColoredConsole.WriteLine(Green("Server side build succeeded!"));
-                    }
-                    else if (status == DeployStatus.Failed)
-                    {
-                        ColoredConsole.WriteLine(Red("Server side build failed!"));
-                    }
+                    ColoredConsole.WriteLine(Green("Server side build succeeded!"));
                 }
-            }, 2);
+                else if (status == DeployStatus.Failed)
+                {
+                    ColoredConsole.WriteLine(Red("Server side build failed!"));
+                }
+            }
         }
 
         private async Task<string> UploadPackageToStorage(Stream package, string blobName, IDictionary<string, string> appSettings)

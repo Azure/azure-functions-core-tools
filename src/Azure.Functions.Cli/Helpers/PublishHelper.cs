@@ -2,10 +2,9 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Handlers;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
-using Microsoft.AspNetCore.Http;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -23,6 +22,24 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch { }
             return null;
+        }
+
+        public static BuildOption UpdateLinuxConsumptionBuildOption(BuildOption currentBuildOption, WorkerRuntime workerRuntime)
+        {
+            switch (currentBuildOption)
+            {
+                case BuildOption.Default:
+                    if (workerRuntime == WorkerRuntime.python &&
+                        FileSystemHelpers.FileExists(Constants.RequirementsTxt) &&
+                        !string.IsNullOrEmpty(FileSystemHelpers.ReadAllTextFromFile(Constants.RequirementsTxt)))
+                    {
+                        return BuildOption.Remote;
+                    }
+                    break;
+                default:
+                    return currentBuildOption;
+            }
+            return currentBuildOption;
         }
 
         public static async Task<HttpResponseMessage> InvokeLongRunningRequest(HttpClient client,

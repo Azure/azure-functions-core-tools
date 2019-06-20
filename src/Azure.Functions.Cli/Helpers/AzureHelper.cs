@@ -142,7 +142,7 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static Task<string> GetSiteRestrictedToken(Site functionApp, string accessToken, string managementURL)
         {
-            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/getsitetoken?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/host/token?api-version={ArmUriTemplates.WebsitesApiVersion}");
             return ArmHttpAsync<string>(HttpMethod.Get, url, accessToken);
         }
 
