@@ -74,16 +74,18 @@ namespace Azure.Functions.Cli.Helpers
         {
             EnsureDotnet();
             var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
+            var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").ToList();
             // If the project name is extensions only then is extensions.csproj a valid csproj file
             if (!Path.GetFileName(Environment.CurrentDirectory).Equals("extensions"))
             {
                 csProjFiles.Remove("extensions.csproj");
+                fsProjFiles.Remove("extensions.fsproj");
             }
-            if (csProjFiles.Count > 1)
+            if (csProjFiles.Count + fsProjFiles.Count > 1)
             {
-                throw new CliException($"Can't determine Project to build. Expected 1 .csproj but found {csProjFiles.Count}");
+                throw new CliException($"Can't determine Project to build. Expected 1 .csproj or .fsproj but found {csProjFiles.Count + fsProjFiles.Count}");
             }
-            return csProjFiles.Count == 1;
+            return csProjFiles.Count + fsProjFiles.Count == 1;
         }
 
         public static async Task<bool> BuildDotnetProject(string outputPath, string dotnetCliParams, bool showOutput = true)
@@ -104,7 +106,7 @@ namespace Azure.Functions.Cli.Helpers
             return true;
         }
 
-        public static string GetCsproj()
+        public static string GetCsprojOrFsproj()
         {
             EnsureDotnet();
             var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
@@ -114,7 +116,15 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                throw new CliException($"Can't determine Project to build. Expected 1 .csproj but found {csProjFiles.Count}");
+                var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").ToList();
+                if (fsProjFiles.Count == 1)
+                {
+                    return fsProjFiles.First();
+                }
+                else
+                {
+                    throw new CliException($"Can't determine Project to build. Expected 1 .csproj or .fsproj but found {csProjFiles.Count + fsProjFiles.Count}");
+                }
             }
         }
 

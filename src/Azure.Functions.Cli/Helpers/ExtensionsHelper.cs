@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Helpers
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(secretsManager);
             if (workerRuntime == WorkerRuntime.dotnet && !csx)
             {
-                return DotnetHelpers.GetCsproj();
+                return DotnetHelpers.GetCsprojOrFsproj();
             }
 
             if (String.IsNullOrEmpty(extensionsDir))
