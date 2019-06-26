@@ -455,6 +455,9 @@ namespace Azure.Functions.Cli.Kubernetes
                 case "servicebustrigger":
                     return "azure-servicebus";
 
+                case "eventhubtrigger":
+                    return "azure-eventhub";
+
                 default:
                     return triggerType;
             }
