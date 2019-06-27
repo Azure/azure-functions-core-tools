@@ -299,7 +299,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (workerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
             {
-                throw new CliException("dotnet sdk is required for PowerShell functions. Please install https://microsoft.com/net");
+                throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
             }
 
             if (!NetworkHelpers.IsPortAvailable(Port))
