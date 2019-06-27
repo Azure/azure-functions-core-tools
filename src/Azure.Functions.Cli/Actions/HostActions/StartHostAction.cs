@@ -236,6 +236,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+
             if (workerRuntime == WorkerRuntime.None)
             {
                 ColoredConsole.WriteLine(WarningColor("your worker runtime is not set. As of 2.0.1-beta.26 a worker runtime setting is required."))
@@ -295,6 +296,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
                 }
+            }
+            else if (workerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
+            {
+                throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
             }
 
             if (!NetworkHelpers.IsPortAvailable(Port))
