@@ -314,7 +314,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {
                 // Consumption Linux
-                shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionApp, workerRuntimeEnum, zipStreamFactory, fileNameNoExtension);
+                shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionAppRoot, functionApp, workerRuntimeEnum, fileNameNoExtension);
             }
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
@@ -377,22 +377,26 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         /// <summary>
         /// Handler for Linux Consumption publish event
         /// </summary>
+        /// <param name="functionAppRoot">Function App project path in local machine</param>
         /// <param name="functionApp">Function App in Azure</param>
         /// <param name="workerRuntime">Function App worker runtime</param>
-        /// <param name="zipStreamFactory">ZipStream creator for publish content</param>
         /// <param name="fileNameNoExtension">Name of the file to be uploaded</param>
         /// <returns>ShouldSyncTrigger value</returns>
-        private async Task<bool> HandleLinuxConsumptionPublish(Site functionApp, WorkerRuntime workerRuntime, Func<Task<Stream>> zipStreamFactory, string fileNameNoExtension)
+        private async Task<bool> HandleLinuxConsumptionPublish(string functionAppRoot, Site functionApp, WorkerRuntime workerRuntime, string fileNameNoExtension)
         {
             // Choose if the content need to use remote build
             BuildOption buildOption = PublishHelper.UpdateLinuxConsumptionBuildOption(PublishBuildOption, workerRuntime);
+            GitIgnoreParser ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
+
+            // We update the buildOption, so we need to update the zipFileStream factory as well
+            Func<Task<Stream>> zipFileStreamTask = () => ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, buildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // Consumption Linux, try squashfs as a package format.
             if (workerRuntime == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || buildOption == BuildOption.Remote))
             {
                 if (BuildNativeDeps)
                 {
-                    await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipStreamFactory()), $"{fileNameNoExtension}.squashfs");
+                    await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipFileStreamTask()), $"{fileNameNoExtension}.squashfs");
                     return true;
                 }
 
@@ -400,13 +404,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (buildOption == BuildOption.Remote)
                 {
                     await RemoveFunctionAppAppSetting(functionApp, "WEBSITE_RUN_FROM_PACKAGE");
-                    await PerformServerSideBuild(functionApp, zipStreamFactory);
+                    await PerformServerSideBuild(functionApp, zipFileStreamTask);
                     return false;
                 }
             }
             else
             {
-                await PublishRunFromPackage(functionApp, await zipStreamFactory(), $"{fileNameNoExtension}.zip");
+                await PublishRunFromPackage(functionApp, await zipFileStreamTask(), $"{fileNameNoExtension}.zip");
                 return true;
             }
             return true;
