@@ -288,9 +288,14 @@ namespace Azure.Functions.Cli.Helpers
             {
                 await RestorePythonRequirementsPackapp(functionAppRoot, packagesLocation);
             }
-            // Store a checksum of requirements.txt
-            var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
-            await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
+
+            // No need to generate and compare .md5 when using remote build
+            if (buildOption != BuildOption.Remote)
+            {
+                // Store a checksum of requirements.txt
+                var md5FilePath = Path.Combine(packagesLocation, $"{Constants.RequirementsTxt}.md5");
+                await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
+            }
 
             return ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
         }
