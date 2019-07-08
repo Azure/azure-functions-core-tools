@@ -74,6 +74,12 @@ namespace Azure.Functions.Cli.Common
             public const string AADClientId = "1950a258-227b-4e31-a9cf-717495945fc2";
         }
 
+        public static class KuduLiteDeploymentConstants
+        {
+            public const int ArmTokenExpiryMinutes = 4;
+            public const int StatusRefreshSeconds = 3;
+        }
+
         public static class DockerImages
         {
             public const string LinuxPythonImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12493-python3.6-buildenv";
