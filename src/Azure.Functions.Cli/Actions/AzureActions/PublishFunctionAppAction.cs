@@ -513,7 +513,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             if (functionApp.AzureAppSettings.ContainsKey(appSettingName))
             {
-                ColoredConsole.WriteLine(Yellow($"Removing {appSettingName} App Setting"));
+                var appSettingValue = functionApp.AzureAppSettings[appSettingName];
+                ColoredConsole.WriteLine(Yellow($"Removing {appSettingName} app setting ({appSettingValue})"));
                 functionApp.AzureAppSettings.Remove(appSettingName);
                 var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
                 if (!result.IsSuccessful)
