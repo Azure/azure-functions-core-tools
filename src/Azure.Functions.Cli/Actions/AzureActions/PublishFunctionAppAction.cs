@@ -403,8 +403,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (buildOption == BuildOption.Remote)
                 {
                     await RemoveFunctionAppAppSetting(functionApp, "WEBSITE_RUN_FROM_PACKAGE");
-                    await PerformServerSideBuild(functionApp, zipFileStreamTask);
-                    return false;
+                    var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask);
+                    return deployStatus == DeployStatus.Success;
                 }
             }
             else
@@ -545,7 +545,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        public async Task PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory)
+        public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
@@ -576,6 +576,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     ColoredConsole.WriteLine(Red("Server side build failed!"));
                 }
+                return status;
             }
         }
 
