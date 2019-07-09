@@ -520,6 +520,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     throw new CliException($"Error remove {appSettingName}: {result.ErrorResult}.");
                 }
+                await Task.Delay(TimeSpan.FromSeconds(5));
             }
         }
 
