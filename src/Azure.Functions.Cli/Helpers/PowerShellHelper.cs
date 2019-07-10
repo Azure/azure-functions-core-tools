@@ -15,6 +15,9 @@ namespace Azure.Functions.Cli.Helpers
         // The PowerShellGallery uri to query for the latest module version.
         private const string PowerShellGalleryFindPackagesByIdUri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id=";
 
+        // Default timeout in seconds to retrieve the module version.
+        private const int DefaultTimeOutInSeconds = 10;
+
         /// <summary>
         /// Gets the latest supported major version of the Az module from the PSGallery.
         /// </summary>
@@ -30,6 +33,7 @@ namespace Azure.Functions.Cli.Helpers
                 using (var client = new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+                    client.Timeout = TimeSpan.FromSeconds(DefaultTimeOutInSeconds);
 
                     try
                     {
