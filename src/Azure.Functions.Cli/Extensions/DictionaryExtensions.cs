@@ -15,5 +15,19 @@ namespace Azure.Functions.Cli.Extensions
         {
             return dictionary.FirstOrDefault(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;
         }
+
+        public static bool SafeLeftMerge(this IDictionary<string, string> dictionary, IDictionary<string, string> another)
+        {
+            bool updated = false;
+            foreach (var keyValPair in another)
+            {
+                if (!dictionary.ContainsKey(keyValPair.Key))
+                {
+                    dictionary.Add(keyValPair.Key, keyValPair.Value);
+                    updated = true;
+                }
+            }
+            return updated;
+        }
     }
 }

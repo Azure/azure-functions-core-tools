@@ -277,14 +277,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
             // For dedicated linux apps, we do not support run from package right now
-            var isFunctionAppDedicated = !functionApp.IsDynamic && !functionApp.IsElasticPremium;
-            if (functionApp.IsLinux && isFunctionAppDedicated && RunFromPackageDeploy)
+            var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            if (isFunctionAppDedicatedLinux && RunFromPackageDeploy && PublishBuildOption != BuildOption.Remote)
             {
                 ColoredConsole.WriteLine("Assuming --nozip (do not run from package) for publishing to Linux dedicated plan.");
                 RunFromPackageDeploy = false;
             }
 
-            // For consumption linux apps, we do not support --build remote with --build-native-deps flag
+            // For Python linux apps, we do not support --build remote with --build-native-deps flag
             if (PublishBuildOption == BuildOption.Remote && BuildNativeDeps)
             {
                 throw new CliException("Cannot use '--build remote' along with '--build-native-deps'");
@@ -315,6 +315,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Elastic Premium Linux
                 await PublishRunFromPackage(functionApp, await zipStreamFactory(), $"{fileNameNoExtension}.zip");
             }
+            else if (isFunctionAppDedicatedLinux)
+            {
+                // Dedicated Linux
+                shouldSyncTriggers = false;
+                await HandleLinuxDedicatedPublish(zipStreamFactory, functionApp, GlobalCoreToolsSettings.CurrentWorkerRuntime, fileNameNoExtension);
+            }
             else if (RunFromPackageDeploy)
             {
                 // Windows default
@@ -326,7 +332,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // need to perform one
                 shouldSyncTriggers = false;
 
-                // Dedicated Linux or "--no-zip"
+                // "--no-zip"
                 await PublishZipDeploy(functionApp, zipStreamFactory);
             }
 
@@ -345,9 +351,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await SyncTriggers(functionApp);
             }
 
-            // Linux Elastic Premium functions take longer to deploy. Right now, we cannot guarantee that functions info will be most up to date.
+            // Linux Elastic Premium functions take longer to deploy. So do Linux Dedicated Function Apps with remote build
+            // Right now, we cannot guarantee that functions info will be most up to date.
             // So, we only show the info, if Function App is not Linux Elastic Premium
-            if (!(functionApp.IsLinux && functionApp.IsElasticPremium))
+            // or a Linux Dedicated Function App with remote build
+            if (!(functionApp.IsLinux && functionApp.IsElasticPremium)
+                && !(isFunctionAppDedicatedLinux && PublishBuildOption == BuildOption.Remote))
             {
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
             }
@@ -366,6 +375,38 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
                 }
             }, retryCount: 5);
+        }
+
+        private async Task HandleLinuxDedicatedPublish(Func<Task<Stream>> zipStreamFactory, Site functionApp, WorkerRuntime workerRuntime, string fileNameNoExtension)
+        {
+            // Local build
+            if (BuildNativeDeps)
+            {
+                await PublishZipDeploy(functionApp, zipStreamFactory);
+                return;
+            }
+
+            // Remote build
+            // If Dedicated Linux, sync the correct Application Settings
+            var appSettingsUpdated = false;
+            if (functionApp.AzureAppSettings.ContainsKey("WEBSITE_RUN_FROM_PACKAGE"))
+            {
+                functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_PACKAGE");
+                appSettingsUpdated = true;
+            }
+            appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings) || appSettingsUpdated;
+            if (appSettingsUpdated)
+            {
+                var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+                if (!result.IsSuccessful)
+                {
+                    throw new CliException("Error updating Application Settings for the Function App for deployment.");
+                }
+                await WaitForAppSettingUpdateSCM(functionApp, functionApp.AzureAppSettings, timeOutSeconds: 300);
+            }
+
+            Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForDedicatedBuildToComplete(client, functionApp);
+            await PerformServerSideBuild(functionApp, zipStreamFactory, pollDedicatedBuild, attachRestrictedToken: false);
         }
 
         /// <summary>
@@ -400,7 +441,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         "WEBSITE_RUN_FROM_PACKAGE",
                         "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
                         "WEBSITE_CONTENTSHARE");
-                    var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask);
+                    Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
+                    var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask, pollConsumptionBuild);
                     return deployStatus == DeployStatus.Success;
                 }
             }
@@ -553,7 +595,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory)
+        public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask, bool attachRestrictedToken = true)
         {
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
@@ -564,25 +606,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
 
-                // Attach x-ms-site-restricted-token for Linux Consumption remote build
-                string restrictedToken = await KuduLiteDeploymentHelpers.GetRestrictedToken(functionApp, AccessToken, ManagementURL);
-
                 (var content, var length) = CreateStreamContentZip(await zipFileFactory());
                 request.Content = content;
-                request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
+
+                if (attachRestrictedToken)
+                {
+                    // Attach x-ms-site-restricted-token for Linux Consumption remote build
+                    string restrictedToken = await KuduLiteDeploymentHelpers.GetRestrictedToken(functionApp, AccessToken, ManagementURL);
+                    request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
+                }
 
                 HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
-                await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
+                await PublishHelper.CheckResponseStatusAsync(response, "Uploading archive...");
 
-                // Streaming deployment status for Linux Dynamic Server Side Build
-                DeployStatus status = await KuduLiteDeploymentHelpers.WaitForServerSideBuild(client, functionApp, AccessToken, ManagementURL);
+                // Streaming deployment status for Linux Server Side Build
+                DeployStatus status = await deploymentStatusPollTask(client);
+
                 if (status == DeployStatus.Success)
                 {
-                    ColoredConsole.WriteLine(Green("Server side build succeeded!"));
+                    ColoredConsole.WriteLine(Green("Remote build succeeded!"));
                 }
                 else if (status == DeployStatus.Failed)
                 {
-                    ColoredConsole.WriteLine(Red("Server side build failed!"));
+                    throw new CliException("Remote build failed!");
                 }
                 return status;
             }

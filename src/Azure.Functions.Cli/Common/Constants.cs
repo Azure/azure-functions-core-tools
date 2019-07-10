@@ -78,6 +78,13 @@ namespace Azure.Functions.Cli.Common
         {
             public const int ArmTokenExpiryMinutes = 4;
             public const int StatusRefreshSeconds = 3;
+
+            public static readonly IDictionary<string, string> LinuxDedicatedBuildSettings = new Dictionary<string, string>
+            {
+                { "ENABLE_ORYX_BUILD", "true" },
+                { "SCM_DO_BUILD_DURING_DEPLOYMENT", "1" },
+                { "BUILD_FLAGS", "UseExpressBuild" }
+            };
         }
 
         public static class DockerImages

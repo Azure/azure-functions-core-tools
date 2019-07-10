@@ -33,9 +33,9 @@ namespace Azure.Functions.Cli.Helpers
             return CachedARMRestrictedToken;
         }
 
-        public static async Task<DeployStatus> WaitForServerSideBuild(HttpClient client, Site functionApp, string accessToken, string managementUrl)
+        public static async Task<DeployStatus> WaitForConsumptionServerSideBuild(HttpClient client, Site functionApp, string accessToken, string managementUrl)
         {
-            ColoredConsole.WriteLine("Server side build in progress, please wait");
+            ColoredConsole.WriteLine("Remote build in progress, please wait...");
             DeployStatus statusCode = DeployStatus.Pending;
             DateTime logLastUpdate = DateTime.MinValue;
             string id = null;
@@ -56,6 +56,34 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return statusCode;
+        }
+
+        public static async Task<DeployStatus> WaitForDedicatedBuildToComplete(HttpClient client, Site functionApp)
+        {
+            // There is a tracked Locking issue in kudulite causing Race conditions, so we have to use this API
+            // to gather deployment progress.
+            ColoredConsole.Write("Remote build in progress, please wait");
+            while (true)
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/isdeploying", UriKind.Relative)))
+                {
+                    var response = await client.SendAsync(request);
+                    response.EnsureSuccessStatusCode();
+                    string jsonString = await response.Content.ReadAsStringAsync();
+                    var json = JsonConvert.DeserializeObject<IDictionary<string, bool>>(jsonString);
+
+                    bool isDeploying = json["value"];
+                    if (!isDeploying)
+                    {
+                        string deploymentId = await GetLatestDeploymentId(client, functionApp, restrictedToken: null);
+                        DeployStatus status = await GetDeploymentStatusById(client, functionApp, restrictedToken: null, id: deploymentId);
+                        ColoredConsole.Write($"done{Environment.NewLine}");
+                        return status;
+                    }
+                    ColoredConsole.Write(".");
+                    await Task.Delay(5000);
+                }
+            }
         }
 
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp, string restrictedToken)
