@@ -313,13 +313,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
                 // Elastic Premium Linux
-                await PublishRunFromPackage(functionApp, await zipStreamFactory(), $"{fileNameNoExtension}.zip");
+                shouldSyncTriggers = await HandleElasticPremiumLinuxPublish(functionApp, zipStreamFactory, $"{fileNameNoExtension}.zip");
             }
             else if (isFunctionAppDedicatedLinux)
             {
                 // Dedicated Linux
                 shouldSyncTriggers = false;
-                await HandleLinuxDedicatedPublish(zipStreamFactory, functionApp, GlobalCoreToolsSettings.CurrentWorkerRuntime, fileNameNoExtension);
+                await HandleLinuxDedicatedPublish(zipStreamFactory, functionApp);
             }
             else if (RunFromPackageDeploy)
             {
@@ -377,17 +377,36 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, retryCount: 5);
         }
 
-        private async Task HandleLinuxDedicatedPublish(Func<Task<Stream>> zipStreamFactory, Site functionApp, WorkerRuntime workerRuntime, string fileNameNoExtension)
+        private async Task<bool> HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory, string fileName)
         {
             // Local build
-            if (BuildNativeDeps)
+            if (PublishBuildOption != BuildOption.Remote)
+            {
+                await PublishRunFromPackage(functionApp, await zipStreamFactory(), fileName);
+                return true;
+            }
+
+            // Remote build
+            await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
+            return false;
+        }
+
+        private async Task HandleLinuxDedicatedPublish(Func<Task<Stream>> zipStreamFactory, Site functionApp)
+        {
+            // Local build
+            if (PublishBuildOption != BuildOption.Remote)
             {
                 await PublishZipDeploy(functionApp, zipStreamFactory);
                 return;
             }
 
             // Remote build
-            // If Dedicated Linux, sync the correct Application Settings
+            await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
+        }
+
+        private async Task PerformAppServiceRemoteBuild(Func<Task<Stream>> zipStreamFactory, Site functionApp)
+        {
+            // Sync the correct Application Settings required for remote build
             var appSettingsUpdated = false;
             if (functionApp.AzureAppSettings.ContainsKey("WEBSITE_RUN_FROM_PACKAGE"))
             {
