@@ -305,7 +305,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 HasStandardError = true,
                 ErrorContains = new[]
                 {
-                    $"Unable to find project root"
+                    $"Can't determin project langauge from files."
                 }
             }, _output);
         }

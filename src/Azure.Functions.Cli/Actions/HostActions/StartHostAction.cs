@@ -141,10 +141,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Parser.Parse(args);
         }
 
-        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, WorkerRuntime workerRuntime, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
+        private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
-            settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(workerRuntime, LanguageWorkerSetting));
+            settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
@@ -235,16 +235,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public override async Task RunAsync()
         {
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
-
-            if (workerRuntime == WorkerRuntime.None)
-            {
-                ColoredConsole.WriteLine(WarningColor("your worker runtime is not set. As of 2.0.1-beta.26 a worker runtime setting is required."))
-                    .WriteLine(WarningColor($"Please run `{AdditionalInfoColor($"func settings add {Constants.FunctionsWorkerRuntime} <option>")}` or add {Constants.FunctionsWorkerRuntime} to your local.settings.json"))
-                    .WriteLine(WarningColor($"Available options: {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}"));
-            }
-
-            await PreRunConditions(workerRuntime);
+            await PreRunConditions();
             Utilities.PrintLogo();
             Utilities.PrintVersion();
 
@@ -252,7 +243,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            IWebHost host = await BuildWebHost(settings, workerRuntime, listenUri, baseUri, certificate);
+            IWebHost host = await BuildWebHost(settings, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();
 
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
@@ -267,9 +258,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private async Task PreRunConditions(WorkerRuntime workerRuntime)
+        private async Task PreRunConditions()
         {
-            if (workerRuntime == WorkerRuntime.python)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python)
             {
                 await PythonHelpers.ValidatePythonVersion(setWorkerExecutable: true, errorIfNoExactMatch: true, errorOutIfOld: true);
                 // We need to update the PYTHONPATH to add worker's dependencies
@@ -284,7 +275,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine($"PYTHONPATH for the process is: {Environment.GetEnvironmentVariable("PYTHONPATH")}");
                 }
             }
-            else if (workerRuntime == WorkerRuntime.dotnet && !NoBuild)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && !NoBuild)
             {
                 if (DotnetHelpers.CanDotnetBuild())
                 {
@@ -297,7 +288,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
                 }
             }
-            else if (workerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
             {
                 throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
             }

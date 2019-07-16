@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -18,7 +15,6 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using System.Net;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -127,7 +123,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
 
             // Get the WorkerRuntime
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
@@ -292,28 +288,27 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (PublishBuildOption == BuildOption.Remote && BuildNativeDeps)
             {
                 throw new CliException("Cannot use '--build remote' along with '--build-native-deps'");
-            } else if (PublishBuildOption == BuildOption.Local ||
-                PublishBuildOption == BuildOption.Container ||
-                PublishBuildOption == BuildOption.None)
+            }
+            else if (PublishBuildOption == BuildOption.Local ||
+              PublishBuildOption == BuildOption.Container ||
+              PublishBuildOption == BuildOption.None)
             {
                 throw new CliException("The --build flag only supports '--build remote'");
             }
 
-            var workerRuntime = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
-            var workerRuntimeEnum = string.IsNullOrEmpty(workerRuntime) ? WorkerRuntime.None : WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
-            if (workerRuntimeEnum == WorkerRuntime.python && !functionApp.IsLinux)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
             {
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
 
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(workerRuntimeEnum, functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
             var fileNameNoExtension = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
             if (functionApp.IsLinux && functionApp.IsDynamic)
             {
                 // Consumption Linux
-                shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionAppRoot, functionApp, workerRuntimeEnum, fileNameNoExtension);
+                shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionAppRoot, functionApp, fileNameNoExtension);
             }
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
@@ -378,20 +373,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         /// </summary>
         /// <param name="functionAppRoot">Function App project path in local machine</param>
         /// <param name="functionApp">Function App in Azure</param>
-        /// <param name="workerRuntime">Function App worker runtime</param>
         /// <param name="fileNameNoExtension">Name of the file to be uploaded</param>
         /// <returns>ShouldSyncTrigger value</returns>
-        private async Task<bool> HandleLinuxConsumptionPublish(string functionAppRoot, Site functionApp, WorkerRuntime workerRuntime, string fileNameNoExtension)
+        private async Task<bool> HandleLinuxConsumptionPublish(string functionAppRoot, Site functionApp, string fileNameNoExtension)
         {
             // Choose if the content need to use remote build
-            BuildOption buildOption = PublishHelper.UpdateLinuxConsumptionBuildOption(PublishBuildOption, workerRuntime);
+            BuildOption buildOption = PublishHelper.UpdateLinuxConsumptionBuildOption(PublishBuildOption);
             GitIgnoreParser ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
 
             // We update the buildOption, so we need to update the zipFileStream factory as well
-            Func<Task<Stream>> zipFileStreamTask = () => ZipHelper.GetAppZipFile(workerRuntime, functionAppRoot, BuildNativeDeps, buildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipFileStreamTask = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, buildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // Consumption Linux, try squashfs as a package format.
-            if (workerRuntime == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || buildOption == BuildOption.Remote))
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || buildOption == BuildOption.Remote))
             {
                 if (BuildNativeDeps)
                 {
