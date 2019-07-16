@@ -175,6 +175,12 @@ namespace Azure.Functions.Cli.Kubernetes
                 scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
             }
 
+            // Set worker runtime if needed.
+            if (!secrets.ContainsKey(Constants.FunctionsWorkerRuntime))
+            {
+                secrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
+            }
+
             if (useConfigMap)
             {
                 var configMap = GetConfigMap(name, @namespace, secrets);

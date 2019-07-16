@@ -24,13 +24,13 @@ namespace Azure.Functions.Cli.Helpers
             return null;
         }
 
-        public static BuildOption UpdateLinuxConsumptionBuildOption(BuildOption currentBuildOption, WorkerRuntime workerRuntime)
+        public static BuildOption UpdateLinuxConsumptionBuildOption(BuildOption currentBuildOption)
         {
             return currentBuildOption;
         }
 
         public static async Task<HttpResponseMessage> InvokeLongRunningRequest(HttpClient client,
-            ProgressMessageHandler handler, HttpRequestMessage request, long requestSize=0, string prompt=null)
+            ProgressMessageHandler handler, HttpRequestMessage request, long requestSize = 0, string prompt = null)
         {
             if (prompt == null)
             {
@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task CheckResponseStatusAsync(HttpResponseMessage response, string message=null)
+        public static async Task CheckResponseStatusAsync(HttpResponseMessage response, string message = null)
         {
             if (message == null)
             {

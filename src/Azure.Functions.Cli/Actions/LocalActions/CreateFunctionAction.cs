@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            var workerRuntime = WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage(_secretsManager);
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             var templates = await _templatesManager.Templates;
 
             if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))

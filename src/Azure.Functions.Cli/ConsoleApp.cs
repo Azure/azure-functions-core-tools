@@ -169,6 +169,8 @@ namespace Azure.Functions.Cli
                 .Select(type => type.GetCustomAttributes<ActionAttribute>().Select(a => new TypeAttributePair { Type = type, Attribute = a }))
                 .SelectMany(i => i);
 
+            // Check if there is a --prefix or --script-root and update CurrentDirectory
+            UpdateCurrentDirectory(args);
             GlobalCoreToolsSettings.Init(container.Resolve<ISecretsManager>(), args);
         }
 
@@ -294,8 +296,6 @@ namespace Azure.Functions.Cli
             // This will be passed into the action as actions can optionally take args for their options.
             var args = argsStack.ToArray();
 
-            // Check if there is a --prefix or --script-root and update CurrentDirectory
-            UpdateCurrentDirectory(args);
             try
             {
                 // Give the action a change to parse its args.

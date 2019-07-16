@@ -19,15 +19,40 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        public static WorkerRuntime CurrentWorkerRuntimeOrNone
+        {
+            get
+            {
+                return _currentWorkerRuntime;
+            }
+        }
+
+        public static string CurrentLanguageOrNull { get; private set; } = null;
+
         public static void Init(ISecretsManager secretsManager, string[] args)
         {
             try
             {
-                if (args.Contains("--csharp") || args.Contains("--dotnet"))
+                if (args.Contains("--csharp"))
+                {
+                    _currentWorkerRuntime = WorkerRuntime.dotnet;
+                    CurrentLanguageOrNull = "csharp";
+                }
+                else if (args.Contains("--dotnet"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.dotnet;
                 }
-                else if (args.Contains("--javascript") || args.Contains("--typescript") || args.Contains("--node"))
+                else if (args.Contains("--javascript"))
+                {
+                    _currentWorkerRuntime = WorkerRuntime.node;
+                    CurrentLanguageOrNull = "javascript";
+                }
+                else if (args.Contains("--typescript"))
+                {
+                    _currentWorkerRuntime = WorkerRuntime.node;
+                    CurrentLanguageOrNull = "typescript";
+                }
+                else if (args.Contains("--node"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.node;
                 }
