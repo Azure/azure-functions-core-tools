@@ -402,7 +402,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Remote build don't need sync trigger, container will be deallocated once the build is finished
                 if (buildOption == BuildOption.Remote)
                 {
-                    await RemoveFunctionAppAppSetting(functionApp, "WEBSITE_RUN_FROM_PACKAGE");
+                    await RemoveFunctionAppAppSetting(functionApp,
+                        "WEBSITE_RUN_FROM_PACKAGE",
+                        "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                        "WEBSITE_CONTENTSHARE");
                     var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask);
                     return deployStatus == DeployStatus.Success;
                 }
@@ -509,17 +512,26 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task RemoveFunctionAppAppSetting(Site functionApp, string appSettingName)
+        private async Task RemoveFunctionAppAppSetting(Site functionApp, params string[] appSettingNames)
         {
-            if (functionApp.AzureAppSettings.ContainsKey(appSettingName))
+            bool isAppSettingUpdated = false;
+            foreach (string appSettingName in appSettingNames)
             {
-                var appSettingValue = functionApp.AzureAppSettings[appSettingName];
-                ColoredConsole.WriteLine(Yellow($"Removing {appSettingName} app setting ({appSettingValue})"));
-                functionApp.AzureAppSettings.Remove(appSettingName);
+                if (functionApp.AzureAppSettings.ContainsKey(appSettingName))
+                {
+                    var appSettingValue = functionApp.AzureAppSettings[appSettingName];
+                    ColoredConsole.WriteLine(Yellow($"Removing {appSettingName} app setting ({appSettingValue})"));
+                    functionApp.AzureAppSettings.Remove(appSettingName);
+                    isAppSettingUpdated = true;
+                }
+            }
+
+            if (isAppSettingUpdated)
+            {
                 var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
                 if (!result.IsSuccessful)
                 {
-                    throw new CliException($"Error remove {appSettingName}: {result.ErrorResult}.");
+                    throw new CliException($"Error when removing app settings: {result.ErrorResult}.");
                 }
                 await Task.Delay(TimeSpan.FromSeconds(5));
             }
