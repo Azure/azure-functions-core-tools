@@ -382,6 +382,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Local build
             if (PublishBuildOption != BuildOption.Remote)
             {
+                await EnsureNoKuduLiteBuildSettings(functionApp);
                 await PublishRunFromPackage(functionApp, await zipStreamFactory(), fileName);
                 return true;
             }
@@ -396,6 +397,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Local build
             if (PublishBuildOption != BuildOption.Remote)
             {
+                await EnsureNoKuduLiteBuildSettings(functionApp);
                 await PublishZipDeploy(functionApp, zipStreamFactory);
                 return;
             }
@@ -419,7 +421,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
                 if (!result.IsSuccessful)
                 {
-                    throw new CliException("Error updating Application Settings for the Function App for deployment.");
+                    throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
                 }
                 await WaitForAppSettingUpdateSCM(functionApp, functionApp.AzureAppSettings, timeOutSeconds: 300);
             }
@@ -496,7 +498,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
-        private async Task WaitForAppSettingUpdateSCM(Site functionApp, IDictionary<string, string> settings, int timeOutSeconds)
+        private async Task WaitForAppSettingUpdateSCM(Site functionApp, IDictionary<string, string> settings, bool strictEqual = false, int timeOutSeconds = 300)
         {
             const int retryTimeoutSeconds = 5;
 
@@ -523,7 +525,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             ColoredConsole.WriteLine(Environment.NewLine);
                         }
 
-                        if (settings.Intersect(scmSettingsDict).Count() == settings.Count())
+                        // Checks for strictly equal or
+                        // if all settings are present in dictionary
+                        if ((strictEqual && settings.Count == scmSettingsDict.Count && !settings.Except(scmSettingsDict).Any())
+                            || (settings.Intersect(scmSettingsDict).Count() == settings.Count))
                         {
                             // All settings are updated in scm
                             return;
@@ -564,6 +569,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (!result.IsSuccessful)
             {
                 throw new CliException($"Error updating app settings: {result.ErrorResult}.");
+            }
+        }
+
+        private async Task EnsureNoKuduLiteBuildSettings(Site functionApp)
+        {
+            var anySettingsRemoved = functionApp.AzureAppSettings.RemoveIfKeyValPresent(Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings);
+            if (anySettingsRemoved)
+            {
+                var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+                if (!result.IsSuccessful)
+                {
+                    throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
+                }
+                await WaitForAppSettingUpdateSCM(functionApp, functionApp.AzureAppSettings, strictEqual: true, timeOutSeconds: 300);
             }
         }
 

@@ -29,5 +29,22 @@ namespace Azure.Functions.Cli.Extensions
             }
             return updated;
         }
+
+        public static bool RemoveIfKeyValPresent(this IDictionary<string, string> dictionary, IDictionary<string, string> another)
+        {
+            bool removed = false;
+            foreach (var anotherKeyValPair in another)
+            {
+                if (dictionary.TryGetValue(anotherKeyValPair.Key, out string myVal))
+                {
+                    if (myVal.Equals(anotherKeyValPair.Value, StringComparison.OrdinalIgnoreCase))
+                    {
+                        dictionary.Remove(anotherKeyValPair.Key);
+                        removed = true;
+                    }
+                }
+            }
+            return removed;
+        }
     }
 }

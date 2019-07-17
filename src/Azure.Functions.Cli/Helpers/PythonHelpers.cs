@@ -251,14 +251,15 @@ namespace Azure.Functions.Cli.Helpers
             var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
             if (FileSystemHelpers.DirectoryExists(packagesLocation))
             {
-                // Only update packages if checksum of requirements.txt does not match or a sync is forced
-                if (await ArePackagesInSync(reqTxtFile, packagesLocation))
+                // Only update packages if checksum of requirements.txt does not match
+                // If build option is remote, we don't need to verify if packages are in sync, as we need to delete them regardless
+                if (buildOption != BuildOption.Remote && await ArePackagesInSync(reqTxtFile, packagesLocation))
                 {
                     ColoredConsole.WriteLine(Yellow($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
                     return ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
                 }
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
-                FileSystemHelpers.DeleteDirectorySafe(Path.Combine(functionAppRoot, Constants.ExternalPythonPackages));
+                FileSystemHelpers.DeleteDirectorySafe(packagesLocation);
             }
 
             FileSystemHelpers.EnsureDirectory(packagesLocation);
