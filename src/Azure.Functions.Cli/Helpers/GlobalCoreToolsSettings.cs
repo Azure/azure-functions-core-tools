@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     return _currentWorkerRuntime;
                 }
-                throw new Exception("Can't determin project langauge from files. Please use one of [--csharp, --javascript, --typescript, --java, --python, --powershell]");
+                throw new Exception("Can't determine project language from files. Please use one of [--csharp, --javascript, --typescript, --java, --python, --powershell]");
             }
         }
 
