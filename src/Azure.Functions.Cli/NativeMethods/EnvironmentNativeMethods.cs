@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using Azure.Functions.Cli.Common;
+using Colors.Net;
 
 namespace Azure.Functions.Cli.NativeMethods
 {
@@ -23,7 +25,10 @@ namespace Azure.Functions.Cli.NativeMethods
                 // There is no safe native way to call into libc setenv on unix from .NET
                 // .NET takes a snapshot of environ on process start and updates that snapshot.
                 // Any changes through setenv() are ignored.
-                throw new NotImplementedException("Setting unsupported .NET environemt variables (empty string) is not implemented.");
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine("Setting unsupported .NET environemt variables (empty string) is not implemented for this platform.");
+                }
             }
         }
     }
