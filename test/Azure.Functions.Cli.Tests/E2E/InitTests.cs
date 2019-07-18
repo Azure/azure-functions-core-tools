@@ -305,7 +305,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 HasStandardError = true,
                 ErrorContains = new[]
                 {
-                    $"Can't determin project langauge from files."
+                    $"Can't determine project language from files."
                 }
             }, _output);
         }
