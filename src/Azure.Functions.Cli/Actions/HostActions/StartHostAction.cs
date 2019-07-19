@@ -154,7 +154,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 defaultBuilder
                 .UseKestrel(options =>
                 {
-                    options.Listen(IPAddress.Loopback, listenAddress.Port, listenOptins =>
+                    options.Listen(IPAddress.Any, listenAddress.Port, listenOptins =>
                     {
                         listenOptins.UseHttps(certificate);
                     });
@@ -210,12 +210,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 }
                 else if (!string.IsNullOrEmpty(secret.Value))
                 {
-                    ColoredConsole.WriteLine(DarkGray($".NET Setting {secret.Key} = {secret.Value}"));
                     Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
                 }
                 else if (secret.Value == string.Empty)
                 {
-                    ColoredConsole.WriteLine(DarkGray($"Windows Setting {secret.Key} = {secret.Value}"));
                     EnvironmentNativeMethods.SetEnvironmentVariable(secret.Key, secret.Value);
                 }
                 else
