@@ -84,7 +84,8 @@ namespace Azure.Functions.Cli.Common
             {
                 { "ENABLE_ORYX_BUILD", "true" },
                 { "SCM_DO_BUILD_DURING_DEPLOYMENT", "1" },
-                { "BUILD_FLAGS", "UseExpressBuild" }
+                { "BUILD_FLAGS", "UseExpressBuild" },
+                { "XDG_CACHE_HOME", "/tmp/.cache" }
             };
         }
 

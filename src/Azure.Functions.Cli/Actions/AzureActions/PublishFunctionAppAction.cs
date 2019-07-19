@@ -418,6 +418,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings) || appSettingsUpdated;
             if (appSettingsUpdated)
             {
+                ColoredConsole.WriteLine("Updating Application Settings for Remote build...");
                 var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
                 if (!result.IsSuccessful)
                 {
@@ -653,7 +654,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     string restrictedToken = await KuduLiteDeploymentHelpers.GetRestrictedToken(functionApp, AccessToken, ManagementURL);
                     request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
                 }
-
                 HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
                 await PublishHelper.CheckResponseStatusAsync(response, "Uploading archive...");
 
