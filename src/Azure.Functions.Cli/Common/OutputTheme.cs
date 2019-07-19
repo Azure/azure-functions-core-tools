@@ -13,5 +13,6 @@ namespace Azure.Functions.Cli.Common
         public static RichString ErrorColor(string value) => Red(value);
         public static RichString QuestionColor(string value) => Magenta(value);
         public static RichString WarningColor(string value) => Yellow(value);
+        public static RichString QuietWarningColor(string value) => DarkGray(value);
     }
 }
