@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -11,11 +13,11 @@ namespace Azure.Functions.Cli.Helpers
         {
             get
             {
-                if (_currentWorkerRuntime != WorkerRuntime.None)
+                if (_currentWorkerRuntime == WorkerRuntime.None)
                 {
-                    return _currentWorkerRuntime;
+                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--csharp, --javascript, --typescript, --java, --python, --powershell]"));
                 }
-                throw new Exception("Can't determin project langauge from files. Please use one of [--csharp, --javascript, --typescript, --java, --python, --powershell]");
+                return _currentWorkerRuntime;
             }
         }
 
