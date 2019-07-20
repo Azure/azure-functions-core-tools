@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Helpers
             const string py3Str = "3.";
             const string warningMessage = "Python 3.6.x is recommended, and used in Azure Functions. You are using Python version {0}.";
             const string errorIfNotExactMessage = "Python 3.6.x is required, and used in Azure Functions. You are using Python version {0}. "
-                + "Please install Python 3.6, and use a virutal environment to switch to Python 3.6.";
+                + "Please install Python 3.6, and use a virtual environment to switch to Python 3.6.";
             const string errorMessageOldPy = "Python 3.x (recommended version 3.6.x) is required. Found python versions ({0}).";
             const string errorMessageNoPy = "Python 3.x (recommended version 3.6.x) is required. No Python versions were found.";
 
@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Helpers
                 return exeWith36KeyPair[0].Key;
             }
 
-            // If any of the possible python exectuables are 3.x, we warn them and go ahead.
+            // If any of the possible python executables are 3.x, we warn them and go ahead.
             var exeWith3KeyPair = exeToVersion.Where(kv => kv.Value.Contains(py3Str)).ToList();
             if (exeWith3KeyPair.Count() != 0)
             {
