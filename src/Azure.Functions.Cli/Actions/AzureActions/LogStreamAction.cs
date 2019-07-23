@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             var subscriptions = await AzureHelper.GetSubscriptions(AccessToken, ManagementURL);
             ColoredConsole.WriteLine("Retrieving Function App...");
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, allSubs: subscriptions);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, allSubs: subscriptions);
             if (UseBrowser)
             {
                 await OpenLiveStreamInBrowser(functionApp, subscriptions);
