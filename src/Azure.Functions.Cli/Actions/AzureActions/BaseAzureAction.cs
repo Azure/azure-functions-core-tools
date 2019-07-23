@@ -91,23 +91,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 ManagementURL = await GetManagementURL();
             }
-
-            if (string.IsNullOrEmpty(Subscription))
-            {
-                Subscription = await GetDefaultSubscription();
-            }
-        }
-
-        private async Task<string> GetDefaultSubscription()
-        {
-            try
-            {
-                return await RunAzCLICommand("account show --query \"id\" --output json");
-            }
-            catch (Exception)
-            {
-                return null;
-            }
         }
 
         private async Task<string> GetManagementURL()

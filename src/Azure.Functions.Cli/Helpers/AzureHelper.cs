@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
@@ -18,96 +19,89 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static string _storageApiVersion = "2018-02-01";
 
-        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string defaultSubscription = null, ArmSubscriptionsArray allSubs = null)
+        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, ArmSubscriptionsArray allSubs = null)
         {
-            if (!string.IsNullOrEmpty(defaultSubscription))
+            IEnumerable<string> allSubscriptionIds;
+            if (defaultSubscription != null)
             {
-                var result = await TryGetFunctionApp(name, accessToken, managementURL, defaultSubscription);
-                if (result != null)
-                {
-                    return result;
-                }
+                allSubscriptionIds = new string[] { defaultSubscription };
+            }
+            else
+            {
+                var subscriptions = (allSubs ?? await GetSubscriptions(accessToken, managementURL)).value;
+                allSubscriptionIds = subscriptions.Select(sub => sub.subscriptionId);
             }
 
-            var subscriptions = allSubs ?? await GetSubscriptions(accessToken, managementURL);
-            foreach (var subscription in subscriptions.value)
+            var result = await TryGetFunctionAppFromArg(name, allSubscriptionIds, accessToken, managementURL, slot);
+            if (result != null)
             {
-                var result = await TryGetFunctionApp(name, accessToken, managementURL, subscription.subscriptionId);
-                if (result != null)
-                {
-                    return result;
-                }
+                return result;
             }
 
-            throw new ArmResourceNotFoundException($"Can't find app with name \"{name}\"");
+            var errorMsg = slot == null
+                ? $"Can't find app with name \"{name}\""
+                : $"Can't find the function app slot with name \"{slot}\"";
+
+            throw new ArmResourceNotFoundException(errorMsg);
         }
 
-        private static async Task<Site> TryGetFunctionApp(string name, string accessToken, string managementURL, string subscription)
+        private static async Task<Site> TryGetFunctionAppFromArg(string name, IEnumerable<string> subscriptions, string accessToken, string managementURL, string slot = null)
         {
+            var resourceType = "Microsoft.Web/sites";
+            var resourceName = name;
+            if (slot != null)
+            {
+                resourceType = "Microsoft.Web/sites/slots";
+                resourceName = $"{name}/{slot}";
+            }
+            var query = $"where type =~ '{resourceType}' and name =~ '{resourceName}' | project id";
+
             try
             {
-                var functionApps = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
-                HttpMethod.Get,
-                ArmUriTemplates.SubscriptionResourceByNameAndType.Bind(managementURL, new
-                {
-                    subscriptionId = subscription,
-                    resourceType = "Microsoft.Web/sites",
-                    resourceName = name
-                }),
-                accessToken);
-
-                // If we haven't found the functionapp, and there is a next page, keep going
-                while (!functionApps.value.Any() && !string.IsNullOrEmpty(functionApps.nextLink))
-                {
-                    try
-                    {
-                        functionApps = await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(HttpMethod.Get, new Uri(functionApps.nextLink), accessToken);
-                    }
-                    catch (Exception)
-                    {
-                        // If we can't go to the next page for some reason, just move on for now
-                        break;
-                    }
-                }
-
-                if (functionApps.value.Any())
-                {
-                    var app = new Site(functionApps.value.First().id);
-                    await LoadFunctionApp(app, accessToken, managementURL);
-                    return app;
-                }
+                string siteId = await GetResourceIDFromArg(subscriptions, query, accessToken, managementURL);
+                var app = new Site(siteId);
+                await LoadFunctionApp(app, accessToken, managementURL);
+                return app;
             }
             catch { }
-
             return null;
         }
 
         internal static async Task<string> GetApplicationInsightIDFromIKey(string iKey, string accessToken, string managementURL, ArmSubscriptionsArray allSubs = null)
         {
-            const string appInsightsError = "Could not find the Application Insights using the configured Instrumentation Key.";
-
             var allArmSubscriptions = (allSubs ?? await GetSubscriptions(accessToken, managementURL)).value;
             var allSubscriptionIds = allArmSubscriptions.Select(sub => sub.subscriptionId);
 
+            var query = $"where type =~ 'Microsoft.Insights/components' and properties.InstrumentationKey == '{iKey}' | project id";
+
+            try
+            {
+                return await GetResourceIDFromArg(allSubscriptionIds, query, accessToken, managementURL);
+            }
+            catch
+            {
+                throw new CliException("Could not find the Application Insights using the configured Instrumentation Key.");
+            }
+        }
+
+        internal static async Task<string> GetResourceIDFromArg(IEnumerable<string> subIds, string query, string accessToken, string managementURL)
+        {
             var url = new Uri($"{managementURL}/{ArmUriTemplates.ArgUri}?api-version={ArmUriTemplates.ArgApiVersion}");
             var bodyObject = new
             {
-                subscriptions = allSubscriptionIds,
-                query = $"where type =~ 'Microsoft.Insights/components' and properties.InstrumentationKey == '{iKey}' | project id"
+                subscriptions = subIds,
+                query
             };
 
             var response = await ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken, objectPayload: bodyObject);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new CliException(appInsightsError);
-            }
+            response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadAsStringAsync();
             var argResponse = JsonConvert.DeserializeObject<ArgResponse>(result);
 
             // we need the first item of the first row
             return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
-                ?? throw new CliException(appInsightsError);
+                ?? throw new CliException("Error finding the Azure Resource information.");
         }
 
         internal static ArmResourceId ParseResourceId(string resourceId)
