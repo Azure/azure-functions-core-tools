@@ -54,6 +54,7 @@ namespace Azure.Functions.Cli.Common
             public const string PidAndAllAreMutuallyExclusive = "-p/--processId and -a/--all are mutually exclusive";
             public const string EitherPidOrAllMustBeSpecified = "Must specify either -a/--all or -p/--processId <Pid>";
             public const string ExtensionsNeedDotnet = "Extensions command requires dotnet on your path. Please make sure to install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download";
+            public const string UnableToUpdateAppSettings = "Error updating Application Settings for the Function App for deployment.";
         }
 
         public static class Languages
@@ -78,6 +79,14 @@ namespace Azure.Functions.Cli.Common
         {
             public const int ArmTokenExpiryMinutes = 4;
             public const int StatusRefreshSeconds = 3;
+
+            public static readonly IDictionary<string, string> LinuxDedicatedBuildSettings = new Dictionary<string, string>
+            {
+                { "ENABLE_ORYX_BUILD", "true" },
+                { "SCM_DO_BUILD_DURING_DEPLOYMENT", "1" },
+                { "BUILD_FLAGS", "UseExpressBuild" },
+                { "XDG_CACHE_HOME", "/tmp/.cache" }
+            };
         }
 
         public static class DockerImages

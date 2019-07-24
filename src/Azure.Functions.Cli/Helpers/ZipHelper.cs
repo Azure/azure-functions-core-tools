@@ -26,8 +26,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 ColoredConsole.WriteLine(Yellow("Perform remote build for functions project (--build remote)."));
             }
-
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !noBuild && buildOption != BuildOption.Remote)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !noBuild)
             {
                 return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, buildOption, additionalPackages);
             }
