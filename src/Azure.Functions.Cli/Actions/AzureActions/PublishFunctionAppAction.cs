@@ -129,7 +129,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // before starting any of the publish activity.
             var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
 
-            if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild)
+            if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild && PublishBuildOption != BuildOption.Remote)
             {
                 if (DotnetHelpers.CanDotnetBuild())
                 {
@@ -448,24 +448,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Func<Task<Stream>> zipFileStreamTask = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, buildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // Consumption Linux, try squashfs as a package format.
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || buildOption == BuildOption.Remote))
+            if (buildOption == BuildOption.Remote)
+            {
+                await RemoveFunctionAppAppSetting(functionApp,
+                    "WEBSITE_RUN_FROM_PACKAGE",
+                    "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                    "WEBSITE_CONTENTSHARE");
+                Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
+                var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask, pollConsumptionBuild);
+                return deployStatus == DeployStatus.Success;
+            }
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.python && !NoBuild && BuildNativeDeps)
             {
                 if (BuildNativeDeps)
                 {
                     await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipFileStreamTask()), $"{fileNameNoExtension}.squashfs");
                     return true;
-                }
-
-                // Remote build don't need sync trigger, container will be deallocated once the build is finished
-                if (buildOption == BuildOption.Remote)
-                {
-                    await RemoveFunctionAppAppSetting(functionApp,
-                        "WEBSITE_RUN_FROM_PACKAGE",
-                        "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
-                        "WEBSITE_CONTENTSHARE");
-                    Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
-                    var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask, pollConsumptionBuild);
-                    return deployStatus == DeployStatus.Success;
                 }
             }
             else
