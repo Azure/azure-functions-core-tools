@@ -30,8 +30,8 @@
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.csx">
-      <LogicalName>$(AssemblyName).Dockerfile.csx</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.csx.dotnet">
+      <LogicalName>$(AssemblyName).Dockerfile.csx.dotnet</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>

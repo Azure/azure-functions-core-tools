@@ -144,7 +144,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, "csharp".Equals(GlobalCoreToolsSettings.CurrentLanguageOrNull, StringComparison.OrdinalIgnoreCase));
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Csx);
         }
 
         private async Task InitFunctionAppProject()
@@ -305,9 +305,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (workerRuntime == Helpers.WorkerRuntime.dotnet)
             {
-                if (csx) 
+                if (csx)
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileCsx);
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileCsxDotNet);
                 }
                 else
                 {
