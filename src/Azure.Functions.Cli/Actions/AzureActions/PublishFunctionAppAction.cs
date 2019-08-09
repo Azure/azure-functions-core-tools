@@ -84,6 +84,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Parser
                 .Setup<BuildOption>('b', "build")
                 .SetDefault(BuildOption.Default)
+                .WithDescription("Perform build action when deploying to a Linux function app. (accepts: remote)")
                 .Callback(bo => PublishBuildOption = bo);
             Parser
                 .Setup<bool>("no-bundler")
