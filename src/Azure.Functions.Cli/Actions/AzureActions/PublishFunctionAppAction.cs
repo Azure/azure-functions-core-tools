@@ -279,11 +279,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // For dedicated linux apps, we do not support run from package right now
             var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
-            if (isFunctionAppDedicatedLinux && RunFromPackageDeploy && PublishBuildOption != BuildOption.Remote)
-            {
-                ColoredConsole.WriteLine("Assuming --nozip (do not run from package) for publishing to Linux dedicated plan.");
-                RunFromPackageDeploy = false;
-            }
 
             // For Python linux apps, we do not support --build remote with --build-native-deps flag
             if (PublishBuildOption == BuildOption.Remote && BuildNativeDeps)
@@ -399,7 +394,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (PublishBuildOption != BuildOption.Remote)
             {
                 await EnsureNoKuduLiteBuildSettings(functionApp);
-                await PublishZipDeploy(functionApp, zipStreamFactory);
+                await PublishRunFromPackageLocal(functionApp, zipStreamFactory);
                 return;
             }
 
