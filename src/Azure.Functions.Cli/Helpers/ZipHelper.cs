@@ -34,9 +34,13 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new CliException("Pack command doesn't work for dotnet functions");
             }
-            else
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && buildOption == BuildOption.Remote)
             {
-                return CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot);
+                // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
+                return CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot);
+            } else
+            {
+                return CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot);
             }
         }
 
