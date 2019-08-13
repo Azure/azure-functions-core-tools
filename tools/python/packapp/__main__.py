@@ -202,7 +202,7 @@ def build_independent_wheel(name, version, args, dest):
 
 def build_binary_wheel(name, version, args, dest):
     die(f'cannot install {name}-{version} dependency: binary dependencies '
-        f'without wheels are not supported.  Use the --build-native-deps option '
+        f'without wheels are not supported.  Use the "--build remote" or "--build-native-deps" option '
         f'to automatically build and configure the dependencies using a Docker container. '
         f'More information at https://aka.ms/func-python-publish', ExitCode.native_deps_error)
 
