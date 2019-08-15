@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (!FileSystemHelpers.FileExists(Constants.RequirementsTxt))
             {
-                FileSystemHelpers.CreateFile(Constants.RequirementsTxt);
+                FileSystemHelpers.WriteAllTextToFile(Constants.RequirementsTxt, Constants.PythonFunctionsLibrary);
             }
             else
             {

@@ -4,4 +4,3 @@
 .vscode
 local.settings.json
 test
-tsconfig.json
