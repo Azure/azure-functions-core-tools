@@ -635,6 +635,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask, bool attachRestrictedToken = true)
         {
+            if (string.IsNullOrEmpty(functionApp.ScmUri))
+            {
+                throw new CliException($"Your function app {functionApp.SiteName} does not support remote build. " + 
+                    "To enable remote build, please update your function app to the latest verison by recreating it.");
+            }
+
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
