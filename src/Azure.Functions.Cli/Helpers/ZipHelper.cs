@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Colors.Net;
+using Ionic.Zip;
 using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
@@ -48,17 +48,22 @@ namespace Azure.Functions.Cli.Helpers
         {
             const int defaultBufferSize = 4096;
             var fileStream = new FileStream(Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite, defaultBufferSize, FileOptions.DeleteOnClose);
-
-            using (var zip = new ZipArchive(fileStream, ZipArchiveMode.Create, leaveOpen: true))
+            using (ZipFile zip = new ZipFile())
             {
-                foreach (var fileName in files)
+                zip.CompressionLevel = Ionic.Zlib.CompressionLevel.BestSpeed;
+                foreach (var file in files)
                 {
-                    zip.AddFile(fileName, fileName, rootPath);
+                    zip.AddFile(file.FixFileNameForZip(rootPath));
                 }
+                zip.Save(fileStream);
             }
-
             fileStream.Seek(0, SeekOrigin.Begin);
             return fileStream;
+        }
+
+        public static string FixFileNameForZip(this string value, string zipRoot)
+        {
+            return value.Substring(zipRoot.Length).TrimStart(new[] { '\\', '/' }).Replace('\\', '/');
         }
     }
 }
