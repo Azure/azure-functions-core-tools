@@ -51,9 +51,9 @@ namespace Azure.Functions.Cli.Helpers
             using (ZipFile zip = new ZipFile())
             {
                 zip.CompressionLevel = Ionic.Zlib.CompressionLevel.BestSpeed;
-                foreach (var fileName in files)
+                foreach (var file in files)
                 {
-                    zip.AddFile(fileName, fileName, rootPath);
+                    zip.AddFile(file.FixFileNameForZip(rootPath));
                 }
                 zip.Save(fileStream);
             }
