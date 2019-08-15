@@ -30,6 +30,7 @@ namespace Azure.Functions.Cli.Common
         public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
         public const string PythonDockerImageSkipPull = "FUNCTIONS_PYTHON_DOCKER_SKIP_PULL";
         public const string PythonDockerRunCommand = "FUNCTIONS_PYTHON_DOCKER_RUN_COMMAND";
+        public const string PythonFunctionsLibrary = "azure-functions";
         public const string FunctionsCoreToolsEnvironment = "FUNCTIONS_CORETOOLS_ENVIRONMENT";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
