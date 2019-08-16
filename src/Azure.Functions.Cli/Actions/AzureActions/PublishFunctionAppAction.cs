@@ -84,6 +84,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Parser
                 .Setup<BuildOption>('b', "build")
                 .SetDefault(BuildOption.Default)
+                .WithDescription("Perform build action when deploying to a Linux function app. (accepts: remote)")
                 .Callback(bo => PublishBuildOption = bo);
             Parser
                 .Setup<bool>("no-bundler")
@@ -129,7 +130,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // before starting any of the publish activity.
             var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
 
-            if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild)
+            if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild && PublishBuildOption != BuildOption.Remote)
             {
                 if (DotnetHelpers.CanDotnetBuild())
                 {
@@ -448,24 +449,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Func<Task<Stream>> zipFileStreamTask = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, buildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             // Consumption Linux, try squashfs as a package format.
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.python && !NoBuild && (BuildNativeDeps || buildOption == BuildOption.Remote))
+            if (buildOption == BuildOption.Remote)
+            {
+                await RemoveFunctionAppAppSetting(functionApp,
+                    "WEBSITE_RUN_FROM_PACKAGE",
+                    "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                    "WEBSITE_CONTENTSHARE");
+                Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
+                var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask, pollConsumptionBuild);
+                return deployStatus == DeployStatus.Success;
+            }
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.python && !NoBuild && BuildNativeDeps)
             {
                 if (BuildNativeDeps)
                 {
                     await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipFileStreamTask()), $"{fileNameNoExtension}.squashfs");
                     return true;
-                }
-
-                // Remote build don't need sync trigger, container will be deallocated once the build is finished
-                if (buildOption == BuildOption.Remote)
-                {
-                    await RemoveFunctionAppAppSetting(functionApp,
-                        "WEBSITE_RUN_FROM_PACKAGE",
-                        "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
-                        "WEBSITE_CONTENTSHARE");
-                    Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
-                    var deployStatus = await PerformServerSideBuild(functionApp, zipFileStreamTask, pollConsumptionBuild);
-                    return deployStatus == DeployStatus.Success;
                 }
             }
             else
@@ -636,6 +635,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask, bool attachRestrictedToken = true)
         {
+            if (string.IsNullOrEmpty(functionApp.ScmUri))
+            {
+                throw new CliException($"Your function app {functionApp.SiteName} does not support remote build. " + 
+                    "To enable remote build, please update your function app to the latest verison by recreating it.");
+            }
+
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
