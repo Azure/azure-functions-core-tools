@@ -137,6 +137,25 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_Dockerfile_for_csx()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet --docker --csx" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentNotContains = new[] { "dotnet publish" },
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:2.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_csx_app()
         {
             return CliTester.Run(new RunConfiguration
@@ -287,6 +306,29 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         Name = "Dockerfile",
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:2.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_docker_only_for_csx_project()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime dotnet --csx",
+                    $"init . --docker-only --csx",
+                },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentNotContains = new[] { "dotnet publish" },
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:2.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
