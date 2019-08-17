@@ -144,7 +144,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime);
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Csx);
         }
 
         private async Task InitFunctionAppProject()
@@ -181,7 +181,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(workerRuntime);
+                await WriteDockerfile(workerRuntime, Csx);
             }
         }
 
@@ -301,11 +301,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
-        private static async Task WriteDockerfile(WorkerRuntime workerRuntime)
+        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, bool csx)
         {
             if (workerRuntime == Helpers.WorkerRuntime.dotnet)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
+                if (csx)
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileCsxDotNet);
+                }
+                else
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
+                }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
