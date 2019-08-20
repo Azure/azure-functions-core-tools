@@ -81,9 +81,6 @@ namespace Azure.Functions.Cli.Helpers
                     case WorkerRuntime.powershell:
                         workerToDisplayStrings[wr] = "powershell (preview)";
                         break;
-                    case WorkerRuntime.python:
-                        workerToDisplayStrings[wr] = "python (preview)";
-                        break;
                     default:
                         workerToDisplayStrings[wr] = wr.ToString();
                         break;

@@ -632,8 +632,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             if (string.IsNullOrEmpty(functionApp.ScmUri))
             {
-                throw new CliException($"Your function app {functionApp.SiteName} does not support remote build. " + 
-                    "To enable remote build, please update your function app to the latest verison by recreating it.");
+                throw new CliException("Remote build is a new feature added to function apps. " +
+                    $"Your function app {functionApp.SiteName} does not support remote build as it was created before August 1st, 2019.");
             }
 
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
