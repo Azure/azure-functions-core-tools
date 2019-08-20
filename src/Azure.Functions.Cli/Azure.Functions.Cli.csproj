@@ -36,6 +36,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.python">
       <LogicalName>$(AssemblyName).Dockerfile.python</LogicalName>
     </EmbeddedResource>
