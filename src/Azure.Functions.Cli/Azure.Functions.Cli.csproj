@@ -30,6 +30,9 @@
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.csx.dotnet">
+      <LogicalName>$(AssemblyName).Dockerfile.csx.dotnet</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
@@ -111,7 +114,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.0.3" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="0.1.152-preview" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.12641" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorkerRunEnvironments" Version="1.0.0-beta20190801.11" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorkerRunEnvironments" Version="1.0.0-beta20190816.7" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>

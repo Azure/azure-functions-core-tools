@@ -65,15 +65,23 @@ namespace Azure.Functions.Cli.Helpers
             ColoredConsole.Write("Remote build in progress, please wait");
             while (true)
             {
-                var json = await InvokeRequest<IDictionary<string, bool>>(client, HttpMethod.Get, "/api/isdeploying");
-                bool isDeploying = json["value"];
-                if (!isDeploying)
+                var json = await InvokeRequest<IDictionary<string, string>>(client, HttpMethod.Get, "/api/isdeploying");
+
+                if (bool.TryParse(json["value"], out bool isDeploying))
                 {
-                    string deploymentId = await GetLatestDeploymentId(client, functionApp, restrictedToken: null);
-                    DeployStatus status = await GetDeploymentStatusById(client, functionApp, restrictedToken: null, id: deploymentId);
-                    ColoredConsole.Write($"done{Environment.NewLine}");
-                    return status;
+                    if (!isDeploying)
+                    {
+                        string deploymentId = await GetLatestDeploymentId(client, functionApp, restrictedToken: null);
+                        DeployStatus status = await GetDeploymentStatusById(client, functionApp, restrictedToken: null, id: deploymentId);
+                        ColoredConsole.Write($"done{Environment.NewLine}");
+                        return status;
+                    }
                 }
+                else
+                {
+                    throw new CliException($"Expected \"value\" from /api/isdeploying endpoing to be a boolean. Actual: {json["value"]}");
+                }
+
                 ColoredConsole.Write(".");
                 await Task.Delay(5000);
             }
