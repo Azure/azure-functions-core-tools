@@ -201,9 +201,9 @@ def build_independent_wheel(name, version, args, dest):
 
 
 def build_binary_wheel(name, version, args, dest):
-    die(f'cannot install {name}-{version} dependency: binary dependencies '
-        f'without wheels are not supported.  Use the "--build remote" or "--build-native-deps" option '
-        f'to automatically build and configure the dependencies using a Docker container. '
+    die(f'cannot install {name}-{version} dependency: binary dependencies without wheels are not supported when building locally. '
+        f'Use the "--build remote" option to build dependencies on the Azure Functions build server, '
+        f'or "--build-native-deps" option to automatically build and configure the dependencies using a Docker container. '
         f'More information at https://aka.ms/func-python-publish', ExitCode.native_deps_error)
 
 
