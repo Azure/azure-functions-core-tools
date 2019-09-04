@@ -141,6 +141,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     // Ideally this should never happen.
                     templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
                 }
+
+                TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
@@ -148,10 +150,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (template == null)
                 {
+                    TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", "N/A");
                     throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\"");
                 }
                 else
                 {
+                    TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", TemplateName);
                     ExtensionsHelper.EnsureDotNetForExtensions(template);
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
@@ -185,17 +189,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 funcObj.Add("scriptFile", $"../dist/{functionName}/index.js");
                 FileSystemHelpers.WriteAllTextToFile(funcJsonFile, JsonConvert.SerializeObject(funcObj, Formatting.Indented));
             }
-        }
-
-        public override void UpdateTelemetryEvent(TelemetryEvent telemetryEvent)
-        {
-            telemetryEvent.CommandEvents = new Dictionary<string, string>
-            {
-                { "language", Language },
-                { "trigger", TemplateName }
-            };
-
-            base.UpdateTelemetryEvent(telemetryEvent);
         }
     }
 }

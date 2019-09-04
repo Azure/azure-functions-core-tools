@@ -6,6 +6,13 @@ namespace Azure.Functions.Cli.Telemetry
 {
     class TelemetryEvent
     {
+        public TelemetryEvent()
+        {
+            Parameters = new List<string>();
+            CommandEvents = new Dictionary<string, string>();
+            GlobalSettings = new Dictionary<string, string>();
+        }
+
         public string CommandName { get; set; }
 
         public string IActionName { get; set; }

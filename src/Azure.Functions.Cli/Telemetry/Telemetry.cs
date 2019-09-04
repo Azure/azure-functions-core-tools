@@ -31,8 +31,7 @@ namespace Azure.Functions.Cli.Telemetry
             bool blockThreadInitialization = false,
             int senderCount = 3)
         {
-            if (EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.TelemetryOptOutVariable)
-                || Constants.TelemetryInstrumentationKey == "00000000-0000-0000-0000-000000000000")
+            if (!StaticSettings.IsTelemetryEnabled)
             {
                 Enabled = false;
                 return;

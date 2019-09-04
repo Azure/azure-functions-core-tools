@@ -7,6 +7,8 @@ using Fclp.Internals;
 using System.Linq;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Common;
+using Colors.Net;
 
 namespace Azure.Functions.Cli.Actions
 {
@@ -16,9 +18,12 @@ namespace Azure.Functions.Cli.Actions
 
         public IEnumerable<ICommandLineOption> MatchedOptions { get; private set; }
 
+        public IDictionary<string, string> TelemetryCommandEvents { get; private set; }
+
         public BaseAction()
         {
             Parser = new FluentCommandLineParser();
+            TelemetryCommandEvents = new Dictionary<string, string>();
         }
 
         public virtual ICommandLineParserResult ParseArgs(string[] args)
@@ -39,8 +44,19 @@ namespace Azure.Functions.Cli.Actions
 
         public virtual void UpdateTelemetryEvent(TelemetryEvent telemetryEvent)
         {
-            var languageContext = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? "N/A";
-            telemetryEvent.GlobalSettings["language"] = languageContext;
+            try
+            {
+                var languageContext = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? "N/A";
+                telemetryEvent.GlobalSettings["language"] = languageContext;
+                telemetryEvent.CommandEvents = TelemetryCommandEvents;
+            }
+            catch (Exception ex)
+            {
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.Error.WriteLine(ex.ToString());
+                }
+            }
         }
 
         public abstract Task RunAsync();

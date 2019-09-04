@@ -1,4 +1,6 @@
-﻿using Azure.Functions.Cli.Telemetry;
+﻿using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Telemetry;
+using Colors.Net;
 using Fclp.Internals;
 using System;
 using System.Collections.Generic;
@@ -13,6 +15,24 @@ namespace Azure.Functions.Cli.Helpers
         public static IEnumerable<string> GetCommandsFromCommandLineOptions(IEnumerable<ICommandLineOption> options)
         {
             return options.Select(option => option.HasLongName ? option.LongName : option.ShortName);
+        }
+
+        public static void AddCommandEventToDictionary(IDictionary<string, string> events, string eventName, string eventVal)
+        {
+            if (StaticSettings.IsTelemetryEnabled)
+            {
+                try
+                {
+                    events[eventName] = eventVal;
+                }
+                catch (Exception ex)
+                {
+                    if (StaticSettings.IsDebug)
+                    {
+                        ColoredConsole.Error.WriteLine(ex.ToString());
+                    }
+                }
+            }
         }
 
         public static void LogEventIfAllowedSafe(ITelemetry telemetry, TelemetryEvent telemetryEvent)
