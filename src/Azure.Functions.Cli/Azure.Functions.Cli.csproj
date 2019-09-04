@@ -117,7 +117,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.1.1" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="0.1.159-preview" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.12673" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorkerRunEnvironments" Version="1.0.0-beta20190816.7" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorkerRunEnvironments" Version="1.0.0-beta20190904.9" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
