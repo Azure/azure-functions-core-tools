@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
@@ -159,6 +160,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 (workerRuntime, language) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
             }
+
+            WorkerRuntime = workerRuntime.ToString();
 
             if (workerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
             {
@@ -428,6 +431,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var bundleConfig = JsonConvert.DeserializeObject<JToken>(bundleConfigContent);
             hostJsonObj.Add("extensionBundle", bundleConfig);
             return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+        }
+
+        public override void UpdateTelemetryEvent(TelemetryEvent telemetryEvent)
+        {
+            telemetryEvent.CommandEvents = new Dictionary<string, string>
+            {
+                { "worker-runtime", WorkerRuntime }
+            };
+
+            base.UpdateTelemetryEvent(telemetryEvent);
         }
     }
 }

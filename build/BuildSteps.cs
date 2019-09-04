@@ -13,6 +13,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace Build
 {
@@ -40,6 +41,22 @@ namespace Build
             .Aggregate(string.Empty, (a, b) => $"{a} --source {b}");
 
             Shell.Run("dotnet", $"restore {Settings.ProjectFile} {feeds}");
+        }
+
+        public static void ReplaceTelemetryInstrumentationKey()
+        {
+            var instrumentationKey = Settings.TelemetryInstrumentationKey;
+            if (!string.IsNullOrEmpty(instrumentationKey))
+            {
+                // Given the small size of the file, it should be ok to load it in the memory
+                var constantsFileText = File.ReadAllText(Settings.ConstantsFile);
+                if (Regex.Matches(constantsFileText, Settings.TelemetryKeyToReplace).Count != 1)
+                {
+                    throw new Exception($"Could not find exactly one {Settings.TelemetryKeyToReplace} in {Settings.ConstantsFile} to replace.");
+                }
+                constantsFileText = constantsFileText.Replace(Settings.TelemetryKeyToReplace, instrumentationKey);
+                File.WriteAllText(Settings.ConstantsFile, constantsFileText);
+            }
         }
 
         private static string GetRuntimeId(string runtime)

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
@@ -54,7 +55,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("csx")
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         public async override Task RunAsync()
@@ -184,6 +185,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 funcObj.Add("scriptFile", $"../dist/{functionName}/index.js");
                 FileSystemHelpers.WriteAllTextToFile(funcJsonFile, JsonConvert.SerializeObject(funcObj, Formatting.Indented));
             }
+        }
+
+        public override void UpdateTelemetryEvent(TelemetryEvent telemetryEvent)
+        {
+            telemetryEvent.CommandEvents = new Dictionary<string, string>
+            {
+                { "language", Language },
+                { "trigger", TemplateName }
+            };
+
+            base.UpdateTelemetryEvent(telemetryEvent);
         }
     }
 }

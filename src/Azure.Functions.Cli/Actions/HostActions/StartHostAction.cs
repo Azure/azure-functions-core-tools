@@ -138,7 +138,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription("A space seperated list of functions to load.")
                 .Callback(f => EnabledFunctions = f);
 
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)

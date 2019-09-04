@@ -47,6 +47,14 @@ const proxy = process.env.npm_config_https_proxy ||
             process.env.HTTP_PROXY ||
             process.env.http_proxy;
 
+const telemetryInfo = os.EOL
+    + 'Telemetry' + os.EOL
+    + '---------' + os.EOL
+    + 'The Azure Functions Core tools collect usage data in order to help us improve your experience. ' + os.EOL
+    + 'The data is anonymous and doesn\'t include any user specific or personal information. The data is collected by Microsoft.' + os.EOL
+    + os.EOL
+    + 'You can opt-out of telemetry by setting the FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT environment variable to \'1\' or \'true\' using your favorite shell.' + os.EOL
+
 if (proxy) {
     console.log('using proxy server %j', proxy);
     options.agent = new HttpsProxyAgent(proxy);
@@ -64,6 +72,7 @@ https.get(options, response => {
             response.on('data', data => bar.tick(data.length));
             const unzipStream = unzipper.Extract({ path: installPath })
                 .on('close', () => {
+                    console.log(telemetryInfo)
                     if (os.platform() === 'linux' || os.platform() === 'darwin') {
                         fs.chmodSync(`${installPath}/func`, 0o755);
                     }

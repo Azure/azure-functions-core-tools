@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using Autofac;
 using Azure.Functions.Cli.Actions;
@@ -12,6 +13,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
@@ -25,6 +27,7 @@ namespace Azure.Functions.Cli
         private readonly IEnumerable<TypeAttributePair> _actionAttributes;
         private readonly string[] _helpArgs = new[] { "help", "h", "?" };
         private readonly string[] _versionArgs = new[] { "version", "v" };
+        private readonly TelemetryEvent _telemetryEvent;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
         public static void Run<T>(string[] args, IContainer container)
@@ -35,6 +38,13 @@ namespace Azure.Functions.Cli
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
         public static async Task RunAsync<T>(string[] args, IContainer container)
         {
+            var stopWatch = Stopwatch.StartNew();
+
+            // This will flush any old telemetry that was saved
+            // We only do this for clients that have not opted out
+            var telemetry = new Telemetry.Telemetry(Guid.NewGuid().ToString());
+            telemetry.Flush();
+
             var app = new ConsoleApp(args, typeof(T).Assembly, container);
             // If all goes well, we will have an action to run.
             // This action can be an actual action, or just a HelpAction, but this method doesn't care
@@ -51,6 +61,15 @@ namespace Azure.Functions.Cli
                     }
                     // All Actions are async. No return value is expected from any action.
                     await action.RunAsync();
+
+                    app._telemetryEvent.IsSuccessful = true;
+                }
+
+                stopWatch.Stop();
+                app._telemetryEvent.TimeTaken = stopWatch.ElapsedMilliseconds;
+                if (!string.IsNullOrEmpty(app._telemetryEvent.CommandName))
+                {
+                    TelemetryHelpers.LogEventIfAllowedSafe(telemetry, app._telemetryEvent);
                 }
             }
             catch (Exception ex)
@@ -69,6 +88,15 @@ namespace Azure.Functions.Cli
                 {
                     ColoredConsole.Write("Press any to continue....");
                     Console.ReadKey(true);
+                }
+
+                stopWatch.Stop();
+                app._telemetryEvent.IsSuccessful = false;
+                app._telemetryEvent.TimeTaken = stopWatch.ElapsedMilliseconds;
+                // Log the event if we did recognize an event
+                if (!string.IsNullOrEmpty(app._telemetryEvent.CommandName))
+                {
+                    TelemetryHelpers.LogEventIfAllowedSafe(telemetry, app._telemetryEvent);
                 }
 
                 Environment.Exit(ExitCodes.GeneralError);
@@ -162,6 +190,7 @@ namespace Azure.Functions.Cli
         {
             _args = args;
             _container = container;
+            _telemetryEvent = new TelemetryEvent();
             // TypeAttributePair is just a typed tuple of an IAction type and one of its action attribute.
             _actionAttributes = assembly
                 .GetTypes()
@@ -181,6 +210,10 @@ namespace Azure.Functions.Cli
         {
             if (_args.Length == 1 && _versionArgs.Any(va => _args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
             {
+                _telemetryEvent.CommandName = "version";
+                _telemetryEvent.IActionName = null;
+                _telemetryEvent.Parameters = new List<string>();
+                _telemetryEvent.IsSuccessful = true;
                 ColoredConsole.WriteLine($"{Constants.CliVersion}");
                 return null;
             }
@@ -191,6 +224,9 @@ namespace Azure.Functions.Cli
                 (_args.Length == 1 && _helpArgs.Any(ha => _args[0].Replace("-", "").Equals(ha, StringComparison.OrdinalIgnoreCase)))
                )
             {
+                _telemetryEvent.CommandName = "help";
+                _telemetryEvent.IActionName = typeof(HelpAction).Name;
+                _telemetryEvent.Parameters = new List<string>();
                 return new HelpAction(_actionAttributes, CreateAction);
             }
 
@@ -238,10 +274,14 @@ namespace Azure.Functions.Cli
             // Otherwise, it could be just an action. Actions are allowed not to have contexts.
             contextStr = argsStack.Peek();
 
+            // Use this to collect all the invoking commands such as - "host start" or "azure functionapp publish"
+            var invokeCommand = new StringBuilder();
+
             if (Enum.TryParse(contextStr, true, out context))
             {
                 // It is a valid context, so pop it out of the stack.
                 argsStack.Pop();
+                invokeCommand.Append(contextStr);
                 if (argsStack.Any())
                 {
                     // We still have items in the stack, do the same again for subContext.
@@ -252,6 +292,8 @@ namespace Azure.Functions.Cli
                     if (Enum.TryParse(subContextStr, true, out subContext))
                     {
                         argsStack.Pop();
+                        invokeCommand.Append(" ");
+                        invokeCommand.Append(subContextStr);
                     }
                 }
             }
@@ -264,6 +306,15 @@ namespace Azure.Functions.Cli
 
             if (string.IsNullOrEmpty(actionStr) || isHelp)
             {
+                // It's ok to log invoke command here because it only contains the
+                // strings we were able to match with context / subcontext.
+                var invokedCommand = invokeCommand.ToString();
+                _telemetryEvent.CommandName = string.IsNullOrEmpty(invokedCommand) ? "help" : invokedCommand;
+                _telemetryEvent.IActionName = typeof(HelpAction).Name;
+                _telemetryEvent.Parameters = new List<string>();
+                // If this wasn't a help command, actionStr was empty or null implying a parseError.
+                _telemetryEvent.ParseError = !isHelp;
+
                 // At this point we have all we need to create an IAction:
                 //    context
                 //    subContext
@@ -286,8 +337,21 @@ namespace Azure.Functions.Cli
             // If none is found, display help passing in all the info we have right now.
             if (actionType == null)
             {
+                // If we did not find the action,
+                // we cannot log any invoked keywords as they may have PII
+                _telemetryEvent.CommandName = "help";
+                _telemetryEvent.IActionName = typeof(HelpAction).Name;
+                _telemetryEvent.Parameters = new List<string>();
+                _telemetryEvent.ParseError = true;
                 return new HelpAction(_actionAttributes, CreateAction, contextStr, subContextStr);
             }
+
+            // If we are here that means actionStr is a legit action
+            if (invokeCommand.Length > 0)
+            {
+                invokeCommand.Append(" ");
+            }
+            invokeCommand.Append(actionStr);
 
             // Create the IAction
             var action = CreateAction(actionType.Type);
@@ -302,11 +366,19 @@ namespace Azure.Functions.Cli
                 var parseResult = action.ParseArgs(args);
                 if (parseResult.HasErrors)
                 {
+                    // If we matched the action, we can log the invoke command
+                    _telemetryEvent.CommandName = invokeCommand.ToString();
+                    _telemetryEvent.IActionName = typeof(HelpAction).Name;
+                    _telemetryEvent.Parameters = new List<string>();
+                    _telemetryEvent.ParseError = true;
                     // There was an error with the args, pass it to the HelpAction.
                     return new HelpAction(_actionAttributes, CreateAction, action, parseResult);
                 }
                 else
                 {
+                    _telemetryEvent.CommandName = invokeCommand.ToString();
+                    _telemetryEvent.IActionName = action.GetType().Name;
+                    _telemetryEvent.Parameters = TelemetryHelpers.GetCommandsFromCommandLineOptions(action.MatchedOptions);
                     // Action is ready to run.
                     return action;
                 }
@@ -316,6 +388,12 @@ namespace Azure.Functions.Cli
                 // TODO: we can probably display help here as well.
                 // This happens for actions that expect an ordered untyped options.
                 ColoredConsole.Error.WriteLine(ex.Message);
+                // If we matched the action, we can log the invoke command
+                _telemetryEvent.CommandName = invokeCommand.ToString();
+                _telemetryEvent.IActionName = action.GetType().Name;
+                _telemetryEvent.Parameters = new List<string>();
+                _telemetryEvent.ParseError = true;
+                _telemetryEvent.IsSuccessful = false;
                 return null;
             }
         }
@@ -337,6 +415,7 @@ namespace Azure.Functions.Cli
                     // update the index to point to the following entry in args
                     // which should contain the path for a prefix
                     index = i + 1;
+                    _telemetryEvent.PrefixOrScriptRoot = true;
                     break;
                 }
             }
