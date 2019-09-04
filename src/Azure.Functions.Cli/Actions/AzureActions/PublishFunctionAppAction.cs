@@ -368,7 +368,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 response = await AzureHelper.SyncTriggers(functionApp, AccessToken, ManagementURL);
                 if (!response.IsSuccessStatusCode)
                 {
-                    throw new CliException($"Error calling sync triggers ({response.StatusCode}).");
+                    var errorMessage = $"Error calling sync triggers ({response.StatusCode}). ";
+
+                    // Add request ID if available
+                    var requestIds = response.Headers.GetValues("x-ms-correlation-request-id");
+                    if (requestIds != null)
+                    {
+                        errorMessage += $"Request ID = '{string.Join(",", requestIds)}'.";
+                    }
+
+                    throw new CliException(errorMessage);
                 }
             }, retryCount: 5);
         }
