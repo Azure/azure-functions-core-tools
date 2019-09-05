@@ -14,7 +14,6 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class PythonHelpers
     {
-        private static readonly string[] _workerPackages = new[] { "azure-functions==1.0.3", "azure-functions-worker==1.0.0" };
         private static readonly string _pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
