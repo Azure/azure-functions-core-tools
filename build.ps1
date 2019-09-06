@@ -1,5 +1,5 @@
 
-if ($env:APPVEYOR_REPO_BRANCH -eq "dev") {
+if ($env:APPVEYOR_REPO_BRANCH -eq "disabled") {
     Set-Location ".\src\Azure.Functions.Cli"
     $result = Invoke-Expression -Command "NuGet list Microsoft.Azure.Functions.JavaWorker -Source  https://ci.appveyor.com/NuGet/azure-functions-java-worker-fejnnsvmrkqg -PreRelease"
     $javaWorkerVersion = $result.Split()[1]
