@@ -403,7 +403,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (PublishBuildOption != BuildOption.Remote)
             {
                 await EnsureNoKuduLiteBuildSettings(functionApp);
-                await PublishRunFromPackageLocal(functionApp, zipStreamFactory);
+
+                if (RunFromPackageDeploy)
+                {
+                    await PublishRunFromPackageLocal(functionApp, zipStreamFactory);
+                }
+                else
+                {
+                    await PublishZipDeploy(functionApp, zipStreamFactory);
+                }
                 return;
             }
 
@@ -429,7 +437,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
                 }
-                await WaitForAppSettingUpdateSCM(functionApp, functionApp.AzureAppSettings, timeOutSeconds: 300);
+                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
+                    shouldNotHaveSettings: new Dictionary<string, string> { {"WEBSITE_RUN_FROM_PACKAGE", "1" } }, timeOutSeconds: 300);
             }
 
             Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForDedicatedBuildToComplete(client, functionApp);
@@ -494,7 +503,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task PublishRunFromPackageLocal(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             await SetRunFromPackageAppSetting(functionApp, "1");
-            await WaitForAppSettingUpdateSCM(functionApp, new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } }, timeOutSeconds: 300);
+            await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } },
+                timeOutSeconds: 300);
 
             // Zip deploy
             await PublishZipDeploy(functionApp, zipFileFactory);
@@ -502,7 +512,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
-        private async Task WaitForAppSettingUpdateSCM(Site functionApp, IDictionary<string, string> settings, bool strictEqual = false, int timeOutSeconds = 300)
+        private async Task WaitForAppSettingUpdateSCM(Site functionApp, IDictionary<string, string> shouldHaveSettings = null,
+            IDictionary<string, string> shouldNotHaveSettings = null, int timeOutSeconds = 300)
         {
             const int retryTimeoutSeconds = 5;
 
@@ -529,20 +540,46 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             ColoredConsole.WriteLine(Environment.NewLine);
                         }
 
+                        bool scmUpdated = true;
+
                         // Checks for strictly equal or
                         // if all settings are present in dictionary
-                        if ((strictEqual && settings.Count == scmSettingsDict.Count && !settings.Except(scmSettingsDict).Any())
-                            || (settings.Intersect(scmSettingsDict).Count() == settings.Count))
+                        if (shouldHaveSettings != null)
                         {
-                            // All settings are updated in scm
+                            foreach (KeyValuePair<string, string> keyValuePair in shouldHaveSettings)
+                            {
+                                if (!scmSettingsDict.ContainsKey(keyValuePair.Key) || scmSettingsDict[keyValuePair.Key] != keyValuePair.Value)
+                                {
+                                    scmUpdated = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (shouldNotHaveSettings != null)
+                        {
+                            foreach (KeyValuePair<string, string> keyValuePair in shouldNotHaveSettings)
+                            {
+                                if (scmSettingsDict.ContainsKey(keyValuePair.Key) && scmSettingsDict[keyValuePair.Key] == keyValuePair.Value)
+                                {
+                                    scmUpdated = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (scmUpdated)
+                        {
                             return;
                         }
                     }
                 }
+
                 if (StaticSettings.IsDebug)
                 {
                     ColoredConsole.WriteLine(VerboseColor("SCM update poll timed out. Retrying..."));
                 }
+
                 await Task.Delay(TimeSpan.FromSeconds(retryTimeoutSeconds));
             }
             throw new CliException("Timed out waiting for SCM to update the Environment Settings");
@@ -578,15 +615,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task EnsureNoKuduLiteBuildSettings(Site functionApp)
         {
-            var anySettingsRemoved = functionApp.AzureAppSettings.RemoveIfKeyValPresent(Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings);
-            if (anySettingsRemoved)
+            var settingsToRemove = Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings.ToDictionary(e => e.Key, e => e.Value);
+
+            if (!RunFromPackageDeploy)
+            {
+                settingsToRemove["WEBSITE_RUN_FROM_PACKAGE"] = "1";
+            }
+
+            var anySettingRemoved = functionApp.AzureAppSettings.RemoveIfKeyValPresent(settingsToRemove);
+
+            if (anySettingRemoved)
             {
                 var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
                 if (!result.IsSuccessful)
                 {
                     throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
                 }
-                await WaitForAppSettingUpdateSCM(functionApp, functionApp.AzureAppSettings, strictEqual: true, timeOutSeconds: 300);
+                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
+                    shouldNotHaveSettings: settingsToRemove, timeOutSeconds: 300);
             }
         }
 
