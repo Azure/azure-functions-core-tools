@@ -172,7 +172,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
                 var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
                 deployments.Add(deployment);
-                scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas, secrets);
+                scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
             }
 
             // Set worker runtime if needed.
@@ -393,7 +393,7 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        private static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas, IDictionary<string, string> secrets)
+        private static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
         {
             return new ScaledObjectV1Alpha1
             {
@@ -430,13 +430,13 @@ namespace Azure.Functions.Cli.Kubernetes
                         .Select(t => new ScaledObjectTriggerV1Alpha1
                         {
                             Type = GetKedaTrigger(t["type"]?.ToString()),
-                            Metadata = PopulateMetadataDictionary(t, secrets)
+                            Metadata = PopulateMetadataDictionary(t)
                         })
                 }
             };
         }
 
-        private static IDictionary<string, string> PopulateMetadataDictionary(JToken t, IDictionary<string, string> secrets)
+        private static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
         {
             IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
                                     .Where(i => i.Value.Type == JTokenType.String)
@@ -444,7 +444,8 @@ namespace Azure.Functions.Cli.Kubernetes
 
             if (t["type"].ToString().ToLower() == "rabbitmqtrigger")
             {
-                metadata["host"] = secrets["connectionStringSetting"];
+                metadata["host"] = metadata["connectionStringSetting"];
+                metadata.Remove("connectionStringSetting");
             }
 
             return metadata;
