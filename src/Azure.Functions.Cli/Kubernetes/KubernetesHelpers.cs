@@ -442,7 +442,7 @@ namespace Azure.Functions.Cli.Kubernetes
                                     .Where(i => i.Value.Type == JTokenType.String)
                                     .ToDictionary(k => k.Key, v => v.Value.ToString());
 
-            if (t["type"].ToString().ToLower() == "rabbitmqtrigger")
+            if (t["type"].ToString() == "rabbitMQTrigger")
             {
                 metadata["host"] = metadata["connectionStringSetting"];
                 metadata.Remove("connectionStringSetting");
