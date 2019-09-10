@@ -436,7 +436,7 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        private static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
+        internal static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
         {
             IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
                                     .Where(i => i.Value.Type == JTokenType.String)
