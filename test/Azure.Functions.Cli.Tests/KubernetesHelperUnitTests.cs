@@ -1,6 +1,9 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Kubernetes;
 using FluentAssertions;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests
@@ -27,6 +30,32 @@ namespace Azure.Functions.Cli.Tests
                     throw;
                 }
             }
+        }
+
+        [Fact]
+        public void PopulateMetadataDictionary_CorrectlyPopulatesRabbitMQMetadata()
+        {
+            string jsonText = @"
+            {
+                ""type"": ""rabbitMQTrigger"",
+                ""connectionStringSetting"": ""RabbitMQConnection"",
+                ""queueName"": ""myQueue"",
+                ""name"": ""message""
+            }";
+
+            JToken jsonObj = JToken.Parse(jsonText);
+
+            IDictionary<string, string> metadata = KubernetesHelper.PopulateMetadataDictionary(jsonObj);
+
+            Assert.Equal(4, metadata.Count);
+            Assert.True(metadata.ContainsKey("type"));
+            Assert.True(metadata.ContainsKey("host"));
+            Assert.True(metadata.ContainsKey("name"));
+            Assert.True(metadata.ContainsKey("queueName"));
+            Assert.Equal("rabbitMQTrigger", metadata["type"]);
+            Assert.Equal("RabbitMQConnection", metadata["host"]);
+            Assert.Equal("message", metadata["name"]);
+            Assert.Equal("myQueue", metadata["queueName"]);
         }
     }
 }

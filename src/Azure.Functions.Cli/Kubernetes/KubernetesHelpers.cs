@@ -430,12 +430,25 @@ namespace Azure.Functions.Cli.Kubernetes
                         .Select(t => new ScaledObjectTriggerV1Alpha1
                         {
                             Type = GetKedaTrigger(t["type"]?.ToString()),
-                            Metadata = t.ToObject<Dictionary<string, JToken>>()
-                                    .Where(i => i.Value.Type == JTokenType.String)
-                                    .ToDictionary(k => k.Key, v => v.Value.ToString())
+                            Metadata = PopulateMetadataDictionary(t)
                         })
                 }
             };
+        }
+
+        internal static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
+        {
+            IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
+                                    .Where(i => i.Value.Type == JTokenType.String)
+                                    .ToDictionary(k => k.Key, v => v.Value.ToString());
+
+            if (t["type"].ToString().Equals("rabbitMQTrigger", StringComparison.InvariantCultureIgnoreCase))
+            {
+                metadata["host"] = metadata["connectionStringSetting"];
+                metadata.Remove("connectionStringSetting");
+            }
+
+            return metadata;
         }
 
         private static string GetKedaTrigger(string triggerType)
@@ -463,6 +476,9 @@ namespace Azure.Functions.Cli.Kubernetes
 
                 case "eventhubtrigger":
                     return "azure-eventhub";
+
+                case "rabbitmqtrigger":
+                    return "rabbitmq";
 
                 default:
                     return triggerType;
