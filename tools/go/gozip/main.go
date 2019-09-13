@@ -20,6 +20,8 @@ var (
 	fquiet     bool
 )
 
+const pathSeparator = string(os.PathSeparator)
+
 func init() {
 	flag.StringVar(&fbaseDir, "base-dir", "", "Base dir for the zip archive")
 	flag.StringVar(&fdir, "dir", "", "dir to zip")
@@ -53,8 +55,8 @@ func validateFlags() {
 		fbaseDir = fdir
 	}
 
-	if !strings.HasSuffix(fbaseDir, "/") {
-		fbaseDir = fbaseDir + "/"
+	if !strings.HasSuffix(fbaseDir, pathSeparator) {
+		fbaseDir = fbaseDir + pathSeparator
 	}
 }
 
@@ -111,7 +113,7 @@ func addFileToZip(zipWriter *zip.Writer, filePath, baseInZip string) error {
 	}
 
 	baseLength := len(baseInZip)
-	if !strings.HasSuffix(baseInZip, "/") {
+	if !strings.HasSuffix(baseInZip, pathSeparator) {
 		baseLength++
 	}
 
