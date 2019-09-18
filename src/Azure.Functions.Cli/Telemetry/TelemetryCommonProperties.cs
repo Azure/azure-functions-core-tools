@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Telemetry
         {
             _getCurrentDirectory = getCurrentDirectory ?? Directory.GetCurrentDirectory;
             _hasher = hasher ?? Sha256Hasher.Hash;
-            _getMACAddress = getMACAddress ?? MacAddressGetter.GetMacAddress;
+            _getMACAddress = getMACAddress ?? MACAddressGetter.GetMACAddress;
             _dockerContainerDetector = dockerContainerDetector ?? new DockerContainerDetectorForTelemetry();
             _persistentSettings = persistentSettings ?? new PersistentSettings(global: true);
         }

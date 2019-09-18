@@ -5,6 +5,6 @@ namespace Azure.Functions.Cli.Telemetry
 {
     internal interface IDockerContainerDetector
     {
-        IsDockerContainer IsDockerContainer();
+        DockerContainer IsDockerContainer();
     }
 }

@@ -45,6 +45,7 @@ namespace Azure.Functions.Cli
             var telemetry = new Telemetry.Telemetry(Guid.NewGuid().ToString());
             telemetry.Flush();
 
+            var exitCode = ExitCodes.Success;
             var app = new ConsoleApp(args, typeof(T).Assembly, container);
             // If all goes well, we will have an action to run.
             // This action can be an actual action, or just a HelpAction, but this method doesn't care
@@ -62,15 +63,8 @@ namespace Azure.Functions.Cli
                     // All Actions are async. No return value is expected from any action.
                     await action.RunAsync();
 
-                    action.UpdateTelemetryEvent(app._telemetryEvent);
+                    TelemetryHelpers.UpdateTelemetryEvent(app._telemetryEvent, action.TelemetryCommandEvents);
                     app._telemetryEvent.IsSuccessful = true;
-                }
-
-                stopWatch.Stop();
-                if (!string.IsNullOrEmpty(app._telemetryEvent?.CommandName))
-                {
-                    app._telemetryEvent.TimeTaken = stopWatch.ElapsedMilliseconds;
-                    TelemetryHelpers.LogEventIfAllowedSafe(telemetry, app._telemetryEvent);
                 }
             }
             catch (Exception ex)
@@ -91,17 +85,21 @@ namespace Azure.Functions.Cli
                     Console.ReadKey(true);
                 }
 
+                app._telemetryEvent.IsSuccessful = false;
+                exitCode = ExitCodes.GeneralError;
+            }
+            finally
+            {
                 stopWatch.Stop();
 
                 // Log the event if we did recognize an event
                 if (!string.IsNullOrEmpty(app._telemetryEvent?.CommandName))
                 {
-                    app._telemetryEvent.IsSuccessful = false;
                     app._telemetryEvent.TimeTaken = stopWatch.ElapsedMilliseconds;
                     TelemetryHelpers.LogEventIfAllowedSafe(telemetry, app._telemetryEvent);
                 }
 
-                Environment.Exit(ExitCodes.GeneralError);
+                Environment.Exit(exitCode);
             }
         }
 

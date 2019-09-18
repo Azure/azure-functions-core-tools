@@ -9,8 +9,8 @@ namespace Azure.Functions.Cli.Interfaces
     internal interface IAction
     {
         IEnumerable<ICommandLineOption> MatchedOptions { get; }
+        IDictionary<string, string> TelemetryCommandEvents { get; }
         ICommandLineParserResult ParseArgs(string[] args);
         Task RunAsync();
-        void UpdateTelemetryEvent(TelemetryEvent telemetryEvent);
     }
 }

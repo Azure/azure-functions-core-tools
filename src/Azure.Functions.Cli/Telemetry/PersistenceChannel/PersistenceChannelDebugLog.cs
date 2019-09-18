@@ -3,7 +3,7 @@
 
 using System;
 using System.Globalization;
-using System.IO;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 
         private static bool IsEnabledByEnvironment()
         {
-            return EnvironmentHelper.GetEnvironmentVariableAsBool("FUNCTIONS_CORE_TOOLS_ENABLE_PERSISTENCE_CHANNEL_DEBUG_OUTPUT");
+            return EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.EnablePersistenceChannelDebugSetting);
         }
 
         public static void WriteLine(string message)

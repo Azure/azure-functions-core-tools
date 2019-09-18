@@ -14,16 +14,17 @@ using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Telemetry
 {
-    internal static class MacAddressGetter
+    internal static class MACAddressGetter
     {
-        private const string MacRegex = @"(?:[a-z0-9]{2}[:\-]){5}[a-z0-9]{2}";
+        private const string MACRegex = @"(?:[a-z0-9]{2}[:\-]){5}[a-z0-9]{2}";
         private const string ZeroRegex = @"(?:00[:\-]){5}00";
         private const int ErrorFileNotFound = 0x2;
-        public static string GetMacAddress()
+
+        public static string GetMACAddress()
         {
             try
             {
-                var shelloutput = GetShellOutMacAddressOutput().Result;
+                var shelloutput = GetShellOutMACAddressOutput().GetAwaiter().GetResult();
                 if (shelloutput == null)
                 {
                     return null;
@@ -35,7 +36,7 @@ namespace Azure.Functions.Cli.Telemetry
             {
                 if (e.NativeErrorCode == ErrorFileNotFound)
                 {
-                    return GetMacAddressByNetworkInterface();
+                    return GetMACAddressByNetworkInterface();
                 }
                 else
                 {
@@ -47,7 +48,7 @@ namespace Azure.Functions.Cli.Telemetry
         private static string ParseMACAddress(string shelloutput)
         {
             string macAddress = null;
-            foreach (Match match in Regex.Matches(shelloutput, MacRegex, RegexOptions.IgnoreCase))
+            foreach (Match match in Regex.Matches(shelloutput, MACRegex, RegexOptions.IgnoreCase))
             {
                 if (!Regex.IsMatch(match.Value, ZeroRegex))
                 {
@@ -68,7 +69,7 @@ namespace Azure.Functions.Cli.Telemetry
             return await ExecuteAndOutput("ip", "link");
         }
 
-        private static async Task<string> GetShellOutMacAddressOutput()
+        private static async Task<string> GetShellOutMACAddressOutput()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -117,12 +118,12 @@ namespace Azure.Functions.Cli.Telemetry
             return null;
         }
 
-        private static string GetMacAddressByNetworkInterface()
+        private static string GetMACAddressByNetworkInterface()
         {
-            return GetMacAddressesByNetworkInterface().FirstOrDefault();
+            return GetMACAddressesByNetworkInterface().FirstOrDefault();
         }
 
-        private static List<string> GetMacAddressesByNetworkInterface()
+        private static List<string> GetMACAddressesByNetworkInterface()
         {
             NetworkInterface[] nics = NetworkInterface.GetAllNetworkInterfaces();
             var macs = new List<string>();

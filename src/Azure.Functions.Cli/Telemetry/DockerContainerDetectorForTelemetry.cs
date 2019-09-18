@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Telemetry
 {
     internal class DockerContainerDetectorForTelemetry : IDockerContainerDetector
     {
-        public IsDockerContainer IsDockerContainer()
+        public DockerContainer IsDockerContainer()
         {
             switch (RuntimeEnvironment.OperatingSystemPlatform)
             {
@@ -21,23 +21,23 @@ namespace Azure.Functions.Cli.Telemetry
                             = Registry.LocalMachine.OpenSubKey("System\\CurrentControlSet\\Control"))
                         {
                             return subkey?.GetValue("ContainerType") != null
-                                ? Cli.Telemetry.IsDockerContainer.True
-                                : Cli.Telemetry.IsDockerContainer.False;
+                                ? Cli.Telemetry.DockerContainer.True
+                                : Cli.Telemetry.DockerContainer.False;
                         }
                     }
                     catch (SecurityException)
                     {
-                        return Cli.Telemetry.IsDockerContainer.Unknown;
+                        return Cli.Telemetry.DockerContainer.Unknown;
                     }
                 case Platform.Linux:
                     return ReadProcToDetectDockerInLinux()
-                        ? Cli.Telemetry.IsDockerContainer.True
-                        : Cli.Telemetry.IsDockerContainer.False;
+                        ? Cli.Telemetry.DockerContainer.True
+                        : Cli.Telemetry.DockerContainer.False;
                 case Platform.Unknown:
-                    return Cli.Telemetry.IsDockerContainer.Unknown;
+                    return Cli.Telemetry.DockerContainer.Unknown;
                 case Platform.Darwin:
                 default:
-                    return Cli.Telemetry.IsDockerContainer.False;
+                    return Cli.Telemetry.DockerContainer.False;
             }
         }
 
@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.Telemetry
         }
     }
 
-    internal enum IsDockerContainer
+    internal enum DockerContainer
     {
         True,
         False,

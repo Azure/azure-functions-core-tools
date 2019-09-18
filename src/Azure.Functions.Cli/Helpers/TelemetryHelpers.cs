@@ -35,6 +35,23 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        public static void UpdateTelemetryEvent(TelemetryEvent telemetryEvent, IDictionary<string, string> commandEvents)
+        {
+            try
+            {
+                var languageContext = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? "N/A";
+                telemetryEvent.GlobalSettings["language"] = languageContext;
+                telemetryEvent.CommandEvents = commandEvents;
+            }
+            catch (Exception ex)
+            {
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.Error.WriteLine(ex.ToString());
+                }
+            }
+        }
+
         public static void LogEventIfAllowedSafe(ITelemetry telemetry, TelemetryEvent telemetryEvent)
         {
             try

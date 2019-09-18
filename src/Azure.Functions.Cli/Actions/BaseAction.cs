@@ -42,23 +42,6 @@ namespace Azure.Functions.Cli.Actions
             }
         }
 
-        public virtual void UpdateTelemetryEvent(TelemetryEvent telemetryEvent)
-        {
-            try
-            {
-                var languageContext = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? "N/A";
-                telemetryEvent.GlobalSettings["language"] = languageContext;
-                telemetryEvent.CommandEvents = TelemetryCommandEvents;
-            }
-            catch (Exception ex)
-            {
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.Error.WriteLine(ex.ToString());
-                }
-            }
-        }
-
         public abstract Task RunAsync();
     }
 }
