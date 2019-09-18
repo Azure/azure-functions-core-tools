@@ -99,6 +99,10 @@ namespace Azure.Functions.Cli.Telemetry
                 _client.Context.Session.Id = CurrentSessionId;
                 _client.Context.Device.OperatingSystem = RuntimeEnvironment.OperatingSystem;
 
+                // We don't want to log this.
+                // Setting it to null doesn't work. So might as well log the session id.
+                _client.Context.Cloud.RoleInstance = $"private-{CurrentSessionId}";
+
                 _commonProperties = new TelemetryCommonProperties().GetTelemetryCommonProperties();
                 _commonMeasurements = new Dictionary<string, double>();
             }
