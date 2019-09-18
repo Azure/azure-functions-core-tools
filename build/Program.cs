@@ -15,6 +15,7 @@ namespace Build
                 .Then(Clean)
                 .Then(LogIntoAzure)
                 .Then(RestorePackages)
+                .Then(ReplaceTelemetryInstrumentationKey)
                 .Then(DotnetPublish)
                 .Then(FilterPowershellRuntimes)
                 .Then(AddDistLib)

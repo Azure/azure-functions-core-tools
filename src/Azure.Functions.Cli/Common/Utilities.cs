@@ -4,6 +4,7 @@ using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Script;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -155,6 +156,13 @@ namespace Azure.Functions.Cli
             {
                 return default(T);
             }
+        }
+
+        internal static string EnsureCoreToolsLocalData()
+        {
+            var localPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "azure-functions-core-tools");
+            FileSystemHelpers.EnsureDirectory(localPath);
+            return localPath;
         }
     }
 }

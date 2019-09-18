@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Actions
                 .WithDescription(nameof(Protocol))
                 .Callback(p => Protocol = p);
 
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         public override Task RunAsync()
