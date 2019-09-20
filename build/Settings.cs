@@ -129,6 +129,7 @@ namespace Build
                 "Autofac.dll",
                 "BouncyCastle.Crypto.dll",
                 "Colors.Net.dll",
+                "DotNetZip.dll",
                 "Dynamitey.dll",
                 "Google.Protobuf.dll",
                 "Grpc.Core.dll",
