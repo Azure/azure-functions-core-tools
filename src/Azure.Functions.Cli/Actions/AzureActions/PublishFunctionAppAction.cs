@@ -442,7 +442,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForDedicatedBuildToComplete(client, functionApp);
-            await PerformServerSideBuild(functionApp, zipStreamFactory, pollDedicatedBuild, attachRestrictedToken: false);
+            await PerformServerSideBuild(functionApp, zipStreamFactory, pollDedicatedBuild);
         }
 
         /// <summary>
@@ -683,7 +683,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, 2);
         }
 
-        public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask, bool attachRestrictedToken = true)
+        public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask)
         {
             if (string.IsNullOrEmpty(functionApp.ScmUri))
             {
@@ -702,13 +702,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 (var content, var length) = CreateStreamContentZip(await zipFileFactory());
                 request.Content = content;
-
-                if (attachRestrictedToken)
-                {
-                    // Attach x-ms-site-restricted-token for Linux Consumption remote build
-                    string restrictedToken = await KuduLiteDeploymentHelpers.GetRestrictedToken(functionApp, AccessToken, ManagementURL);
-                    request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
-                }
                 HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
                 await PublishHelper.CheckResponseStatusAsync(response, "Uploading archive...");
 
