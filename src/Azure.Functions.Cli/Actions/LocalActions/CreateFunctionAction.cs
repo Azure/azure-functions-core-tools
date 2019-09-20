@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Telemetry;
@@ -156,7 +157,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else
                 {
                     TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", TemplateName);
-                    ExtensionsHelper.EnsureDotNetForExtensions(template);
+
+                    var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+                    if (template.Metadata.Extensions != null && !extensionBundleManager.IsExtensionBundleConfigured() && !CommandChecker.CommandExists("dotnet"))
+                    {
+                        throw new CliException($"The {template.Metadata.Name} template has extensions. {Constants.Errors.ExtensionsNeedDotnet}");
+                    }
+
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
                     FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
