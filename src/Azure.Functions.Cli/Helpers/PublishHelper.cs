@@ -24,8 +24,18 @@ namespace Azure.Functions.Cli.Helpers
             return null;
         }
 
-        public static BuildOption UpdateLinuxConsumptionBuildOption(BuildOption currentBuildOption)
+        public static BuildOption UpdateBuildOption(BuildOption currentBuildOption, WorkerRuntime runtime, Site site)
         {
+            if (currentBuildOption == BuildOption.Default)
+            {
+                // Change to remote build if, python app, has requirements.txt, requirements.txt has content
+                if (runtime == WorkerRuntime.python &&
+                    FileSystemHelpers.FileExists(Constants.RequirementsTxt) &&
+                    new FileInfo(Path.Combine(Environment.CurrentDirectory, Constants.RequirementsTxt)).Length > 0)
+                {
+                    return BuildOption.Remote;
+                }
+            }
             return currentBuildOption;
         }
 
