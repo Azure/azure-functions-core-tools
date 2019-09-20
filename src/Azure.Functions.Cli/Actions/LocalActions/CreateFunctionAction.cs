@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
@@ -54,7 +55,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("csx")
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         public async override Task RunAsync()
@@ -140,6 +141,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     // Ideally this should never happen.
                     templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
                 }
+
+                TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
@@ -147,10 +150,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (template == null)
                 {
+                    TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", "N/A");
                     throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\"");
                 }
                 else
                 {
+                    TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", TemplateName);
                     ExtensionsHelper.EnsureDotNetForExtensions(template);
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();

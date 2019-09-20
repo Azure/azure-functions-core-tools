@@ -25,6 +25,8 @@ namespace Build
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
+        public static readonly string ConstantsFile = Path.Combine(SrcProjectPath, "Common", "Constants.cs");
+
         public static readonly string TestProjectPath = Path.GetFullPath("../test/Azure.Functions.Cli.Tests/");
 
         public static readonly string ProjectFile = Path.Combine(SrcProjectPath, "Azure.Functions.Cli.csproj");
@@ -75,9 +77,13 @@ namespace Build
 
         public static readonly string ProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{ProjectTemplatesVersion}";
 
+        public static readonly string TelemetryKeyToReplace = "00000000-0000-0000-0000-000000000000";
+
         public static string BuildNumber => config(null, "devops_buildNumber") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
 
         public static string CommitId => config(null, "Build.SourceVersion") ?? config("N/A", "APPVEYOR_REPO_COMMIT");
+
+        public static string TelemetryInstrumentationKey => config(null, "TELEMETRY_INSTRUMENTATION_KEY");
 
         public static string BuildArtifactsStorage => config(null);
 

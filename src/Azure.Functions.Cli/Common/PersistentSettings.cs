@@ -70,5 +70,9 @@ namespace Azure.Functions.Cli.Common
         public string CurrentSubscription { get { return GetConfig(string.Empty); } set { SetConfig(value); } }
 
         public string CurrentTenant { get { return GetConfig(string.Empty); } set { SetConfig(value); } }
+
+        public string MachineId { get { return GetConfig(string.Empty);  } set { SetConfig(value); } }
+
+        public string IsDockerContainer { get { return GetConfig(string.Empty); } set { SetConfig(value); } }
     }
 }

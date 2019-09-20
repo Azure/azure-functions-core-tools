@@ -12,6 +12,10 @@ namespace Azure.Functions.Cli.Interfaces
 
         string CurrentTenant { get; set; }
 
+        string MachineId { get; set; }
+
+        string IsDockerContainer { get; set; }
+
         Dictionary<string, object> GetSettings();
 
         void SetSetting(string name, string value);

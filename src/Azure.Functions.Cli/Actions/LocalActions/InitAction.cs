@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
@@ -159,6 +160,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 (workerRuntime, language) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
             }
+
+            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", workerRuntime.ToString());
 
             if (workerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
             {

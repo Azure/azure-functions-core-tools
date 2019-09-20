@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>('a', "showValue")
                 .Callback(a => ShowValues = a)
                 .WithDescription("Specifying this shows decrypted settings."); 
-            return Parser.Parse(args);
+            return base.ParseArgs(args);
         }
 
         public override Task RunAsync()
