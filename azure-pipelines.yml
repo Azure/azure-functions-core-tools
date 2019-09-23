@@ -5,13 +5,15 @@ pr:
     include:
     - master
     - dev
+    - v3.x
 
 trigger:
   branches:
     include:
     - dev
     - master
-
+    - v3.x
+    
 pool:
   vmImage: 'vs2017-win2016'
 
@@ -23,6 +25,11 @@ variables:
 steps:
 - pwsh: |
     Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '3.0.x'
+    performMultiLevelLookup: true
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: 
