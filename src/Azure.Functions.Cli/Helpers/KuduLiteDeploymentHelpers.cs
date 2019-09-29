@@ -93,17 +93,36 @@ namespace Azure.Functions.Cli.Helpers
             return DeployStatus.Failed;
         }
 
-        private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate)
+        private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null)
         {
+            string logUrl = innerUrl != null ? innerUrl.ToString() : $"/deployments/{id}/log";
             var json = await InvokeRequest<List<Dictionary<string, string>>>(client,
-                HttpMethod.Get, $"/deployments/{id}/log");
+                HttpMethod.Get, logUrl);
 
-            var logs = json.Where(dict => DateTime.Parse(dict["log_time"]) > lastUpdate);
+            var logs = json.Where(dict => DateTime.Parse(dict["log_time"]) > lastUpdate || dict["details_url"] != null);
+            DateTime currentLogDatetime = lastUpdate;
             foreach (var log in logs)
             {
-                ColoredConsole.WriteLine(log["message"]);
+                // Filter out details_url log
+                if (DateTime.Parse(log["log_time"]) > lastUpdate)
+                {
+                    ColoredConsole.WriteLine(log["message"]);
+                }
+
+                // Recursively log details_url from scm/api/deployments/xxx/log endpoint
+                if (log["details_url"] != null && Uri.TryCreate(log["details_url"], UriKind.Absolute, out Uri detailsUrl))
+                {
+                    DateTime innerLogDatetime = await DisplayDeploymentLog(client, functionApp, id, currentLogDatetime, detailsUrl);
+                    currentLogDatetime = innerLogDatetime > currentLogDatetime ? innerLogDatetime : currentLogDatetime;
+                }
             }
-            return logs.LastOrDefault() != null ? DateTime.Parse(logs.Last()["log_time"]) : lastUpdate;
+
+            if (logs.LastOrDefault() != null)
+            {
+                DateTime lastLogDatetime = DateTime.Parse(logs.Last()["log_time"]);
+                currentLogDatetime = lastLogDatetime > currentLogDatetime ? lastLogDatetime : currentLogDatetime;
+            }
+            return currentLogDatetime;
         }
 
         private static async Task<T> InvokeRequest<T>(HttpClient client, HttpMethod method, string url)
@@ -111,7 +130,7 @@ namespace Azure.Functions.Cli.Helpers
             HttpResponseMessage response = null;
             await RetryHelper.Retry(async () =>
             {
-                using (var request = new HttpRequestMessage(method, new Uri(url, UriKind.Relative)))
+                using (var request = new HttpRequestMessage(method, new Uri(url, UriKind.RelativeOrAbsolute)))
                 {
                     response = await client.SendAsync(request);
                     response.EnsureSuccessStatusCode();
