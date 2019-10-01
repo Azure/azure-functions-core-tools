@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -243,36 +244,27 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (managedDependenciesOption)
                 {
+                    var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
+
                     string majorVersion = null;
 
-                    bool failedToGetModuleVersion = false;
+                    string guidance = null;
                     try
                     {
                         majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
+
+                        requirementsContent = Regex.Replace(requirementsContent, @"#(\s?)'Az'", "'Az'");
+                        requirementsContent = Regex.Replace(requirementsContent, "MAJOR_VERSION", majorVersion);
                     }
                     catch
-                    {
-                        failedToGetModuleVersion = true;
-                    }
-
-                    string guidance = null;
-                    var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
-
-                    if (failedToGetModuleVersion)
                     {
                         guidance = "Uncomment the next line and replace the MAJOR_VERSION, e.g., 'Az' = '2.*'";
 
                         var warningMsg = "Failed to get Az module version. Edit the requirements.psd1 file when the powershellgallery.com is accessible.";
                         ColoredConsole.WriteLine(WarningColor(warningMsg));
                     }
-                    else
-                    {
-                        guidance = string.Empty;
-                        requirementsContent = requirementsContent.Replace("# 'Az'", "'Az'");
-                        requirementsContent = requirementsContent.Replace("MAJOR_VERSION", majorVersion);
-                    }
 
-                    requirementsContent = requirementsContent.Replace("[GUIDANCE]", guidance);
+                    requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance ?? string.Empty);
                     await WriteFiles("requirements.psd1", requirementsContent);
                 }
             }
