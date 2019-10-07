@@ -1,16 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Diagnostics;
-using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script;
-using Microsoft.Azure.WebJobs.Script.Description;
-using Microsoft.Azure.WebJobs.Script.Rpc;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -22,33 +14,6 @@ namespace Azure.Functions.Cli.Helpers
         public static void SetIsHelpRunning()
         {
             _isHelpRunning = true;
-        }
-
-        public static FunctionMetadata GetFunctionMetadata(string functionName)
-        {
-            var functionErrors = new Dictionary<string, Collection<string>>();
-            var scriptHostOptions = new ScriptJobHostOptions
-            {
-                RootScriptPath = Environment.CurrentDirectory
-            };
-
-            var loggerFactory = new LoggerFactory();
-            var languageWorkerOptions = new LanguageWorkerOptions { };
-            loggerFactory.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
-            var metadataManager = new FunctionMetadataManager(new OptionsWrapper<ScriptJobHostOptions>(scriptHostOptions), new OptionsWrapper<LanguageWorkerOptions>(languageWorkerOptions), loggerFactory);
-            var function = metadataManager.Functions.FirstOrDefault(f => f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
-            if (function == null)
-            {
-                var error = metadataManager.Errors
-                    .FirstOrDefault(f => f.Key.Equals(functionName, StringComparison.OrdinalIgnoreCase))
-                    .Value
-                    .Aggregate(string.Empty, (a, b) => string.Join(Environment.NewLine, a, b));
-                throw new FunctionNotFoundException($"Unable to get metadata for function {functionName}. Error: {error}");
-            }
-            else
-            {
-                return function;
-            }
         }
 
         public static string GetFunctionAppRootDirectory(string startingDirectory, IEnumerable<string> searchFiles = null)
