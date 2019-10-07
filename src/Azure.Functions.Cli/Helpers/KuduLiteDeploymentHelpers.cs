@@ -12,27 +12,6 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class KuduLiteDeploymentHelpers
     {
-        private static string CachedARMRestrictedToken = string.Empty;
-        private static DateTime TokenLastUpdate = DateTime.MinValue;
-
-        public static async Task<string> GetRestrictedToken(Site functionApp, string accessToken, string managementUrl)
-        {
-            DateTime expiry = TokenLastUpdate + TimeSpan.FromMinutes(Constants.KuduLiteDeploymentConstants.ArmTokenExpiryMinutes);
-            if (DateTime.UtcNow > expiry || string.IsNullOrEmpty(CachedARMRestrictedToken))
-            {
-                try
-                {
-                    CachedARMRestrictedToken = await AzureHelper.GetSiteRestrictedToken(functionApp, accessToken, managementUrl);
-                    TokenLastUpdate = DateTime.UtcNow;
-                }
-                catch
-                {
-                    // When host is restarting, we will suppress the error and use the old ARM token (still valid for 1 minute)
-                }
-            }
-            return CachedARMRestrictedToken;
-        }
-
         public static async Task<DeployStatus> WaitForConsumptionServerSideBuild(HttpClient client, Site functionApp, string accessToken, string managementUrl)
         {
             ColoredConsole.WriteLine("Remote build in progress, please wait...");
@@ -42,16 +21,14 @@ namespace Azure.Functions.Cli.Helpers
 
             while (string.IsNullOrEmpty(id))
             {
-                string restrictedToken = await GetRestrictedToken(functionApp, accessToken, managementUrl);
-                id = await GetLatestDeploymentId(client, functionApp, restrictedToken);
+                id = await GetLatestDeploymentId(client, functionApp);
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
 
             while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed)
             {
-                string restrictedToken = await GetRestrictedToken(functionApp, accessToken, managementUrl);
-                statusCode = await GetDeploymentStatusById(client, functionApp, restrictedToken, id);
-                logLastUpdate = await DisplayDeploymentLog(client, functionApp, restrictedToken, id, logLastUpdate);
+                statusCode = await GetDeploymentStatusById(client, functionApp, id);
+                logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
 
@@ -71,8 +48,8 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     if (!isDeploying)
                     {
-                        string deploymentId = await GetLatestDeploymentId(client, functionApp, restrictedToken: null);
-                        DeployStatus status = await GetDeploymentStatusById(client, functionApp, restrictedToken: null, id: deploymentId);
+                        string deploymentId = await GetLatestDeploymentId(client, functionApp);
+                        DeployStatus status = await GetDeploymentStatusById(client, functionApp, id: deploymentId);
                         ColoredConsole.Write($"done{Environment.NewLine}");
                         return status;
                     }
@@ -87,10 +64,9 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp, string restrictedToken)
+        private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
         {
-            var json = await InvokeRequest<List<Dictionary<string, string>>>(client,
-                HttpMethod.Get, "/deployments", restrictedToken);
+            var json = await InvokeRequest<List<Dictionary<string, string>>>(client, HttpMethod.Get, "/deployments");
 
             // Automatically ordered by received time
             var latestDeployment = json.First();
@@ -105,10 +81,10 @@ namespace Azure.Functions.Cli.Helpers
             return null;
         }
 
-        private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string restrictedToken, string id)
+        private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
             var json = await InvokeRequest<Dictionary<string, string>>(client,
-                HttpMethod.Get, $"/deployments/{id}", restrictedToken);
+                HttpMethod.Get, $"/deployments/{id}");
 
             if (json.TryGetValue("status", out string statusString))
             {
@@ -117,31 +93,45 @@ namespace Azure.Functions.Cli.Helpers
             return DeployStatus.Failed;
         }
 
-        private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string restrictedToken, string id, DateTime lastUpdate)
+        private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null)
         {
+            string logUrl = innerUrl != null ? innerUrl.ToString() : $"/deployments/{id}/log";
             var json = await InvokeRequest<List<Dictionary<string, string>>>(client,
-                HttpMethod.Get, $"/deployments/{id}/log", restrictedToken);
+                HttpMethod.Get, logUrl);
 
-            var logs = json.Where(dict => DateTime.Parse(dict["log_time"]) > lastUpdate);
+            var logs = json.Where(dict => DateTime.Parse(dict["log_time"]) > lastUpdate || dict["details_url"] != null);
+            DateTime currentLogDatetime = lastUpdate;
             foreach (var log in logs)
             {
-                ColoredConsole.WriteLine(log["message"]);
+                // Filter out details_url log
+                if (DateTime.Parse(log["log_time"]) > lastUpdate)
+                {
+                    ColoredConsole.WriteLine(log["message"]);
+                }
+
+                // Recursively log details_url from scm/api/deployments/xxx/log endpoint
+                if (log["details_url"] != null && Uri.TryCreate(log["details_url"], UriKind.Absolute, out Uri detailsUrl))
+                {
+                    DateTime innerLogDatetime = await DisplayDeploymentLog(client, functionApp, id, currentLogDatetime, detailsUrl);
+                    currentLogDatetime = innerLogDatetime > currentLogDatetime ? innerLogDatetime : currentLogDatetime;
+                }
             }
-            return logs.LastOrDefault() != null ? DateTime.Parse(logs.Last()["log_time"]) : lastUpdate;
+
+            if (logs.LastOrDefault() != null)
+            {
+                DateTime lastLogDatetime = DateTime.Parse(logs.Last()["log_time"]);
+                currentLogDatetime = lastLogDatetime > currentLogDatetime ? lastLogDatetime : currentLogDatetime;
+            }
+            return currentLogDatetime;
         }
 
-        private static async Task<T> InvokeRequest<T>(HttpClient client, HttpMethod method, string url, string restrictedToken=null)
+        private static async Task<T> InvokeRequest<T>(HttpClient client, HttpMethod method, string url)
         {
             HttpResponseMessage response = null;
             await RetryHelper.Retry(async () =>
             {
-                using (var request = new HttpRequestMessage(method, new Uri(url, UriKind.Relative)))
+                using (var request = new HttpRequestMessage(method, new Uri(url, UriKind.RelativeOrAbsolute)))
                 {
-                    if (!string.IsNullOrEmpty(restrictedToken))
-                    {
-                        request.Headers.Add("x-ms-site-restricted-token", restrictedToken);
-                    }
-
                     response = await client.SendAsync(request);
                     response.EnsureSuccessStatusCode();
                 }

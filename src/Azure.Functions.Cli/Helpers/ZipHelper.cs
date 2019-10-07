@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Extensions;
 using Colors.Net;
 using Ionic.Zip;
 using static Colors.Net.StringStaticMethods;
@@ -24,8 +23,12 @@ namespace Azure.Functions.Cli.Helpers
                 ColoredConsole.WriteLine(Yellow("Skipping build event for functions project (--no-build)."));
             } else if (buildOption == BuildOption.Remote)
             {
-                ColoredConsole.WriteLine(Yellow("Perform remote build for functions project (--build remote)."));
+                ColoredConsole.WriteLine(Yellow("Performing remote build for functions project."));
+            } else if (buildOption == BuildOption.Local)
+            {
+                ColoredConsole.WriteLine(Yellow("Performing local build for functions project."));
             }
+
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !noBuild)
             {
                 return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, buildOption, additionalPackages);
