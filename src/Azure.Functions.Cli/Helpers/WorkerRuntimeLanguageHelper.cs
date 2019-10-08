@@ -71,24 +71,6 @@ namespace Azure.Functions.Cli.Helpers
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
             .Where(k => k != WorkerRuntime.java);
 
-        public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
-        {
-            IDictionary<WorkerRuntime, string> workerToDisplayStrings = new Dictionary<WorkerRuntime, string>();
-            foreach (WorkerRuntime wr in AvailableWorkersList)
-            {
-                switch (wr)
-                {
-                    case WorkerRuntime.powershell:
-                        workerToDisplayStrings[wr] = "powershell (preview)";
-                        break;
-                    default:
-                        workerToDisplayStrings[wr] = wr.ToString();
-                        break;
-                }
-            }
-            return workerToDisplayStrings;
-        }
-
         public static WorkerRuntime NormalizeWorkerRuntime(string workerRuntime)
         {
             if (string.IsNullOrWhiteSpace(workerRuntime))
