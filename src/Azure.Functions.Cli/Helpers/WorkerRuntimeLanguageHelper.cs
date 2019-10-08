@@ -78,9 +78,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (wr)
                 {
-                    case WorkerRuntime.powershell:
-                        workerToDisplayStrings[wr] = "powershell (preview)";
-                        break;
                     default:
                         workerToDisplayStrings[wr] = wr.ToString();
                         break;
