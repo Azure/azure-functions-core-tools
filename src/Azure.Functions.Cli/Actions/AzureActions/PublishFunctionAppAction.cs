@@ -184,19 +184,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsExtensionVersion, out string version))
                 {
-                    // v2 can be either "~2", "beta", or an exact match like "2.0.11961-alpha"
-                    if (!version.Equals("~2") &&
-                        !version.StartsWith("2.0") &&
-                        !version.Equals("beta", StringComparison.OrdinalIgnoreCase))
+                    // v3 can be either "~3" or an exact match like "3.0.11961"
+                    if (!version.Equals("~3") &&
+                        !version.StartsWith("3.0"))
                     {
                         if (Force)
                         {
-                            result.Add(Constants.FunctionsExtensionVersion, "~2");
+                            result.Add(Constants.FunctionsExtensionVersion, "~3");
                         }
                         else
                         {
-                            throw new CliException("You're trying to publish to a v1 function app from v2 tooling.\n" +
-                            "You can pass --force to force update the app to v2, or downgrade to v1 tooling for publishing");
+                            throw new CliException($"You're trying to use v3 tooling to publish to a non-v3 function app ({Constants.FunctionsExtensionVersion} is set to {version}).\n" +
+                            "You can pass --force to force update the app to v3, or downgrade to v1 or v2 tooling for publishing.");
                         }
                     }
                 }
