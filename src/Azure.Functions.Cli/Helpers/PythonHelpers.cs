@@ -73,65 +73,64 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task<string> ValidatePythonVersion(bool setWorkerExecutable = false, bool errorIfNoExactMatch = false, bool errorOutIfOld = true)
+        public static async Task<WorkerLanguageVersionInfo> ValidatePythonVersion(
+            bool setWorkerExecutable = false,
+            bool errorIfNoExactMatch = false,
+            bool errorOutIfOld = true)
         {
             // If users are overriding this value, we don't have to worry about verification
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar)))
+            string pythonDefaultExecutablePath = Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar);
+            if (!string.IsNullOrEmpty(pythonDefaultExecutablePath))
             {
-                return Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar);
+                return await GetVersion(pythonDefaultExecutablePath);
             }
 
-            const string pythonStr = "python";
-            const string python3Str = "python3";
-            const string python36Str = "python3.6";
-            const string py36Str = "3.6";
-            const string py3Str = "3.";
-            const string warningMessage = "Python 3.6.x is recommended, and used in Azure Functions. You are using Python version {0}.";
-            const string errorIfNotExactMessage = "Python 3.6.x is required, and used in Azure Functions. You are using Python version {0}. "
-                + "Please install Python 3.6, and use a virtual environment to switch to Python 3.6.";
-            const string errorMessageOldPy = "Python 3.x (recommended version 3.6.x) is required. Found python versions ({0}).";
-            const string errorMessageNoPy = "Python 3.x (recommended version 3.6.x) is required. No Python versions were found.";
+            const string infoVersionSelectMessage = "We select Python interpreter '{0}' with version {1} for your project.";
+            const string warningMessage = "Python 3.6.x or 3.7.x is recommended, and used in Azure Functions. You are using Python version {0}.";
+            const string errorIfNotExactMessage = "Python 3.6.x or 3.7.x is required, and used in Azure Functions. You are using Python version {0}. "
+                + "Please install Python 3.6 or 3.7, and use a virtual environment to switch to Python 3.6 or 3.7.";
+            const string errorMessageOldPy = "Python 3.x (recommended version 3.7.x) is required. Found python versions ({0}).";
+            const string errorMessageNoPy = "Python 3.x (recommended version 3.7.x) is required. No Python versions were found.";
 
-            var pythonExeVersionTask = VerifyVersion(pythonStr);
-            var python3ExeVersionTask = VerifyVersion(python3Str);
-            var python36ExeVersionTask = VerifyVersion(python36Str);
+            var pythonGetVersionTask = GetVersion("python");
+            var python3GetVersionTask = GetVersion("python3");
+            var python36GetVersionTask = GetVersion("python3.6");
+            var python37GetVersionTask = GetVersion("python3.7");
 
-            var pythonExeVersion = await Utilities.SafeExecution(async () => await pythonExeVersionTask) ?? string.Empty;
-            var python3ExeVersion = await Utilities.SafeExecution(async () => await python3ExeVersionTask) ?? string.Empty;
-            var python36ExeVersion = await Utilities.SafeExecution(async () => await python36ExeVersionTask) ?? string.Empty;
-
-            var exeToVersion = new Dictionary<string, string>()
+            var workers = new List<WorkerLanguageVersionInfo>
             {
-                { pythonStr, pythonExeVersion },
-                { python3Str, python3ExeVersion },
-                { python36Str, python36ExeVersion }
+                await pythonGetVersionTask,
+                await python3GetVersionTask,
+                await python36GetVersionTask,
+                await python37GetVersionTask
             };
 
-            // If any of the possible python executables had 3.6, we are good.
-            var exeWith36KeyPair = exeToVersion.Where(kv => kv.Value.Contains(py36Str)).ToList();
-            if (exeWith36KeyPair.Count() != 0)
+            // Go through the list, if we find the first python 3.6 or python 3.7 worker, we stick to it.
+            WorkerLanguageVersionInfo python36_37worker = workers.FirstOrDefault(w => (w?.Major == 3 && w?.Minor == 6) || (w?.Major == 3 && w?.Minor == 7));
+            if (python36_37worker != null)
             {
-                SetWorkerPathIfNeeded(setWorkerExecutable, exeWith36KeyPair[0].Key);
-                return exeWith36KeyPair[0].Key;
+                SetWorkerPathIfNeeded(setWorkerExecutable, python36_37worker.ExecutablePath);
+                ColoredConsole.WriteLine(AdditionalInfoColor(string.Format(infoVersionSelectMessage, python36_37worker.ExecutablePath, python36_37worker.Version)));
+                return python36_37worker;
             }
 
             // If any of the possible python executables are 3.x, we warn them and go ahead.
-            var exeWith3KeyPair = exeToVersion.Where(kv => kv.Value.Contains(py3Str)).ToList();
-            if (exeWith3KeyPair.Count() != 0)
+            WorkerLanguageVersionInfo python3worker = workers.FirstOrDefault(w => w?.Major == 3);
+            if (python3worker != null)
             {
-                if (errorIfNoExactMatch) throw new CliException(string.Format(errorIfNotExactMessage, exeWith3KeyPair[0].Value));
-                SetWorkerPathIfNeeded(setWorkerExecutable, exeWith3KeyPair[0].Key);
-                ColoredConsole.WriteLine(WarningColor(string.Format(warningMessage, exeWith3KeyPair[0].Value)));
-                return exeWith3KeyPair[0].Key;
+                if (errorIfNoExactMatch) throw new CliException(string.Format(errorIfNotExactMessage, python3worker.Version));
+                SetWorkerPathIfNeeded(setWorkerExecutable, python3worker.ExecutablePath);
+                ColoredConsole.WriteLine(WarningColor(string.Format(warningMessage, python3worker.Version)));
+                return python3worker;
             }
 
             // If we found any python versions at all, we warn or error out if flag enabled.
-            var anyPyVersions = exeToVersion.Where(kv => !string.IsNullOrEmpty(kv.Value)).Select(kv => kv.Value).ToList();
-            if (anyPyVersions.Count != 0)
+            WorkerLanguageVersionInfo anyPythonWorker = workers.FirstOrDefault(w => !string.IsNullOrEmpty(w?.Version));
+            if (anyPythonWorker != null)
             {
-                if (errorIfNoExactMatch) throw new CliException(string.Format(errorIfNotExactMessage, exeWith3KeyPair[0].Value));
-                if (errorOutIfOld) throw new CliException(string.Format(errorMessageOldPy, string.Join(", ", anyPyVersions)));
-                else ColoredConsole.WriteLine(WarningColor(string.Format(errorMessageOldPy, string.Join(", ", anyPyVersions))));
+                if (errorIfNoExactMatch) throw new CliException(string.Format(errorIfNotExactMessage, anyPythonWorker.Version));
+                if (errorOutIfOld) throw new CliException(string.Format(errorMessageOldPy, string.Join(", ", anyPythonWorker.Version)));
+                else ColoredConsole.WriteLine(WarningColor(string.Format(errorMessageOldPy, string.Join(", ", anyPythonWorker.Version))));
             }
 
             // If we didn't find python at all, we warn or error out if flag enabled.
@@ -156,6 +155,18 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        private static async Task<WorkerLanguageVersionInfo> GetVersion(string pythonExe = "python")
+        {
+            var pythonExeVersionTask = VerifyVersion(pythonExe);
+            string pythonExeVersion = await Utilities.SafeExecution(async () => await pythonExeVersionTask) ?? string.Empty;
+            pythonExeVersion = pythonExeVersion.Replace("Python ", string.Empty);
+            if (!string.IsNullOrEmpty(pythonExeVersion))
+            {
+                return new WorkerLanguageVersionInfo(WorkerRuntime.python, pythonExeVersion, pythonExe);
+            }
+            return null;
+        }
+
         public static async Task<string> VerifyVersion(string pythonExe = "python")
         {
             var exe = new Executable(pythonExe, "--version");
@@ -167,7 +178,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch (Exception)
             {
-                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.6 installed.");
+                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.6 or 3.7 installed.");
             }
             if (exitCode == 0)
             {
@@ -303,8 +314,8 @@ namespace Azure.Functions.Cli.Helpers
         private static async Task RestorePythonRequirementsPackapp(string functionAppRoot, string packagesLocation)
         {
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
-
-            var pythonExe = await ValidatePythonVersion(errorOutIfOld: true);
+            var pythonWorkerInfo = await ValidatePythonVersion(errorOutIfOld: true);
+            var pythonExe = pythonWorkerInfo.ExecutablePath;
             var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\" --verbose");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
