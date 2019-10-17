@@ -313,7 +313,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython);
+                await WritePythonDockerFile();
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
@@ -324,6 +324,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 throw new CliException("Can't find WorkerRuntime None");
             }
             await WriteFiles(".dockerignore", await StaticResources.DockerIgnoreFile);
+        }
+
+        private static async Task WritePythonDockerFile()
+        {
+            WorkerLanguageVersionInfo worker = await PythonHelpers.ValidatePythonVersion(false, false, false);
+            if (worker?.Major == 3 && worker?.Minor == 7)
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython37);
+            }
+            else
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython36);
+            }
         }
 
         private static async Task WriteExtensionsJson()
