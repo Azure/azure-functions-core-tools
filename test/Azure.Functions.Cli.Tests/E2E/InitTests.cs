@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
 using Xunit.Abstractions;
+using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -131,6 +133,33 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         Name = "Dockerfile",
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:2.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [SkippableFact]
+        public async Task init_with_python_Dockerfile()
+        {
+            WorkerLanguageVersionInfo worker = await PythonHelpers.ValidatePythonVersion();
+            Skip.If(worker == null);
+
+            string expectedDockerImage = "FROM mcr.microsoft.com/azure-functions/python:2.0";
+            if (worker.Major == 3 && worker.Minor == 7)
+            {
+                expectedDockerImage = "FROM mcr.microsoft.com/azure-functions/python:2.0-python3.7";
+            }
+
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime python --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { expectedDockerImage }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
