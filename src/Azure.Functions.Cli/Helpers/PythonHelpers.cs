@@ -211,7 +211,8 @@ namespace Azure.Functions.Cli.Helpers
             string containerId = null;
             try
             {
-                containerId = await DockerHelpers.DockerRun(Constants.DockerImages.LinuxPythonImageAmd64, command: "sleep infinity");
+                string dockerImage = await ChoosePythonBuildEnvImage();
+                containerId = await DockerHelpers.DockerRun(dockerImage, command: "sleep infinity");
 
                 await DockerHelpers.CopyToContainer(containerId, tmpFile, $"/file.zip");
 
@@ -341,9 +342,11 @@ namespace Azure.Functions.Cli.Helpers
             var dockerSkipPullFlagSetting = Environment.GetEnvironmentVariable(Constants.PythonDockerImageSkipPull);
             var dockerRunSetting = Environment.GetEnvironmentVariable(Constants.PythonDockerRunCommand);
 
-            var dockerImage = string.IsNullOrEmpty(pythonDockerImageSetting)
-                ? Constants.DockerImages.LinuxPythonImageAmd64
-                : pythonDockerImageSetting;
+            string dockerImage = pythonDockerImageSetting;
+            if (string.IsNullOrEmpty(dockerImage))
+            {
+                dockerImage = await ChoosePythonBuildEnvImage();
+            }
 
             if (string.IsNullOrEmpty(dockerSkipPullFlagSetting) ||
                 !(dockerSkipPullFlagSetting.Equals("true", StringComparison.OrdinalIgnoreCase) || dockerSkipPullFlagSetting == "1"))
@@ -388,6 +391,18 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     await DockerHelpers.KillContainer(containerId, ignoreError: true);
                 }
+            }
+        }
+
+        private static async Task<string> ChoosePythonBuildEnvImage()
+        {
+            WorkerLanguageVersionInfo workerInfo = await ValidatePythonVersion(false, false, false);
+            if (workerInfo?.Major == 3 && workerInfo?.Minor == 7)
+            {
+                return Constants.DockerImages.LinuxPython37ImageAmd64;
+            } else
+            {
+                return Constants.DockerImages.LinuxPython36ImageAmd64;
             }
         }
 
