@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Common
 
         public const string DefaultTaskHubName = "DurableFunctionsHub";
 
-        public const string DurableAzureStorageExtensionName = "DurableTask.AzureStorage.dll";
+        public const string DurableAzureStorageExtensionName = "DurableTask.AzureStorage*.dll";
 
         public const string MinimumDurableAzureStorageExtensionVersion = "1.4.0";
 
