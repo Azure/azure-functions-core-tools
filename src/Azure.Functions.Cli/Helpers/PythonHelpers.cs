@@ -276,11 +276,6 @@ namespace Azure.Functions.Cli.Helpers
             FileSystemHelpers.EnsureDirectory(packagesLocation);
 
             // Only one of the remote build or build-native-deps flag can be chosen
-            if (buildNativeDeps && buildOption == BuildOption.Remote)
-            {
-                throw new CliException("Cannot perform '--build-native-deps' along with '--build remote'");
-            }
-
             if (buildNativeDeps)
             {
                 if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())

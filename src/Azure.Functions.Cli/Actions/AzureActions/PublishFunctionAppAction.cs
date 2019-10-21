@@ -131,7 +131,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
 
             // Update build option
-            PublishBuildOption = PublishHelper.UpdateBuildOption(PublishBuildOption, workerRuntime, functionApp);
+            PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
 
             if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild && PublishBuildOption != BuildOption.Remote)
             {
@@ -282,16 +282,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // For dedicated linux apps, we do not support run from package right now
             var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
-
-            // For Python linux apps, we do not support --build remote with --build-native-deps flag
-            if (PublishBuildOption != BuildOption.Default && BuildNativeDeps)
-            {
-                throw new CliException("Cannot use '--build-native-deps' along with '--build' flag");
-            }
-            else if (PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.None)
-            {
-                throw new CliException("The --build flag only supports '--build remote' or '--build local'");
-            }
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
             {
