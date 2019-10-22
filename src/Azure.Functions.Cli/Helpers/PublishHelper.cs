@@ -24,8 +24,19 @@ namespace Azure.Functions.Cli.Helpers
             return null;
         }
 
-        public static BuildOption UpdateBuildOption(BuildOption currentBuildOption, WorkerRuntime runtime, Site site)
+        public static BuildOption ResolveBuildOption(BuildOption currentBuildOption, WorkerRuntime runtime, Site site, bool buildNativeDeps, bool noBuild)
         {
+            // --no-build and --build-native-deps will take precedence over --build local and --build remote
+            if (noBuild)
+            {
+                return BuildOption.None;
+            }
+
+            if (buildNativeDeps)
+            {
+                return BuildOption.Container;
+            }
+
             if (currentBuildOption == BuildOption.Default)
             {
                 // Change to remote build if, python app, has requirements.txt, requirements.txt has content
