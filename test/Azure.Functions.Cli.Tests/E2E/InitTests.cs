@@ -142,7 +142,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async Task init_with_python_Dockerfile()
         {
-            WorkerLanguageVersionInfo worker = await PythonHelpers.ValidatePythonVersion();
+            WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
             Skip.If(worker == null);
 
             await CliTester.Run(new RunConfiguration

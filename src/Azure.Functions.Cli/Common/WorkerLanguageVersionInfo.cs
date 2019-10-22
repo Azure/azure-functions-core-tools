@@ -60,19 +60,8 @@ namespace Azure.Functions.Cli.Common
                 throw new ArgumentNullException("Worker runtime should not be None");
             }
 
-            if (string.IsNullOrEmpty(version.Trim()))
-            {
-                throw new ArgumentNullException("Worker runtime version should not be empty");
-            }
-
-            if (string.IsNullOrEmpty(executable))
-            {
-                throw new ArgumentNullException("Worker executable should not be empty");
-            }
-
-
             Runtime = runtime;
-            Version = version.Trim();
+            Version = version?.Trim();
             ExecutablePath = executable;
         }
     }

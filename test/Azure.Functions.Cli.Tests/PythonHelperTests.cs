@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Tests
         [SkipIfPythonNonExistFact]
         public async void InterpreterShouldHaveExecutablePath()
         {
-            WorkerLanguageVersionInfo worker = await PythonHelpers.ValidatePythonVersion();
+            WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
 
             if (worker.ExecutablePath == null)
             {
@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Tests
         [SkipIfPythonNonExistFact]
         public async void InterpreterShouldHaveMajorVersion()
         {
-            WorkerLanguageVersionInfo worker = await PythonHelpers.ValidatePythonVersion();
+            WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
             if (worker.Major != 2 && worker.Major != 3)
             {
                 throw new Exception("Python major version should be 2 or 3");
@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Tests
         [SkipIfPythonNonExistFact]
         public async void WorkerInfoRuntimeShouldBePython()
         {
-            WorkerLanguageVersionInfo worker = await PythonHelpers.ValidatePythonVersion();
+            WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
             if (worker.Runtime != WorkerRuntime.python)
             {
                 throw new Exception("Worker runtime should always be python");

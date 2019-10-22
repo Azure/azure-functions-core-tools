@@ -17,6 +17,7 @@ namespace Azure.Functions.Cli.Common
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
+        public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
         public const string FunctionJsonFileName = "function.json";
         public const string ExtenstionsCsProjFile = "extensions.csproj";
@@ -46,7 +47,7 @@ namespace Azure.Functions.Cli.Common
         {
             { WorkerRuntime.dotnet, new [] { "mcr.microsoft.com/azure-functions/dotnet", "microsoft/azure-functions-dotnet-core2.0", "mcr.microsoft.com/azure-functions/base", "microsoft/azure-functions-base" } },
             { WorkerRuntime.node, new [] { "mcr.microsoft.com/azure-functions/node", "microsoft/azure-functions-node8" } },
-            { WorkerRuntime.python, new [] { "mcr.microsoft.com/azure-functions/python", "microsoft/azure-functions-python3.6"  } },
+            { WorkerRuntime.python, new [] { "mcr.microsoft.com/azure-functions/python", "microsoft/azure-functions-python3.6" } },
             { WorkerRuntime.powershell, new [] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } }
         };
 

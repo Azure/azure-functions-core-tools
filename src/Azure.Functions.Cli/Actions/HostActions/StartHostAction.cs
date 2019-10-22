@@ -260,18 +260,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python)
             {
-                await PythonHelpers.ValidatePythonVersion(setWorkerExecutable: true, errorIfNoExactMatch: true, errorOutIfOld: true);
-                // We need to update the PYTHONPATH to add worker's dependencies
-                var pythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? string.Empty;
-                var pythonWorkerDeps = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "workers", "python", "deps");
-                if (!pythonPath.Contains(pythonWorkerDeps))
-                {
-                    Environment.SetEnvironmentVariable("PYTHONPATH", $"{pythonPath}{Path.PathSeparator}{pythonWorkerDeps}", EnvironmentVariableTarget.Process);
-                }
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine($"PYTHONPATH for the process is: {Environment.GetEnvironmentVariable("PYTHONPATH")}");
-                }
+                var pythonVersion = await PythonHelpers.GetEnvironmentPythonVersion();
+                PythonHelpers.AssertPythonVersion(pythonVersion, errorIfNotSupported: true, errorIfNoVersion: true);
+                PythonHelpers.SetWorkerPath(pythonVersion?.ExecutablePath, overwrite: false);
+                PythonHelpers.SetWorkerRuntimeVersionPython(pythonVersion);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && !NoBuild)
             {

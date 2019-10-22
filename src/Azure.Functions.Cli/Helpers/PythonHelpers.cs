@@ -17,10 +17,13 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly string _pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
         private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
+        private static WorkerLanguageVersionInfo _pythonVersionCache = null;
 
         public static async Task SetupPythonProject()
         {
-            await ValidatePythonVersion(errorOutIfOld: false);
+            var pyVersion = await GetEnvironmentPythonVersion();
+            AssertPythonVersion(pyVersion, errorIfNoVersion: false);
+
             CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
         }
@@ -73,31 +76,61 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task<WorkerLanguageVersionInfo> ValidatePythonVersion(
-            bool setWorkerExecutable = false,
-            bool errorIfNoExactMatch = false,
-            bool errorOutIfOld = true)
+        public static void AssertPythonVersion(WorkerLanguageVersionInfo pythonVersion, bool errorIfNotSupported = false, bool errorIfNoVersion = true)
         {
-            // If users are overriding this value, we don't have to worry about verification
+            if (pythonVersion?.Version == null)
+            {
+                var message = "Could not find a Python version. Python 3.6.x or 3.7.x is recommended, and used in Azure Functions.";
+                if (errorIfNoVersion) throw new CliException(message);
+                ColoredConsole.WriteLine(WarningColor(message));
+                return;
+            }
+
+            ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
+
+            // Python 3.6 or 3.7 (supported)
+            if (pythonVersion.Major == 3 && (pythonVersion.Minor == 6 || pythonVersion.Minor == 7))
+            {
+                return;
+            }
+
+            // Python 3.x (but not 3.6 or 3.7), not recommended, may fail
+            if (pythonVersion.Major == 3)
+            {
+                if (errorIfNotSupported) throw new CliException($"Python 3.6.x or 3.7.x is required for this operation. "
+                + "Please install Python 3.6 or 3.7, and use a virtual environment to switch to Python 3.6 or 3.7.");
+                ColoredConsole.WriteLine(WarningColor("Python 3.6.x or 3.7.x is recommended, and used in Azure Functions."));
+            }
+
+            // No Python 3
+            var error = "Python 3.x (recommended version 3.6 or 3.7) is required.";
+            if (errorIfNoVersion) throw new CliException(error);
+            ColoredConsole.WriteLine(WarningColor(error));
+        }
+
+        public static async Task<WorkerLanguageVersionInfo> GetEnvironmentPythonVersion()
+        {
+            // By circuiting here, we avoid computing the Python version multiple times
+            // in the scope of one command run
+            if (_pythonVersionCache != null)
+            {
+                return _pythonVersionCache;
+            }
+
+            // If users are overriding this value, we will use the path it's pointing to.
+            // This also allows for an escape path for complicated envrionments.
             string pythonDefaultExecutablePath = Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar);
             if (!string.IsNullOrEmpty(pythonDefaultExecutablePath))
             {
                 return await GetVersion(pythonDefaultExecutablePath);
             }
 
-            const string infoVersionSelectMessage = "We select Python interpreter '{0}' with version {1} for your project.";
-            const string warningMessage = "Python 3.6.x or 3.7.x is recommended, and used in Azure Functions. You are using Python version {0}.";
-            const string errorIfNotExactMessage = "Python 3.6.x or 3.7.x is required, and used in Azure Functions. You are using Python version {0}. "
-                + "Please install Python 3.6 or 3.7, and use a virtual environment to switch to Python 3.6 or 3.7.";
-            const string errorMessageOldPy = "Python 3.x (recommended version 3.7.x) is required. Found python versions ({0}).";
-            const string errorMessageNoPy = "Python 3.x (recommended version 3.7.x) is required. No Python versions were found.";
-
             var pythonGetVersionTask = GetVersion("python");
             var python3GetVersionTask = GetVersion("python3");
             var python36GetVersionTask = GetVersion("python3.6");
             var python37GetVersionTask = GetVersion("python3.7");
 
-            var workers = new List<WorkerLanguageVersionInfo>
+            var versions = new List<WorkerLanguageVersionInfo>
             {
                 await pythonGetVersionTask,
                 await python3GetVersionTask,
@@ -105,53 +138,38 @@ namespace Azure.Functions.Cli.Helpers
                 await python37GetVersionTask
             };
 
-            // Go through the list, if we find the first python 3.6 or python 3.7 worker, we stick to it.
-            WorkerLanguageVersionInfo python36_37worker = workers.FirstOrDefault(w => (w?.Major == 3 && w?.Minor == 6) || (w?.Major == 3 && w?.Minor == 7));
+            // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
+            WorkerLanguageVersionInfo python36_37worker = versions.FirstOrDefault(w => (w?.Major == 3 && w?.Minor == 6) || (w?.Major == 3 && w?.Minor == 7));
             if (python36_37worker != null)
             {
-                SetWorkerPathIfNeeded(setWorkerExecutable, python36_37worker.ExecutablePath);
-                ColoredConsole.WriteLine(AdditionalInfoColor(string.Format(infoVersionSelectMessage, python36_37worker.ExecutablePath, python36_37worker.Version)));
-                return python36_37worker;
+                _pythonVersionCache = python36_37worker;
+                return _pythonVersionCache;
             }
 
-            // If any of the possible python executables are 3.x, we warn them and go ahead.
-            WorkerLanguageVersionInfo python3worker = workers.FirstOrDefault(w => w?.Major == 3);
+            // If any of the possible python executables are 3.x, we will take that.
+            WorkerLanguageVersionInfo python3worker = versions.FirstOrDefault(w => w?.Major == 3);
             if (python3worker != null)
             {
-                if (errorIfNoExactMatch) throw new CliException(string.Format(errorIfNotExactMessage, python3worker.Version));
-                SetWorkerPathIfNeeded(setWorkerExecutable, python3worker.ExecutablePath);
-                ColoredConsole.WriteLine(WarningColor(string.Format(warningMessage, python3worker.Version)));
-                return python3worker;
+                _pythonVersionCache = python3worker;
+                return _pythonVersionCache;
             }
 
-            // If we found any python versions at all, we warn or error out if flag enabled.
-            WorkerLanguageVersionInfo anyPythonWorker = workers.FirstOrDefault(w => !string.IsNullOrEmpty(w?.Version));
-            if (anyPythonWorker != null)
-            {
-                if (errorIfNoExactMatch) throw new CliException(string.Format(errorIfNotExactMessage, anyPythonWorker.Version));
-                if (errorOutIfOld) throw new CliException(string.Format(errorMessageOldPy, string.Join(", ", anyPythonWorker.Version)));
-                else ColoredConsole.WriteLine(WarningColor(string.Format(errorMessageOldPy, string.Join(", ", anyPythonWorker.Version))));
-            }
+            // Least preferred -- If we found any python versions at all we return that
+            WorkerLanguageVersionInfo anyPythonWorker = versions.FirstOrDefault(w => !string.IsNullOrEmpty(w?.Version));
+            _pythonVersionCache = anyPythonWorker ?? new WorkerLanguageVersionInfo(WorkerRuntime.python, null, null);
 
-            // If we didn't find python at all, we warn or error out if flag enabled.
-            else
-            {
-                if (errorOutIfOld) throw new CliException(errorMessageNoPy);
-                else ColoredConsole.WriteLine(WarningColor(errorMessageNoPy));
-            }
-
-            return null;
+            return _pythonVersionCache;
         }
 
-        private static void SetWorkerPathIfNeeded(bool setWorker, string pyExe)
+        public static void SetWorkerPath(string pyExe, bool overwrite = false)
         {
-            if (setWorker)
+            if (overwrite || string.IsNullOrEmpty(Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar)))
             {
                 Environment.SetEnvironmentVariable(_pythonDefaultExecutableVar, pyExe, EnvironmentVariableTarget.Process);
-                if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine(VerboseColor($"{_pythonDefaultExecutableVar} set to {pyExe}"));
-                }
+            }
+            if (StaticSettings.IsDebug)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"{_pythonDefaultExecutableVar} is set to {Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar)}"));
             }
         }
 
@@ -167,7 +185,18 @@ namespace Azure.Functions.Cli.Helpers
             return null;
         }
 
-        public static async Task<string> VerifyVersion(string pythonExe = "python")
+        public static void SetWorkerRuntimeVersionPython(WorkerLanguageVersionInfo version)
+        {
+            if (version?.Version == null)
+            {
+                throw new ArgumentNullException(nameof(version), "Version must not be null.");
+            }
+
+            var versionStr = $"{version.Major}.{version.Minor}";
+            Environment.SetEnvironmentVariable(Constants.FunctionsWorkerRuntimeVersion, versionStr, EnvironmentVariableTarget.Process);
+        }
+
+        private static async Task<string> VerifyVersion(string pythonExe = "python")
         {
             var exe = new Executable(pythonExe, "--version");
             var sb = new StringBuilder();
@@ -310,7 +339,8 @@ namespace Azure.Functions.Cli.Helpers
         private static async Task RestorePythonRequirementsPackapp(string functionAppRoot, string packagesLocation)
         {
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
-            var pythonWorkerInfo = await ValidatePythonVersion(errorOutIfOld: true);
+            var pythonWorkerInfo = await GetEnvironmentPythonVersion();
+            AssertPythonVersion(pythonWorkerInfo, errorIfNoVersion: true);
             var pythonExe = pythonWorkerInfo.ExecutablePath;
             var pythonVersion = $"{pythonWorkerInfo.Major}{pythonWorkerInfo.Minor}";
             var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version {pythonVersion} --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\" --verbose");
@@ -392,11 +422,12 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<string> ChoosePythonBuildEnvImage()
         {
-            WorkerLanguageVersionInfo workerInfo = await ValidatePythonVersion(false, false, false);
+            WorkerLanguageVersionInfo workerInfo = await GetEnvironmentPythonVersion();
             if (workerInfo?.Major == 3 && workerInfo?.Minor == 7)
             {
                 return Constants.DockerImages.LinuxPython37ImageAmd64;
-            } else
+            }
+            else
             {
                 return Constants.DockerImages.LinuxPython36ImageAmd64;
             }
