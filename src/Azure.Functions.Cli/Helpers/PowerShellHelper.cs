@@ -67,17 +67,16 @@ namespace Azure.Functions.Cli.Helpers
 
                 // Find the version information
                 XmlNode root = doc.DocumentElement;
-                var props = root.SelectNodes("//m:properties/d:Version", nsmgr);
+                var props = root.SelectNodes("//m:properties[d:IsPrerelease = \"false\"]/d:Version", nsmgr);
                 var latestVersion = new Version("0.0");
 
                 if (props != null && props.Count > 0)
                 {
                     foreach (XmlNode prop in props)
                     {
-                        var currentVersion = new Version(prop.FirstChild.Value);
+                        Version.TryParse(prop.FirstChild.Value, out var currentVersion);
 
-                        var result = currentVersion.CompareTo(latestVersion);
-                        if (result > 0)
+                        if (currentVersion != null && currentVersion > latestVersion)
                         {
                             latestVersion = currentVersion;
                         }
