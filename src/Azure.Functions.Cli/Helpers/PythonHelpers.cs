@@ -312,7 +312,8 @@ namespace Azure.Functions.Cli.Helpers
             var packApp = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tools", "python", "packapp");
             var pythonWorkerInfo = await ValidatePythonVersion(errorOutIfOld: true);
             var pythonExe = pythonWorkerInfo.ExecutablePath;
-            var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version 36 --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\" --verbose");
+            var pythonVersion = $"{pythonWorkerInfo.Major}{pythonWorkerInfo.Minor}";
+            var exe = new Executable(pythonExe, $"\"{packApp}\" --platform linux --python-version {pythonVersion} --packages-dir-name {Constants.ExternalPythonPackages} \"{functionAppRoot}\" --verbose");
             var sbErrors = new StringBuilder();
             var exitCode = await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => sbErrors.AppendLine(e));
 
