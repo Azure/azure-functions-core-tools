@@ -145,12 +145,6 @@ namespace Azure.Functions.Cli.Tests.E2E
             WorkerLanguageVersionInfo worker = await PythonHelpers.ValidatePythonVersion();
             Skip.If(worker == null);
 
-            string expectedDockerImage = "FROM mcr.microsoft.com/azure-functions/python:2.0";
-            if (worker.Major == 3 && worker.Minor == 7)
-            {
-                expectedDockerImage = "FROM mcr.microsoft.com/azure-functions/python:2.0-python3.7";
-            }
-
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[] { $"init . --worker-runtime python --docker" },
@@ -159,7 +153,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { expectedDockerImage }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:2.0-python{worker.Major}.{worker.Minor}" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
