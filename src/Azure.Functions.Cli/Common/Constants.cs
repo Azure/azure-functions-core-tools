@@ -35,6 +35,7 @@ namespace Azure.Functions.Cli.Common
         public const string EnablePersistenceChannelDebugSetting = "FUNCTIONS_CORE_TOOLS_ENABLE_PERSISTENCE_CHANNEL_DEBUG_OUTPUT";
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
         public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
+        public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -83,6 +84,9 @@ namespace Azure.Functions.Cli.Common
         {
             public const int ArmTokenExpiryMinutes = 4;
             public const int StatusRefreshSeconds = 3;
+            public const int ScmRunFromPackageBlobExpiryInDays = 3650;
+            public const string ScmRunFromPackageContainerName = "scm-releases";
+            public const string ScmRunFromPackageBlobFormat = "scm-latest-{0}-{1}.squashfs";
 
             public static readonly IDictionary<string, string> LinuxDedicatedBuildSettings = new Dictionary<string, string>
             {

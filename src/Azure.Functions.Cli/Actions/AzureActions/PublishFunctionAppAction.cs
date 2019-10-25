@@ -456,12 +456,33 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Consumption Linux, try squashfs as a package format.
             if (PublishBuildOption == BuildOption.Remote)
             {
-                await RemoveFunctionAppAppSetting(functionApp,
-                    "WEBSITE_RUN_FROM_PACKAGE",
-                    "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
-                    "WEBSITE_CONTENTSHARE");
-                Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
+                // Check if scm uri exists, otherwise, we know it is an old function app
+                if (string.IsNullOrEmpty(functionApp.ScmUri))
+                {
+                    throw new CliException($"Remote build is a new feature added to function apps.{Environment.NewLine}" +
+                        $"Your function app {functionApp.SiteName} does not support remote build as it was created before August 1st, 2019.{Environment.NewLine}" +
+                        $"Please use '--build local', '--build-native-deps' or manually enable remote build.{Environment.NewLine}" +
+                        $"For more information, please visit https://aka.ms/remotebuild");
+                }
+
+                // Check if app settings is blocking remote build
+                await RemoveFunctionAppAppSetting(functionApp, "WEBSITE_RUN_FROM_PACKAGE", "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", "WEBSITE_CONTENTSHARE");
+
+                // Check if SCM_RUN_FROM_PACKAGE exists, if not, create a blob for our customer
+                string newBlobSas = await EnsureScmRunFromPackageSetting(functionApp);
+
+                // Perform Remote Build
+                Task<DeployStatus> pollConsumptionBuild(HttpClient client) =>
+                    KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
                 var deployStatus = await PerformServerSideBuild(functionApp, zipFileFactory, pollConsumptionBuild);
+
+                // If the new blob sas is set, we need to update WEBSITE_RUN_FROM_PACKAGE
+                if (!string.IsNullOrEmpty(newBlobSas))
+                {
+                    functionApp.AzureAppSettings.Add("WEBSITE_RUN_FROM_PACKAGE", newBlobSas);
+                    await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+                }
+
                 return deployStatus == DeployStatus.Success;
             }
             else if (PublishBuildOption == BuildOption.Local)
@@ -629,6 +650,35 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
+        private async Task<string> EnsureScmRunFromPackageSetting(Site functionApp)
+        {
+            using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+            {
+                var KuduAppSettings = await KuduLiteDeploymentHelpers.GetAppSettings(client);
+                if (!KuduAppSettings.ContainsKey(Constants.ScmRunFromPackage))
+                {
+                    string blobName = string.Format(Constants.KuduLiteDeploymentConstants.ScmRunFromPackageBlobFormat,
+                        functionApp.SiteName, DateTime.UtcNow.ToString("yyyyMMddHHmmss"));
+                    string blobSas = await StorageBlobHelper.PrepareScmRunFromPackageBlob(
+                        connectionString: KuduAppSettings[Constants.AzureWebJobsStorage],
+                        containerName: Constants.KuduLiteDeploymentConstants.ScmRunFromPackageContainerName,
+                        blobName: blobName,
+                        expiryInDays: Constants.KuduLiteDeploymentConstants.ScmRunFromPackageBlobExpiryInDays);
+                    ColoredConsole.WriteLine(Yellow($"Change SCM_RUN_FROM_PACKAGE app setting in Kudu to {blobName}"));
+
+                    functionApp.AzureAppSettings.Add(Constants.ScmRunFromPackage, blobSas);
+                    var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+                    await Task.Delay(TimeSpan.FromSeconds(5));
+                    if (!result.IsSuccessful)
+                    {
+                        throw new CliException($"Failed to update app settings");
+                    }
+                    return blobSas;
+                }
+            }
+            return null;
+        }
+
         private async Task RemoveFunctionAppAppSetting(Site functionApp, params string[] appSettingNames)
         {
             bool isAppSettingUpdated = false;
@@ -678,14 +728,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask)
         {
-            if (string.IsNullOrEmpty(functionApp.ScmUri))
-            {
-                throw new CliException($"Remote build is a new feature added to function apps.{Environment.NewLine}" +
-                    $"Your function app {functionApp.SiteName} does not support remote build as it was created before August 1st, 2019.{Environment.NewLine}" +
-                    $"Please use '--build local', '--build-native-deps' or manually enable remote build.{Environment.NewLine}" +
-                    $"For more information, please visit https://aka.ms/remotebuild");
-            }
-
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(

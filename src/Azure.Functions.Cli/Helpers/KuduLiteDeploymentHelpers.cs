@@ -6,12 +6,33 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Helpers
 {
     internal class KuduLiteDeploymentHelpers
     {
+        public static async Task<IDictionary<string, string>> GetAppSettings(HttpClient client)
+        {
+            return await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, "/api/settings");
+        }
+
+        public static async Task AddOrUpdateAppSetting(HttpClient client, string key, string value)
+        {
+            var settings = new Dictionary<string, string> {
+                { key, value }
+            };
+            string json = JsonConvert.SerializeObject(settings);
+            HttpContent content = new StringContent(json, Encoding.UTF8, "application/json");
+            await InvokeRequest<Task>(client, HttpMethod.Post, "/api/settings", content, ensureSuccess: false);
+        }
+
+        public static async Task RemoveAppSetting(HttpClient client, string key)
+        {
+            await InvokeRequest<Task>(client, HttpMethod.Delete, $"/api/settings/{key}", null, ensureSuccess: false);
+        }
+
         public static async Task<DeployStatus> WaitForConsumptionServerSideBuild(HttpClient client, Site functionApp, string accessToken, string managementUrl)
         {
             ColoredConsole.WriteLine("Remote build in progress, please wait...");
@@ -125,15 +146,23 @@ namespace Azure.Functions.Cli.Helpers
             return currentLogDatetime;
         }
 
-        private static async Task<T> InvokeRequest<T>(HttpClient client, HttpMethod method, string url)
+        private static async Task<T> InvokeRequest<T>(HttpClient client, HttpMethod method, string url,
+            HttpContent content = null, bool ensureSuccess = true)
         {
             HttpResponseMessage response = null;
             await RetryHelper.Retry(async () =>
             {
                 using (var request = new HttpRequestMessage(method, new Uri(url, UriKind.RelativeOrAbsolute)))
                 {
+                    if (content != null)
+                    {
+                        request.Content = content;
+                    }
                     response = await client.SendAsync(request);
-                    response.EnsureSuccessStatusCode();
+                    if (ensureSuccess)
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
                 }
             }, 3);
 
