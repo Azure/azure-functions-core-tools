@@ -1,6 +1,7 @@
 ﻿using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,7 +18,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         {
             hostOptions = hostOptions ?? SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
             IConfigurationBuilder builder = new ConfigurationBuilder();
-            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance));
+            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance, new MetricsLogger()));
             var configuration = builder.Build();
 
             var configurationHelper = new ExtensionBundleConfigurationHelper(configuration, SystemEnvironment.Instance);
