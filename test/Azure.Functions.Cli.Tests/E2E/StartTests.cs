@@ -249,7 +249,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
-                        result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
+                        result.Should().Be("Hello Te;dalsjflk;dajgjlfnsrlnfst", because: "response from default function should be 'Hello {name}'");
                     }
                 },
             }, _output);
