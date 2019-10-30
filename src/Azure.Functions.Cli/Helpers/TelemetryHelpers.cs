@@ -4,9 +4,9 @@ using Colors.Net;
 using Fclp.Internals;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading;
+using System.Reflection;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -50,6 +50,28 @@ namespace Azure.Functions.Cli.Helpers
                     ColoredConsole.Error.WriteLine(ex.ToString());
                 }
             }
+        }
+
+        public static bool CheckIfTelemetryEnabled()
+        {
+            // If Ikey is not set, can't get anything
+            // Note: Do not change this to use from the Constants file. As the key in Constants may change
+            if (Constants.TelemetryInstrumentationKey == "00000000-0000-0000-0000-000000000000")
+            {
+                return false;
+            }
+
+            #pragma warning disable 0162
+            // If opt out is not set, we check if the default sentinel is present
+            var optOutVar = Environment.GetEnvironmentVariable(Constants.TelemetryOptOutVariable);
+            if (string.IsNullOrEmpty(optOutVar))
+            {
+                var sentinelPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "telemetryDefaultOn.sentinel");
+                return File.Exists(sentinelPath);
+            }
+
+            // If opt out is present and set to falsy, only then we enable telemetry
+            return optOutVar == "0" || optOutVar.Equals("false", StringComparison.OrdinalIgnoreCase);
         }
 
         public static void LogEventIfAllowedSafe(ITelemetry telemetry, TelemetryEvent telemetryEvent)

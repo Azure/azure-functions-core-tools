@@ -40,6 +40,7 @@ namespace Azure.Functions.Cli.Common
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
+        public const string TelemetrySentinelFile = "telemetryDefaultOn.sentinel";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
