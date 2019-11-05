@@ -75,7 +75,7 @@ def find_and_build_deps(args):
     # for that.
     with tempfile.TemporaryDirectory(prefix='azureworker') as td:
         run_or_die([
-            'pip', 'download', '-r', str(req_txt), '--dest', td
+           sys.executable, '-m', 'pip', 'download', '-r', str(req_txt), '--dest', td
         ], verbose=args.verbose)
 
         files = os.listdir(td)
