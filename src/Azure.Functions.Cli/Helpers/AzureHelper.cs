@@ -128,16 +128,10 @@ namespace Azure.Functions.Cli.Helpers
             };
         }
 
-        internal static Task<IEnumerable<FunctionInfo>> GetFunctions(Site functionApp, string accessToken, string managementURL)
+        internal static Task<ArmArrayWrapper<FunctionInfo>> GetFunctions(Site functionApp, string accessToken, string managementURL)
         {
-            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/functions?api-version={ArmUriTemplates.WebsitesApiVersion}");
-            return ArmHttpAsync<IEnumerable<FunctionInfo>>(HttpMethod.Get, url, accessToken);
-        }
-
-        internal static Task<string> GetSiteRestrictedToken(Site functionApp, string accessToken, string managementURL)
-        {
-            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/host/token?api-version={ArmUriTemplates.WebsitesApiVersion}");
-            return ArmHttpAsync<string>(HttpMethod.Get, url, accessToken);
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/functions?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            return ArmHttpAsync<ArmArrayWrapper<FunctionInfo>>(HttpMethod.Get, url, accessToken);
         }
 
         internal static async Task<string> GetFunctionKey(string functionName, string appId, string accessToken, string managementURL)
@@ -147,12 +141,12 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return null;
             }
-            var url = new Uri($"{managementURL}{appId}/hostruntime/admin/functions/{functionName}/keys?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{appId}/functions/{functionName}/listKeys?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var key = string.Empty;
             try
             {
-                var keysJson = await ArmHttpAsync<JToken>(HttpMethod.Get, url, accessToken);
-                key = (string)(keysJson["keys"] as JArray).First()["value"];
+                var keysJson = await ArmHttpAsync<JToken>(HttpMethod.Post, url, accessToken);
+                key = keysJson.Select(k => k.Values()).SelectMany(i => i).FirstOrDefault()?.ToString();
             }
             catch (Exception)
             {
@@ -349,7 +343,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             var functions = await GetFunctions(functionApp, accessToken, managementURL);
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
-            foreach (var function in functions)
+            foreach (var function in functions.value.Select(v => v.properties))
             {
                 var trigger = function
                     .Config?["bindings"]

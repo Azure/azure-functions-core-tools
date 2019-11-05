@@ -14,10 +14,17 @@ namespace Azure.Functions.Cli.Arm
     public static class ArmClient
     {
         private static readonly Random _random;
+        private static HttpMessageHandler _testHandler = null;
 
         static ArmClient()
         {
             _random = new Random();
+        }
+
+        // For testing
+        internal static void SetTestHandler(HttpMessageHandler testHandler)
+        {
+            _testHandler = testHandler;
         }
 
         public static Task<HttpResponseMessage> HttpInvoke(HttpMethod method, Uri uri, string accessToken, object objectPayload = null, int retryCount = 3)
@@ -69,7 +76,7 @@ namespace Azure.Functions.Cli.Arm
         private static async Task<HttpResponseMessage> HttpInvoke(Uri uri, string verb, string accessToken, object objectPayload)
         {
             var payload = JsonConvert.SerializeObject(objectPayload);
-            HttpMessageHandler handler = new HttpClientHandler();
+            HttpMessageHandler handler = _testHandler ?? new HttpClientHandler();
 
             if (StaticSettings.IsDebug)
             {
