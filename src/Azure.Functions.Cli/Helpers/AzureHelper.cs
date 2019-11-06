@@ -266,7 +266,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static Task<HttpResponseMessage> SyncTriggers(Site functionApp, string accessToken, string managementURL)
         {
-            var url = new Uri($"{managementURL}{functionApp.SiteId}/hostruntime/admin/host/synctriggers?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/host/default/sync?api-version={ArmUriTemplates.WebsitesApiVersion}");
             return ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken);
         }
 
