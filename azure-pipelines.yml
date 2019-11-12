@@ -23,6 +23,9 @@ variables:
 steps:
 - pwsh: |
     Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+- task: NodeTool@0 
+  inputs:
+    versionSpec: '10.x'
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: 
