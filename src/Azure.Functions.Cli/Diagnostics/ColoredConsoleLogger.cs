@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Logging;
+using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Diagnostics
@@ -10,12 +11,14 @@ namespace Azure.Functions.Cli.Diagnostics
     public class ColoredConsoleLogger : ILogger
     {
         private readonly Func<string, LogLevel, bool> _filter;
+        private readonly bool _verboseErrors;
         private readonly string _category;
 
         public ColoredConsoleLogger(string category, Func<string, LogLevel, bool> filter = null)
         {
             _category = category;
             _filter = filter;
+            _verboseErrors = StaticSettings.IsDebug;
         }
 
         public bool IsEnabled(LogLevel logLevel)
@@ -48,11 +51,11 @@ namespace Azure.Functions.Cli.Diagnostics
             }
         }
 
-        private static IEnumerable<RichString> GetMessageString(LogLevel level, string formattedMessage, Exception exception)
+        private IEnumerable<RichString> GetMessageString(LogLevel level, string formattedMessage, Exception exception)
         {
             if (exception != null)
             {
-                formattedMessage += Environment.NewLine + Utility.FlattenException(exception);
+                formattedMessage += Environment.NewLine + (_verboseErrors ? exception.ToString() : Utility.FlattenException(exception));
             }
 
             switch (level)
