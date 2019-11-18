@@ -36,6 +36,11 @@ steps:
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
   displayName: 'Executing build script'
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'XUnit'
+    testResultsFiles: '**/*.trx'
+    failTaskOnFailedTests: true
 - task: CopyFiles@2
   inputs:
     SourceFolder: '$(Build.Repository.LocalPath)\artifacts'

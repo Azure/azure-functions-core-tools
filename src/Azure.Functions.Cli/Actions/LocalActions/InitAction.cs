@@ -37,8 +37,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Csx { get; set; }
 
-        public bool ExtensionBundle { get; set; }
-
         public string Language { get; set; }
 
         public bool? ManagedDependencies { get; set; }
@@ -107,11 +105,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
                 .Callback(f => ManagedDependencies = f);
 
-            Parser
-                .Setup<bool>("extension-bundle")
-                //.WithDescription("use default extension bundle configuration in host.json")
-                .Callback(e => ExtensionBundle = e);
-
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -173,7 +166,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 bool managedDependenciesOption = ResolveManagedDependencies(workerRuntime, ManagedDependencies);
                 await InitLanguageSpecificArtifacts(workerRuntime, language, managedDependenciesOption);
                 await WriteFiles();
-                await WriteHostJson(workerRuntime, managedDependenciesOption, ExtensionBundle);
+                await WriteHostJson(workerRuntime, managedDependenciesOption);
                 await WriteLocalSettingsJson(workerRuntime);
             }
 
@@ -413,16 +406,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return true;
         }
 
-        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle)
+        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption)
         {
             var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
                 ? await StaticResources.PowerShellHostJson
                 : await StaticResources.HostJson;
 
-            if (extensionBundle)
-            {
-                hostJsonContent = await AddBundleConfig(hostJsonContent);
-            }
+            hostJsonContent = await AddBundleConfig(hostJsonContent);
 
             await WriteFiles("host.json", hostJsonContent);
         }

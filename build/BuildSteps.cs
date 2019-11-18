@@ -195,7 +195,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} --logger trx");
         }
 
         public static void GenerateZipToSign()
