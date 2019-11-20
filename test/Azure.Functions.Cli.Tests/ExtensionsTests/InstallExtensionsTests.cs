@@ -1,6 +1,8 @@
-﻿using Azure.Functions.Cli.Tests.E2E;
+﻿using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Tests.E2E;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
@@ -45,6 +47,12 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
         {
             return CliTester.Run(new RunConfiguration
             {
+                PreTest = (workingDir) =>
+                {
+                    var hostJson = Path.Combine(workingDir, "host.json");
+                    _output.WriteLine($"Creating host json without bundles {hostJson}");
+                    FileSystemHelpers.WriteAllTextToFile(hostJson, "{ \"version\": \"2.0\" }");
+                },
                 Commands = new[] {
                     "init . --worker-runtime node",
                     "new --template SendGrid --name testfunc",
@@ -70,6 +78,24 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                             "Microsoft.Azure.WebJobs.Extensions.SendGrid"
                         }
                     }
+                },
+                CommandTimeout = TimeSpan.FromMinutes(1)
+            }, _output);
+        }
+
+        [Fact]
+        public Task bundlesconfiguredbydefault_no_action()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] {
+                    "init . --worker-runtime node",
+                    "new --template SendGrid --name testfunc",
+                    "extensions install"
+                },
+                OutputContains = new[]
+                {
+                    "No action performed"
                 },
                 CommandTimeout = TimeSpan.FromMinutes(1)
             }, _output);
