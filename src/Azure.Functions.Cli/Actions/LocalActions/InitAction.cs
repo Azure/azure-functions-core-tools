@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Csx { get; set; }
 
-        public bool ExtensionBundle { get; set; }
+        public bool ExtensionBundle { get; set; } = true;
 
         public string Language { get; set; }
 
@@ -108,9 +108,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => ManagedDependencies = f);
 
             Parser
-                .Setup<bool>("extension-bundle")
-                //.WithDescription("use default extension bundle configuration in host.json")
-                .Callback(e => ExtensionBundle = e);
+                .Setup<bool>("no-bundle")
+                .Callback(e => ExtensionBundle = !e);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -413,7 +412,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return true;
         }
 
-        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle)
+        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
         {
             var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
                 ? await StaticResources.PowerShellHostJson
