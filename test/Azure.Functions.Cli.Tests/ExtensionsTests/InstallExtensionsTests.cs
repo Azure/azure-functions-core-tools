@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 },
                 OutputContains = new[]
                 {
-                    "No action performed"
+                    "No action performed because no functions in your app require extensions"
                 },
                 OutputDoesntContain = new[]
                 {

@@ -78,7 +78,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         logStd($"[{DateTime.Now}] Resuming commands.");
                     }
 
-                    logStd($"Running: > {exe.Command}");
+                    logStd($"Running: > {exe.Command} from Directory:{workingDir}");
 
                     if (runConfiguration.ExpectExit || (i + 1) < runConfiguration.Commands.Length)
                     {
