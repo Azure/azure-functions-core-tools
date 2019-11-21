@@ -18,6 +18,12 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
         {
             return CliTester.Run(new RunConfiguration
             {
+                PreTest = (workingDir) =>
+                {
+                    var hostJson = Path.Combine(workingDir, "host.json");
+                    _output.WriteLine($"Creating host json without bundles {hostJson}");
+                    FileSystemHelpers.WriteAllTextToFile(hostJson, "{ \"version\": \"2.0\" }");
+                },
                 Commands = new[] {
                     "init . --worker-runtime node",
                     "new --template HttpTrigger --name testfunc",
@@ -25,7 +31,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 },
                 OutputContains = new[]
                 {
-                    "No action performed because no functions in your app require extensions"
+                    "No action performed"
                 },
                 OutputDoesntContain = new[]
                 {
@@ -79,25 +85,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromMinutes(1)
-            }, _output);
-        }
-
-        [Fact]
-        public Task bundlesconfiguredbydefault_no_action()
-        {
-            return CliTester.Run(new RunConfiguration
-            {
-                Commands = new[] {
-                    "init . --worker-runtime node",
-                    "new --template SendGrid --name testfunc",
-                    "extensions install"
-                },
-                OutputContains = new[]
-                {
-                    "No action performed"
-                },
-                CommandTimeout = TimeSpan.FromMinutes(1)
+                CommandTimeout = TimeSpan.FromMinutes(59)
             }, _output);
         }
     }
