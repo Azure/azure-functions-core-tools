@@ -38,9 +38,10 @@ steps:
   displayName: 'Executing build script'
 - task: PublishTestResults@2
   inputs:
-    testResultsFormat: 'XUnit'
+    testResultsFormat: 'VSTest'
     testResultsFiles: '**/*.trx'
     failTaskOnFailedTests: true
+  condition: succeededOrFailed()
 - task: CopyFiles@2
   inputs:
     SourceFolder: '$(Build.Repository.LocalPath)\artifacts'
