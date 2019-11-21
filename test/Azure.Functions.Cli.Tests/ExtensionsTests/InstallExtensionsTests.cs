@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] {
-                    "init . --worker-runtime node --no-bundle true",
+                    "init . --worker-runtime node --no-bundle",
                     "new --template HttpTrigger --name testfunc",
                     "extensions install"
                 },
@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] {
-                    "init . --worker-runtime node --no-bundle true",
+                    "init . --worker-runtime node --no-bundle",
                     "new --template SendGrid --name testfunc",
                     "extensions install"
                 },
