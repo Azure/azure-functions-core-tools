@@ -35,6 +35,7 @@ steps:
     AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+    TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
   displayName: 'Executing build script'
 - task: CopyFiles@2
   inputs:
