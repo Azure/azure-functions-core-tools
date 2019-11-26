@@ -272,6 +272,13 @@ A good usage scenario for using functions with VKubelet would be with event trig
 * `CurrentDirectory`: is the default directory the functions runtime looks for functions in.
 * `%TMP%\LogFiles\Application\Functions`: is the default directory for logs. It mirrors the logs directory on Azure as well.
 
+## Telemetry
+
+The Azure Functions Core tools collect usage data in order to help us improve your experience.
+The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft.
+
+You can opt-out of telemetry by setting the FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your favorite shell.
+
 ## License
 
 This project is under the benevolent umbrella of the [.NET Foundation](http://www.dotnetfoundation.org/) and is licensed under [the MIT License](LICENSE)
