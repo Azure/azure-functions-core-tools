@@ -279,6 +279,8 @@ The data is anonymous and doesn't include any user specific or personal informat
 
 You can opt-out of telemetry by setting the `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` environment variable to '1' or 'true' using your favorite shell.
 
+[Microsoft privacy statement](https://privacy.microsoft.com/en-US/privacystatement)
+
 ## License
 
 This project is under the benevolent umbrella of the [.NET Foundation](http://www.dotnetfoundation.org/) and is licensed under [the MIT License](LICENSE)
