@@ -277,7 +277,7 @@ A good usage scenario for using functions with VKubelet would be with event trig
 The Azure Functions Core tools collect usage data in order to help us improve your experience.
 The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft.
 
-You can opt-out of telemetry by setting the FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your favorite shell.
+You can opt-out of telemetry by setting the `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` environment variable to '1' or 'true' using your favorite shell.
 
 ## License
 
