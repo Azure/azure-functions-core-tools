@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/java/maven:8u212-zulu-debian9 AS installer-env
+FROM mcr.microsoft.com/azure-functions/java:3.0-java8-build AS installer-env
 
 COPY . /src/java-function-app
 RUN cd /src/java-function-app && \
@@ -9,8 +9,8 @@ RUN cd /src/java-function-app && \
     cp -a . /home/site/wwwroot
  
 # To enable ssh & remote debugging on app service change the base image to the one below
-# FROM mcr.microsoft.com/azure-functions/java:2.0-appservice
-FROM mcr.microsoft.com/azure-functions/java:2.0
+# FROM mcr.microsoft.com/azure-functions/java:3.0-java8-appservice
+FROM mcr.microsoft.com/azure-functions/java:3.0-java8
 
 ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
     AzureFunctionsJobHost__Logging__Console__IsEnabled=true
