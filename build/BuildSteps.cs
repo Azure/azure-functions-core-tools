@@ -160,22 +160,6 @@ namespace Build
             }
         }
 
-        public static void AddPythonWorker()
-        {
-            foreach (var runtime in Settings.TargetRuntimes)
-            {
-                // Python worker's dependencies are platform dependent and need to be copied accordingly
-                var pythonDir = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
-                if (Directory.Exists(pythonDir))
-                {
-                    var allOsDirectories = Directory.GetDirectories(pythonDir);
-                    var pythonPlatformSpecificWorker = Path.Combine(pythonDir, Settings.RuntimesToOS[runtime]);
-                    FileHelpers.RecursiveCopy(pythonPlatformSpecificWorker, pythonDir);
-                    allOsDirectories.ToList().ForEach(dir => Directory.Delete(dir, recursive: true));
-                }
-            }
-        }
-
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
@@ -211,7 +195,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile}");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} --logger trx");
         }
 
         public static void GenerateZipToSign()

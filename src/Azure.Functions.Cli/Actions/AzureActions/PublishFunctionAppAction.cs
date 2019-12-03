@@ -131,7 +131,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
 
             // Update build option
-            PublishBuildOption = PublishHelper.UpdateBuildOption(PublishBuildOption, workerRuntime, functionApp);
+            PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
 
             if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild && PublishBuildOption != BuildOption.Remote)
             {
@@ -281,16 +281,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // For dedicated linux apps, we do not support run from package right now
             var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
-
-            // For Python linux apps, we do not support --build remote with --build-native-deps flag
-            if (PublishBuildOption != BuildOption.Default && BuildNativeDeps)
-            {
-                throw new CliException("Cannot use '--build-native-deps' along with '--build' flag");
-            }
-            else if (PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.None)
-            {
-                throw new CliException("The --build flag only supports '--build remote' or '--build local'");
-            }
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
             {
@@ -461,14 +451,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<bool> HandleLinuxConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             string fileNameNoExtension = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
-
             // Consumption Linux, try squashfs as a package format.
             if (PublishBuildOption == BuildOption.Remote)
             {
-                await RemoveFunctionAppAppSetting(functionApp,
-                    "WEBSITE_RUN_FROM_PACKAGE",
-                    "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
-                    "WEBSITE_CONTENTSHARE");
+                await EnsureRemoteBuildIsSupported(functionApp);
+                await RemoveFunctionAppAppSetting(functionApp, Constants.WebsiteRunFromPackage, Constants.WebsiteContentAzureFileConnectionString, Constants.WebsiteContentShared);
                 Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
                 var deployStatus = await PerformServerSideBuild(functionApp, zipFileFactory, pollConsumptionBuild);
                 return deployStatus == DeployStatus.Success;
@@ -663,6 +650,32 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
+        public async Task EnsureRemoteBuildIsSupported(Site functionApp)
+        {
+            string errorMessage = $"Remote build is a new feature added to function apps.{Environment.NewLine}" +
+                $"Your function app {functionApp.SiteName} does not support remote build as it was created before August 1st, 2019.{Environment.NewLine}" +
+                $"Please use '--build local' or '--build-native-deps'.{Environment.NewLine}" +
+                $"For more information, please visit https://aka.ms/remotebuild";
+
+            // Check if SCM site and SCM_RUN_FROM_PACKAGE exist. If not, we know it is an old function app.
+            if (functionApp.IsLinux && functionApp.IsDynamic)
+            {
+                if (string.IsNullOrEmpty(functionApp.ScmUri))
+                {
+                    throw new CliException(errorMessage);
+                }
+
+                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                {
+                    var kuduAppSettings = await KuduLiteDeploymentHelpers.GetAppSettings(client);
+                    if (!kuduAppSettings.ContainsKey(Constants.ScmRunFromPackage))
+                    {
+                        throw new CliException(errorMessage);
+                    }
+                }
+            }
+        }
+
         public async Task PublishZipDeploy(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             await RetryHelper.Retry(async () =>
@@ -687,14 +700,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask)
         {
-            if (string.IsNullOrEmpty(functionApp.ScmUri))
-            {
-                throw new CliException($"Remote build is a new feature added to function apps.{Environment.NewLine}" +
-                    $"Your function app {functionApp.SiteName} does not support remote build as it was created before August 1st, 2019.{Environment.NewLine}" +
-                    $"Please use '--build local', '--build-native-deps' or manually enable remote build.{Environment.NewLine}" +
-                    $"For more information, please visit https://aka.ms/remotebuild");
-            }
-
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(

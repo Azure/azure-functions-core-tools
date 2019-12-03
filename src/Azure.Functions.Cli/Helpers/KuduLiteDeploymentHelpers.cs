@@ -12,6 +12,11 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class KuduLiteDeploymentHelpers
     {
+        public static async Task<Dictionary<string, string>> GetAppSettings(HttpClient client)
+        {
+            return await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, "/api/settings");
+        }
+
         public static async Task<DeployStatus> WaitForConsumptionServerSideBuild(HttpClient client, Site functionApp, string accessToken, string managementUrl)
         {
             ColoredConsole.WriteLine("Remote build in progress, please wait...");

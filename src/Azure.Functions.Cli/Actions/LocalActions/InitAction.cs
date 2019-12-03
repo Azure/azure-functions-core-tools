@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool Csx { get; set; }
 
-        public bool ExtensionBundle { get; set; }
+        public bool ExtensionBundle { get; set; } = true;
 
         public string Language { get; set; }
 
@@ -108,9 +108,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => ManagedDependencies = f);
 
             Parser
-                .Setup<bool>("extension-bundle")
-                //.WithDescription("use default extension bundle configuration in host.json")
-                .Callback(e => ExtensionBundle = e);
+                .Setup<bool>("no-bundle")
+                .Callback(e => ExtensionBundle = !e);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -313,7 +312,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython);
+                await WritePythonDockerFile();
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
@@ -324,6 +323,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 throw new CliException("Can't find WorkerRuntime None");
             }
             await WriteFiles(".dockerignore", await StaticResources.DockerIgnoreFile);
+        }
+
+        private static async Task WritePythonDockerFile()
+        {
+            WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
+            if (worker?.Major == 3 && worker?.Minor == 7)
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython37);
+            }
+            else
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython36);
+            }
         }
 
         private static async Task WriteExtensionsJson()
@@ -400,7 +412,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return true;
         }
 
-        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle)
+        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
         {
             var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
                 ? await StaticResources.PowerShellHostJson

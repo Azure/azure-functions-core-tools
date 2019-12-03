@@ -2,6 +2,7 @@
 using System.IO;
 using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -20,18 +21,15 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
         public void Configure(IConfigurationBuilder builder)
         {
-
-            IConfigurationSource hostJsonSource = null;
-            foreach (var source in builder.Sources)
+            var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
+            if (!string.IsNullOrEmpty(bundleId))
             {
-                if (source.GetType().ToString().Contains("HostJsonFileConfigurationSource"))
+                builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
-                    hostJsonSource = source;
-                    break;
-                }
+                    { "AzureFunctionsJobHost:extensionBundle:downloadPath", Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId)},
+                    { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "true"}
+                });
             }
-            builder.Sources.Remove(hostJsonSource);
-            builder.Add(new JsonFileConfigurationSource(_hostOptions, SystemEnvironment.Instance, new LoggerFactory()));
         }
     }
 }

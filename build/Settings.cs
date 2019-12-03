@@ -67,9 +67,9 @@ namespace Build
 
         public static string MinifiedVersionPrefix = "min.";
 
-        public const string DistLibVersion = "distlib-15dba58a827f56195b0fa0afe80a8925a92e8bf5";
+        public const string DistLibVersion = "distlib-0.3.0";
 
-        public const string DistLibUrl = "https://github.com/vsajip/distlib/archive/15dba58a827f56195b0fa0afe80a8925a92e8bf5.zip";
+        public const string DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.0.zip";
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 

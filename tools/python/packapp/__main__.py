@@ -75,7 +75,7 @@ def find_and_build_deps(args):
     # for that.
     with tempfile.TemporaryDirectory(prefix='azureworker') as td:
         run_or_die([
-            'pip', 'download', '-r', str(req_txt), '--dest', td
+           sys.executable, '-m', 'pip', 'download', '-r', str(req_txt), '--dest', td
         ], verbose=args.verbose)
 
         files = os.listdir(td)
@@ -110,8 +110,13 @@ def find_and_build_deps(args):
                 headers = venv / 'Include'
                 scripts = venv / 'Scripts'
                 data = venv
-            elif args.platform == 'linux':
+            elif args.platform == 'linux' and python == "python3.6":
                 sp = venv / 'lib' / python / 'site-packages'
+                headers = venv / 'include' / 'site' / python
+                scripts = venv / 'bin'
+                data = venv
+            elif args.platform == 'linux':
+                sp = venv / 'lib' / 'site-packages'
                 headers = venv / 'include' / 'site' / python
                 scripts = venv / 'bin'
                 data = venv

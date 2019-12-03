@@ -19,7 +19,6 @@ namespace Build
                 .Then(DotnetPublish)
                 .Then(FilterPowershellRuntimes)
                 .Then(AddDistLib)
-                .Then(AddPythonWorker)
                 .Then(AddTemplatesNupkgs)
                 .Then(GenerateZipToSign, skip: !args.Contains("--sign"))
                 .Then(UploadZipToSign, skip: !args.Contains("--sign"))
