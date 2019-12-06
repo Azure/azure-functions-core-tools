@@ -153,7 +153,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:2.0-python{worker.Major}.{worker.Minor}" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:3.0-python{worker.Major}.{worker.Minor}" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
