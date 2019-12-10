@@ -40,7 +40,7 @@ const options = url.parse(endpoint);
 // npm config preceed system environment
 // https://github.com/npm/npm/blob/19397ad523434656af3d3765e80e22d7e6305f48/lib/config/reg-client.js#L7-L8
 // https://github.com/request/request/blob/b12a6245d9acdb1e13c6486d427801e123fdafae/lib/getProxyFromURI.js#L66-L71
-const proxy = process.env.npm_config_https_proxy || 
+const proxy = process.env.npm_config_https_proxy ||
             process.env.npm_config_proxy ||
             process.env.HTTPS_PROXY ||
             process.env.https_proxy ||
@@ -62,7 +62,7 @@ if (proxy) {
 
 https.get(options, response => {
 
-        const bar = new ProgressBar('[:bar] Downloading Azure Functions Core Tools', { 
+        const bar = new ProgressBar('[:bar] Downloading Azure Functions Core Tools', {
             total: Number(response.headers['content-length']),
             width: 18
         });
@@ -81,6 +81,7 @@ https.get(options, response => {
                     }
                     if (os.platform() === 'linux' || os.platform() === 'darwin') {
                         fs.chmodSync(`${installPath}/func`, 0o755);
+                        fs.chmodSync(`${installPath}/gozip`, 0o755);
                     }
                 });
             response.pipe(unzipStream);

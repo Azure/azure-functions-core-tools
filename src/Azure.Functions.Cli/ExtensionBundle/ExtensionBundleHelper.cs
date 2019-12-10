@@ -33,6 +33,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             if (!string.IsNullOrEmpty(extensionBundleOption.Id))
             {
                 extensionBundleOption.DownloadPath = Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, extensionBundleOption.Id);
+                extensionBundleOption.EnsureLatest = true;
             }
             return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance);
         }
