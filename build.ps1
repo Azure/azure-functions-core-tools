@@ -26,7 +26,7 @@ else {
     Set-Location ".\build"
 }
 
-if ($env:APPVEYOR_REPO_BRANCH -eq "master") {
+if ($env:APPVEYOR_REPO_BRANCH -eq "v3.x") {
     Invoke-Expression -Command  "dotnet run --sign"
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
 }
