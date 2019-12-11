@@ -114,6 +114,7 @@ namespace Build
                 "DurableTask.Core.Internal.dll",
                 "func.dll",
                 "func.exe",
+                "gozip.exe",
                 "func.pdb",
                 "Microsoft.Azure.AppService.*",
                 "Microsoft.Azure.WebJobs.*",

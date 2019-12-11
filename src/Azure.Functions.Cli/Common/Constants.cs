@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Common
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
+        public const string GoZipFileName = "gozip";
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
