@@ -59,7 +59,6 @@ brew install azure-functions-core-tools@3
 Homebrew allow side by side installation of v2 and v3, you can switch between the versions using
 ```bash
 brew link --overwrite azure-functions-core-tools@3
-bash
 ```
 
 
