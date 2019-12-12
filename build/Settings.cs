@@ -118,6 +118,8 @@ namespace Build
                 "Microsoft.Azure.AppService.*",
                 "Microsoft.Azure.WebJobs.*",
                 "Microsoft.Azure.WebSites.DataProtection.dll",
+                "Microsoft.*.dll",
+                "System.*.dll",
                 Path.Combine("templates", "itemTemplates.2.0.10328.nupkg"),
                 Path.Combine("templates", "projectTemplates.2.0.10328.nupkg"),
                 Path.Combine("tools", "python", "packapp", "__main__.py"),
@@ -149,6 +151,7 @@ namespace Build
                 "Remotion.Linq.dll",
                 "System.IO.Abstractions.dll",
                 "YamlDotNet.dll",
+                "Marklio.Metadata.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
             };
         }

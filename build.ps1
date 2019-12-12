@@ -31,6 +31,6 @@ if ($env:APPVEYOR_REPO_BRANCH -eq "v3.x") {
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
 }
 else {
-    Invoke-Expression -Command  "dotnet run"
+    Invoke-Expression -Command  "dotnet run --sign"
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
 }
