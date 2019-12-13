@@ -30,15 +30,59 @@ steps:
   inputs:
     versionSpec:
 - task: AzureCLI@2
-  displayName: Login via Azure CLI to acquire access token
+  displayName: Setup E2E test resources
   inputs:
     azureSubscription: $(E2ETestServiceConnectionName)
     scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
+
+      # Determine if the task should be skipped, ENABLE_DEPLOYMENT_TEST
+      if ($env:ENABLE_DEPLOYMENT_TEST -ne "true" -and $env:ENABLE_DEPLOYMENT_TEST -ne "1")
+      {
+        echo "Skipped since ENABLE_DEPLOYMENT_TEST is not set to 'true' or '1'"
+        exit 0
+      }
+
+      # Get a random number as test id
+      $subscriptionName = (az account show --query name | % { $_.trim('"') })
+      $e2eTestId = Get-Random
+      $location = "westus2"
+
       # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+
+      # create resource groups
+      # export WINDOWS_RESOURCE_GROUP and LINUX_RESOURCE_GROUP (for clean up)
+      $windowsResourceGroup = "CoreToolsE2EWin$e2eTestId"
+      $linuxResourceGroup = "CoreToolsE2ELinux$e2eTestId"
+      az group create -n "$windowsResourceGroup" -l "$location"
+      az group create -n "$linuxResourceGroup" -l "$location"
+      echo "##vso[task.setvariable variable=windows_resource_group]$windowsResourceGroup"
+      echo "##vso[task.setvariable variable=linux_resource_group]$linuxResourceGroup"
+
+      # create storage accounts
+      $windowsStorageAccount = "clitestwin$e2eTestId"
+      $linuxStorageAccount = "clitestlinux$e2eTestId"
+      az storage account create -n "$windowsStorageAccount" -g "$windowsResourceGroup" --sku Standard_LRS -l "$location" --kind StorageV2
+      az storage account create -n "$linuxStorageAccount" -g "$linuxResourceGroup" --sku Standard_LRS -l "$location" --kind StorageV2
+
+      # create app service plan
+      $windowsAppServicePlan = "clitestwinasp$e2eTestId"
+      $linuxAppServicePlan = "clitestlinuxasp$e2eTestId"
+      az functionapp plan create -g "$windowsResourceGroup" -n "$windowsAppServicePlan" -l "$location" --sku P1V2
+      az functionapp plan create -g "$linuxResourceGroup" -n "$linuxAppServicePlan" -l "$location" --is-linux --sku P1V2
+
+      # create function app V2_LINUX_DED_PYTHON36
+      $v2LinuxDedPython36 = "clitestldpython36$e2eTestId"
+      az functionapp create -g "$linuxResourceGroup" -n "$v2LinuxDedPython36" -p "$linuxAppServicePlan" -s "$linuxStorageAccount" --os-type Linux --runtime python
+      echo "##vso[task.setvariable variable=v2_linux_ded_python36]$v2LinuxDedPython36"
+
+      # report resources
+      echo "E2ETestId = $e2eTestId"
+      echo "WindowsResourceGroup = $subscriptionName / $windowsResourceGroup"
+      echo "LinuxResourceGroup = $subscriptionName / $linuxResourceGroup"
 - pwsh: |
     .\build.ps1
   env:
@@ -52,6 +96,25 @@ steps:
     testResultsFormat: 'VSTest'
     testResultsFiles: '**/*.trx'
     failTaskOnFailedTests: true
+  condition: succeededOrFailed()
+- task: AzureCLI@2
+  displayName: Clean up E2E test resources
+  inputs:
+    azureSubscription: $(E2ETestServiceConnectionName)
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+
+      # Determine if the task should be skipped, ENABLE_DEPLOYMENT_TEST
+      if ($env:ENABLE_DEPLOYMENT_TEST -ne "true" -and $env:ENABLE_DEPLOYMENT_TEST -ne "1")
+      {
+        echo "Skipped since ENABLE_DEPLOYMENT_TEST is not set to 'true' or '1'"
+        exit 0
+      }
+
+      echo "Deleting $env:WINDOWS_RESOURCE_GROUP and $env:LINUX_RESOURCE_GROUP"
+      az group delete -y -g "$env:WINDOWS_RESOURCE_GROUP" --no-wait
+      az group delete -y -g "$env:LINUX_RESOURCE_GROUP" --no-wait
   condition: succeededOrFailed()
 - task: CopyFiles@2
   inputs:
