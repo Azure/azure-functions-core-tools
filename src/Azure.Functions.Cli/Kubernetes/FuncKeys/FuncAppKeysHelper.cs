@@ -86,7 +86,8 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
                 envVariables.Add(AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes");
             }
 
-            if (!envVariables.ContainsKey(AzureWebJobsKubernetesSecretNameEnvVariableName) && !mountFuncKeysAsContainerVolume)
+            if (!envVariables.ContainsKey(AzureWebJobsKubernetesSecretNameEnvVariableName) 
+                && !mountFuncKeysAsContainerVolume)
             {
                 if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
                 {
