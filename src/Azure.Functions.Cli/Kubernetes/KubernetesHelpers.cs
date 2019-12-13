@@ -173,7 +173,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 {
                     { "osiris.deislabs.io/enabled", "true" },
                     { "osiris.deislabs.io/minReplicas", "1" }
-                }, port: 80);
+                }, port: 80, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
                 deployments.Add(deployment);
                 var service = GetService(name + "-http", @namespace, deployment, serviceType, new Dictionary<string, string>
                 {
@@ -187,7 +187,7 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 int position = 0;
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
+                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions, funcAppKeysSecretsCollectionName: funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName: funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume: mountFuncKeysAsContainerVolume);
                 deployments.Add(deployment);
                 scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
             }
@@ -197,7 +197,7 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 appSettingsSecrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
-
+          
             if (useConfigMapForAppSettings)
             {
                 var configMap = GetConfigMap(name, @namespace, appSettingsSecrets);
@@ -267,12 +267,15 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
+            int resourceIndex = 0;
             if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
             {
-                var secret = GetSecret(funcAppKeysSecretsCollectionName, @namespace, funcAppKeys);
+                var appKeysSecret = GetSecret(funcAppKeysSecretsCollectionName, @namespace, funcAppKeys);
+              
                 if (!await ResourceExists("secret", funcAppKeysSecretsCollectionName, @namespace))
                 {
-                    result.Insert(1, secret);
+                    resourceIndex++;
+                    result.Insert(resourceIndex, appKeysSecret);
                 }
 
                 foreach (var deployment in deployments)
@@ -282,17 +285,19 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             SecretRef = new NamedObjectV1
                             {
-                                Name = secret.Metadata.Name
+                                Name = appKeysSecret.Metadata.Name
                             }
                         });
                 }
             }
             else if (!string.IsNullOrWhiteSpace(funcAppKeysConfigMapName))
             {
-                var configMap = GetConfigMap(funcAppKeysConfigMapName, @namespace, funcAppKeys);
+                var appKeysConfigMap = GetConfigMap(funcAppKeysConfigMapName, @namespace, funcAppKeys);
+
+                resourceIndex++;
                 if (!await ResourceExists("configMap", funcAppKeysConfigMapName, @namespace))
                 {
-                    result.Insert(1, configMap);
+                    result.Insert(resourceIndex, appKeysConfigMap);
                 }
 
                 foreach (var deployment in deployments)
@@ -302,15 +307,47 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             ConfigMapRef = new NamedObjectV1
                             {
-                                Name = configMap.Metadata.Name
+                                Name = appKeysConfigMap.Metadata.Name
                             }
                         });
                 }
             }
 
+            //if function keys Secrets/configMaps needs to be mounted as volume in the function runtime container
             if (mountFuncKeysAsContainerVolume)
             {
                 FuncAppKeysHelper.CreateFuncAppKeysVolumeMountDeploymentResource(deployments, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName);
+            }
+            else
+            {
+                var svcActName = "function-identity-svc-act";
+                var svcAct = GetServiceAccount(svcActName, @namespace);
+                if (!await ResourceExists("ServiceAccount", svcActName, @namespace))
+                {
+                    resourceIndex++;
+                    result.Insert(resourceIndex, svcAct);
+                }
+
+                var secretManagerRoleName = "secrets-manager-role";
+                var secretManagerRole = GetRole(secretManagerRoleName, @namespace);
+                if (!await ResourceExists("Role", secretManagerRoleName, @namespace))
+                {
+                    resourceIndex++;
+                    result.Insert(resourceIndex, svcAct);
+                }
+
+                var roleBindingName = "function-identity-svcact-to-secret-manager-rolebinding";
+                var secretRoleBinding = GetRoleBinding(roleBindingName, @namespace, secretManagerRoleName, svcActName);
+                if (!await ResourceExists("RoleBinding", secretManagerRoleName, @namespace))
+                {
+                    resourceIndex++;
+                    result.Insert(resourceIndex, svcAct);
+                }
+
+                foreach (var deployment in deployments)
+                {
+                    deployment.Spec.Template.Spec.ServiceAccountName = svcActName;
+                }
             }
 
             result = result.Concat(deployments).ToList();
@@ -354,6 +391,7 @@ namespace Azure.Functions.Cli.Kubernetes
 
         private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1, string funcAppKeysSecretsCollectionName = null, string funcAppKeysConfigMapName = null, bool mountFuncKeysAsContainerVolume = false)
         {
+            //Add environment variables for the func app keys
             FuncAppKeysHelper.AddAppKeysEnvironVariableNames(additionalEnv, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
 
             var deployment = new DeploymentV1Apps
@@ -591,6 +629,72 @@ namespace Azure.Functions.Cli.Kubernetes
                     Namespace = @namespace
                 },
                 Data = secrets
+            };
+        }
+
+        public static ServiceAccountV1 GetServiceAccount(string name, string @namespace)
+        {
+            return new ServiceAccountV1
+            {
+                ApiVersion = "v1",
+                Kind = "ServiceAccount",
+                Metadata = new ObjectMetadataV1
+                {
+                    Name = name,
+                    Namespace = @namespace
+                }
+            };
+        }
+
+        public static RoleV1 GetRole(string name, string @namespace)
+        {
+            return new RoleV1
+            {
+                ApiVersion = "rbac.authorization.k8s.io/v1",
+                Kind = "Role",
+                Metadata = new ObjectMetadataV1
+                {
+                    Name = name,
+                    Namespace = @namespace
+                },
+                Rules = new RuleV1[]
+                {
+                    new RuleV1
+                    {
+                        ApiGroups = new string[]{""},
+                        Resources = new string[]{"secrets"},
+                        Verbs = new string[]{ "get", "list", "watch", "create", "update", "patch", "delete" }
+                    }
+                }
+            };
+        }
+
+        public static RoleBindingV1 GetRoleBinding(string name, string @namespace, string refRoleName, string subjectName)
+        {
+            return new RoleBindingV1
+            {
+                ApiVersion = "rbac.authorization.k8s.io/v1",
+                Kind = "RoleBinding",
+                Metadata = new ObjectMetadataV1
+                {
+                    Name = name,
+                    Namespace = @namespace
+                },
+                RoleRef = new RoleSubjectV1
+                {
+                    ApiGroup = "rbac.authorization.k8s.io",
+                    Kind = "Role",
+                    Name = refRoleName
+                },
+                Subjects = new RoleSubjectV1[]
+                {
+                    new RoleSubjectV1
+                    {
+                        ApiGroup = "rbac.authorization.k8s.io",
+                        Kind = "ServiceAccount",
+                        Name = subjectName
+                    }
+                }
             };
         }
     }

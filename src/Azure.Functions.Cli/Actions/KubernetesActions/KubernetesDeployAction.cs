@@ -65,8 +65,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<string>("funcappkeys-secret-name", "The name of a kubernetes secret collection to use for the function app keys (host keys, function keys etc.)", ksn => FunAppKeysSecretsCollectionName = ksn);
             SetFlag<string>("funcappkeys-config-map-name", "The name of a kubernetes config map to use for the function app keys (host keys, function keys etc.)", kcm => FunAppKeysConfigMapName = kcm);
             SetFlag<bool>("mount-funcappkeys-as-containervolume", "The flag indicating to mount the func app keys as container volume", kmv => MountFuncAppKeysAsContainerVolume = kmv);
-            SetFlag<string>("appsettings-secret-name", "The name of a kubernetes secret collection to use in the deployment instead of generating one based on local.settings.json", sn => AppSettingsSecretsCollectionName = sn);
-            SetFlag<string>("appsettings-config-map-name", "The name of a config map to use in the deployment", cm => AppSettingsConfigMapName = cm);
+            SetFlag<string>("appsettings-secret-name", "The name of a existing func app settings kubernetes secret collection to use in the deployment instead of generating one based on local.settings.json", sn => AppSettingsSecretsCollectionName = sn);
+            SetFlag<string>("appsettings-config-map-name", "The name of an existing config map with func app settings to use in the deployment", cm => AppSettingsConfigMapName = cm);
             SetFlag<string>("service-type", "Kubernetes Service Type. Default LoadBalancer  Valid options: " + string.Join(",", ServiceTypes), s =>
             {
                 if (!string.IsNullOrEmpty(s) && !ServiceTypes.Contains(s))

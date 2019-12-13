@@ -1,7 +1,9 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Kubernetes;
 using FluentAssertions;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using NuGet.ContentModel;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -56,6 +58,53 @@ namespace Azure.Functions.Cli.Tests
             Assert.Equal("RabbitMQConnection", metadata["host"]);
             Assert.Equal("message", metadata["name"]);
             Assert.Equal("myQueue", metadata["queueName"]);
+        }
+
+        [Fact]
+        public void GetServiceAccountTest()
+        {
+            var svcActName = "function-identity-svc-act";
+            var @namespace = "funcappkeys-test-ns0";
+            var resource = KubernetesHelper.GetServiceAccount(svcActName, @namespace);
+            var payload = JsonConvert.SerializeObject(resource, Formatting.Indented,
+               new JsonSerializerSettings
+               {
+                   NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+               });
+
+            Assert.True(JToken.Parse(payload) is JToken);
+        }
+
+        [Fact]
+        public void GetRoleTest()
+        {
+            var roleName = "secrets-manager-role";
+            var @namespace = "funcappkeys-test-ns0";
+            var resource = KubernetesHelper.GetRole(roleName, @namespace);
+            var payload = JsonConvert.SerializeObject(resource, Formatting.Indented,
+               new JsonSerializerSettings
+               {
+                   NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+               });
+
+            Assert.True(JToken.Parse(payload) is JToken);
+        }
+
+        [Fact]
+        public void GetRoleBindingTest()
+        {
+            var roleBindingName = "function-identity-svcact-to-secret-manager-rolebinding";
+            var roleName = "secrets-manager-role";
+            var svcActName = "function-identity-svc-act";
+            var @namespace = "funcappkeys-test-ns0";
+            var resource = KubernetesHelper.GetRoleBinding(roleBindingName, @namespace, roleName, svcActName);
+            var payload = JsonConvert.SerializeObject(resource, Formatting.Indented,
+               new JsonSerializerSettings
+               {
+                   NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+               });
+
+            Assert.True(JToken.Parse(payload) is JToken);
         }
     }
 }
