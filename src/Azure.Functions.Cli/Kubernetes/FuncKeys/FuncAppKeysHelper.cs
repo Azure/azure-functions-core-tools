@@ -54,12 +54,14 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
                 envVariables = new Dictionary<string, string>();
             }
 
-            if (!envVariables.ContainsKey(AzureWebJobsSecretStorageTypeEnvVariableName))
+            //if funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName or mountFuncKeysAsContainerVolume has been assigned then that means the func app keys needs to be managed as kubernetes secret/configMap
+            if ((!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName) || !string.IsNullOrWhiteSpace(funcAppKeysConfigMapName) || mountFuncKeysAsContainerVolume)
+                && !envVariables.ContainsKey(AzureWebJobsSecretStorageTypeEnvVariableName))
             {
                 envVariables.Add(AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes");
             }
 
-            if (!envVariables.ContainsKey(AzureWebJobsKubernetesSecretNameEnvVariableName) 
+            if (!envVariables.ContainsKey(AzureWebJobsKubernetesSecretNameEnvVariableName)
                 && !mountFuncKeysAsContainerVolume)
             {
                 if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
