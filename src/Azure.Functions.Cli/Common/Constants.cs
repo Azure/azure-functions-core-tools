@@ -41,6 +41,8 @@ namespace Azure.Functions.Cli.Common
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
         public const string TelemetrySentinelFile = "telemetryDefaultOn.sentinel";
+        public const string DefaultManagementURL = "https://management.azure.com/";
+        public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

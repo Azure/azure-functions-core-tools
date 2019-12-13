@@ -12,6 +12,7 @@ using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Colors.Net.StringStaticMethods;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -29,7 +30,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         // Windows PowerShell is PowerShell version 5.1 and lower that only works on Windows
         private const string _windowsPowerShellExecutable = "powershell";
 
-        private const string _defaultManagementURL = "https://management.azure.com/";
+        private const string _defaultManagementURL = Constants.DefaultManagementURL;
 
         public string AccessToken { get; set; }
         public bool ReadStdin { get; set; }
@@ -131,7 +132,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             (bool powershellSucceeded, string psToken) = await TryGetAzPowerShellToken();
             if (powershellSucceeded) return psToken;
 
+            if (TryGetTokenFromTestEnvironment(out string envToken))
+            {
+                return envToken;
+            }
+
             throw new CliException($"Unable to connect to Azure. Make sure you have the `az` CLI or `{_azProfileModuleName}` PowerShell module installed and logged in and try again");
+        }
+
+        private bool TryGetTokenFromTestEnvironment(out string token)
+        {
+            token = Environment.GetEnvironmentVariable(Constants.AzureManagementAccessToken);
+            return !string.IsNullOrEmpty(token);
         }
 
         private async Task<(bool succeeded, string token)> TryGetAzCliToken()
