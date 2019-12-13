@@ -197,11 +197,13 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 appSettingsSecrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
-          
+
+            int resourceIndex = 0;
             if (useConfigMapForAppSettings)
             {
                 var configMap = GetConfigMap(name, @namespace, appSettingsSecrets);
-                result.Insert(0, configMap);
+                result.Insert(resourceIndex, configMap);
+                resourceIndex++;
                 foreach (var deployment in deployments)
                 {
                     deployment.Spec.Template.Spec.Containers.First().EnvFrom = new ContainerEnvironmentFromV1[]
@@ -251,7 +253,8 @@ namespace Azure.Functions.Cli.Kubernetes
             else
             {
                 var secret = GetSecret(name, @namespace, appSettingsSecrets);
-                result.Insert(0, secret);
+                result.Insert(resourceIndex, secret);
+                resourceIndex++;
                 foreach (var deployment in deployments)
                 {
                     deployment.Spec.Template.Spec.Containers.First().EnvFrom = new ContainerEnvironmentFromV1[]
@@ -267,15 +270,14 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            int resourceIndex = 0;
             if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
             {
                 var appKeysSecret = GetSecret(funcAppKeysSecretsCollectionName, @namespace, funcAppKeys);
-              
+
                 if (!await ResourceExists("secret", funcAppKeysSecretsCollectionName, @namespace))
                 {
-                    resourceIndex++;
                     result.Insert(resourceIndex, appKeysSecret);
+                    resourceIndex++;
                 }
 
                 foreach (var deployment in deployments)
@@ -294,10 +296,10 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 var appKeysConfigMap = GetConfigMap(funcAppKeysConfigMapName, @namespace, funcAppKeys);
 
-                resourceIndex++;
                 if (!await ResourceExists("configMap", funcAppKeysConfigMapName, @namespace))
                 {
                     result.Insert(resourceIndex, appKeysConfigMap);
+                    resourceIndex++;
                 }
 
                 foreach (var deployment in deployments)
@@ -324,24 +326,24 @@ namespace Azure.Functions.Cli.Kubernetes
                 var svcAct = GetServiceAccount(svcActName, @namespace);
                 if (!await ResourceExists("ServiceAccount", svcActName, @namespace))
                 {
-                    resourceIndex++;
                     result.Insert(resourceIndex, svcAct);
+                    resourceIndex++;
                 }
 
                 var secretManagerRoleName = "secrets-manager-role";
                 var secretManagerRole = GetRole(secretManagerRoleName, @namespace);
                 if (!await ResourceExists("Role", secretManagerRoleName, @namespace))
                 {
-                    resourceIndex++;
                     result.Insert(resourceIndex, svcAct);
+                    resourceIndex++;
                 }
 
                 var roleBindingName = "function-identity-svcact-to-secret-manager-rolebinding";
                 var secretRoleBinding = GetRoleBinding(roleBindingName, @namespace, secretManagerRoleName, svcActName);
                 if (!await ResourceExists("RoleBinding", secretManagerRoleName, @namespace))
                 {
-                    resourceIndex++;
                     result.Insert(resourceIndex, svcAct);
+                    resourceIndex++;
                 }
 
                 foreach (var deployment in deployments)
