@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public string Namespace { get; set; } = "default";
         public string PullSecret { get; set; } = string.Empty;
         public bool NoDocker { get; set; }
-        public bool UseConfigMap { get; set; }
+        public bool UseConfigMapForAppSettings { get; set; }
         public bool DryRun { get; private set; }
         public string ImageName { get; private set; }
         public string ConfigMapName { get; private set; }
@@ -109,17 +109,18 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
-
+			
             (var resources, var existingKeysSecret, var newKeysSecret) = await KubernetesHelper.GetFunctionsDeploymentResources(
                 Name,
                 resolvedImageName,
                 Namespace,
                 triggers,
                 _secretsManager.GetSecrets(),
+                funcAppKeys,
                 PullSecret,
-                SecretsCollectionName,
-                ConfigMapName,
-                UseConfigMap,
+                AppSettingsSecretsCollectionName,
+                AppSettingsConfigMapName,
+                UseConfigMapForAppSettings,
                 PollingInterval,
                 CooldownPeriod,
                 ServiceType,

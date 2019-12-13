@@ -1,9 +1,15 @@
 ﻿using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+<<<<<<< HEAD
 using Colors.Net;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+=======
+using System;
+using System.Collections.Generic;
+using System.Linq;
+>>>>>>> Function keys in Kubernetes
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -46,6 +52,7 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             return funcAppKeys;
         }
 
+<<<<<<< HEAD
         public static IDictionary<string, string> FuncKeysKubernetesEnvironVariables(string keysSecretCollectionName, bool mountKeysAsContainerVolume)
         {
             var funcKeysKubernetesEnvironVariables = new Dictionary<string, string>
@@ -63,6 +70,39 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
         }
 
         public static void CreateFuncAppKeysVolumeMountDeploymentResource(IEnumerable<DeploymentV1Apps> deployments, string funcAppKeysSecretsCollectionName)
+=======
+        public static void AddAppKeysEnvironVariableNames(IDictionary<string, string> envVariables,
+            string funcAppKeysSecretsCollectionName,
+            string funcAppKeysConfigMapName,
+            bool mountFuncKeysAsContainerVolume)
+        {
+            if (envVariables == null)
+            {
+                envVariables = new Dictionary<string, string>();
+            }
+
+            if (!envVariables.ContainsKey(AzureWebJobsSecretStorageTypeEnvVariableName))
+            {
+                envVariables.Add(AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes");
+            }
+
+            if (!envVariables.ContainsKey(AzureWebJobsKubernetesSecretNameEnvVariableName) && !mountFuncKeysAsContainerVolume)
+            {
+                if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
+                {
+                    envVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"secrets/{funcAppKeysSecretsCollectionName}");
+                }
+                else if (!string.IsNullOrWhiteSpace(funcAppKeysConfigMapName))
+                {
+                    envVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"configmaps/{funcAppKeysConfigMapName}");
+                }
+            }
+        }
+
+        public static void CreateFuncAppKeysVolumeMountDeploymentResource(IEnumerable<DeploymentV1Apps> deployments,
+            string funcAppKeysSecretsCollectionName,
+            string funcAppKeysConfigMapName)
+>>>>>>> Function keys in Kubernetes
         {
             if (deployments?.Any() == false)
             {
@@ -78,8 +118,16 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             {
                 volume.VolumeSecret = new VolumeSecretV1 { SecretName = funcAppKeysSecretsCollectionName };
             }
+<<<<<<< HEAD
 
             //Mount the app keys as volume mount to the container at the path "/run/secrets/functions-keys"
+=======
+            else if (!string.IsNullOrWhiteSpace(funcAppKeysConfigMapName))
+            {
+                volume.VolumeConfigMap = new VolumeConfigMapV1 { Name = funcAppKeysSecretsCollectionName };
+            }
+
+>>>>>>> Function keys in Kubernetes
             foreach (var deployment in deployments)
             {
                 deployment.Spec.Template.Spec.Volumes = new VolumeV1[] { volume };
@@ -94,6 +142,7 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             }
         }
 
+<<<<<<< HEAD
         public static void FunKeysMessage(SecretsV1 existingKeysSecret, SecretsV1 newKeysSecret)
         {
             if (existingKeysSecret?.Data?.Any() == true || newKeysSecret?.Data?.Any() == true)
@@ -125,6 +174,8 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             }
         }
 
+=======
+>>>>>>> Function keys in Kubernetes
         private static string GenerateKey()
         {
             using (var rng = RandomNumberGenerator.Create())

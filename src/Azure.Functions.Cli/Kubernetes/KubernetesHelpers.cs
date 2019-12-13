@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.Kubernetes
             (_, _, var exitCode) = await KubectlHelper.RunKubectl($"get namespace {@namespace}", ignoreError: true, showOutput: false);
             return exitCode == 0;
         }
-
+		
         internal static async Task<(string, bool)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
         {
             string cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
@@ -146,15 +146,17 @@ namespace Azure.Functions.Cli.Kubernetes
         }
 
         internal async static Task<(IEnumerable<IKubernetesResource>, SecretsV1, SecretsV1)> GetFunctionsDeploymentResources(
+
             string name,
             string imageName,
             string @namespace,
             TriggersPayload triggers,
-            IDictionary<string, string> secrets,
+            IDictionary<string, string> appSettingsSecrets,
+            IDictionary<string, string> funcAppKeys,
             string pullSecret = null,
-            string secretsCollectionName = null,
-            string configMapName = null,
-            bool useConfigMap = false,
+            string appSettingsSecretsCollectionName = null,
+            string appSettingsConfigMapName = null,
+            bool useConfigMapForAppSettings = false,
             int? pollingInterval = null,
             int? cooldownPeriod = null,
             string serviceType = "LoadBalancer",
@@ -204,9 +206,9 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             // Set worker runtime if needed.
-            if (!secrets.ContainsKey(Constants.FunctionsWorkerRuntime))
+            if (!appSettingsSecrets.ContainsKey(Constants.FunctionsWorkerRuntime))
             {
-                secrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
+                appSettingsSecrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
 
             int resourceIndex = 0;
@@ -229,7 +231,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(secretsCollectionName))
+            else if (!string.IsNullOrEmpty(appSettingsSecretsCollectionName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -239,13 +241,13 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             SecretRef = new NamedObjectV1
                             {
-                                Name = secretsCollectionName
+                                Name = appSettingsSecretsCollectionName
                             }
                         }
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(configMapName))
+            else if (!string.IsNullOrEmpty(appSettingsConfigMapName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -255,7 +257,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             ConfigMapRef = new NamedObjectV1
                             {
-                                Name = configMapName
+                                Name = appSettingsConfigMapName
                             }
                         }
                     };
@@ -280,7 +282,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     };
                 }
             }
-
+			
             SecretsV1 existingFuncKeysSecret = null;
             SecretsV1 newKeysSecret = null;
             if (httpFunctions.Any())
@@ -377,8 +379,10 @@ namespace Azure.Functions.Cli.Kubernetes
             return sb.ToString();
         }
 
-        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1)
+        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1, string funcAppKeysSecretsCollectionName = null, string funcAppKeysConfigMapName = null, bool mountFuncKeysAsContainerVolume = false)
         {
+            FuncAppKeysHelper.AddAppKeysEnvironVariableNames(additionalEnv, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
+
             var deployment = new DeploymentV1Apps
             {
                 ApiVersion = "apps/v1",
