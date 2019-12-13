@@ -308,7 +308,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     newKeysSecret = GetSecret(keysSecretCollectionName, @namespace, funcKeys);
                     keysSecret = newKeysSecret;
                 }
-
+				
                 result.Insert(resourceIndex, keysSecret);
                 resourceIndex++;
 
