@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Kubernetes;
+using Azure.Functions.Cli.Kubernetes.FuncKeys;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Colors.Net;
 using Fclp;
@@ -25,11 +26,14 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public string Namespace { get; set; } = "default";
         public string PullSecret { get; set; } = string.Empty;
         public bool NoDocker { get; set; }
-        public bool UseConfigMap { get; set; }
+        public bool UseConfigMapForAppSettings { get; set; }
         public bool DryRun { get; private set; }
         public string ImageName { get; private set; }
-        public string ConfigMapName { get; private set; }
-        public string SecretsCollectionName { get; private set; }
+        public string AppSettingsConfigMapName { get; private set; }
+        public string AppSettingsSecretsCollectionName { get; private set; }
+        public string FunAppKeysConfigMapName { get; private set; }
+        public string FunAppKeysSecretsCollectionName { get; private set; }
+        public bool MountFuncAppKeysAsContainerVolume { get; private set; }
         public int? PollingInterval { get; private set; }
         public int? CooldownPeriod { get; private set; }
         public string ServiceType { get; set; } = "LoadBalancer";
@@ -58,8 +62,11 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<int>("cooldown-period", "The cooldown period for the deployment before scaling back to 0 after all triggers are no longer active. Default: 300 (seconds)", p => CooldownPeriod = p);
             SetFlag<int>("min-replicas", "Minimum replica count", m => MinReplicaCount = m);
             SetFlag<int>("max-replicas", "Maximum replica count to scale to by HPA", m => MaxReplicaCount = m);
-            SetFlag<string>("secret-name", "The name of a kubernetes secret collection to use in the deployment instead of generating one based on local.settings.json", sn => SecretsCollectionName = sn);
-            SetFlag<string>("config-map-name", "The name of a config map to use in the deployment", cm => ConfigMapName = cm);
+            SetFlag<string>("funcappkeys-secret-name", "The name of a kubernetes secret collection to use for the function app keys (host keys, function keys etc.)", ksn => FunAppKeysSecretsCollectionName = ksn);
+            SetFlag<string>("funcappkeys-config-map-name", "The name of a kubernetes config map to use for the function app keys (host keys, function keys etc.)", kcm => FunAppKeysConfigMapName = kcm);
+            SetFlag<bool>("mount-funcappkeys-as-containervolume", "The flag indicating to mount the func app keys as container volume", kmv => MountFuncAppKeysAsContainerVolume = kmv);
+            SetFlag<string>("appsettings-secret-name", "The name of a kubernetes secret collection to use in the deployment instead of generating one based on local.settings.json", sn => AppSettingsSecretsCollectionName = sn);
+            SetFlag<string>("appsettings-config-map-name", "The name of a config map to use in the deployment", cm => AppSettingsConfigMapName = cm);
             SetFlag<string>("service-type", "Kubernetes Service Type. Default LoadBalancer  Valid options: " + string.Join(",", ServiceTypes), s =>
             {
                 if (!string.IsNullOrEmpty(s) && !ServiceTypes.Contains(s))
@@ -69,7 +76,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 ServiceType = s;
             });
             SetFlag<bool>("no-docker", "With --image-name, the core-tools will inspect the functions inside the image. This will require mounting the image filesystem. Passing --no-docker uses current directory for functions.", nd => NoDocker = nd);
-            SetFlag<bool>("use-config-map", "Use a ConfigMap/V1 instead of a Secret/V1 object.", c => UseConfigMap = c);
+            SetFlag<bool>("use-config-map-for-appsettings", "Use a ConfigMap/V1 instead of a Secret/V1 object for function app settings configurations", c => UseConfigMapForAppSettings = c);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             return base.ParseArgs(args);
@@ -102,21 +109,27 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
 
-            var resources = KubernetesHelper.GetFunctionsDeploymentResources(
+            var functionNames = triggers.FunctionsJson.Select(f => f.Key);
+            var funcAppKeys = FuncAppKeysHelper.CreateKeys(functionNames);
+            var resources = await KubernetesHelper.GetFunctionsDeploymentResources(
                 Name,
                 resolvedImageName,
                 Namespace,
                 triggers,
                 _secretsManager.GetSecrets(),
+                funcAppKeys,
                 PullSecret,
-                SecretsCollectionName,
-                ConfigMapName,
-                UseConfigMap,
+                AppSettingsSecretsCollectionName,
+                AppSettingsConfigMapName,
+                UseConfigMapForAppSettings,
                 PollingInterval,
                 CooldownPeriod,
                 ServiceType,
                 MinReplicaCount,
-                MaxReplicaCount);
+                MaxReplicaCount,
+                FunAppKeysSecretsCollectionName,
+                FunAppKeysConfigMapName,
+                MountFuncAppKeysAsContainerVolume);
 
             if (DryRun)
             {

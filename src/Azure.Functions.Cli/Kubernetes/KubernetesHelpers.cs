@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Kubernetes.FuncKeys;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
@@ -121,6 +122,12 @@ namespace Azure.Functions.Cli.Kubernetes
             return exitCode == 0;
         }
 
+        internal static async Task<bool> ResourceExists(string resourceTypeName, string resourceName, string @namespace)
+        {
+            (_, _, var exitCode) = await KubectlHelper.RunKubectl($"get {resourceTypeName} {resourceName} --namespace {@namespace}", ignoreError: true, showOutput: false);
+            return exitCode == 0;
+        }
+
         internal static Task CreateNamespace(string @namespace)
             => KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
 
@@ -132,21 +139,25 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Replace("KEDA_NAMESPACE", @namespace);
         }
 
-        internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(
+        internal async static Task<IEnumerable<IKubernetesResource>> GetFunctionsDeploymentResources(
             string name,
             string imageName,
             string @namespace,
             TriggersPayload triggers,
-            IDictionary<string, string> secrets,
+            IDictionary<string, string> appSettingsSecrets,
+            IDictionary<string, string> funcAppKeys,
             string pullSecret = null,
-            string secretsCollectionName = null,
-            string configMapName = null,
-            bool useConfigMap = false,
+            string appSettingsSecretsCollectionName = null,
+            string appSettingsConfigMapName = null,
+            bool useConfigMapForAppSettings = false,
             int? pollingInterval = null,
             int? cooldownPeriod = null,
             string serviceType = "LoadBalancer",
             int? minReplicas = null,
-            int? maxReplicas = null)
+            int? maxReplicas = null,
+            string funcAppKeysSecretsCollectionName = null,
+            string funcAppKeysConfigMapName = null,
+            bool mountFuncKeysAsContainerVolume = false)
         {
             ScaledObjectV1Alpha1 scaledobject = null;
             var result = new List<IKubernetesResource>();
@@ -182,14 +193,14 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             // Set worker runtime if needed.
-            if (!secrets.ContainsKey(Constants.FunctionsWorkerRuntime))
+            if (!appSettingsSecrets.ContainsKey(Constants.FunctionsWorkerRuntime))
             {
-                secrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
+                appSettingsSecrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
 
-            if (useConfigMap)
+            if (useConfigMapForAppSettings)
             {
-                var configMap = GetConfigMap(name, @namespace, secrets);
+                var configMap = GetConfigMap(name, @namespace, appSettingsSecrets);
                 result.Insert(0, configMap);
                 foreach (var deployment in deployments)
                 {
@@ -205,7 +216,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(secretsCollectionName))
+            else if (!string.IsNullOrEmpty(appSettingsSecretsCollectionName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -215,13 +226,13 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             SecretRef = new NamedObjectV1
                             {
-                                Name = secretsCollectionName
+                                Name = appSettingsSecretsCollectionName
                             }
                         }
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(configMapName))
+            else if (!string.IsNullOrEmpty(appSettingsConfigMapName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -231,7 +242,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             ConfigMapRef = new NamedObjectV1
                             {
-                                Name = configMapName
+                                Name = appSettingsConfigMapName
                             }
                         }
                     };
@@ -239,7 +250,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
             else
             {
-                var secret = GetSecret(name, @namespace, secrets);
+                var secret = GetSecret(name, @namespace, appSettingsSecrets);
                 result.Insert(0, secret);
                 foreach (var deployment in deployments)
                 {
@@ -254,6 +265,52 @@ namespace Azure.Functions.Cli.Kubernetes
                         }
                     };
                 }
+            }
+
+            if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
+            {
+                var secret = GetSecret(funcAppKeysSecretsCollectionName, @namespace, funcAppKeys);
+                if (!await ResourceExists("secret", funcAppKeysSecretsCollectionName, @namespace))
+                {
+                    result.Insert(1, secret);
+                }
+
+                foreach (var deployment in deployments)
+                {
+                    deployment.Spec.Template.Spec.Containers.First().EnvFrom.Append(
+                        new ContainerEnvironmentFromV1
+                        {
+                            SecretRef = new NamedObjectV1
+                            {
+                                Name = secret.Metadata.Name
+                            }
+                        });
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(funcAppKeysConfigMapName))
+            {
+                var configMap = GetConfigMap(funcAppKeysConfigMapName, @namespace, funcAppKeys);
+                if (!await ResourceExists("configMap", funcAppKeysConfigMapName, @namespace))
+                {
+                    result.Insert(1, configMap);
+                }
+
+                foreach (var deployment in deployments)
+                {
+                    deployment.Spec.Template.Spec.Containers.First().EnvFrom.Append(
+                        new ContainerEnvironmentFromV1
+                        {
+                            ConfigMapRef = new NamedObjectV1
+                            {
+                                Name = configMap.Metadata.Name
+                            }
+                        });
+                }
+            }
+
+            if (mountFuncKeysAsContainerVolume)
+            {
+                FuncAppKeysHelper.CreateFuncAppKeysVolumeMountDeploymentResource(deployments, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName);
             }
 
             result = result.Concat(deployments).ToList();
@@ -295,8 +352,10 @@ namespace Azure.Functions.Cli.Kubernetes
             return sb.ToString();
         }
 
-        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1)
+        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1, string funcAppKeysSecretsCollectionName = null, string funcAppKeysConfigMapName = null, bool mountFuncKeysAsContainerVolume = false)
         {
+            FuncAppKeysHelper.AddAppKeysEnvironVariableNames(additionalEnv, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
+
             var deployment = new DeploymentV1Apps
             {
                 ApiVersion = "apps/v1",
