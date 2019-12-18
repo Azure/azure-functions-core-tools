@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
         {
             hostOptions = hostOptions ?? SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
             IConfigurationBuilder builder = new ConfigurationBuilder();
-            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance, new MetricsLogger()));
+            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance, metricsLogger: new MetricsLogger()));
             var configuration = builder.Build();
 
             var configurationHelper = new ExtensionBundleConfigurationHelper(configuration, SystemEnvironment.Instance);

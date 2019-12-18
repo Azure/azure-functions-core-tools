@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Common
         public const string WebsiteHostname = "WEBSITE_HOSTNAME";
         public const string DotNetClrProcessId = @"${command:pickProcess}";
         public const string FuncIgnoreFile = ".funcignore";
+        public const string GoZipFileName = "gozip";
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
@@ -41,6 +42,8 @@ namespace Azure.Functions.Cli.Common
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
         public const string TelemetrySentinelFile = "telemetryDefaultOn.sentinel";
+        public const string DefaultManagementURL = "https://management.azure.com/";
+        public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -40,17 +43,47 @@ namespace Azure.Functions.Cli.Helpers
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && buildOption == BuildOption.Remote)
             {
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
-                return CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot);
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot);
             } else
             {
-                return CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot);
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot);
             }
         }
 
-        public static Stream CreateZip(IEnumerable<string> files, string rootPath)
+        public static async Task<Stream> CreateZip(IEnumerable<string> files, string rootPath)
+        {
+            var zipFilePath = Path.GetTempFileName();
+
+            if (GoZipExists(out string goZipLocation))
+            {
+                return await CreateGoZip(files, rootPath, zipFilePath, goZipLocation);
+            }
+
+            ColoredConsole.WriteLine(Yellow("Could not find gozip for packaging. Using DotNetZip to package. " +
+                "This may cause problems preserving file permissions when using in a Linux based environment."));
+
+            return CreateDotNetZip(files, rootPath, zipFilePath);
+        }
+
+        public static bool GoZipExists(out string fileLocation)
+        {
+            // It can be gozip.exe or gozip
+            fileLocation = Directory.GetFiles(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location))
+                .Where(f => Path.GetFileNameWithoutExtension(f).Equals(Constants.GoZipFileName, StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault();
+
+            if (fileLocation != null)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static Stream CreateDotNetZip(IEnumerable<string> files, string rootPath, string zipFilePath)
         {
             const int defaultBufferSize = 4096;
-            var fileStream = new FileStream(Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite, defaultBufferSize, FileOptions.DeleteOnClose);
+            var fileStream = new FileStream(zipFilePath, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite, defaultBufferSize, FileOptions.DeleteOnClose);
             using (ZipFile zip = new ZipFile())
             {
                 zip.CompressionLevel = Ionic.Zlib.CompressionLevel.BestSpeed;
@@ -62,6 +95,16 @@ namespace Azure.Functions.Cli.Helpers
             }
             fileStream.Seek(0, SeekOrigin.Begin);
             return fileStream;
+        }
+
+        public static async Task<Stream> CreateGoZip(IEnumerable<string> files, string rootPath, string zipFilePath, string goZipLocation)
+        {
+            var contentsFile = Path.GetTempFileName();
+            await File.WriteAllLinesAsync(contentsFile, files);
+
+            var goZipExe = new Executable(goZipLocation, $"-base-dir {rootPath} -input-file {contentsFile} -output {zipFilePath}");
+            await goZipExe.RunAsync();
+            return new FileStream(zipFilePath, FileMode.Open, FileAccess.Read);
         }
 
         public static string FixFileNameForZip(this string value, string zipRoot)

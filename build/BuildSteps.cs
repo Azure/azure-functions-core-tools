@@ -490,5 +490,32 @@ namespace Build
                 }
             }
         }
+
+        public static void AddGoZip()
+        {
+            foreach (var runtime in Settings.TargetRuntimes)
+            {
+                var outputPath = Path.Combine(Settings.OutputDir, runtime, "gozip");
+                Environment.SetEnvironmentVariable("GOARCH", "amd64");
+                Environment.SetEnvironmentVariable("CGO_ENABLED", "0");
+                var goFile = Path.GetFullPath("../tools/go/gozip/main.go");
+
+                if (runtime.Contains("win"))
+                {
+                    Environment.SetEnvironmentVariable("GOOS", "windows");
+                    Shell.Run("go", $"build -o {outputPath}.exe {goFile}");
+                }
+                else if (runtime.Contains("linux"))
+                {
+                    Environment.SetEnvironmentVariable("GOOS", "linux");
+                    Shell.Run("go", $"build -o {outputPath} {goFile}");
+                }
+                else if (runtime.Contains("osx"))
+                {
+                    Environment.SetEnvironmentVariable("GOOS", "darwin");
+                    Shell.Run("go", $"build -o {outputPath} {goFile}");
+                }
+            }
+        }
     }
 }

@@ -16,14 +16,22 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 **v2** (master branch): Self-contained cross-platform package
 
+**v3**: Self-contained cross-platform package
+
 ## Installing
 
 ### Windows
 
 To install runtime with npm:
 
+**v2**
 ```bash
-npm i -g azure-functions-core-tools --unsafe-perm true
+npm i -g azure-functions-core-tools@2 --unsafe-perm true
+```
+
+**v3**
+```bash
+npm i -g azure-functions-core-tools@3 --unsafe-perm true
 ```
 
 To install with chocolatey:
@@ -36,10 +44,23 @@ choco install azure-functions-core-tools
 
 **Homebrew**:
 
+**v2**
 ```bash
 brew tap azure/functions
-brew install azure-functions-core-tools
+brew install azure-functions-core-tools@2
 ```
+
+**v3**
+```bash
+brew tap azure/functions
+brew install azure-functions-core-tools@3
+```
+
+Homebrew allow side by side installation of v2 and v3, you can switch between the versions using
+```bash
+brew link --overwrite azure-functions-core-tools@3
+```
+
 
 ### Linux
 
