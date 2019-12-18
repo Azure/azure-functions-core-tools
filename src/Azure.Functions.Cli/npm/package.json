@@ -11,7 +11,7 @@
     "preferGlobal": true,
     "repository": {
         "type": "git",
-        "url": "https://github.com/Azure/azure-functions-core-tools.git"
+        "url": "https://github.com/Yi-Coder/azure-functions-core-tools.git"
     },
     "bin": {
         "func": "lib/main.js",
