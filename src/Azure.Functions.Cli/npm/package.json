@@ -1,6 +1,6 @@
 {
     "name": "azure-functions-core-tools",
-    "version": "1.0.22",
+    "version": "1.0.23",
     "description": "Azure Functions Core Tools",
     "scripts": {
         "postinstall": "node lib/install.js"

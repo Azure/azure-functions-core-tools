@@ -164,6 +164,8 @@ Target "GenerateZipToSign" (fun _ ->
         ++ (buildDir @@ "azurefunctions/functions.js")
         ++ (buildDir @@ "azurefunctions/http/request.js")
         ++ (buildDir @@ "azurefunctions/http/response.js")
+        ++ (buildDir @@ "edge/edge.js")
+        ++ (buildDir @@ "edge/double_edge.js")
         |> notSigned
         |> CreateZip buildDir toSignZipPath String.Empty 7 true
 
@@ -187,6 +189,7 @@ Target "GenerateZipToSign" (fun _ ->
         "Ignite.SharpNetSH.dll"
         "NCrontab.dll"
         "Newtonsoft.Json.dll"
+        "protobuf-net.dll"
         "RestSharp.dll"
         "SendGrid.CSharp.HTTP.Client.dll"
         "SendGrid.dll"
@@ -250,6 +253,8 @@ Target "WaitForSigning" (fun _ ->
         MoveFile (buildDir @@ "azurefunctions/") (buildDir @@ "functions.js")
         MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "request.js")
         MoveFile (buildDir @@ "azurefunctions/http/") (buildDir @@ "response.js")
+        MoveFile (buildDir @@ "edge/") (buildDir @@ "edge.js")
+        MoveFile (buildDir @@ "edge/") (buildDir @@ "double_edge.js")
     | Failure e -> targetError e null |> ignore
 
     let signed = downloadFile toSignThirdPartyName DateTime.UtcNow |> Async.RunSynchronously
