@@ -67,8 +67,8 @@ namespace Azure.Functions.Cli.Common
                 })
                 .Select(item => new[]
                 {
-                    item[0].Count > 0 ? new Regex("^((" + string.Join(")|(", item[0]) + "))", RegexOptions.ECMAScript) : new Regex("$^", RegexOptions.ECMAScript),
-                    item[1].Count > 0 ? new Regex("^((" + string.Join(")|(", item[1]) + "))", RegexOptions.ECMAScript) : new Regex("$^", RegexOptions.ECMAScript)
+                    item[0].Count > 0 ? new Regex("^((" + string.Join(")|(", item[0]) + "))\\b", RegexOptions.ECMAScript) : new Regex("$^", RegexOptions.ECMAScript),
+                    item[1].Count > 0 ? new Regex("^((" + string.Join(")|(", item[1]) + "))\\b", RegexOptions.ECMAScript) : new Regex("$^", RegexOptions.ECMAScript)
                 })
                 .ToArray();
             _positive = parsed[0];
