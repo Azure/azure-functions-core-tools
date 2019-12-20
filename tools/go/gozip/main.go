@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 )
 
@@ -118,6 +119,9 @@ func addFileToZip(zipWriter *zip.Writer, filePath, baseInZip string) error {
 	}
 
 	header.Name = filePath[baseLength:]
+	if runtime.GOOS == "windows" {
+		header.Name = strings.ReplaceAll(header.Name, "\\", "/")
+	}
 
 	header.Method = zip.Deflate
 	if !fquiet {
