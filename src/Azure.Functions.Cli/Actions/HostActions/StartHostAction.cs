@@ -211,7 +211,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
                 }
-                else if (secret.Value == string.Empty)
+                else if (!string.IsNullOrEmpty(secret.Key) && secret.Value == string.Empty)
                 {
                     EnvironmentNativeMethods.SetEnvironmentVariable(secret.Key, secret.Value);
                 }
