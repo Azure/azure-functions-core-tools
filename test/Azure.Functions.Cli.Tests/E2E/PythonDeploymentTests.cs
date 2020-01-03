@@ -21,12 +21,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
             string appName = _v2LinuxDedicatedPython36;
-            string triggerName = Guid.NewGuid().ToString();
+            string triggerName = DeploymentTestHelper.GetRandomTriggerName();
             await CliTester.Run(new RunConfiguration[] {
                 DeploymentTestHelper.GenerateInitTask(triggerName),
                 DeploymentTestHelper.GeneratePublishTask(appName, string.Empty, new [] { "Remote build succeeded!" }),
-                DeploymentTestHelper.GenerateWaitTask(),
-                DeploymentTestHelper.GenerateRequestTask(appName, triggerName)
+                DeploymentTestHelper.GenerateCheckFunctionTask(appName, triggerName)
             }, _output);
         }
 
@@ -35,12 +34,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
             string appName = _v2LinuxDedicatedPython36;
-            string triggerName = Guid.NewGuid().ToString();
+            string triggerName = DeploymentTestHelper.GetRandomTriggerName();
             await CliTester.Run(new RunConfiguration[] {
                 DeploymentTestHelper.GenerateInitTask(triggerName),
                 DeploymentTestHelper.GeneratePublishTask(appName, "--build remote", new [] { "Remote build succeeded!" }),
-                DeploymentTestHelper.GenerateWaitTask(),
-                DeploymentTestHelper.GenerateRequestTask(appName, triggerName)
+                DeploymentTestHelper.GenerateCheckFunctionTask(appName, triggerName)
             }, _output);
         }
 
@@ -49,12 +47,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
             string appName = _v2LinuxDedicatedPython36;
-            string triggerName = Guid.NewGuid().ToString();
+            string triggerName = DeploymentTestHelper.GetRandomTriggerName();
             await CliTester.Run(new RunConfiguration[] {
                 DeploymentTestHelper.GenerateInitTask(triggerName),
                 DeploymentTestHelper.GeneratePublishTask(appName, "--build local", new [] { "Deployment completed successfully." }),
-                DeploymentTestHelper.GenerateWaitTask(),
-                DeploymentTestHelper.GenerateRequestTask(appName, triggerName)
+                DeploymentTestHelper.GenerateCheckFunctionTask(appName, triggerName)
             }, _output);
         }
     }

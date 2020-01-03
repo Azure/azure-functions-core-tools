@@ -2,8 +2,6 @@
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Helpers;
-using DryIoc;
 using FluentAssertions;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
@@ -45,35 +43,22 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             };
         }
 
-        public static RunConfiguration GenerateWaitTask(int waitSec = 15)
+        public static RunConfiguration GenerateCheckFunctionTask(string appName, string triggerName)
         {
             return new RunConfiguration
             {
-                Test = async (workingDir, _) =>
+                Commands = new[]
                 {
-                    await Task.Delay(waitSec * 1000);
-                }
+                    $"func azure functionapp list-functions {appName}"
+                },
+                OutputContains = new string[] { $"    HttpTrigger - [{triggerName}]" },
+                CommandTimeout = TimeSpan.FromMinutes(3)
             };
         }
 
-        public static RunConfiguration GenerateRequestTask(string appName, string triggerName)
+        public static string GetRandomTriggerName()
         {
-            return new RunConfiguration
-            {
-                Test = async (workingDir, _) =>
-                {
-                    string url = $"https://{appName}.azurewebsites.net/";
-                    using (var client = new HttpClient() { BaseAddress = new Uri(url) })
-                    {
-                        var response = await client.GetAsync($"/api/{triggerName}?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        var trimmedResult = result.Trim(new[] { '!', '.' });
-                        trimmedResult.Should().Be(
-                            expected: "Hello Test",
-                            because: $"trigger {triggerName} should respond 'Hello Test'");
-                    }
-                }
-            };
+            return Guid.NewGuid().ToString().Split('-')[0];
         }
     }
 }
