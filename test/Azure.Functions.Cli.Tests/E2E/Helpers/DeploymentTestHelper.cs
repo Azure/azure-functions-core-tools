@@ -45,25 +45,33 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             };
         }
 
-        public static RunConfiguration GenerateRequestTask(string appName, string triggerName, int retries = 5, int intervalSec = 10)
+        public static RunConfiguration GenerateWaitTask(int waitSec = 15)
         {
             return new RunConfiguration
             {
                 Test = async (workingDir, _) =>
                 {
-                    await RetryHelper.Retry(async () =>
+                    await Task.Delay(waitSec * 1000);
+                }
+            };
+        }
+
+        public static RunConfiguration GenerateRequestTask(string appName, string triggerName)
+        {
+            return new RunConfiguration
+            {
+                Test = async (workingDir, _) =>
+                {
+                    string url = $"https://{appName}.azurewebsites.net/";
+                    using (var client = new HttpClient() { BaseAddress = new Uri(url) })
                     {
-                        string url = $"https://{appName}.azurewebsites.net/";
-                        using (var client = new HttpClient() { BaseAddress = new Uri(url) })
-                        {
-                            var response = await client.GetAsync($"/api/{triggerName}?name=Test");
-                            var result = await response.Content.ReadAsStringAsync();
-                            var trimmedResult = result.Trim(new[] { '!', '.' });
-                            trimmedResult.Should().Be(
-                                expected: "Hello Test",
-                                because: $"trigger {triggerName} should respond 'Hello Test'");
-                        }
-                    }, retryCount: retries, retryDelay: TimeSpan.FromSeconds(intervalSec));
+                        var response = await client.GetAsync($"/api/{triggerName}?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        var trimmedResult = result.Trim(new[] { '!', '.' });
+                        trimmedResult.Should().Be(
+                            expected: "Hello Test",
+                            because: $"trigger {triggerName} should respond 'Hello Test'");
+                    }
                 }
             };
         }
