@@ -49,10 +49,16 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             {
                 Commands = new[]
                 {
-                    $"azure functionapp list-functions {appName}"
+                    $"azure functionapp list-functions {appName}",
                 },
-                OutputContains = new string[] { $"    HttpTrigger - [{triggerName}]" },
-                CommandTimeout = TimeSpan.FromMinutes(3)
+                OutputContains = new string[]
+                {
+                    $"api/{triggerName}"
+                },
+                OutputDoesntContain = new string[]
+                {
+                    "api/{triggerName}?code="
+                },
             };
         }
 
