@@ -38,6 +38,10 @@ namespace Azure.Functions.Cli.Tests
 
 /foo/*.wat
 
+/test1
+
+test2
+
 # Ignore some deep sub folders
 /othernonexistent/**/what
 
@@ -56,7 +60,16 @@ namespace Azure.Functions.Cli.Tests
         {
             _gitignore.Accepts("test/index.js").Should().BeTrue();
             _gitignore.Accepts("wat/test/index.js").Should().BeTrue();
+            _gitignore.Accepts("/othernonexistent/blah/adsasd/whatads").Should().BeTrue();
+            _gitignore.Accepts("/othernonexistent/blah/adsasd/what/foo").Should().BeTrue();
             _gitignoreNoNegatives.Accepts("test/index.js").Should().BeTrue();
+        }
+
+        [Fact]
+        public void AcceptShouldAcceptFileNameThatContainsNameIgnored()
+        {
+            _gitignore.Accepts("test1").Should().BeFalse();
+            _gitignore.Accepts("test1File.wat").Should().BeTrue();
         }
 
         [Fact]
@@ -65,6 +78,7 @@ namespace Azure.Functions.Cli.Tests
             _gitignore.Accepts("test.swp").Should().BeFalse();
             _gitignore.Accepts("node_modules/wat.js").Should().BeFalse();
             _gitignore.Accepts("foo/bar.wat").Should().BeFalse();
+            _gitignore.Accepts("othernonexistent/blah/what").Should().BeFalse();
             _gitignoreNoNegatives.Accepts("node_modules/wat.js").Should().BeFalse();
         }
 
@@ -73,6 +87,7 @@ namespace Azure.Functions.Cli.Tests
         {
             _gitignore.Accepts("nonexistent").Should().BeFalse();
             _gitignore.Accepts("nonexistent/bar").Should().BeFalse();
+            _gitignore.Accepts("test2").Should().BeFalse();
             _gitignoreNoNegatives.Accepts("node_modules").Should().BeFalse();
         }
 
@@ -102,6 +117,7 @@ namespace Azure.Functions.Cli.Tests
         {
             _gitignore.Denies("test/index.js").Should().BeFalse();
             _gitignore.Denies("wat/test/index.js").Should().BeFalse();
+            _gitignore.Denies("test1File.wat").Should().BeFalse();
             _gitignoreNoNegatives.Denies("test/index.js").Should().BeFalse();
             _gitignoreNoNegatives.Denies("wat/test/index.js").Should().BeFalse();
         }
@@ -110,6 +126,7 @@ namespace Azure.Functions.Cli.Tests
         public void DeniesShouldDenyTheGivenDirectory()
         {
             _gitignore.Denies("nonexistent").Should().BeTrue();
+            _gitignore.Denies("test1").Should().BeTrue();
             _gitignore.Denies("nonexistent/bar").Should().BeTrue();
             _gitignoreNoNegatives.Denies("node_modules").Should().BeTrue();
             _gitignoreNoNegatives.Denies("node_modules/foo").Should().BeTrue();
