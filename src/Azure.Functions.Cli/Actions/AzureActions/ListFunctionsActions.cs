@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription);
             if (functionApp != null)
             {
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, ShowKeys);
