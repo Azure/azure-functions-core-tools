@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static string _storageApiVersion = "2018-02-01";
 
-        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, ArmSubscriptionsArray allSubs = null)
+        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null)
         {
             IEnumerable<string> allSubscriptionIds;
             if (defaultSubscription != null)
@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                var subscriptions = (allSubs ?? await GetSubscriptions(accessToken, managementURL)).value;
+                var subscriptions = allSubs ?? await GetSubscriptions(accessToken, managementURL);
                 allSubscriptionIds = subscriptions.Select(sub => sub.subscriptionId);
             }
 
@@ -67,9 +67,9 @@ namespace Azure.Functions.Cli.Helpers
             return null;
         }
 
-        internal static async Task<string> GetApplicationInsightIDFromIKey(string iKey, string accessToken, string managementURL, ArmSubscriptionsArray allSubs = null)
+        internal static async Task<string> GetApplicationInsightIDFromIKey(string iKey, string accessToken, string managementURL, IEnumerable<ArmSubscription> allSubs = null)
         {
-            var allArmSubscriptions = (allSubs ?? await GetSubscriptions(accessToken, managementURL)).value;
+            var allArmSubscriptions = allSubs ?? await GetSubscriptions(accessToken, managementURL);
             var allSubscriptionIds = allArmSubscriptions.Select(sub => sub.subscriptionId);
 
             var query = $"where type =~ 'Microsoft.Insights/components' and properties.InstrumentationKey == '{iKey}' | project id";
@@ -201,7 +201,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<StorageAccount> GetStorageAccount(string storageAccountName, string accessToken, string managementURL)
         {
             var subscriptions = await GetSubscriptions(accessToken, managementURL);
-            foreach (var subscription in subscriptions.value)
+            foreach (var subscription in subscriptions)
             {
                 var storageAccount =
                     await ArmHttpAsync<ArmArrayWrapper<ArmGenericResource>>(
@@ -246,13 +246,21 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        internal static Task<ArmSubscriptionsArray> GetSubscriptions(string accessToken, string managementURL)
+        internal static async Task<IEnumerable<ArmSubscription>> GetSubscriptions(string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}/subscriptions?api-version={ArmUriTemplates.ArmApiVersion}");
-            return ArmHttpAsync<ArmSubscriptionsArray>(
-                HttpMethod.Get,
-                url,
-                accessToken);
+            var allSubs = new List<ArmSubscription>();
+
+            var armSubResponse = await ArmHttpAsync<ArmSubscriptionsArray>(HttpMethod.Get, url, accessToken);
+            allSubs.AddRange(armSubResponse.value);
+
+            while (armSubResponse.nextLink != null)
+            {
+                armSubResponse = await ArmHttpAsync<ArmSubscriptionsArray>(HttpMethod.Get, new Uri(armSubResponse.nextLink), accessToken);
+                allSubs.AddRange(armSubResponse.value);
+            }
+
+            return allSubs;
         }
 
         public static async Task<Site> LoadSiteConfigAsync(Site site, string accessToken, string managementURL)
