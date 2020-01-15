@@ -45,39 +45,32 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
         }
 
         public static void AddAppKeysEnvironVariableNames(IDictionary<string, string> envVariables,
-            string funcAppKeysSecretsCollectionName,
-            string funcAppKeysConfigMapName,
-            bool mountFuncKeysAsContainerVolume)
+            string keysSecretCollectionName,
+            bool mountKeysAsContainerVolume)
         {
             if (envVariables == null)
             {
                 envVariables = new Dictionary<string, string>();
             }
 
-            //if funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName or mountFuncKeysAsContainerVolume has been assigned then that means the func app keys needs to be managed as kubernetes secret/configMap
-            if ((!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName) || !string.IsNullOrWhiteSpace(funcAppKeysConfigMapName) || mountFuncKeysAsContainerVolume)
+            //if keysSecretCollectionName, mountKeysAsContainerVolume has been passed as deployment parameter then that means the func app keys needs to be managed as kubernetes secret
+            if ((!string.IsNullOrWhiteSpace(keysSecretCollectionName) || mountKeysAsContainerVolume)
                 && !envVariables.ContainsKey(AzureWebJobsSecretStorageTypeEnvVariableName))
             {
                 envVariables.Add(AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes");
             }
 
             if (!envVariables.ContainsKey(AzureWebJobsKubernetesSecretNameEnvVariableName)
-                && !mountFuncKeysAsContainerVolume)
+                && !mountKeysAsContainerVolume)
             {
-                if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
+                if (!string.IsNullOrWhiteSpace(keysSecretCollectionName))
                 {
-                    envVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"secrets/{funcAppKeysSecretsCollectionName}");
-                }
-                else if (!string.IsNullOrWhiteSpace(funcAppKeysConfigMapName))
-                {
-                    envVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"configmaps/{funcAppKeysConfigMapName}");
+                    envVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"secrets/{keysSecretCollectionName}");
                 }
             }
         }
 
-        public static void CreateFuncAppKeysVolumeMountDeploymentResource(IEnumerable<DeploymentV1Apps> deployments,
-            string funcAppKeysSecretsCollectionName,
-            string funcAppKeysConfigMapName)
+        public static void CreateFuncAppKeysVolumeMountDeploymentResource(IEnumerable<DeploymentV1Apps> deployments, string funcAppKeysSecretsCollectionName)
         {
             if (deployments?.Any() == false)
             {
@@ -93,11 +86,8 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             {
                 volume.VolumeSecret = new VolumeSecretV1 { SecretName = funcAppKeysSecretsCollectionName };
             }
-            else if (!string.IsNullOrWhiteSpace(funcAppKeysConfigMapName))
-            {
-                volume.VolumeConfigMap = new VolumeConfigMapV1 { Name = funcAppKeysSecretsCollectionName };
-            }
 
+            //Mount the app keys as volume mount to the container at the path "/run/secrets/functions-keys"
             foreach (var deployment in deployments)
             {
                 deployment.Spec.Template.Spec.Volumes = new VolumeV1[] { volume };

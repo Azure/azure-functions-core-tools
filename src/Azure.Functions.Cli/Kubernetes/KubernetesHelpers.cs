@@ -144,20 +144,18 @@ namespace Azure.Functions.Cli.Kubernetes
             string imageName,
             string @namespace,
             TriggersPayload triggers,
-            IDictionary<string, string> appSettingsSecrets,
-            IDictionary<string, string> funcAppKeys,
+            IDictionary<string, string> secrets,
             string pullSecret = null,
-            string appSettingsSecretsCollectionName = null,
-            string appSettingsConfigMapName = null,
-            bool useConfigMapForAppSettings = false,
+            string secretsCollectionName = null,
+            string configMapName = null,
+            bool useConfigMap = false,
             int? pollingInterval = null,
             int? cooldownPeriod = null,
             string serviceType = "LoadBalancer",
             int? minReplicas = null,
             int? maxReplicas = null,
-            string funcAppKeysSecretsCollectionName = null,
-            string funcAppKeysConfigMapName = null,
-            bool mountFuncKeysAsContainerVolume = false)
+            string keysSecretCollectionName = null,
+            bool mountKeysAsContainerVolume = false)
         {
             ScaledObjectV1Alpha1 scaledobject = null;
             var result = new List<IKubernetesResource>();
@@ -169,11 +167,13 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 int position = 0;
                 var enabledFunctions = httpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
+                //Add environment variables for the func app keys
+                FuncAppKeysHelper.AddAppKeysEnvironVariableNames(enabledFunctions, keysSecretCollectionName, mountKeysAsContainerVolume);
                 var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, enabledFunctions, new Dictionary<string, string>
                 {
                     { "osiris.deislabs.io/enabled", "true" },
                     { "osiris.deislabs.io/minReplicas", "1" }
-                }, port: 80, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
+                }, port: 80);
                 deployments.Add(deployment);
                 var service = GetService(name + "-http", @namespace, deployment, serviceType, new Dictionary<string, string>
                 {
@@ -187,21 +187,21 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 int position = 0;
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions, funcAppKeysSecretsCollectionName: funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName: funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume: mountFuncKeysAsContainerVolume);
+                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
                 deployments.Add(deployment);
                 scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
             }
 
             // Set worker runtime if needed.
-            if (!appSettingsSecrets.ContainsKey(Constants.FunctionsWorkerRuntime))
+            if (!secrets.ContainsKey(Constants.FunctionsWorkerRuntime))
             {
-                appSettingsSecrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
+                secrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
 
             int resourceIndex = 0;
-            if (useConfigMapForAppSettings)
+            if (useConfigMap)
             {
-                var configMap = GetConfigMap(name, @namespace, appSettingsSecrets);
+                var configMap = GetConfigMap(name, @namespace, secrets);
                 result.Insert(resourceIndex, configMap);
                 resourceIndex++;
                 foreach (var deployment in deployments)
@@ -218,7 +218,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(appSettingsSecretsCollectionName))
+            else if (!string.IsNullOrEmpty(secretsCollectionName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -228,13 +228,13 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             SecretRef = new NamedObjectV1
                             {
-                                Name = appSettingsSecretsCollectionName
+                                Name = secretsCollectionName
                             }
                         }
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(appSettingsConfigMapName))
+            else if (!string.IsNullOrEmpty(configMapName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -244,7 +244,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             ConfigMapRef = new NamedObjectV1
                             {
-                                Name = appSettingsConfigMapName
+                                Name = configMapName
                             }
                         }
                     };
@@ -252,7 +252,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
             else
             {
-                var secret = GetSecret(name, @namespace, appSettingsSecrets);
+                var secret = GetSecret(name, @namespace, secrets);
                 result.Insert(resourceIndex, secret);
                 resourceIndex++;
                 foreach (var deployment in deployments)
@@ -270,85 +270,51 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(funcAppKeysSecretsCollectionName))
+            if (httpFunctions.Any())
             {
-                var appKeysSecret = GetSecret(funcAppKeysSecretsCollectionName, @namespace, funcAppKeys);
-
-                if (!await ResourceExists("secret", funcAppKeysSecretsCollectionName, @namespace))
+                var funcKeys = FuncAppKeysHelper.CreateKeys(triggers.FunctionsJson.Select(f => f.Key));
+                if (!string.IsNullOrWhiteSpace(keysSecretCollectionName))
                 {
-                    result.Insert(resourceIndex, appKeysSecret);
+                    var appKeysSecret = GetSecret(keysSecretCollectionName, @namespace, funcKeys);
+
+                    if (!await ResourceExists("secret", keysSecretCollectionName, @namespace))
+                    {
+                        result.Insert(resourceIndex, appKeysSecret);
+                        resourceIndex++;
+                    }
+                }
+
+                //if function keys Secrets needs to be mounted as volume in the function runtime container
+                if (mountKeysAsContainerVolume)
+                {
+                    FuncAppKeysHelper.CreateFuncAppKeysVolumeMountDeploymentResource(deployments, keysSecretCollectionName);
+                }
+                //Create the Pod identity with the role to modify the function kubernetes secret
+                else
+                {
+                    var svcActName = $"{name}-function-keys-identity-svc-act";
+                    var svcActDeploymentResource = GetServiceAccount(svcActName, @namespace);
+                    result.Insert(resourceIndex, svcActDeploymentResource);
                     resourceIndex++;
-                }
 
-                foreach (var deployment in deployments)
-                {
-                    deployment.Spec.Template.Spec.Containers.First().EnvFrom.Append(
-                        new ContainerEnvironmentFromV1
-                        {
-                            SecretRef = new NamedObjectV1
-                            {
-                                Name = appKeysSecret.Metadata.Name
-                            }
-                        });
-                }
-            }
-            else if (!string.IsNullOrWhiteSpace(funcAppKeysConfigMapName))
-            {
-                var appKeysConfigMap = GetConfigMap(funcAppKeysConfigMapName, @namespace, funcAppKeys);
+                    var funcKeysManagerRoleName = "functions-keys-manager-role";
+                    var secretManagerRole = GetSecretManagerRole(funcKeysManagerRoleName, @namespace);
+                    if (!await ResourceExists("Role", funcKeysManagerRoleName, @namespace))
+                    {
+                        result.Insert(resourceIndex, secretManagerRole);
+                        resourceIndex++;
+                    }
 
-                if (!await ResourceExists("configMap", funcAppKeysConfigMapName, @namespace))
-                {
-                    result.Insert(resourceIndex, appKeysConfigMap);
+                    var roleBindingName = $"{svcActName}-functions-keys-manager-rolebinding";
+                    var funcKeysRoleBindingDeploymentResource = GetRoleBinding(roleBindingName, @namespace, funcKeysManagerRoleName, svcActName);
+                    result.Insert(resourceIndex, funcKeysRoleBindingDeploymentResource);
                     resourceIndex++;
-                }
 
-                foreach (var deployment in deployments)
-                {
-                    deployment.Spec.Template.Spec.Containers.First().EnvFrom.Append(
-                        new ContainerEnvironmentFromV1
-                        {
-                            ConfigMapRef = new NamedObjectV1
-                            {
-                                Name = appKeysConfigMap.Metadata.Name
-                            }
-                        });
-                }
-            }
-
-            //if function keys Secrets/configMaps needs to be mounted as volume in the function runtime container
-            if (mountFuncKeysAsContainerVolume)
-            {
-                FuncAppKeysHelper.CreateFuncAppKeysVolumeMountDeploymentResource(deployments, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName);
-            }
-            else
-            {
-                var svcActName = "function-identity-svc-act";
-                var svcAct = GetServiceAccount(svcActName, @namespace);
-                if (!await ResourceExists("ServiceAccount", svcActName, @namespace))
-                {
-                    result.Insert(resourceIndex, svcAct);
-                    resourceIndex++;
-                }
-
-                var secretManagerRoleName = "secrets-manager-role";
-                var secretManagerRole = GetRole(secretManagerRoleName, @namespace);
-                if (!await ResourceExists("Role", secretManagerRoleName, @namespace))
-                {
-                    result.Insert(resourceIndex, svcAct);
-                    resourceIndex++;
-                }
-
-                var roleBindingName = "function-identity-svcact-to-secret-manager-rolebinding";
-                var secretRoleBinding = GetRoleBinding(roleBindingName, @namespace, secretManagerRoleName, svcActName);
-                if (!await ResourceExists("RoleBinding", secretManagerRoleName, @namespace))
-                {
-                    result.Insert(resourceIndex, svcAct);
-                    resourceIndex++;
-                }
-
-                foreach (var deployment in deployments)
-                {
-                    deployment.Spec.Template.Spec.ServiceAccountName = svcActName;
+                    //add service account identity to the pod
+                    foreach (var deployment in deployments)
+                    {
+                        deployment.Spec.Template.Spec.ServiceAccountName = svcActName;
+                    }
                 }
             }
 
@@ -391,11 +357,8 @@ namespace Azure.Functions.Cli.Kubernetes
             return sb.ToString();
         }
 
-        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1, string funcAppKeysSecretsCollectionName = null, string funcAppKeysConfigMapName = null, bool mountFuncKeysAsContainerVolume = false)
+        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1)
         {
-            //Add environment variables for the func app keys
-            FuncAppKeysHelper.AddAppKeysEnvironVariableNames(additionalEnv, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
-
             var deployment = new DeploymentV1Apps
             {
                 ApiVersion = "apps/v1",
@@ -648,7 +611,7 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        public static RoleV1 GetRole(string name, string @namespace)
+        public static RoleV1 GetSecretManagerRole(string name, string @namespace)
         {
             return new RoleV1
             {

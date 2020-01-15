@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Tests
         {
             var roleName = "secrets-manager-role";
             var @namespace = "funcappkeys-test-ns0";
-            var resource = KubernetesHelper.GetRole(roleName, @namespace);
+            var resource = KubernetesHelper.GetSecretManagerRole(roleName, @namespace);
             var payload = JsonConvert.SerializeObject(resource, Formatting.Indented,
                new JsonSerializerSettings
                {
