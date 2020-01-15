@@ -151,12 +151,11 @@ namespace Azure.Functions.Cli.Kubernetes
             string imageName,
             string @namespace,
             TriggersPayload triggers,
-            IDictionary<string, string> appSettingsSecrets,
-            IDictionary<string, string> funcAppKeys,
+            IDictionary<string, string> secrets,
             string pullSecret = null,
-            string appSettingsSecretsCollectionName = null,
-            string appSettingsConfigMapName = null,
-            bool useConfigMapForAppSettings = false,
+            string secretsCollectionName = null,
+            string configMapName = null,
+            bool useConfigMap = false,
             int? pollingInterval = null,
             int? cooldownPeriod = null,
             string serviceType = "LoadBalancer",
@@ -186,7 +185,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 {
                     { "osiris.deislabs.io/enabled", "true" },
                     { "osiris.deislabs.io/minReplicas", "1" }
-                }, port: 80, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
+                }, port: 80);
                 deployments.Add(deployment);
                 var service = GetService(name + "-http", @namespace, deployment, serviceType, new Dictionary<string, string>
                 {
@@ -200,15 +199,15 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 int position = 0;
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions, funcAppKeysSecretsCollectionName: funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName: funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume: mountFuncKeysAsContainerVolume);
+                var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
                 deployments.Add(deployment);
                 scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
             }
 
             // Set worker runtime if needed.
-            if (!appSettingsSecrets.ContainsKey(Constants.FunctionsWorkerRuntime))
+            if (!secrets.ContainsKey(Constants.FunctionsWorkerRuntime))
             {
-                appSettingsSecrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
+                secrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
 			
             int resourceIndex = 0;
@@ -231,7 +230,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(appSettingsSecretsCollectionName))
+            else if (!string.IsNullOrEmpty(secretsCollectionName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -241,13 +240,13 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             SecretRef = new NamedObjectV1
                             {
-                                Name = appSettingsSecretsCollectionName
+                                Name = secretsCollectionName
                             }
                         }
                     };
                 }
             }
-            else if (!string.IsNullOrEmpty(appSettingsConfigMapName))
+            else if (!string.IsNullOrEmpty(configMapName))
             {
                 foreach (var deployment in deployments)
                 {
@@ -257,7 +256,7 @@ namespace Azure.Functions.Cli.Kubernetes
                         {
                             ConfigMapRef = new NamedObjectV1
                             {
-                                Name = appSettingsConfigMapName
+                                Name = configMapName
                             }
                         }
                     };
@@ -329,7 +328,6 @@ namespace Azure.Functions.Cli.Kubernetes
                     var secretManagerRole = GetSecretManagerRole(funcKeysManagerRoleName, @namespace);
                     result.Insert(resourceIndex, secretManagerRole);
                     resourceIndex++;
-
                     var roleBindingName = $"{svcActName}-functions-keys-manager-rolebinding";
                     var funcKeysRoleBindingDeploymentResource = GetRoleBinding(roleBindingName, @namespace, funcKeysManagerRoleName, svcActName);
                     result.Insert(resourceIndex, funcKeysRoleBindingDeploymentResource);
@@ -379,11 +377,8 @@ namespace Azure.Functions.Cli.Kubernetes
             return sb.ToString();
         }
 
-        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1, string funcAppKeysSecretsCollectionName = null, string funcAppKeysConfigMapName = null, bool mountFuncKeysAsContainerVolume = false)
+        private static DeploymentV1Apps GetDeployment(string name, string @namespace, string image, string pullSecret, int replicaCount, IDictionary<string, string> additionalEnv = null, IDictionary<string, string> annotations = null, int port = -1)
         {
-            //Add environment variables for the func app keys
-            FuncAppKeysHelper.AddAppKeysEnvironVariableNames(additionalEnv, funcAppKeysSecretsCollectionName, funcAppKeysConfigMapName, mountFuncKeysAsContainerVolume);
-
             var deployment = new DeploymentV1Apps
             {
                 ApiVersion = "apps/v1",
@@ -635,7 +630,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             };
         }
-		
+
         public static RoleV1 GetSecretManagerRole(string name, string @namespace)
         {
             return new RoleV1
