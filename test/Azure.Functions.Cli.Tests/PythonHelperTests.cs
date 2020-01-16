@@ -5,19 +5,11 @@ using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests
 {
     public class PythonHelperTests
     {
-        private readonly ITestOutputHelper _output;
-
-        public PythonHelperTests(ITestOutputHelper output)
-        {
-            _output = output;
-        }
-
         [SkipIfPythonNonExistFact]
         public async void InterpreterShouldHaveExecutablePath()
         {

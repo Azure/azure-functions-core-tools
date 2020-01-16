@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Helpers
             ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
 
             // Python 3.6 | 3.7 | 3.8 (supported)
-            if (pythonVersion.IsVersionSupported)
+            if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
@@ -431,7 +431,7 @@ namespace Azure.Functions.Cli.Helpers
         private static async Task<string> ChoosePythonBuildEnvImage()
         {
             WorkerLanguageVersionInfo workerInfo = await GetEnvironmentPythonVersion();
-            return workerInfo.BuildNativeDepsEnvironmentImage;
+            return GetBuildNativeDepsEnvironmentImage(workerInfo);
         }
 
         private static string CopyToTemp(IEnumerable<string> files, string rootPath)
@@ -448,6 +448,45 @@ namespace Azure.Functions.Cli.Helpers
                 FileSystemHelpers.Copy(file, Path.Combine(tmp, relativeFileName));
             }
             return tmp;
+        }
+
+        public static Task<string> GetDockerInitFileContent(WorkerLanguageVersionInfo info)
+        {
+            if (info?.Major == 3)
+            {
+                switch (info?.Minor)
+                {
+                    case 6:
+                        return StaticResources.DockerfilePython36;
+                    case 7:
+                        return StaticResources.DockerfilePython37;
+                    case 8:
+                        return StaticResources.DockerfilePython38;
+                }
+            }
+            return StaticResources.DockerfilePython36;
+        }
+
+        private static string GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
+        {
+            if (info?.Major == 3)
+            {
+                switch (info?.Minor)
+                {
+                    case 6:
+                        return Constants.DockerImages.LinuxPython36ImageAmd64;
+                    case 7:
+                        return Constants.DockerImages.LinuxPython37ImageAmd64;
+                    case 8:
+                        return Constants.DockerImages.LinuxPython38ImageAmd64;
+                }
+            }
+            return Constants.DockerImages.LinuxPython36ImageAmd64;
+        }
+
+        private static bool IsVersionSupported(WorkerLanguageVersionInfo info)
+        {
+            return (info?.Major == 3 && info?.Minor == 6) || (info?.Major == 3 && info?.Minor == 7) || (info?.Major == 3 && info?.Minor == 8);
         }
     }
 }
