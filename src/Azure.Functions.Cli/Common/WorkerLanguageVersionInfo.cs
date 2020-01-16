@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
