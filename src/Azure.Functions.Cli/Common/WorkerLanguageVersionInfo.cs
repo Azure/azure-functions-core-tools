@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
@@ -44,6 +45,46 @@ namespace Azure.Functions.Cli.Common
                     return Version.Split('.')[2];
                 }
                 return null;
+            }
+        }
+
+        public Task<string> DockerInitFileContent
+        {
+            get
+            {
+                if (Major == 3)
+                {
+                    switch (Minor)
+                    {
+                        case 6:
+                            return StaticResources.DockerfilePython36;
+                        case 7:
+                            return StaticResources.DockerfilePython37;
+                        case 8:
+                            return StaticResources.DockerfilePython38;
+                    }
+                }
+                return StaticResources.DockerfilePython36;
+            }
+        }
+
+        public string BuildNativeDepsEnvironmentImage
+        {
+            get
+            {
+                if (Major == 3)
+                {
+                    switch (Minor)
+                    {
+                        case 6:
+                            return Constants.DockerImages.LinuxPython36ImageAmd64;
+                        case 7:
+                            return Constants.DockerImages.LinuxPython37ImageAmd64;
+                        case 8:
+                            return Constants.DockerImages.LinuxPython38ImageAmd64;
+                    }
+                }
+                return Constants.DockerImages.LinuxPython36ImageAmd64;
             }
         }
 

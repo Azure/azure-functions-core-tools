@@ -328,14 +328,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private static async Task WritePythonDockerFile()
         {
             WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
-            if (worker?.Major == 3 && worker?.Minor == 7)
-            {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython37);
-            }
-            else
-            {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePython36);
-            }
+            await WriteFiles("Dockerfile", await worker.DockerInitFileContent);
         }
 
         private static async Task WriteExtensionsJson()

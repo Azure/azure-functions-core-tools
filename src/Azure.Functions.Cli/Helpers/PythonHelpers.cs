@@ -129,20 +129,26 @@ namespace Azure.Functions.Cli.Helpers
             var python3GetVersionTask = GetVersion("python3");
             var python36GetVersionTask = GetVersion("python3.6");
             var python37GetVersionTask = GetVersion("python3.7");
+            var python38GetVersionTask = GetVersion("python3.8");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
                 await pythonGetVersionTask,
                 await python3GetVersionTask,
                 await python36GetVersionTask,
-                await python37GetVersionTask
+                await python37GetVersionTask,
+                await python38GetVersionTask
             };
 
             // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
-            WorkerLanguageVersionInfo python36_37worker = versions.FirstOrDefault(w => (w?.Major == 3 && w?.Minor == 6) || (w?.Major == 3 && w?.Minor == 7));
-            if (python36_37worker != null)
+            WorkerLanguageVersionInfo recommendedPythonWorker = versions.FirstOrDefault(w =>
+                (w?.Major == 3 && w?.Minor == 6) ||
+                (w?.Major == 3 && w?.Minor == 7) ||
+                (w?.Major == 3 && w?.Minor == 8)
+            );
+            if (recommendedPythonWorker != null)
             {
-                _pythonVersionCache = python36_37worker;
+                _pythonVersionCache = recommendedPythonWorker;
                 return _pythonVersionCache;
             }
 
