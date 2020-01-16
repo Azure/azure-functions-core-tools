@@ -88,6 +88,14 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
+        public bool IsVersionSupported
+        {
+            get
+            {
+                return (Major == 3 && Minor == 6) || (Major == 3 && Minor == 7) || (Major == 3 && Minor == 8);
+            }
+        }
+
         /// <summary>
         /// Construct the basic information of a worker runtime
         /// </summary>
