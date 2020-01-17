@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     await KubernetesHelper.CreateNamespace(Namespace);
                 }
 
-                await KubectlHelper.KubectlApply(sb.ToString(), showOutput: true, @namespace: Namespace);
+                await KubectlHelper.KubectlApply(sb.ToString(), showOutput: true);
             }
         }
     }
