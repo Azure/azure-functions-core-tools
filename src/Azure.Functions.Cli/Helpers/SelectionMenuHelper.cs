@@ -10,6 +10,20 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class SelectionMenuHelper
     {
+        public static void DisplaySelectionWizardPrompt(string selectionItem)
+        {
+            if (IsEnvironmentCursorTopFriendly())
+            {
+                // windows
+                ColoredConsole.Write("Use the up/down arrow keys to select a " + selectionItem + ":");
+            }
+            else
+            {
+                // *nix/generic
+                ColoredConsole.Write("Select a number for " + selectionItem + ":");
+            }
+        }
+
         public static T DisplaySelectionWizard<T>(IEnumerable<T> options)
         {
             // Console.CursorTop behaves very differently on Unix vs Windows for some reason

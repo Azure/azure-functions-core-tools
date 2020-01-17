@@ -91,7 +91,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (workerRuntime == WorkerRuntime.None)
                 {
-                    ColoredConsole.Write("Select a language: ");
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
                     Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
@@ -109,7 +109,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                     else if (!InferAndUpdateLanguage(workerRuntime))
                     {
-                        ColoredConsole.Write("Select a language: ");
+                        SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
                         Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
                     }
                 }
@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (workerRuntime == WorkerRuntime.dotnet && !Csx)
             {
-                ColoredConsole.Write("Select a template: ");
+                SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates());
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
@@ -131,7 +131,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                ColoredConsole.Write("Select a template: ");
+                SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
                 string templateLanguage;
                 try
                 {
