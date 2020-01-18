@@ -1,7 +1,9 @@
 ﻿using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Colors.Net;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -44,30 +46,20 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             return funcAppKeys;
         }
 
-        public static void AddAppKeysEnvironVariableNames(IDictionary<string, string> envVariables,
-            string keysSecretCollectionName,
-            bool mountKeysAsContainerVolume)
+        public static IDictionary<string, string> FuncKeysKubernetesEnvironVariables(string keysSecretCollectionName, bool mountKeysAsContainerVolume)
         {
-            if (envVariables == null)
+            var funcKeysKubernetesEnvironVariables = new Dictionary<string, string>
             {
-                envVariables = new Dictionary<string, string>();
+                { AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes" }
+            };
+
+            //if keys needs are not to be mounted as container volume then add "AzureWebJobsKubernetesSecretName" enviornment varibale to the container 
+            if (!mountKeysAsContainerVolume)
+            {
+                funcKeysKubernetesEnvironVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"secrets/{keysSecretCollectionName}");
             }
 
-            //if keysSecretCollectionName, mountKeysAsContainerVolume has been passed as deployment parameter then that means the func app keys needs to be managed as kubernetes secret
-            if ((!string.IsNullOrWhiteSpace(keysSecretCollectionName) || mountKeysAsContainerVolume)
-                && !envVariables.ContainsKey(AzureWebJobsSecretStorageTypeEnvVariableName))
-            {
-                envVariables.Add(AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes");
-            }
-
-            if (!envVariables.ContainsKey(AzureWebJobsKubernetesSecretNameEnvVariableName)
-                && !mountKeysAsContainerVolume)
-            {
-                if (!string.IsNullOrWhiteSpace(keysSecretCollectionName))
-                {
-                    envVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"secrets/{keysSecretCollectionName}");
-                }
-            }
+            return funcKeysKubernetesEnvironVariables;
         }
 
         public static void CreateFuncAppKeysVolumeMountDeploymentResource(IEnumerable<DeploymentV1Apps> deployments, string funcAppKeysSecretsCollectionName)
@@ -99,6 +91,37 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
                             MountPath = KubernetesSecretsMountPath
                         }
                 };
+            }
+        }
+
+        public static void FunKeysMessage(SecretsV1 existingKeysSecret, SecretsV1 newKeysSecret)
+        {
+            if (existingKeysSecret?.Data?.Any() == true || newKeysSecret?.Data?.Any() == true)
+            {
+                ColoredConsole.WriteLine("Http Functions:");
+            }
+
+            if (existingKeysSecret?.Data?.Any() == true)
+            {
+                var existingFunctionKeys = existingKeysSecret.Data.Where(item => item.Key.StartsWith("functions"));
+                PrintKeyOutputMessage(existingFunctionKeys, " # this didn't change");
+            }
+
+            if (newKeysSecret?.Data?.Any() == true)
+            {
+                var newFunctionKeys = newKeysSecret.Data.Where(item => item.Key.StartsWith("functions"));
+                PrintKeyOutputMessage(newFunctionKeys, " # this was added");
+            }
+        }
+
+        private static void PrintKeyOutputMessage(IEnumerable<KeyValuePair<string, string>> functionKeys, string keyMsg)
+        {
+            var keyOutputMsgTemplate = "http://[ip]/api/{0}?code={1}";
+            foreach (var funcKey in functionKeys)
+            {
+                var functionName = funcKey.Key.Split('.')[1];
+                var functionKey = Encoding.UTF8.GetString(Convert.FromBase64String(funcKey.Value));
+                ColoredConsole.WriteLine(string.Concat("\t", string.Format(keyOutputMsgTemplate, functionName, functionKey), keyMsg));
             }
         }
 

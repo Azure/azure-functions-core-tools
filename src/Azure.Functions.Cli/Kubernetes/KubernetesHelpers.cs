@@ -122,10 +122,16 @@ namespace Azure.Functions.Cli.Kubernetes
             return exitCode == 0;
         }
 
-        internal static async Task<bool> ResourceExists(string resourceTypeName, string resourceName, string @namespace)
+        internal static async Task<(string, bool)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
         {
-            (_, _, var exitCode) = await KubectlHelper.RunKubectl($"get {resourceTypeName} {resourceName} --namespace {@namespace}", ignoreError: true, showOutput: false);
-            return exitCode == 0;
+            string cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
+            if (returnJsonOutput)
+            {
+                cmd = string.Concat(cmd, " -o json");
+            }
+
+            (string output, _, var exitCode) = await KubectlHelper.RunKubectl(cmd, ignoreError: true, showOutput: false);
+            return (output, exitCode == 0);
         }
 
         internal static Task CreateNamespace(string @namespace)
@@ -139,7 +145,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Replace("KEDA_NAMESPACE", @namespace);
         }
 
-        internal async static Task<IEnumerable<IKubernetesResource>> GetFunctionsDeploymentResources(
+        internal async static Task<(IEnumerable<IKubernetesResource>, SecretsV1, SecretsV1)> GetFunctionsDeploymentResources(
             string name,
             string imageName,
             string @namespace,
@@ -154,7 +160,7 @@ namespace Azure.Functions.Cli.Kubernetes
             string serviceType = "LoadBalancer",
             int? minReplicas = null,
             int? maxReplicas = null,
-            string keysSecretCollectionName = null,
+            string keysSecretCollectionName = "func-keys-secret",
             bool mountKeysAsContainerVolume = false)
         {
             ScaledObjectV1Alpha1 scaledobject = null;
@@ -167,8 +173,13 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 int position = 0;
                 var enabledFunctions = httpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                //Add environment variables for the func app keys
-                FuncAppKeysHelper.AddAppKeysEnvironVariableNames(enabledFunctions, keysSecretCollectionName, mountKeysAsContainerVolume);
+                //Environment variables for the func app keys
+                var funcKeyEnvironmentVariables = FuncAppKeysHelper.FuncKeysKubernetesEnvironVariables(keysSecretCollectionName, mountKeysAsContainerVolume);
+                foreach (var environmentVar in funcKeyEnvironmentVariables)
+                {
+                    enabledFunctions.TryAdd(environmentVar.Key, environmentVar.Value);
+                }
+
                 var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, enabledFunctions, new Dictionary<string, string>
                 {
                     { "osiris.deislabs.io/enabled", "true" },
@@ -270,19 +281,34 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
+            SecretsV1 existingFuncKeysSecret = null;
+            SecretsV1 newKeysSecret = null;
             if (httpFunctions.Any())
             {
-                var funcKeys = FuncAppKeysHelper.CreateKeys(triggers.FunctionsJson.Select(f => f.Key));
-                if (!string.IsNullOrWhiteSpace(keysSecretCollectionName))
+                var funcKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
+                SecretsV1 keysSecret = null;
+                (string output, bool keysSecretExist) = await ResourceExists("secret", keysSecretCollectionName, @namespace, true);
+                if (keysSecretExist)
                 {
-                    var appKeysSecret = GetSecret(keysSecretCollectionName, @namespace, funcKeys);
-
-                    if (!await ResourceExists("secret", keysSecretCollectionName, @namespace))
+                    existingFuncKeysSecret = TryParse<SecretsV1>(output);
+                    if (existingFuncKeysSecret?.Data?.Any() == true)
                     {
-                        result.Insert(resourceIndex, appKeysSecret);
-                        resourceIndex++;
+                        funcKeys = funcKeys.Where(item => !existingFuncKeysSecret.Data.ContainsKey(item.Key)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                        if (!funcKeys.Any())
+                        {
+                            keysSecret = existingFuncKeysSecret;
+                        }
                     }
                 }
+
+                if (funcKeys.Any())
+                {
+                    newKeysSecret = GetSecret(keysSecretCollectionName, @namespace, funcKeys);
+                    keysSecret = newKeysSecret;
+                }
+
+                result.Insert(resourceIndex, keysSecret);
+                resourceIndex++;
 
                 //if function keys Secrets needs to be mounted as volume in the function runtime container
                 if (mountKeysAsContainerVolume)
@@ -299,11 +325,8 @@ namespace Azure.Functions.Cli.Kubernetes
 
                     var funcKeysManagerRoleName = "functions-keys-manager-role";
                     var secretManagerRole = GetSecretManagerRole(funcKeysManagerRoleName, @namespace);
-                    if (!await ResourceExists("Role", funcKeysManagerRoleName, @namespace))
-                    {
-                        result.Insert(resourceIndex, secretManagerRole);
-                        resourceIndex++;
-                    }
+                    result.Insert(resourceIndex, secretManagerRole);
+                    resourceIndex++;
 
                     var roleBindingName = $"{svcActName}-functions-keys-manager-rolebinding";
                     var funcKeysRoleBindingDeploymentResource = GetRoleBinding(roleBindingName, @namespace, funcKeysManagerRoleName, svcActName);
@@ -319,10 +342,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             result = result.Concat(deployments).ToList();
-
-            return scaledobject != null
-                ? result.Append(scaledobject)
-                : result;
+            return (scaledobject != null ? result.Append(scaledobject) : result, existingFuncKeysSecret, newKeysSecret);
         }
 
         internal static async Task RemoveKeda(string @namespace)
@@ -655,12 +675,23 @@ namespace Azure.Functions.Cli.Kubernetes
                 {
                     new RoleSubjectV1
                     {
-                        ApiGroup = "rbac.authorization.k8s.io",
                         Kind = "ServiceAccount",
                         Name = subjectName
                     }
                 }
             };
+        }
+
+        private static T TryParse<T>(string jsonData)
+        {
+            try
+            {
+                return JsonConvert.DeserializeObject<T>(jsonData);
+            }
+            catch
+            {
+                return default;
+            }
         }
     }
 }
