@@ -94,6 +94,37 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             }
         }
 
+        public static void FunKeysMessage(SecretsV1 existingKeysSecret, SecretsV1 newKeysSecret)
+        {
+            if (existingKeysSecret?.Data?.Any() == true || newKeysSecret?.Data?.Any() == true)
+            {
+                ColoredConsole.WriteLine("Http Functions:");
+            }
+
+            if (existingKeysSecret?.Data?.Any() == true)
+            {
+                var existingFunctionKeys = existingKeysSecret.Data.Where(item => item.Key.StartsWith("functions"));
+                PrintKeyOutputMessage(existingFunctionKeys, " # this didn't change");
+            }
+
+            if (newKeysSecret?.Data?.Any() == true)
+            {
+                var newFunctionKeys = newKeysSecret.Data.Where(item => item.Key.StartsWith("functions"));
+                PrintKeyOutputMessage(newFunctionKeys, " # this was added");
+            }
+        }
+
+        private static void PrintKeyOutputMessage(IEnumerable<KeyValuePair<string, string>> functionKeys, string keyMsg)
+        {
+            var keyOutputMsgTemplate = "http://[ip]/api/{0}?code={1}";
+            foreach (var funcKey in functionKeys)
+            {
+                var functionName = funcKey.Key.Split('.')[1];
+                var functionKey = Encoding.UTF8.GetString(Convert.FromBase64String(funcKey.Value));
+                ColoredConsole.WriteLine(string.Concat("\t", string.Format(keyOutputMsgTemplate, functionName, functionKey), keyMsg));
+            }
+        }
+
         private static string GenerateKey()
         {
             using (var rng = RandomNumberGenerator.Create())

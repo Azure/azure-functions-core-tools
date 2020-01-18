@@ -146,7 +146,6 @@ namespace Azure.Functions.Cli.Kubernetes
         }
 
         internal async static Task<(IEnumerable<IKubernetesResource>, SecretsV1, SecretsV1)> GetFunctionsDeploymentResources(
-
             string name,
             string imageName,
             string @namespace,
@@ -281,7 +280,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     };
                 }
             }
-			
+
             SecretsV1 existingFuncKeysSecret = null;
             SecretsV1 newKeysSecret = null;
             if (httpFunctions.Any())
@@ -307,7 +306,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     newKeysSecret = GetSecret(keysSecretCollectionName, @namespace, funcKeys);
                     keysSecret = newKeysSecret;
                 }
-				
+
                 result.Insert(resourceIndex, keysSecret);
                 resourceIndex++;
 
