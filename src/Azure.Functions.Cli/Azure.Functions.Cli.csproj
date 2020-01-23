@@ -127,7 +127,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="1.0.201" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.0.13107" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="1.1.202001106" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
 
