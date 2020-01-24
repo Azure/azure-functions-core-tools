@@ -12,6 +12,7 @@ using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using System.Collections.Generic;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -38,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             var subscriptions = await AzureHelper.GetSubscriptions(AccessToken, ManagementURL);
             ColoredConsole.WriteLine("Retrieving Function App...");
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, allSubs: subscriptions);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription, allSubs: subscriptions);
             if (UseBrowser)
             {
                 await OpenLiveStreamInBrowser(functionApp, subscriptions);
@@ -70,7 +71,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        public async Task OpenLiveStreamInBrowser(Site functionApp, ArmSubscriptionsArray allSubscriptions)
+        public async Task OpenLiveStreamInBrowser(Site functionApp, IEnumerable<ArmSubscription> allSubscriptions)
         {
             if (!functionApp.AzureAppSettings.ContainsKey(ApplicationInsightsIKeySetting))
             {
