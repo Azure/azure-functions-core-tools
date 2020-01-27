@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
 
 namespace Build
 {
@@ -177,6 +178,27 @@ namespace Build
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 FileHelpers.RecursiveCopy(templatesPath, Path.Combine(Settings.OutputDir, runtime, "templates"));
+            }
+        }
+
+        public static void AddTemplatesJson()
+        {
+            var tempDirectoryPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            using (var client = new WebClient())
+            {
+                FileHelpers.EnsureDirectoryExists(tempDirectoryPath);
+                var zipFilePath = Path.Combine(tempDirectoryPath, "templates.zip");
+                client.DownloadFile(Settings.TemplatesJsonZip, zipFilePath);
+                FileHelpers.ExtractZipToDirectory(zipFilePath, tempDirectoryPath);
+            }
+
+            string templatesJsonPath = Path.Combine(tempDirectoryPath, "templates", "templates.json");
+            if (FileHelpers.FileExists(templatesJsonPath))
+            {
+                foreach (var runtime in Settings.TargetRuntimes)
+                {
+                    File.Copy(templatesJsonPath, Path.Combine(Settings.OutputDir, runtime, "templates", "templates.json"));
+                }
             }
         }
 
