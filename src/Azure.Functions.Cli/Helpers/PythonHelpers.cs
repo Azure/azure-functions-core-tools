@@ -143,11 +143,7 @@ namespace Azure.Functions.Cli.Helpers
             };
 
             // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
-            WorkerLanguageVersionInfo recommendedPythonWorker = versions.FirstOrDefault(w =>
-                (w?.Major == 3 && w?.Minor == 6) ||
-                (w?.Major == 3 && w?.Minor == 7) ||
-                (w?.Major == 3 && w?.Minor == 8)
-            );
+            WorkerLanguageVersionInfo recommendedPythonWorker = versions.FirstOrDefault(w => IsVersionSupported(w));
             if (recommendedPythonWorker != null)
             {
                 _pythonVersionCache = recommendedPythonWorker;
