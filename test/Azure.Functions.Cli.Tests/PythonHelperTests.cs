@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Dynamitey.DynamicObjects;
-using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests
@@ -44,6 +40,25 @@ namespace Azure.Functions.Cli.Tests
                 throw new Exception("Worker runtime should always be python");
             }
         }
+
+        [Theory]
+        [InlineData("2.7.10", true)]
+        [InlineData("3.5.5", true)]
+        [InlineData("3.6.8b", false)]
+        [InlineData("3.7.2", false)]
+        [InlineData("3.8.0", false)]
+        public void AssertPythonVersion(string pythonVersion, bool expectException)
+        {
+            WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.python, pythonVersion, "python");
+            if (!expectException)
+            {
+                PythonHelpers.AssertPythonVersion(worker);
+            }
+            else
+            {
+                Assert.Throws<CliException>(() => PythonHelpers.AssertPythonVersion(worker));
+            }
+        }
     }
 
     public sealed class SkipIfPythonNonExistFact : FactAttribute
@@ -53,11 +68,11 @@ namespace Azure.Functions.Cli.Tests
             string[] pythons;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                pythons = new string[] { "python.exe", "python3.exe", "python36.exe", "python37.exe" };
+                pythons = new string[] { "python.exe", "python3.exe", "python36.exe", "python37.exe", "python38.exe", "py.exe" };
             }
             else
             {
-                pythons = new string[] { "python", "python3", "python36", "python37" };
+                pythons = new string[] { "python", "python3", "python36", "python37", "python38" };
             }
 
             string pythonExe = pythons.FirstOrDefault(p => CheckIfPythonExist(p));
