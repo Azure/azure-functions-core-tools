@@ -78,9 +78,6 @@
     <EmbeddedResource Include="StaticResources\profile.ps1">
       <LogicalName>$(AssemblyName).profile.ps1</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\templates.json">
-      <LogicalName>$(AssemblyName).templates.json</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\package.json">
       <LogicalName>$(AssemblyName).package.json</LogicalName>
     </EmbeddedResource>
