@@ -55,7 +55,8 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 },
                 OutputContains = new[]
                 {
-                    "Restoring packages for"
+                    "Restoring packages for",
+                    "Restore completed"
                 },
                 OutputDoesntContain = new[]
                 {
@@ -71,6 +72,44 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                         {
                             "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator",
                             "Microsoft.Azure.WebJobs.Extensions.SendGrid"
+                        }
+                    }
+                },
+                CommandTimeout = TimeSpan.FromMinutes(1)
+            }, _output);
+        }
+
+        [Fact]
+        public Task try_install_with_a_version()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] {
+                    "init . --worker-runtime node --no-bundle",
+                    "new --template SendGrid --name testfunc",
+                    "extensions install",
+                    "extensions install -p Microsoft.Azure.WebJobs.Extensions.Storage -v 3.0.8"
+                },
+                OutputContains = new[]
+                {
+                    "Restoring packages for",
+                    "Restore completed"
+                },
+                OutputDoesntContain = new[]
+                {
+                    "No action performed because no functions in your app require extensions"
+                },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "extensions.csproj",
+                        Exists = true,
+                        ContentContains = new[]
+                        {
+                            "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator",
+                            "Microsoft.Azure.WebJobs.Extensions.SendGrid",
+                            "Include=\"Microsoft.Azure.WebJobs.Extensions.Storage\" Version=\"3.0.8\""
                         }
                     }
                 },
