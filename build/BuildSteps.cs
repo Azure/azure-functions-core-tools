@@ -180,6 +180,27 @@ namespace Build
             }
         }
 
+        public static void AddTemplatesJson()
+        {
+            var tempDirectoryPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            using (var client = new WebClient())
+            {
+                FileHelpers.EnsureDirectoryExists(tempDirectoryPath);
+                var zipFilePath = Path.Combine(tempDirectoryPath, "templates.zip");
+                client.DownloadFile(Settings.TemplatesJsonZip, zipFilePath);
+                FileHelpers.ExtractZipToDirectory(zipFilePath, tempDirectoryPath);
+            }
+
+            string templatesJsonPath = Path.Combine(tempDirectoryPath, "templates", "templates.json");
+            if (File.Exists(templatesJsonPath))
+            {
+                foreach (var runtime in Settings.TargetRuntimes)
+                {
+                    File.Copy(templatesJsonPath, Path.Combine(Settings.OutputDir, runtime, "templates", "templates.json"));
+                }
+            }
+        }
+
         public static void Test()
         {
             var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
