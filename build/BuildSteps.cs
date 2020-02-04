@@ -14,7 +14,6 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json.Linq;
 
 namespace Build
 {
@@ -193,7 +192,7 @@ namespace Build
             }
 
             string templatesJsonPath = Path.Combine(tempDirectoryPath, "templates", "templates.json");
-            if (FileHelpers.FileExists(templatesJsonPath))
+            if (File.FileExists(templatesJsonPath))
             {
                 foreach (var runtime in Settings.TargetRuntimes)
                 {

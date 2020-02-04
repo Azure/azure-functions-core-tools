@@ -15,11 +15,6 @@ namespace Build
             }
         }
 
-        public static bool FileExists(string filePath)
-        {
-            return File.Exists(filePath);
-        }
-
         // https://docs.microsoft.com/en-us/dotnet/standard/io/how-to-copy-directories
         public static void RecursiveCopy(string sourcePath, string destinationPath)
         {
