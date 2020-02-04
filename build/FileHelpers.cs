@@ -6,6 +6,15 @@ namespace Build
 {
     public static class FileHelpers
     {
+
+        public static void EnsureDirectoryExists(string dirPath)
+        {
+            if (!Directory.Exists(dirPath))
+            {
+                Directory.CreateDirectory(dirPath);
+            }
+        }
+
         // https://docs.microsoft.com/en-us/dotnet/standard/io/how-to-copy-directories
         public static void RecursiveCopy(string sourcePath, string destinationPath)
         {
@@ -104,6 +113,11 @@ namespace Build
                     file.ExtractToFile(Path.Combine(to, file.FullName), overwrite: true);
                 }
             }
+        }
+
+        public static void ExtractZipToDirectory(string zipFile, string to)
+        {
+            ZipFile.ExtractToDirectory(zipFile, to);
         }
     }
 }
