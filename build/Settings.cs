@@ -22,6 +22,7 @@ namespace Build
 
         public const string ItemTemplatesVersion = "3.0.10405";
         public const string ProjectTemplatesVersion = "3.0.10405";
+        public const string TemplateJsonVersion = "3.0.10405";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
@@ -48,7 +49,7 @@ namespace Build
             { "min.win-x64", "Windows" },
         };
 
-        private static readonly string[] _winPowershellRuntimes = new [] { "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86", "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64" };
+        private static readonly string[] _winPowershellRuntimes = new[] { "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86", "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64" };
         public static readonly Dictionary<string, string[]> ToolsRuntimeToPowershellRuntimes = new Dictionary<string, string[]>
         {
             { "win-x86", _winPowershellRuntimes },
@@ -77,6 +78,8 @@ namespace Build
 
         public static readonly string ProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{ProjectTemplatesVersion}";
 
+        public static readonly string TemplatesJsonZip = $"https://functionscdn.azureedge.net/public/TemplatesApi/{TemplateJsonVersion}.zip";
+
         public static readonly string TelemetryKeyToReplace = "00000000-0000-0000-0000-000000000000";
 
         public static string BuildNumber => config(null, "devops_buildNumber") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
@@ -99,7 +102,7 @@ namespace Build
             public static readonly string SignedDir = "signed";
             public static readonly string Authenticode = "SignAuthenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
-            public static readonly string[] RuntimesToSign = new[] { "min.win-x86" };
+            public static readonly string[] RuntimesToSign = new[] { "min.win-x86", "min.win-x64" };
             public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
