@@ -196,7 +196,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task AddPackage(string extensionsProj, string packageName, string version)
         {
-            var args = $"add \"{extensionsProj}\" package {packageName} --version {version}";
+            var args = $"add \"{extensionsProj}\" package {packageName}";
+            if (!string.IsNullOrEmpty(version))
+            {
+                args += $" --version {version}";
+            }
             if (!string.IsNullOrEmpty(Source))
             {
                 args += $" --source {Source}";
