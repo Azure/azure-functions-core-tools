@@ -62,7 +62,6 @@ namespace Azure.Functions.Cli.Helpers
                 "DurableFunctionsOrchestration",
                 "SendGrid",
                 "EventHubTrigger",
-                "EventGridTrigger",
                 "ServiceBusQueueTrigger",
                 "ServiceBusTopicTrigger",
                 "EventGridTrigger",
