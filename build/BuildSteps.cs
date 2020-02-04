@@ -192,7 +192,7 @@ namespace Build
             }
 
             string templatesJsonPath = Path.Combine(tempDirectoryPath, "templates", "templates.json");
-            if (File.FileExists(templatesJsonPath))
+            if (File.Exists(templatesJsonPath))
             {
                 foreach (var runtime in Settings.TargetRuntimes)
                 {
