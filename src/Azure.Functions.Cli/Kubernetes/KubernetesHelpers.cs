@@ -306,12 +306,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 if (newFuncKeys?.Any() == true)
                 {
                     kubernetesKeysSecretResource = GetSecret(keysSecretCollectionName, @namespace, newFuncKeys);
-                    newFuncKeys = new Dictionary<string, string>();
-                    foreach (var item in kubernetesKeysSecretResource.Data)
-                    {
-                        newFuncKeys.Add(item);
-                    }
-
+                    newFuncKeys = new Dictionary<string, string>(kubernetesKeysSecretResource.Data);
                     if (unchangedFuncKeys?.Any() == true)
                     {
                         foreach (var item in unchangedFuncKeys)
