@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Replace("KEDA_NAMESPACE", @namespace);
         }
 
-        internal async static Task<(IEnumerable<IKubernetesResource>, SecretsV1, SecretsV1)> GetFunctionsDeploymentResources(
+        internal async static Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
             string name,
             string imageName,
             string @namespace,
@@ -160,7 +160,7 @@ namespace Azure.Functions.Cli.Kubernetes
             string serviceType = "LoadBalancer",
             int? minReplicas = null,
             int? maxReplicas = null,
-            string keysSecretCollectionName = "func-keys-secret",
+            string keysSecretCollectionName = null,
             bool mountKeysAsContainerVolume = false)
         {
             ScaledObjectV1Alpha1 scaledobject = null;
@@ -169,6 +169,7 @@ namespace Azure.Functions.Cli.Kubernetes
             var httpFunctions = triggers.FunctionsJson
                 .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true);
             var nonHttpFunctions = triggers.FunctionsJson.Where(f => httpFunctions.All(h => h.Key != f.Key));
+            keysSecretCollectionName = string.IsNullOrEmpty(keysSecretCollectionName) ? string.Concat($"func-keys-kube-secret-{name}") : keysSecretCollectionName;
             if (httpFunctions.Any())
             {
                 int position = 0;
@@ -281,33 +282,67 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            SecretsV1 existingFuncKeysSecret = null;
-            SecretsV1 newKeysSecret = null;
+            IDictionary<string, string> newFuncKeys = null;
+            IDictionary<string, string> unchangedFuncKeys = null;
             if (httpFunctions.Any())
             {
-                var funcKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
-                SecretsV1 keysSecret = null;
+                var currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
+                SecretsV1 kubernetesKeysSecretResource = null;
+                SecretsV1 allExistingFuncKeys = null;
+                IDictionary<string, string> funcKeysToRemove = null;
                 (string output, bool keysSecretExist) = await ResourceExists("secret", keysSecretCollectionName, @namespace, true);
                 if (keysSecretExist)
                 {
-                    existingFuncKeysSecret = TryParse<SecretsV1>(output);
-                    if (existingFuncKeysSecret?.Data?.Any() == true)
+                    allExistingFuncKeys = TryParse<SecretsV1>(output);
+                    if (allExistingFuncKeys?.Data?.Any() == true)
                     {
-                        funcKeys = funcKeys.Where(item => !existingFuncKeysSecret.Data.ContainsKey(item.Key)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                        if (!funcKeys.Any())
-                        {
-                            keysSecret = existingFuncKeysSecret;
-                        }
+                        newFuncKeys = currentImageFuncKeys.Except(allExistingFuncKeys.Data, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                        unchangedFuncKeys = allExistingFuncKeys.Data.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                        funcKeysToRemove = allExistingFuncKeys.Data.Except(currentImageFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                     }
                 }
 
-                if (funcKeys.Any())
+                //If there are new function keys to add
+                if (newFuncKeys?.Any() == true)
                 {
-                    newKeysSecret = GetSecret(keysSecretCollectionName, @namespace, funcKeys);
-                    keysSecret = newKeysSecret;
+                    kubernetesKeysSecretResource = GetSecret(keysSecretCollectionName, @namespace, newFuncKeys);
+                    newFuncKeys = new Dictionary<string, string>();
+                    foreach (var item in kubernetesKeysSecretResource.Data)
+                    {
+                        newFuncKeys.Add(item);
+                    }
+
+                    if (unchangedFuncKeys?.Any() == true)
+                    {
+                        foreach (var item in unchangedFuncKeys)
+                        {
+                            kubernetesKeysSecretResource.Data.Add(item);
+                        }
+                    }
+                }
+                //No new keys to add but some keys needs to be removed from the existing keys
+                else if (funcKeysToRemove?.Any() == true)
+                {
+                    foreach (var item in funcKeysToRemove)
+                    {
+                        allExistingFuncKeys.Data.Remove(item);
+                    }
+
+                    kubernetesKeysSecretResource = allExistingFuncKeys;
+                }
+                //If all existing keys needs to remain unchaged
+                else if (unchangedFuncKeys?.Any() == true)
+                {
+                    kubernetesKeysSecretResource = allExistingFuncKeys;
+                }
+                //All keys are the new keys
+                else
+                {
+                    kubernetesKeysSecretResource = GetSecret(keysSecretCollectionName, @namespace, currentImageFuncKeys);
+                    newFuncKeys = kubernetesKeysSecretResource.Data;
                 }
 
-                result.Insert(resourceIndex, keysSecret);
+                result.Insert(resourceIndex, kubernetesKeysSecretResource);
                 resourceIndex++;
 
                 //if function keys Secrets needs to be mounted as volume in the function runtime container
@@ -341,7 +376,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             result = result.Concat(deployments).ToList();
-            return (scaledobject != null ? result.Append(scaledobject) : result, existingFuncKeysSecret, newKeysSecret);
+            return (scaledobject != null ? result.Append(scaledobject) : result, unchangedFuncKeys, newFuncKeys);
         }
 
         internal static async Task RemoveKeda(string @namespace)

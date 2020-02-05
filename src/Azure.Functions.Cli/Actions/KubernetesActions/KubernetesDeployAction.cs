@@ -150,7 +150,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
 
                 //Print the function keys message to the console
-                FuncAppKeysHelper.FunKeysMessage(existingKeysSecret, newKeysSecret);
+                FuncAppKeysHelper.FunKeysMessage(unchangedFuncKeys, newFuncKeys);
             }
         }
 

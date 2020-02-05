@@ -94,22 +94,22 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             }
         }
 
-        public static void FunKeysMessage(SecretsV1 existingKeysSecret, SecretsV1 newKeysSecret)
+        public static void FunKeysMessage(IDictionary<string, string> unchangedFuncKeys, IDictionary<string, string> newFuncKeys)
         {
-            if (existingKeysSecret?.Data?.Any() == true || newKeysSecret?.Data?.Any() == true)
+            if (unchangedFuncKeys?.Any() == true || newFuncKeys?.Any() == true)
             {
                 ColoredConsole.WriteLine("Http Functions:");
             }
 
-            if (existingKeysSecret?.Data?.Any() == true)
+            if (unchangedFuncKeys?.Any() == true)
             {
-                var existingFunctionKeys = existingKeysSecret.Data.Where(item => item.Key.StartsWith("functions"));
+                var existingFunctionKeys = unchangedFuncKeys.Where(item => item.Key.StartsWith("functions"));
                 PrintKeyOutputMessage(existingFunctionKeys, " # this didn't change");
             }
 
-            if (newKeysSecret?.Data?.Any() == true)
+            if (newFuncKeys?.Any() == true)
             {
-                var newFunctionKeys = newKeysSecret.Data.Where(item => item.Key.StartsWith("functions"));
+                var newFunctionKeys = newFuncKeys.Where(item => item.Key.StartsWith("functions"));
                 PrintKeyOutputMessage(newFunctionKeys, " # this was added");
             }
         }
