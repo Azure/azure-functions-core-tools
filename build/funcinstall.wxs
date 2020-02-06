@@ -1,0 +1,86 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<?define Manufacturer='Microsoft'?>
+<?define ProductName='Azure Functions Core Tools'?>
+
+<?if $(var.Platform)=x64?>
+  <?define UpgradeCodeGuid='4E39ECC2-3CAE-43BD-94A6-AF9F97F54684'?>
+  <?define PathGuid='240C4066-04AB-4F29-8593-079B6FB3C1DA'?>
+  <?define ProgramMenuDirGuid='C3A3339D-DE95-46E2-8AE0-23C03793B365'?>
+  <?define PlatformProgramFilesFolder='ProgramFiles64Folder'?>
+<?else?>
+  <?define UpgradeCodeGuid='E8B743C0-51BE-43DF-A344-E995DD3FFD7E'?>
+  <?define PathGuid='1CF628D0-C094-42EE-AC0B-9C2419A136C4'?>
+  <?define ProgramMenuDirGuid='09A34A64-54B8-4017-8972-399981526250'?>
+  <?define PlatformProgramFilesFolder='ProgramFilesFolder'?>
+<?endif?>
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+  <!-- Product, Package and Upgrade Information -->
+  <Product Id='*'
+           Name='$(var.ProductName) - $(var.ProductVersion) ($(var.Platform))'
+           UpgradeCode='$(var.UpgradeCodeGuid)'
+           Language='1033'
+           Codepage='1252'
+           Version='$(var.ProductVersion)'
+           Manufacturer='$(var.Manufacturer)'>
+
+    <Package Id='*'
+             Keywords='Azure, Functions, Core Tools, Installer'
+             Description='$(var.ProductName) $(var.ProductVersion) $(var.Platform) Installer'
+             Manufacturer='$(var.Manufacturer)'
+             Comments='Copyright (c) .NET Foundation. All rights reserved. Licensed under the MIT License.'
+             InstallerVersion='300'
+             Compressed='yes'
+             Languages='1033'
+             SummaryCodepage='1252' />
+
+    <MajorUpgrade AllowDowngrades='yes' Schedule='afterInstallInitialize' />
+
+    <Media Id='1' Cabinet='funchost.cab' EmbedCab='yes' />
+
+    <!-- Directory Structure and Feature Definition -->
+    <Directory Id='TARGETDIR' Name='SourceDir'>
+        <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
+            <Directory Id='$(var.Manufacturer)' Name='$(var.Manufacturer)'>
+                <Directory Id='INSTALLDIR' Name='$(var.ProductName)'>
+                  <!-- FuncHost componentgroup in fragment -->
+                  <Component Id='Path' Guid='$(var.PathGuid)' KeyPath='yes'>
+                    <Environment Id='UpdatePath' Name='PATH' Value='[INSTALLDIR]' Permanent='no' Part='last' Action='set' System='yes' />
+                  </Component>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Directory Id='ProgramMenuFolder' Name='Programs'>
+          <Directory Id='ProgramMenuDir' Name='$(var.ProductName)'>
+            <Component Id='ProgramMenuDir' Guid='$(var.ProgramMenuDirGuid)'>
+              <RemoveFolder Id='ProgramMenuDir' On='uninstall' />
+              <RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+            </Component>
+          </Directory>
+        </Directory>
+    </Directory>
+
+    <Feature Id='Complete'
+             Level='1'
+             Title='$(var.ProductName)'
+             Description='Placeholder description'
+             Display='expand'>
+      <ComponentGroupRef Id='FuncHost' />
+      <ComponentRef Id='ProgramMenuDir' />
+      <ComponentRef Id='Path' />
+    </Feature>
+
+    <!-- UI -->
+    <UIRef Id='WixUI_InstallDir' />
+    <UIRef Id='WixUI_ErrorProgressText' />
+    <Property Id='WIXUI_INSTALLDIR' Value='INSTALLDIR' />
+
+    <Icon Id='icon.ico' SourceFile='icon.ico' />
+    <Property Id='ARPPRODUCTICON' Value='icon.ico' />
+
+    <WixVariable Id='WixUILicenseRtf' Value='license.rtf' />
+    <WixVariable Id='WixUIBannerBmp' Value='installbanner.bmp' />
+    <WixVariable Id='WixUIDialogBmp' Value='installdialog.bmp' />
+  </Product>
+</Wix>

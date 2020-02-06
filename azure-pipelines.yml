@@ -19,7 +19,6 @@ variables:
   devops_buildNumber: $[counter(format(''), 1500)]
   APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
   APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
-
 steps:
 - pwsh: |
     Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
@@ -40,7 +39,7 @@ steps:
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 - pwsh: |
-    .\build.ps1
+    .\build.ps1 -MsiGenBranches master,v3.x
   env:
     AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
     BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -56,7 +55,9 @@ steps:
 - task: CopyFiles@2
   inputs:
     SourceFolder: '$(Build.Repository.LocalPath)\artifacts'
-    Contents: 'Azure.Functions.Cli.*'
+    Contents: |
+      Azure.Functions.Cli.*
+      func-cli*.msi
     TargetFolder: '$(Build.ArtifactStagingDirectory)'
     CleanTargetFolder: true
 - task: PublishBuildArtifacts@1
