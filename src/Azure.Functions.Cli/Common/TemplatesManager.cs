@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
 using System.Linq;
+using System.Reflection;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -42,9 +43,20 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                templatesJson = await StaticResources.TemplatesJson;
+                templatesJson = GetTemplatesJson();
             }
             return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
+        }
+
+        private static string GetTemplatesJson()
+        {
+            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "templates", "templates.json");
+            if (!FileSystemHelpers.FileExists(templatesLocation))
+            {
+                throw new CliException($"Can't find templates location. Looked at '{templatesLocation}'");
+            }
+
+            return FileSystemHelpers.ReadAllTextFromFile(templatesLocation);
         }
 
         public async Task Deploy(string Name, Template template)
