@@ -4614,19 +4614,19 @@ spec:
     served: true
     storage: true
 ---
-# Source: keda/templates/service-account.yaml
+# Source: keda/templates/01-serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: keda
+  name: keda-operator
   namespace: KEDA_NAMESPACE
 ---
-# Source: keda/templates/role.yaml
+# Source: keda/templates/10-keda-clusterrole.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: keda
+  name: keda-operator
 rules:
 - apiGroups:
   - ""
@@ -4676,12 +4676,12 @@ rules:
   verbs:
    - '*'
 ---
-# Source: keda/templates/role.yaml
+# Source: keda/templates/20-metrics-clusterrole.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: keda-external-metrics-reader
+  name: keda-operator-external-metrics-reader
 rules:
 - apiGroups:
   - "external.metrics.k8s.io"
@@ -4690,53 +4690,53 @@ rules:
   verbs:
   - list
 ---
-# Source: keda/templates/role_binding.yaml
+# Source: keda/templates/11-keda-clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: keda:system:auth-delegator
+  name: keda-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keda-operator
+subjects:
+- kind: ServiceAccount
+  name: keda-operator
+  namespace: KEDA_NAMESPACE
+---
+# Source: keda/templates/21-metrics-clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keda-operator-hpa-controller-external-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keda-operator-external-metrics-reader
+subjects:
+- kind: ServiceAccount
+  name: horizontal-pod-autoscaler
+  namespace: kube-system
+---
+# Source: keda/templates/21-metrics-clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keda-operator:system:auth-delegator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: system:auth-delegator
 subjects:
 - kind: ServiceAccount
-  name: keda
+  name: keda-operator
   namespace: KEDA_NAMESPACE
 ---
-# Source: keda/templates/role_binding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: keda-hpa-controller-external-metrics
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: keda-external-metrics-reader
-subjects:
-- kind: ServiceAccount
-  name: horizontal-pod-autoscaler
-  namespace: kube-system
----
-# Source: keda/templates/role_binding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: keda
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: keda
-subjects:
-- kind: ServiceAccount
-  name: keda
-  namespace: KEDA_NAMESPACE
----
-# Source: keda/templates/role_binding.yaml
+# Source: keda/templates/21-metrics-clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: keda-auth-reader
+  name: keda-operator-auth-reader
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -4744,52 +4744,58 @@ roleRef:
   name: extension-apiserver-authentication-reader
 subjects:
 - kind: ServiceAccount
-  name: keda
+  name: keda-operator
   namespace: KEDA_NAMESPACE
 ---
-# Source: keda/templates/service.yaml
+# Source: keda/templates/23-metrics-service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: keda
+  name: keda-operator-metrics-apiserver
   namespace: KEDA_NAMESPACE
 spec:
   ports:
   - name: https
     port: 443
     targetPort: 6443
+    protocol: TCP
   - name: http
     port: 80
     targetPort: 8080
+    protocol: TCP
   selector:
-    app: keda
+    app: keda-operator-metrics-apiserver
 ---
-# Source: keda/templates/operator.yaml
+# Source: keda/templates/12-keda-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: keda
-  name: keda
+  name: keda-operator
   namespace: KEDA_NAMESPACE
+  labels:
+    app: keda-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: keda
+      app: keda-operator
   template:
     metadata:
       labels:
-        app: keda
+        app: keda-operator
     spec:
-      serviceAccountName: keda
+      serviceAccountName: keda-operator
+      securityContext:
+        {}
       containers:
-        - name: keda
+        - name: keda-operator
+          securityContext:
+            {}
           image: "docker.io/kedacore/keda:1.2.0"
           command:
           - keda
           args:
-          - '--zap-level=info'
+          - "--zap-level=info"
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
@@ -4799,32 +4805,63 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
-              value: keda
-        - name: keda-metrics-apiserver
-          image: docker.io/kedacore/keda-metrics-adapter:1.2.0
+              value: keda-operator
+          resources:
+            {}
+---
+# Source: keda/templates/22-metrics-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-operator-metrics-apiserver
+  namespace: KEDA_NAMESPACE
+  labels:
+    app: keda-operator-metrics-apiserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-operator-metrics-apiserver
+  template:
+    metadata:
+      labels:
+        app: keda-operator-metrics-apiserver
+    spec:
+      serviceAccountName: keda-operator
+      securityContext:
+        {}
+      containers:
+        - name: keda-operator-metrics-apiserver
+          securityContext:
+            {}
+          image: "docker.io/kedacore/keda-metrics-adapter:1.2.0"
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
               value: ""
           args:
-          - /usr/local/bin/keda-adapter
-          - --secure-port=6443
-          - --logtostderr=true
-          - --v=0
+            - /usr/local/bin/keda-adapter
+            - --secure-port=6443
+            - --logtostderr=true
+            - --v=0
           ports:
-          - containerPort: 6443
-            name: https
-          - containerPort: 8080
-            name: http
+            - containerPort: 6443
+              name: https
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          resources:
+            {}
 ---
-# Source: keda/templates/api_service.yaml
+# Source: keda/templates/24-metrics-apiservice.yaml
 apiVersion: apiregistration.k8s.io/v1beta1
 kind: APIService
 metadata:
   name: v1beta1.external.metrics.k8s.io
 spec:
   service:
-    name: keda
+    name: keda-operator-metrics-apiserver
     namespace: KEDA_NAMESPACE
   group: external.metrics.k8s.io
   version: v1beta1
