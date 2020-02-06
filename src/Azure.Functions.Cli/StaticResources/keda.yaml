@@ -4785,7 +4785,7 @@ spec:
       serviceAccountName: keda
       containers:
         - name: keda
-          image: "docker.io/kedacore/keda:1.1.0"
+          image: "docker.io/kedacore/keda:1.2.0"
           command:
           - keda
           args:
@@ -4801,7 +4801,7 @@ spec:
             - name: OPERATOR_NAME
               value: keda
         - name: keda-metrics-apiserver
-          image: docker.io/kedacore/keda-metrics-adapter:1.1.0
+          image: docker.io/kedacore/keda-metrics-adapter:1.2.0
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
