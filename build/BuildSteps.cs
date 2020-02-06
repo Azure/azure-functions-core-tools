@@ -425,13 +425,16 @@ namespace Build
                 ColoredConsole.WriteLine($"Creating {shaPath}");
                 File.WriteAllText(shaPath, ComputeSha256(zipPath));
 
-                try
-                {
-                    Directory.Delete(path, recursive: true);
-                }
-                catch
-                {
-                    ColoredConsole.Error.WriteLine($"Error deleting {path}");
+                if (!runtime.StartsWith("win")) {
+                    try
+                    {
+                        Directory.Delete(path, recursive: true);
+                    }
+                    catch
+                    {
+                        ColoredConsole.Error.WriteLine($"Error deleting {path}");
+                    }
+
                 }
 
                 ColoredConsole.WriteLine();
