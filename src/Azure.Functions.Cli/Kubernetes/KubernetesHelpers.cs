@@ -18,6 +18,8 @@ using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Dynamitey.DynamicObjects;
+using Microsoft.IdentityModel.Xml;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Identity;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using YamlDotNet.Serialization;
@@ -128,7 +130,7 @@ namespace Azure.Functions.Cli.Kubernetes
 		
         internal static async Task<(string, bool)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
         {
-            string cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
+            var cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
             if (returnJsonOutput)
             {
                 cmd = string.Concat(cmd, " -o json");
@@ -370,9 +372,11 @@ namespace Azure.Functions.Cli.Kubernetes
             var httpFunctions = triggers.FunctionsJson
                 .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true)
                 .Select(item => item.Key);
-            var loadBalancerIp = await GetLoadBalancerIp(serviceName, @namespace);
+
+            var loadBalancerIp = await GetLoadBalancerIp(serviceName, @namespace, 24);
             if (string.IsNullOrEmpty(loadBalancerIp))
             {
+                ColoredConsole.WriteLine(WarningColor($"The service: {serviceName} is not yet ready, please re-run the deployment to get the function keys."));
                 return;
             }
 
@@ -382,7 +386,13 @@ namespace Azure.Functions.Cli.Kubernetes
                 foreach (var functionName in httpFunctions)
                 {
                     var getFunctionAdminUri = $"http://{loadBalancerIp}/admin/functions/{functionName}?code={masterKey}";
-                    var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri));
+                    var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri), 20);
+
+                    if (httpResponseMessage.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        ColoredConsole.WriteLine(WarningColor($"The service: {functionName} is not yet ready in the runtime yet, please re-run the deployment to get the function keys."));
+                        return;
+                    }
 
                     if (httpResponseMessage.IsSuccessStatusCode)
                     {
@@ -459,7 +469,7 @@ namespace Azure.Functions.Cli.Kubernetes
             return httpResponseMsg;
         }
 
-        private async static Task<string> GetLoadBalancerIp(string serviceName, string @namespace)
+        private async static Task<string> GetLoadBalancerIp(string serviceName, string @namespace, int retryCount = 12)
         {
             if (string.IsNullOrWhiteSpace(serviceName)
                 || string.IsNullOrWhiteSpace(@namespace))
@@ -467,14 +477,22 @@ namespace Azure.Functions.Cli.Kubernetes
                 return string.Empty;
             }
 
-            (string output, bool serviceExists) = await ResourceExists("service", serviceName, @namespace, true);
-            if (serviceExists)
+            ColoredConsole.WriteLine(AdditionalInfoColor($"Getting loadbalancer ip for the service: {serviceName}"));
+            int currentRetry = 0;
+            while (currentRetry++ < retryCount)
             {
-                var service = TryParse<ServiceV1>(output);
-                if (service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                (string output, bool serviceExists) = await ResourceExists("service", serviceName, @namespace, true);
+                if (serviceExists)
                 {
-                    return service?.Status?.LoadBalancer?.Ingress.First().Ip;
+                    var service = TryParse<ServiceV1>(output);
+                    if (service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                    {
+                        return service?.Status?.LoadBalancer?.Ingress.First().Ip;
+                    }
                 }
+
+                await Task.Delay(5000);
+                ColoredConsole.WriteLine(AdditionalInfoColor($"Waiting for the service to be ready: {serviceName}"));
             }
 
             return string.Empty;
