@@ -360,7 +360,9 @@ namespace Azure.Functions.Cli.Kubernetes
         internal async static Task PrintFunctionsInfo(string serviceName, string @namespace, IDictionary<string, string> funcKeys, TriggersPayload triggers)
         {
             if (string.IsNullOrWhiteSpace(serviceName)
-                || string.IsNullOrWhiteSpace(@namespace))
+                || string.IsNullOrWhiteSpace(@namespace)
+                || funcKeys?.Any() == false
+                || triggers == null)
             {
                 return;
             }
@@ -369,6 +371,11 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true)
                 .Select(item => item.Key);
             var loadBalancerIp = await GetLoadBalancerIp(serviceName, @namespace);
+            if (string.IsNullOrEmpty(loadBalancerIp))
+            {
+                return;
+            }
+
             var masterKey = funcKeys["host.master"];
             if (httpFunctions?.Any() == true)
             {
@@ -424,17 +431,23 @@ namespace Azure.Functions.Cli.Kubernetes
 
         private async static Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
         {
-            int currentRetry = 0;
             HttpResponseMessage httpResponseMsg = new HttpResponseMessage();
+            if (httpRequestMessage == null)
+            {
+                return httpResponseMsg;
+            }
+
+            int currentRetry = 0;
             using (var httpClient = new HttpClient(new HttpClientHandler()))
             {
                 while (currentRetry++ < retryCount)
                 {
                     httpResponseMsg = await httpClient.SendAsync(httpRequestMessage.Clone());
-                    if (httpResponseMsg.IsSuccessStatusCode
-                        || httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
-                        || httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
-                        || httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout)
+                    if (httpResponseMsg.IsSuccessStatusCode ||
+                        (httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
+                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
+                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout
+                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.NotFound))
                     {
                         return httpResponseMsg;
                     }
