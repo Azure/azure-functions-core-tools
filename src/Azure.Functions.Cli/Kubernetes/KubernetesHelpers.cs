@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Kubernetes.FuncKeys;
@@ -352,6 +355,116 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             return new Dictionary<string, string>();
+        }
+
+        internal async static Task PrintFunctionsInfo(string serviceName, string @namespace, IDictionary<string, string> funcKeys, TriggersPayload triggers)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName)
+                || string.IsNullOrWhiteSpace(@namespace))
+            {
+                return;
+            }
+
+            var httpFunctions = triggers.FunctionsJson
+                .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true)
+                .Select(item => item.Key);
+            var loadBalancerIp = await GetLoadBalancerIp(serviceName, @namespace);
+            var masterKey = funcKeys["host.master"];
+            if (httpFunctions?.Any() == true)
+            {
+                foreach (var functionName in httpFunctions)
+                {
+                    var getFunctionAdminUri = $"http://{loadBalancerIp}/admin/functions/{functionName}?code={masterKey}";
+                    var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri));
+
+                    if (httpResponseMessage.IsSuccessStatusCode)
+                    {
+                        var responseContent = await httpResponseMessage.Content.ReadAsStringAsync();
+                        var functionsInfo = JsonConvert.DeserializeObject<FunctionInfo>(responseContent);
+
+                        var trigger = functionsInfo
+                            .Config?["bindings"]
+                            ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
+                            ?["type"];
+
+                        trigger = trigger ?? "No Trigger Found";
+                        var showFunctionKey = true;
+
+                        var authLevel = functionsInfo
+                            .Config?["bindings"]
+                            ?.FirstOrDefault(o => !string.IsNullOrEmpty(o["authLevel"]?.ToString()))
+                            ?["authLevel"];
+
+                        if (authLevel != null && authLevel.ToString().Equals("anonymous", StringComparison.OrdinalIgnoreCase))
+                        {
+                            showFunctionKey = false;
+                        }
+
+                        ColoredConsole.WriteLine($"\t{functionName} - [{VerboseColor(trigger.ToString())}]");
+                        if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate))
+                        {
+                            if (showFunctionKey)
+                            {
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor($"{functionsInfo.InvokeUrlTemplate}?code={funcKeys[$"functions.{functionName.ToLower()}.default"]}")}");
+                            }
+                            else
+                            {
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor(functionsInfo.InvokeUrlTemplate)}");
+                            }
+                        }
+                        ColoredConsole.WriteLine();
+
+                    }
+                }
+            }
+
+            //Print the master key as well for the user
+            ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys[$"host.master"]}")}");
+        }
+
+        private async static Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
+        {
+            int currentRetry = 0;
+            HttpResponseMessage httpResponseMsg = new HttpResponseMessage();
+            using (var httpClient = new HttpClient(new HttpClientHandler()))
+            {
+                while (currentRetry++ < retryCount)
+                {
+                    httpResponseMsg = await httpClient.SendAsync(httpRequestMessage.Clone());
+                    if (httpResponseMsg.IsSuccessStatusCode
+                        || httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
+                        || httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
+                        || httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout)
+                    {
+                        return httpResponseMsg;
+                    }
+
+                    await Task.Delay(new Random().Next(500, 2000));
+                }
+            }
+
+            return httpResponseMsg;
+        }
+
+        private async static Task<string> GetLoadBalancerIp(string serviceName, string @namespace)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName)
+                || string.IsNullOrWhiteSpace(@namespace))
+            {
+                return string.Empty;
+            }
+
+            (string output, bool serviceExists) = await ResourceExists("service", serviceName, @namespace, true);
+            if (serviceExists)
+            {
+                var service = TryParse<ServiceV1>(output);
+                if (service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                {
+                    return service?.Status?.LoadBalancer?.Ingress.First().Ip;
+                }
+            }
+
+            return string.Empty;
         }
 
         private static IDictionary<string, string> GetFunctionKeys(IDictionary<string, string> currentImageFuncKeys, IDictionary<string, string> existingFuncKeys)

@@ -150,7 +150,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
 
                 //Print the function keys message to the console
-                FuncAppKeysHelper.FunKeysMessage(funcKeys);
+                await KubernetesHelper.PrintFunctionsInfo($"{Name}-http", Namespace, funcKeys, triggers);
             }
         }
 
