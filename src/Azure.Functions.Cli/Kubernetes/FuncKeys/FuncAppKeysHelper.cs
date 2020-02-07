@@ -94,22 +94,16 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             }
         }
 
-        public static void FunKeysMessage(IDictionary<string, string> unchangedFuncKeys, IDictionary<string, string> newFuncKeys)
+        public static void FunKeysMessage(IDictionary<string, string> funcKeys)
         {
-            if (unchangedFuncKeys?.Any() == true || newFuncKeys?.Any() == true)
+            if (funcKeys?.Any() == true)
             {
                 ColoredConsole.WriteLine("Http Functions:");
             }
 
-            if (unchangedFuncKeys?.Any() == true)
+            if (funcKeys?.Any() == true)
             {
-                var existingFunctionKeys = unchangedFuncKeys.Where(item => item.Key.StartsWith("functions"));
-                PrintKeyOutputMessage(existingFunctionKeys, " # this didn't change");
-            }
-
-            if (newFuncKeys?.Any() == true)
-            {
-                var newFunctionKeys = newFuncKeys.Where(item => item.Key.StartsWith("functions"));
+                var newFunctionKeys = funcKeys.Where(item => item.Key.StartsWith("functions"));
                 PrintKeyOutputMessage(newFunctionKeys, " # this was added");
             }
         }
@@ -119,9 +113,8 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
             var keyOutputMsgTemplate = "http://[ip]/api/{0}?code={1}";
             foreach (var funcKey in functionKeys)
             {
-                var functionName = funcKey.Key.Split('.')[1];
-                var functionKey = Encoding.UTF8.GetString(Convert.FromBase64String(funcKey.Value));
-                ColoredConsole.WriteLine(string.Concat("\t", string.Format(keyOutputMsgTemplate, functionName, functionKey), keyMsg));
+                var functionName = funcKey.Key.Split('.')[1];          
+                ColoredConsole.WriteLine(string.Concat("\t", string.Format(keyOutputMsgTemplate, functionName, funcKey.Value), keyMsg));
             }
         }
 
