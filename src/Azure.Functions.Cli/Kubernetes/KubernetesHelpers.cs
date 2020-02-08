@@ -176,14 +176,15 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true);
             var nonHttpFunctions = triggers.FunctionsJson.Where(f => httpFunctions.All(h => h.Key != f.Key));
             keysSecretCollectionName = string.IsNullOrEmpty(keysSecretCollectionName)
-                ? string.Concat($"func-keys-kube-secret-{name}")
+                ? $"func-keys-kube-secret-{name}"
                 : keysSecretCollectionName;
             if (httpFunctions.Any())
             {
                 int position = 0;
                 var enabledFunctions = httpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                //Environment variables for the func app keys kubernetes secret              
-                enabledFunctions = enabledFunctions.Concat(FuncAppKeysHelper.FuncKeysKubernetesEnvironVariables(keysSecretCollectionName, mountKeysAsContainerVolume)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                //Environment variables for the func app keys kubernetes secret
+                var kubernetesSecretEnvironmentVariable = FuncAppKeysHelper.FuncKeysKubernetesEnvironVariables(keysSecretCollectionName, mountKeysAsContainerVolume);
+                enabledFunctions = enabledFunctions.Concat(kubernetesSecretEnvironmentVariable).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, enabledFunctions, new Dictionary<string, string>
                 {
                     { "osiris.deislabs.io/enabled", "true" },
