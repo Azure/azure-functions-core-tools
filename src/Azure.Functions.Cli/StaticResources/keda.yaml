@@ -4618,7 +4618,7 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: keda-operator
+  name: keda
   namespace: KEDA_NAMESPACE
 ---
 # Source: keda/templates/10-keda-clusterrole.yaml
@@ -4626,7 +4626,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: keda-operator
+  name: keda
 rules:
 - apiGroups:
   - ""
@@ -4681,7 +4681,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: keda-operator-external-metrics-reader
+  name: keda-external-metrics-reader
 rules:
 - apiGroups:
   - "external.metrics.k8s.io"
@@ -4694,25 +4694,25 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: keda-operator
+  name: keda
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: keda-operator
+  name: keda
 subjects:
 - kind: ServiceAccount
-  name: keda-operator
+  name: keda
   namespace: KEDA_NAMESPACE
 ---
 # Source: keda/templates/21-metrics-clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: keda-operator-hpa-controller-external-metrics
+  name: keda-hpa-controller-external-metrics
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: keda-operator-external-metrics-reader
+  name: keda-external-metrics-reader
 subjects:
 - kind: ServiceAccount
   name: horizontal-pod-autoscaler
@@ -4722,21 +4722,21 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: keda-operator:system:auth-delegator
+  name: keda:system:auth-delegator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: system:auth-delegator
 subjects:
 - kind: ServiceAccount
-  name: keda-operator
+  name: keda
   namespace: KEDA_NAMESPACE
 ---
 # Source: keda/templates/21-metrics-clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: keda-operator-auth-reader
+  name: keda-auth-reader
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -4744,14 +4744,14 @@ roleRef:
   name: extension-apiserver-authentication-reader
 subjects:
 - kind: ServiceAccount
-  name: keda-operator
+  name: keda
   namespace: KEDA_NAMESPACE
 ---
 # Source: keda/templates/23-metrics-service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: keda-operator-metrics-apiserver
+  name: keda-metrics-apiserver
   namespace: KEDA_NAMESPACE
 spec:
   ports:
@@ -4764,31 +4764,31 @@ spec:
     targetPort: 8080
     protocol: TCP
   selector:
-    app: keda-operator-metrics-apiserver
+    app: keda-metrics-apiserver
 ---
 # Source: keda/templates/12-keda-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: keda-operator
+  name: keda
   namespace: KEDA_NAMESPACE
   labels:
-    app: keda-operator
+    app: keda
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: keda-operator
+      app: keda
   template:
     metadata:
       labels:
-        app: keda-operator
+        app: keda
     spec:
-      serviceAccountName: keda-operator
+      serviceAccountName: keda
       securityContext:
         {}
       containers:
-        - name: keda-operator
+        - name: keda
           securityContext:
             {}
           image: "docker.io/kedacore/keda:1.2.0"
@@ -4805,7 +4805,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
-              value: keda-operator
+              value: keda
           resources:
             {}
 ---
@@ -4813,25 +4813,25 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: keda-operator-metrics-apiserver
+  name: keda-metrics-apiserver
   namespace: KEDA_NAMESPACE
   labels:
-    app: keda-operator-metrics-apiserver
+    app: keda-metrics-apiserver
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: keda-operator-metrics-apiserver
+      app: keda-metrics-apiserver
   template:
     metadata:
       labels:
-        app: keda-operator-metrics-apiserver
+        app: keda-metrics-apiserver
     spec:
-      serviceAccountName: keda-operator
+      serviceAccountName: keda
       securityContext:
         {}
       containers:
-        - name: keda-operator-metrics-apiserver
+        - name: keda-metrics-apiserver
           securityContext:
             {}
           image: "docker.io/kedacore/keda-metrics-adapter:1.2.0"
@@ -4861,7 +4861,7 @@ metadata:
   name: v1beta1.external.metrics.k8s.io
 spec:
   service:
-    name: keda-operator-metrics-apiserver
+    name: keda-metrics-apiserver
     namespace: KEDA_NAMESPACE
   group: external.metrics.k8s.io
   version: v1beta1
