@@ -110,7 +110,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
 			
-            (var resources, var existingKeysSecret, var newKeysSecret) = await KubernetesHelper.GetFunctionsDeploymentResources(
+            (var resources, var funcKeys) = await KubernetesHelper.GetFunctionsDeploymentResources(
                 Name,
                 resolvedImageName,
                 Namespace,
