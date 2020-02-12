@@ -75,10 +75,10 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [Fact]
         public async Task CheckNonOptionalSettingsDoesntThrowOnMissingAzureWebJobsStorageWhenFlagIsSet()
         {
-            var fileSystem = GetFakeFileSystem(new[]
-   {
-                ("x:\\folder1", "{'bindings': [{'type': 'httpTrigger'}]}"),
-                ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
+            var fileSystem = GetFakeFileSystem(new[] 
+            {
+                ("x:\\folder1", "{'bindings': [{'type': 'blobTrigger'}]}"),
+                ("x:\\folder2", "{'bindings': [{'type': 'timerTrigger'}]}")
             });
 
             FileSystemHelpers.Instance = fileSystem;
