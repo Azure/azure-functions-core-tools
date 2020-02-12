@@ -1,6 +1,6 @@
 {
     "name": "azure-functions-core-tools",
-    "version": "2.4.290",
+    "version": "2.7.2184",
     "lockfileVersion": 1,
     "requires": true,
     "dependencies": {
