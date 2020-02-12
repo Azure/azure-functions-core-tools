@@ -2,17 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Kubernetes.FuncKeys;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
+using Dynamitey.DynamicObjects;
+using Microsoft.IdentityModel.Xml;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Identity;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using YamlDotNet.Serialization;
@@ -120,6 +127,18 @@ namespace Azure.Functions.Cli.Kubernetes
             (_, _, var exitCode) = await KubectlHelper.RunKubectl($"get namespace {@namespace}", ignoreError: true, showOutput: false);
             return exitCode == 0;
         }
+		
+        internal static async Task<(string, bool)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
+        {
+            var cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
+            if (returnJsonOutput)
+            {
+                cmd = string.Concat(cmd, " -o json");
+            }
+
+            (string output, _, var exitCode) = await KubectlHelper.RunKubectl(cmd, ignoreError: true, showOutput: false);
+            return (output, exitCode == 0);
+        }
 
         internal static Task CreateNamespace(string @namespace)
             => KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
@@ -132,7 +151,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Replace("KEDA_NAMESPACE", @namespace);
         }
 
-        internal static IEnumerable<IKubernetesResource> GetFunctionsDeploymentResources(
+        internal async static Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
             string name,
             string imageName,
             string @namespace,
@@ -146,7 +165,9 @@ namespace Azure.Functions.Cli.Kubernetes
             int? cooldownPeriod = null,
             string serviceType = "LoadBalancer",
             int? minReplicas = null,
-            int? maxReplicas = null)
+            int? maxReplicas = null,
+            string keysSecretCollectionName = null,
+            bool mountKeysAsContainerVolume = false)
         {
             ScaledObjectV1Alpha1 scaledobject = null;
             var result = new List<IKubernetesResource>();
@@ -154,11 +175,17 @@ namespace Azure.Functions.Cli.Kubernetes
             var httpFunctions = triggers.FunctionsJson
                 .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true);
             var nonHttpFunctions = triggers.FunctionsJson.Where(f => httpFunctions.All(h => h.Key != f.Key));
+            keysSecretCollectionName = string.IsNullOrEmpty(keysSecretCollectionName)
+                ? $"func-keys-kube-secret-{name}"
+                : keysSecretCollectionName;
             if (httpFunctions.Any())
             {
                 int position = 0;
                 var enabledFunctions = httpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, enabledFunctions, new Dictionary<string, string>
+                //Environment variables for the func app keys kubernetes secret
+                var kubernetesSecretEnvironmentVariable = FuncAppKeysHelper.FuncKeysKubernetesEnvironVariables(keysSecretCollectionName, mountKeysAsContainerVolume);
+                var additionalEnvVars = enabledFunctions.Concat(kubernetesSecretEnvironmentVariable).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, additionalEnvVars, new Dictionary<string, string>
                 {
                     { "osiris.deislabs.io/enabled", "true" },
                     { "osiris.deislabs.io/minReplicas", "1" }
@@ -186,11 +213,13 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 secrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
-
+			
+            int resourceIndex = 0;
             if (useConfigMap)
             {
                 var configMap = GetConfigMap(name, @namespace, secrets);
-                result.Insert(0, configMap);
+                result.Insert(resourceIndex, configMap);
+                resourceIndex++;
                 foreach (var deployment in deployments)
                 {
                     deployment.Spec.Template.Spec.Containers.First().EnvFrom = new ContainerEnvironmentFromV1[]
@@ -240,7 +269,8 @@ namespace Azure.Functions.Cli.Kubernetes
             else
             {
                 var secret = GetSecret(name, @namespace, secrets);
-                result.Insert(0, secret);
+                result.Insert(resourceIndex, secret);
+                resourceIndex++;
                 foreach (var deployment in deployments)
                 {
                     deployment.Spec.Template.Spec.Containers.First().EnvFrom = new ContainerEnvironmentFromV1[]
@@ -256,11 +286,49 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            result = result.Concat(deployments).ToList();
+            IDictionary<string, string> resultantFunctionKeys = new Dictionary<string, string>();
+            if (httpFunctions.Any())
+            {
+                var currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
+                resultantFunctionKeys = GetFunctionKeys(currentImageFuncKeys, await GetExistingFunctionKeys(keysSecretCollectionName, @namespace));
+                if (resultantFunctionKeys?.Any() == true)
+                {
+                    result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, resultantFunctionKeys));
+                    resourceIndex++;
+                }
 
-            return scaledobject != null
-                ? result.Append(scaledobject)
-                : result;
+                //if function keys Secrets needs to be mounted as volume in the function runtime container
+                if (mountKeysAsContainerVolume)
+                {
+                    FuncAppKeysHelper.CreateFuncAppKeysVolumeMountDeploymentResource(deployments, keysSecretCollectionName);
+                }
+                //Create the Pod identity with the role to modify the function kubernetes secret
+                else
+                {
+                    var svcActName = $"{name}-function-keys-identity-svc-act";
+                    var svcActDeploymentResource = GetServiceAccount(svcActName, @namespace);
+                    result.Insert(resourceIndex, svcActDeploymentResource);
+                    resourceIndex++;
+
+                    var funcKeysManagerRoleName = "functions-keys-manager-role";
+                    var secretManagerRole = GetSecretManagerRole(funcKeysManagerRoleName, @namespace);
+                    result.Insert(resourceIndex, secretManagerRole);
+                    resourceIndex++;
+                    var roleBindingName = $"{svcActName}-functions-keys-manager-rolebinding";
+                    var funcKeysRoleBindingDeploymentResource = GetRoleBinding(roleBindingName, @namespace, funcKeysManagerRoleName, svcActName);
+                    result.Insert(resourceIndex, funcKeysRoleBindingDeploymentResource);
+                    resourceIndex++;
+
+                    //add service account identity to the pod
+                    foreach (var deployment in deployments)
+                    {
+                        deployment.Spec.Template.Spec.ServiceAccountName = svcActName;
+                    }
+                }
+            }
+
+            result = result.Concat(deployments).ToList();
+            return (scaledobject != null ? result.Append(scaledobject) : result, resultantFunctionKeys);
         }
 
         internal static async Task RemoveKeda(string @namespace)
@@ -269,6 +337,185 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 await KubectlHelper.RunKubectl($"delete {name} --namespace {@namespace}", ignoreError: true, showOutput: true);
             }
+        }
+
+        private async static Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
+        {
+            if (string.IsNullOrWhiteSpace(keysSecretCollectionName)
+                || string.IsNullOrWhiteSpace(@namespace))
+            {
+                return new Dictionary<string, string>();
+            }
+
+            (string output, bool keysSecretExist) = await ResourceExists("secret", keysSecretCollectionName, @namespace, true);
+            if (keysSecretExist)
+            {
+                var allExistingFuncKeys = TryParse<SecretsV1>(output);
+                if (allExistingFuncKeys?.Data?.Any() == true)
+                {
+                    return allExistingFuncKeys.Data.ToDictionary(k => k.Key, v => Encoding.UTF8.GetString(Convert.FromBase64String(v.Value)));
+                }
+            }
+
+            return new Dictionary<string, string>();
+        }
+
+        internal async static Task PrintFunctionsInfo(string serviceName, string @namespace, IDictionary<string, string> funcKeys, TriggersPayload triggers)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName)
+                || string.IsNullOrWhiteSpace(@namespace)
+                || funcKeys?.Any() == false
+                || triggers == null)
+            {
+                return;
+            }
+
+            var httpFunctions = triggers.FunctionsJson
+                .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true)
+                .Select(item => item.Key);
+
+            var loadBalancerIp = await GetLoadBalancerIp(serviceName, @namespace, 24);
+            if (string.IsNullOrEmpty(loadBalancerIp))
+            {
+                ColoredConsole.WriteLine(WarningColor($"The service: {serviceName} is not yet ready, please re-run the deployment to get the function keys."));
+                return;
+            }
+
+            var masterKey = funcKeys["host.master"];
+            if (httpFunctions?.Any() == true)
+            {
+                foreach (var functionName in httpFunctions)
+                {
+                    var getFunctionAdminUri = $"http://{loadBalancerIp}/admin/functions/{functionName}?code={masterKey}";
+                    var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri), 20);
+
+                    if (httpResponseMessage.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        ColoredConsole.WriteLine(WarningColor($"The service: {functionName} is not yet ready in the runtime yet, please re-run the deployment to get the function keys."));
+                        return;
+                    }
+
+                    if (httpResponseMessage.IsSuccessStatusCode)
+                    {
+                        var responseContent = await httpResponseMessage.Content.ReadAsStringAsync();
+                        var functionsInfo = JsonConvert.DeserializeObject<FunctionInfo>(responseContent);
+
+                        var trigger = functionsInfo
+                            .Config?["bindings"]
+                            ?.FirstOrDefault(o => o["type"]?.ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
+                            ?["type"];
+
+                        trigger = trigger ?? "No Trigger Found";
+                        var showFunctionKey = true;
+
+                        var authLevel = functionsInfo
+                            .Config?["bindings"]
+                            ?.FirstOrDefault(o => !string.IsNullOrEmpty(o["authLevel"]?.ToString()))
+                            ?["authLevel"];
+
+                        if (authLevel != null && authLevel.ToString().Equals("anonymous", StringComparison.OrdinalIgnoreCase))
+                        {
+                            showFunctionKey = false;
+                        }
+
+                        ColoredConsole.WriteLine($"\t{functionName} - [{VerboseColor(trigger.ToString())}]");
+                        if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate))
+                        {
+                            if (showFunctionKey)
+                            {
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor($"{functionsInfo.InvokeUrlTemplate}?code={funcKeys[$"functions.{functionName.ToLower()}.default"]}")}");
+                            }
+                            else
+                            {
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor(functionsInfo.InvokeUrlTemplate)}");
+                            }
+                        }
+                        ColoredConsole.WriteLine();
+
+                    }
+                }
+            }
+
+            //Print the master key as well for the user
+            ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys[$"host.master"]}")}");
+        }
+
+        private async static Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
+        {
+            HttpResponseMessage httpResponseMsg = new HttpResponseMessage();
+            if (httpRequestMessage == null)
+            {
+                return httpResponseMsg;
+            }
+
+            int currentRetry = 0;
+            using (var httpClient = new HttpClient(new HttpClientHandler()))
+            {
+                while (currentRetry++ < retryCount)
+                {
+                    httpResponseMsg = await httpClient.SendAsync(httpRequestMessage.Clone());
+                    if (httpResponseMsg.IsSuccessStatusCode ||
+                        (httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
+                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
+                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout
+                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.NotFound))
+                    {
+                        return httpResponseMsg;
+                    }
+
+                    await Task.Delay(new Random().Next(500, 2000));
+                }
+            }
+
+            return httpResponseMsg;
+        }
+
+        private async static Task<string> GetLoadBalancerIp(string serviceName, string @namespace, int retryCount = 12)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName)
+                || string.IsNullOrWhiteSpace(@namespace))
+            {
+                return string.Empty;
+            }
+
+            ColoredConsole.WriteLine(AdditionalInfoColor($"Getting loadbalancer ip for the service: {serviceName}"));
+            int currentRetry = 0;
+            while (currentRetry++ < retryCount)
+            {
+                (string output, bool serviceExists) = await ResourceExists("service", serviceName, @namespace, true);
+                if (serviceExists)
+                {
+                    var service = TryParse<ServiceV1>(output);
+                    if (service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                    {
+                        return service?.Status?.LoadBalancer?.Ingress.First().Ip;
+                    }
+                }
+
+                await Task.Delay(5000);
+                ColoredConsole.WriteLine(AdditionalInfoColor($"Waiting for the service to be ready: {serviceName}"));
+            }
+
+            return string.Empty;
+        }
+
+        private static IDictionary<string, string> GetFunctionKeys(IDictionary<string, string> currentImageFuncKeys, IDictionary<string, string> existingFuncKeys)
+        {
+            if ((currentImageFuncKeys == null || !currentImageFuncKeys.Any())
+                || (existingFuncKeys == null || !existingFuncKeys.Any()))
+            {
+                return currentImageFuncKeys;
+            }
+
+            //The function keys that doesn't exist in Kubernetes yet
+            IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            //Merge the new keys with the keys that already exist in kubernetes
+            foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
+            {
+                funcKeys.Add(commonKey);
+            }
+
+            return funcKeys;
         }
 
         internal static string SerializeResources(IEnumerable<IKubernetesResource> resources, OutputSerializationOptions outputFormat)
@@ -533,6 +780,83 @@ namespace Azure.Functions.Cli.Kubernetes
                 },
                 Data = secrets
             };
+        }
+
+        public static ServiceAccountV1 GetServiceAccount(string name, string @namespace)
+        {
+            return new ServiceAccountV1
+            {
+                ApiVersion = "v1",
+                Kind = "ServiceAccount",
+                Metadata = new ObjectMetadataV1
+                {
+                    Name = name,
+                    Namespace = @namespace
+                }
+            };
+        }
+
+        public static RoleV1 GetSecretManagerRole(string name, string @namespace)
+        {
+            return new RoleV1
+            {
+                ApiVersion = "rbac.authorization.k8s.io/v1",
+                Kind = "Role",
+                Metadata = new ObjectMetadataV1
+                {
+                    Name = name,
+                    Namespace = @namespace
+                },
+                Rules = new RuleV1[]
+                {
+                    new RuleV1
+                    {
+                        ApiGroups = new string[]{""},
+                        Resources = new string[]{"secrets", "configMaps"},
+                        Verbs = new string[]{ "get", "list", "watch", "create", "update", "patch", "delete" }
+                    }
+                }
+            };
+        }
+
+        public static RoleBindingV1 GetRoleBinding(string name, string @namespace, string refRoleName, string subjectName)
+        {
+            return new RoleBindingV1
+            {
+                ApiVersion = "rbac.authorization.k8s.io/v1",
+                Kind = "RoleBinding",
+                Metadata = new ObjectMetadataV1
+                {
+                    Name = name,
+                    Namespace = @namespace
+                },
+                RoleRef = new RoleSubjectV1
+                {
+                    ApiGroup = "rbac.authorization.k8s.io",
+                    Kind = "Role",
+                    Name = refRoleName
+                },
+                Subjects = new RoleSubjectV1[]
+                {
+                    new RoleSubjectV1
+                    {
+                        Kind = "ServiceAccount",
+                        Name = subjectName
+                    }
+                }
+            };
+        }
+
+        private static T TryParse<T>(string jsonData)
+        {
+            try
+            {
+                return JsonConvert.DeserializeObject<T>(jsonData);
+            }
+            catch
+            {
+                return default;
+            }
         }
     }
 }
