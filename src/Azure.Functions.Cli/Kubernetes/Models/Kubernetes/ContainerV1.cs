@@ -26,6 +26,18 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 
         [JsonProperty("imagePullPolicy")]
         public string ImagePullPolicy { get; internal set; }
+
+        [JsonProperty("volumeMounts")]
+        public IEnumerable<ContainerVolumeMountV1> VolumeMounts { get; internal set; }
+    }
+
+    public class ContainerVolumeMountV1
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("mountPath")]
+        public string MountPath { get; set; }
     }
 
     public class ContainerResourceRequestsV1
@@ -93,5 +105,17 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
     {
         [JsonProperty("name")]
         public string Name { get; set; }
+    }
+
+    public class VolumeMountV1
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("mountPath")]
+        public string MountPath { get; set; }
+
+        [JsonProperty("readOnly")]
+        public bool ReadOnly { get; set; }
     }
 }

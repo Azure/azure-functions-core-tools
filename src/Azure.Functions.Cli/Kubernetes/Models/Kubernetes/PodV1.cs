@@ -25,6 +25,32 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 
         [JsonProperty("serviceAccountName")]
         public string ServiceAccountName { get; internal set; }
+
+        [JsonProperty("volumes")]
+        public IEnumerable<VolumeV1> Volumes { get; set; }
+    }
+    public class VolumeV1
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("configMap")]
+        public VolumeConfigMapV1 VolumeConfigMap { get; set; }
+
+        [JsonProperty("secret")]
+        public VolumeSecretV1 VolumeSecret { get; set; }
+    }
+
+    public class VolumeConfigMapV1
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+    }
+
+    public class VolumeSecretV1
+    {
+        [JsonProperty("secretName")]
+        public string SecretName { get; set; }
     }
 
     public class PodTolerationV1
