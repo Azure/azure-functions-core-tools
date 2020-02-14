@@ -1,6 +1,6 @@
 {
     "name": "azure-functions-core-tools",
-    "version": "2.4.290",
+    "version": "2.7.2184",
     "lockfileVersion": 1,
     "requires": true,
     "dependencies": {
@@ -275,9 +275,9 @@
             "integrity": "sha512-7PiHtLll5LdnKIMw100I+8xJXR5gW2QwWYkT6iJva0bXitZKa/XMrSbdmg3r2Xnaidz9Qumd0VPaMrZlF9V9sA=="
         },
         "readable-stream": {
-            "version": "2.3.6",
-            "resolved": "https://registry.npmjs.org/readable-stream/-/readable-stream-2.3.6.tgz",
-            "integrity": "sha512-tQtKA9WIAhBF3+VLAseyMqZeBjW0AHJoxOtYqSUZNJxauErmLbVm2FW1y+J/YA9dUrAC39ITejlZWhVIwawkKw==",
+            "version": "2.3.7",
+            "resolved": "https://registry.npmjs.org/readable-stream/-/readable-stream-2.3.7.tgz",
+            "integrity": "sha512-Ebho8K4jIbHAxnuxi7o42OrZgF/ZTNcsZj6nRKyUmkhLFq8CHItp/fy6hQZuZmP/n3yZ9VBUbp4zz/mX8hmYPw==",
             "requires": {
                 "core-util-is": "~1.0.0",
                 "inherits": "~2.0.3",
@@ -346,9 +346,9 @@
             "integrity": "sha1-cXuPIgzAu3tE5AUUwisui7xw2Lk="
         },
         "unzipper": {
-            "version": "0.10.5",
-            "resolved": "https://registry.npmjs.org/unzipper/-/unzipper-0.10.5.tgz",
-            "integrity": "sha512-i5ufkXNjWZYxU/0nKKf6LkvW8kn9YzRvfwuPWjXP+JTFce/8bqeR0gEfbiN2IDdJa6ZU6/2IzFRLK0z1v0uptw==",
+            "version": "0.10.8",
+            "resolved": "https://registry.npmjs.org/unzipper/-/unzipper-0.10.8.tgz",
+            "integrity": "sha512-CZRd20MbyAfWL1Xc+lqgNFYDj5e/HaH9pLEWZgseQWCvEtNfX0wOjnhaJ6PcGpNnDvifSW1ZNSCHX6GoNliR0A==",
             "requires": {
                 "big-integer": "^1.6.17",
                 "binary": "~0.3.0",

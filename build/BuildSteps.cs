@@ -180,6 +180,27 @@ namespace Build
             }
         }
 
+        public static void AddTemplatesJson()
+        {
+            var tempDirectoryPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            using (var client = new WebClient())
+            {
+                FileHelpers.EnsureDirectoryExists(tempDirectoryPath);
+                var zipFilePath = Path.Combine(tempDirectoryPath, "templates.zip");
+                client.DownloadFile(Settings.TemplatesJsonZip, zipFilePath);
+                FileHelpers.ExtractZipToDirectory(zipFilePath, tempDirectoryPath);
+            }
+
+            string templatesJsonPath = Path.Combine(tempDirectoryPath, "templates", "templates.json");
+            if (File.Exists(templatesJsonPath))
+            {
+                foreach (var runtime in Settings.TargetRuntimes)
+                {
+                    File.Copy(templatesJsonPath, Path.Combine(Settings.OutputDir, runtime, "templates", "templates.json"));
+                }
+            }
+        }
+
         public static void Test()
         {
             var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
@@ -339,6 +360,12 @@ namespace Build
                 client.DownloadFile(Settings.SignInfo.SigcheckDownloadURL, sigcheckPath);
             }
 
+            // https://peter.hahndorf.eu/blog/post/2010/03/07/WorkAroundSysinternalsLicensePopups
+            // Can't use sigcheck without signing the License Agreement
+            Console.WriteLine("Signing EULA");
+            Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKCU\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
+            Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKU\\.DEFAULT\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
+
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
                 var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
@@ -360,6 +387,12 @@ namespace Build
                         unSignedPackages.Add(fileName);
                     }
                 }
+
+                if (unSignedPackages.Count() < 1)
+                {
+                    throw new Exception("Something went wrong while testing for signed packages. There must be a few unsigned allowed binaries");
+                }
+
                 // The first element is simply the column heading
                 unSignedPackages = unSignedPackages.Skip(1).ToList();
 

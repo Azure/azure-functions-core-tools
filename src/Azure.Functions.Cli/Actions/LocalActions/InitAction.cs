@@ -199,7 +199,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
-                ColoredConsole.Write("Select a worker runtime: ");
+                SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
                 workerRuntime = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.AvailableWorkersList);
                 ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
                 language = LanguageSelectionIfRelevant(workerRuntime);
@@ -220,7 +220,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
                     && languages.Count() != 0)
                 {
-                    ColoredConsole.Write("Select a Language: ");
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
                     var language = SelectionMenuHelper.DisplaySelectionWizard(languages);
                     ColoredConsole.WriteLine(TitleColor(language));
                     return language;

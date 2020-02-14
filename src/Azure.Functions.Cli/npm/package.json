@@ -1,6 +1,6 @@
 {
     "name": "azure-functions-core-tools",
-    "version": "2.4.290",
+    "version": "2.7.2184",
     "description": "Azure Functions Core Tools",
     "scripts": {
         "postinstall": "node lib/install.js",
@@ -34,6 +34,6 @@
         "progress": "2.0.3",
         "rimraf": "3.0.0",
         "tmp": "0.1.0",
-        "unzipper": "0.10.5"
+        "unzipper": "0.10.8"
     }
 }
