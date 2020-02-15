@@ -65,6 +65,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool EnableAuth { get; set; }
         public List<string> EnabledFunctions { get; private set; }
+        public bool SkipAzureStorageCheck { get; private set; }
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -122,7 +123,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Do no build current project before running. For dotnet projects only. Default is set to false.")
+                .WithDescription("Do not build current project before running. For dotnet projects only. Default is set to false.")
                 .SetDefault(false)
                 .Callback(b => NoBuild = b);
 
@@ -136,6 +137,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Setup<List<string>>("functions")
                 .WithDescription("A space seperated list of functions to load.")
                 .Callback(f => EnabledFunctions = f);
+
+            Parser
+                .Setup<bool>("skip-azure-storage-check")
+                .WithDescription("Skip the check for AzureWebJobsStorage being set. WARNING: Proceed with caution, only set this flag if you are sure you know what you're doing.")
+                .SetDefault(false)
+                .Callback(skip => SkipAzureStorageCheck = skip);
 
             return base.ParseArgs(args);
         }
@@ -191,7 +198,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .GetEnvironmentVariables()
                     .Cast<DictionaryEntry>()
                     .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
-            await CheckNonOptionalSettings(settings.Union(environment), scriptPath);
+            await CheckNonOptionalSettings(settings.Union(environment), scriptPath, SkipAzureStorageCheck);
 
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
@@ -349,7 +356,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Replace("\"", string.Empty).ToUpperInvariant();
         }
 
-        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
+        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool skipAzureWebJobsStorageCheck = false)
         {
             try
             {
@@ -374,7 +381,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
+                if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
