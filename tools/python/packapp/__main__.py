@@ -158,7 +158,7 @@ def find_and_build_deps(args):
 
 def ensure_wheel(name, version, args, dest):
     cmd = [
-        'pip', 'download', '--no-deps', '--only-binary', ':all:',
+        sys.executable, '-m', 'pip', 'download', '--no-deps', '--only-binary', ':all:',
         '--platform', _platform_map.get(args.platform),
         '--python-version', args.python_version,
         '--implementation', 'cp',
@@ -177,7 +177,7 @@ def ensure_wheel(name, version, args, dest):
 def build_independent_wheel(name, version, args, dest):
     with tempfile.TemporaryDirectory(prefix='azureworker') as td:
         cmd = [
-            'pip', 'wheel', '--no-deps', '--no-binary', ':all:',
+            sys.executable, '-m', 'pip', 'wheel', '--no-deps', '--no-binary', ':all:',
             '--wheel-dir', td,
             f'{name}=={version}'
         ]
