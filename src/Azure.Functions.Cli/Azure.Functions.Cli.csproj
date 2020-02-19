@@ -90,9 +90,6 @@
     <EmbeddedResource Include="StaticResources\print-functions.sh">
       <LogicalName>$(AssemblyName).print-functions.sh</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\osiris.yaml">
-      <LogicalName>$(AssemblyName).osiris.yaml</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\keda.yaml">
       <LogicalName>$(AssemblyName).keda.yaml</LogicalName>
     </EmbeddedResource>
