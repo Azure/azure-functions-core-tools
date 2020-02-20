@@ -187,12 +187,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
             var settings = _secretsManager.GetSecrets();
-            settings.Add(Constants.WebsiteHostname, uri.Authority);
+            settings.TryAdd(Constants.WebsiteHostname, uri.Authority);
 
             // Add our connection strings
             var connectionStrings = _secretsManager.GetConnectionStrings();
             settings.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
-            settings.Add(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
+            settings.TryAdd(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
 
             var environment = Environment
                     .GetEnvironmentVariables()
@@ -202,7 +202,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
-            settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+            settings.TryAdd(Constants.AzureFunctionsEnvorinmentEnvironmentVariable, "Development");
+            settings.TryAdd(Constants.AspNetCoreEnvironmentEnvironmentVariable, "Development");
             return settings;
         }
 
@@ -210,7 +211,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var secret in secrets)
             {
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
+                if (string.Equals(secret.Key, Constants.AzureFunctionsEnvorinmentEnvironmentVariable, StringComparison.OrdinalIgnoreCase))
+                {
+                    ColoredConsole.WriteLine($"{Constants.AzureFunctionsEnvorinmentEnvironmentVariable}: {secret.Value}");
+                    Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
+                }
+                else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' from local settings as it's already defined in current environment variables."));
                 }
