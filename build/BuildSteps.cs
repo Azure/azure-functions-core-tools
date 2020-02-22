@@ -97,34 +97,46 @@ namespace Build
             var minifiedRuntimes = Settings.TargetRuntimes.Where(r => r.StartsWith(Settings.MinifiedVersionPrefix));
             foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
             {
-                var powershellRuntimePath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell", "runtimes");
-
-                var allKnownPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes.Values.SelectMany(x => x).Distinct().ToList();
-                var allFoundPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
-
-                // Check to make sure any new runtime is categorizied properly and all the expected runtimes are available
-                if (allFoundPowershellRuntimes.Count != allKnownPowershellRuntimes.Count || !allKnownPowershellRuntimes.All(allFoundPowershellRuntimes.Contains))
+                var powershellWorkerRootPath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell");
+                var allPowershellWorkerPaths = Directory.GetDirectories(powershellWorkerRootPath);
+                foreach (var powershellWorkerPath in allPowershellWorkerPaths)
                 {
-                    throw new Exception($"Mismatch between classified Powershell runtimes and Powershell runtimes found. Classified runtimes are ${string.Join(", ", allKnownPowershellRuntimes)}." +
-                        $"{Environment.NewLine}Found runtimes are ${string.Join(", ", allFoundPowershellRuntimes)}");
-                }
+                    var powerShellVersion = Path.GetFileName(powershellWorkerPath);
+                    var powershellRuntimePath = Path.Combine(powershellWorkerPath, "runtimes");
 
-                // Delete all the runtimes that should not belong to the current runtime
-                var powershellForCurrentRuntime = Settings.ToolsRuntimeToPowershellRuntimes[runtime];
-                allFoundPowershellRuntimes.Except(powershellForCurrentRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
+                    var allKnownPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion].Values.SelectMany(x => x).Distinct().ToList();
+                    var allFoundPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
+
+                    // Check to make sure any new runtime is categorizied properly and all the expected runtimes are available
+                    if (allFoundPowershellRuntimes.Count != allKnownPowershellRuntimes.Count || !allKnownPowershellRuntimes.All(allFoundPowershellRuntimes.Contains))
+                    {
+                        throw new Exception($"Mismatch between classified Powershell runtimes and Powershell runtimes found for Powershell v{powerShellVersion}. Classified runtimes are ${string.Join(", ", allKnownPowershellRuntimes)}." +
+                            $"{Environment.NewLine}Found runtimes are ${string.Join(", ", allFoundPowershellRuntimes)}");
+                    }
+
+                    // Delete all the runtimes that should not belong to the current runtime
+                    var powershellForCurrentRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
+                    allFoundPowershellRuntimes.Except(powershellForCurrentRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
+                }
             }
 
             // Small test to ensure we have all the right runtimes at the right places
             foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
             {
-                var powershellRuntimePath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell", "runtimes");
-                var currentPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
-                var requiredPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes[runtime].Distinct().ToList();
-
-                if (currentPowershellRuntimes.Count != requiredPowershellRuntimes.Count() || !requiredPowershellRuntimes.All(currentPowershellRuntimes.Contains))
+                var powershellWorkerRootPath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell");
+                var allPowershellWorkerPaths = Directory.GetDirectories(powershellWorkerRootPath);
+                foreach (var powershellWorkerPath in allPowershellWorkerPaths)
                 {
-                    throw new Exception($"Mismatch between Expected Powershell runtimes ({string.Join(", ", requiredPowershellRuntimes)}) and Found Powershell runtimes " +
-                        $"({string.Join(", ", currentPowershellRuntimes)}) in the path {powershellRuntimePath}");
+                    var powerShellVersion = Path.GetFileName(powershellWorkerPath);
+                    var powershellRuntimePath = Path.Combine(powershellWorkerPath, "runtimes");
+                    var currentPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
+                    var requiredPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime].Distinct().ToList();
+
+                    if (currentPowershellRuntimes.Count != requiredPowershellRuntimes.Count() || !requiredPowershellRuntimes.All(currentPowershellRuntimes.Contains))
+                    {
+                        throw new Exception($"Mismatch between Expected Powershell runtimes ({string.Join(", ", requiredPowershellRuntimes)}) and Found Powershell runtimes " +
+                            $"({string.Join(", ", currentPowershellRuntimes)}) in the path {powershellRuntimePath}");
+                    }
                 }
             }
         }
