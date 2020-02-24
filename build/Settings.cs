@@ -20,9 +20,9 @@ namespace Build
                 : value;
         }
 
-        public const string ItemTemplatesVersion = "2.0.10369";
-        public const string ProjectTemplatesVersion = "2.0.10369";
-        public const string TemplateJsonVersion = "2.0.10344";
+        public const string ItemTemplatesVersion = "2.1.1517";
+        public const string ProjectTemplatesVersion = "2.1.1517";
+        public const string TemplateJsonVersion = "2.1.1517";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
@@ -122,8 +122,8 @@ namespace Build
                 "Microsoft.Azure.AppService.*",
                 "Microsoft.Azure.WebJobs.*",
                 "Microsoft.Azure.WebSites.DataProtection.dll",
-                Path.Combine("templates", "itemTemplates.2.0.10328.nupkg"),
-                Path.Combine("templates", "projectTemplates.2.0.10328.nupkg"),
+                Path.Combine("templates", "itemTemplates.2.1.1517.nupkg"),
+                Path.Combine("templates", "projectTemplates.2.1.1517.nupkg"),
                 Path.Combine("tools", "python", "packapp", "__main__.py"),
                 Path.Combine("workers", "python")
             };
@@ -150,6 +150,9 @@ namespace Build
                 "Newtonsoft.Json.Bson.dll",
                 "Newtonsoft.Json.dll",
                 "protobuf-net.dll",
+                "protobuf-net.Core.dll",
+                "DotNetTI.BreakingChangeAnalysis.dll",
+                "Marklio.Metadata.dll",
                 "Remotion.Linq.dll",
                 "System.IO.Abstractions.dll",
                 "YamlDotNet.dll",
