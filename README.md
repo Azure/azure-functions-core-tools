@@ -39,7 +39,10 @@ To install with chocolatey:
 ```bash
 choco install azure-functions-core-tools
 ```
-
+#### Notice: To debug functions under vscode, x64 bitness is required
+```bash
+choco install azure-functions-core-tools --params "'/x64'"
+```
 ### Mac
 
 **Homebrew**:
