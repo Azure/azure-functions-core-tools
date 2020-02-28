@@ -46,6 +46,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 sb.AppendLine(KubernetesHelper.GetKedaResources(Namespace));
                 if (!KedaOnly)
                 {
+                    sb.AppendLine("---");
                     sb.AppendLine(KubernetesHelper.GetOsirisResources(Namespace));
                 }
 
