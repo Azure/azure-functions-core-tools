@@ -438,7 +438,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     shouldNotHaveSettings: new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } }, timeOutSeconds: 300);
             }
 
-            Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForDedicatedBuildToComplete(client, functionApp);
+            Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
             await PerformServerSideBuild(functionApp, zipStreamFactory, pollDedicatedBuild);
         }
 
@@ -456,7 +456,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await EnsureRemoteBuildIsSupported(functionApp);
                 await RemoveFunctionAppAppSetting(functionApp, Constants.WebsiteRunFromPackage, Constants.WebsiteContentAzureFileConnectionString, Constants.WebsiteContentShared);
-                Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForConsumptionServerSideBuild(client, functionApp, AccessToken, ManagementURL);
+                Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
                 var deployStatus = await PerformServerSideBuild(functionApp, zipFileFactory, pollConsumptionBuild);
                 return deployStatus == DeployStatus.Success;
             }
@@ -724,6 +724,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 else if (status == DeployStatus.Failed)
                 {
                     throw new CliException("Remote build failed!");
+                }
+                else if (status == DeployStatus.Unknown)
+                {
+                    ColoredConsole.WriteLine(Yellow($"Failed to retrieve remote build status, please visit https://{functionApp.ScmUri}/api/deployments"));
                 }
                 return status;
             }
