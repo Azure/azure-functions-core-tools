@@ -125,6 +125,7 @@ namespace Azure.Functions.Cli.Helpers
                 return await GetVersion(pythonDefaultExecutablePath);
             }
 
+            var pyGetVersionTask = GetVersion("py");
             var pythonGetVersionTask = GetVersion("python");
             var python3GetVersionTask = GetVersion("python3");
             var python36GetVersionTask = GetVersion("python3.6");
@@ -134,6 +135,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
+                await pyGetVersionTask,
                 await pythonGetVersionTask,
                 await python3GetVersionTask,
                 await python36GetVersionTask,
