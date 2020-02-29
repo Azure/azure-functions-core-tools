@@ -126,16 +126,16 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             var pyGetVersionTask = GetVersion("py");
-            var pythonGetVersionTask = GetVersion("python");
             var python3GetVersionTask = GetVersion("python3");
+            var pythonGetVersionTask = GetVersion("python");
             var python36GetVersionTask = GetVersion("python3.6");
             var python37GetVersionTask = GetVersion("python3.7");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
                 await pyGetVersionTask,
-                await pythonGetVersionTask,
                 await python3GetVersionTask,
+                await pythonGetVersionTask,
                 await python36GetVersionTask,
                 await python37GetVersionTask
             };
