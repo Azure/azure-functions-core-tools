@@ -417,6 +417,33 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_function_app_contains_logging_config()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init ." },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "host.json",
+                        ContentContains = new []
+                        {
+                            "applicationInsights",
+                            "samplingExcludedTypes",
+                            "Request",
+                            "logging"
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "Writing host.json"
+                }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_managed_dependencies_is_only_supported_in_powershell()
         {
             return CliTester.Run(new RunConfiguration
