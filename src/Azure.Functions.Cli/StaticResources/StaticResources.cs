@@ -69,7 +69,6 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
 
-        public static Task<string> OsirisTemplate => GetValue("osiris.yaml");
 
         public static Task<string> KedaTemplate => GetValue("keda.yaml");
 
