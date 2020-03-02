@@ -39,7 +39,10 @@ To install with chocolatey:
 ```bash
 choco install azure-functions-core-tools
 ```
-
+#### Notice: To debug functions under vscode, x64 bitness is required
+```bash
+choco install azure-functions-core-tools --params "'/x64'"
+```
 ### Mac
 
 **Homebrew**:
@@ -131,11 +134,12 @@ unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip
 
 3. Make the `func` command executable
 
-Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary executable. Assuming you used the instructions above to unzip:
+Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary, as well as `gozip` (used by func during packaging) executables. Assuming you used the instructions above to unzip:
 
 ```bash
 cd azure-functions-cli
 chmod +x func
+chmod +x gozip
 ./func
 ```
 
