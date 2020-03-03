@@ -1,4 +1,4 @@
-param([String[]] $MsiGenBranches)
+param([String[]] $MsiGenBranches, [string] $CommitMessage)
 
 $baseDir = Get-Location
 
@@ -43,7 +43,7 @@ else {
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
 }
 
-if ($MsiGenBranches -Contains $env:APPVEYOR_REPO_BRANCH) {
+if ($MsiGenBranches -Contains $env:APPVEYOR_REPO_BRANCH -or $CommitMessage -Contains "[Build MSI]") {
     Write-Host "Generating MSI files"
 
     # Add WiX to PATH
