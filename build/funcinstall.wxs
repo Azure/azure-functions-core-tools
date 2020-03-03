@@ -3,14 +3,14 @@
 <?define ProductName='Azure Functions Core Tools'?>
 
 <?if $(var.Platform)=x64?>
-  <?define UpgradeCodeGuid='4E39ECC2-3CAE-43BD-94A6-AF9F97F54684'?>
-  <?define PathGuid='240C4066-04AB-4F29-8593-079B6FB3C1DA'?>
-  <?define ProgramMenuDirGuid='C3A3339D-DE95-46E2-8AE0-23C03793B365'?>
+  <?define UpgradeCodeGuid='E9F5190E-0E1F-49C0-BAF5-3D47FE5837B9'?>
+  <?define PathGuid='E7D05676-5209-45E2-99DB-F4B20CF3D89D'?>
+  <?define ProgramMenuDirGuid='09195356-949C-4CEF-9C2C-84EA559E5C19'?>
   <?define PlatformProgramFilesFolder='ProgramFiles64Folder'?>
 <?else?>
-  <?define UpgradeCodeGuid='E8B743C0-51BE-43DF-A344-E995DD3FFD7E'?>
-  <?define PathGuid='1CF628D0-C094-42EE-AC0B-9C2419A136C4'?>
-  <?define ProgramMenuDirGuid='09A34A64-54B8-4017-8972-399981526250'?>
+  <?define UpgradeCodeGuid='31C010A9-2414-4DB7-BFEA-A6F1D085382E'?>
+  <?define PathGuid='35765F38-08D4-4E00-A006-CD71240AD39F'?>
+  <?define ProgramMenuDirGuid='46CAA18B-4C44-4954-8D99-C681CD1F301D'?>
   <?define PlatformProgramFilesFolder='ProgramFilesFolder'?>
 <?endif?>
 
