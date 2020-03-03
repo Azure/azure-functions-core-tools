@@ -38,7 +38,7 @@ else {
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
 }
 
-if ($MsiGenBranches.Contains($env:APPVEYOR_REPO_BRANCH)) {
+if ($MsiGenBranches -Contains $env:APPVEYOR_REPO_BRANCH) {
     Write-Host "Generating MSI files"
 
     # Add WiX to PATH
