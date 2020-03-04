@@ -421,7 +421,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init ." },
+                Commands = new[] { "init . --worker-runtime node" },
                 CheckFiles = new FileResult[]
                 {
                     new FileResult
