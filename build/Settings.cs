@@ -202,6 +202,15 @@ namespace Build
                 "System.Reactive.*.dll",
                 "YamlDotNet.dll",
                 "Marklio.Metadata.dll",
+                "Microsoft.Azure.Cosmos.Table.dll",
+                "Microsoft.Azure.DocumentDB.Core.dll",
+                "Microsoft.Azure.Storage.Blob.dll",
+                "Microsoft.Azure.Storage.Common.dll",
+                "Microsoft.Azure.Storage.File.dll",
+                "Microsoft.Azure.Storage.Queue.dll",
+                "Microsoft.OData.Core.dll",
+                "Microsoft.OData.Edm.dll",
+                "Microsoft.Spatial.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
             };
         }
