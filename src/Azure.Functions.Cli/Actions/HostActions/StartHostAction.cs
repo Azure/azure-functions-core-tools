@@ -34,6 +34,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Microsoft.Azure.WebJobs.Script.Description;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -248,6 +249,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await PreRunConditions();
             Utilities.PrintLogo();
             Utilities.PrintVersion();
+            ValidateHostJsonConfiguration();
 
             var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
 
@@ -266,6 +268,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
             DisplayDisabledFunctions(scriptHost);
 
             await runTask;
+        }
+
+        private void ValidateHostJsonConfiguration()
+        {
+            bool IsPreCompiledApp = IsPreCompiledFunctionApp();
+            if (IsPreCompiledApp && !HostJsonExist())
+            {
+                throw new CliException($"Host.json file does not exist. Please make sure host.json file is preset at {Environment.CurrentDirectory}");
+            }
+
+            if (IsPreCompiledApp && BundleConfigurationExists())
+            {
+                throw new CliException($"Extension bundle is configured for the function app with pre-compiled functions. Please remove extension bundle configuration from host.json: {Path.Combine(Environment.CurrentDirectory, "host.json")}");
+            }
         }
 
         private async Task PreRunConditions()
@@ -299,6 +315,39 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 throw new CliException($"Port {Port} is unavailable. Close the process using that port, or specify another port using --port [-p].");
             }
+        }
+
+        private bool HostJsonExist()
+        {
+            var hostJsonPath = Path.Combine(Environment.CurrentDirectory, "host.json");
+            return File.Exists(hostJsonPath);
+        }
+
+        private bool BundleConfigurationExists()
+        {
+            var hostJsonPath = Path.Combine(Environment.CurrentDirectory, "host.json");
+            var hostJson = FileSystemHelpers.ReadAllTextFromFile(hostJsonPath);
+            return hostJson.Contains("extensionBundle", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsPreCompiledFunctionApp()
+        {
+            bool isPrecompiled = false;
+            foreach (var directory in FileSystemHelpers.GetDirectories(Environment.CurrentDirectory))
+            {
+                var functionMetadataFile = Path.Combine(directory, "function.json");
+                if (File.Exists(functionMetadataFile))
+                {
+                    var functionMetadataFileContent = FileSystemHelpers.ReadAllTextFromFile(functionMetadataFile);
+                    var functionMetadata = JsonConvert.DeserializeObject<FunctionMetadata>(functionMetadataFileContent);
+                    isPrecompiled = isPrecompiled || (functionMetadata?.ScriptFile?.EndsWith(".dll") != null && functionMetadata.ScriptFile.EndsWith(".dll"));
+                }
+                if (isPrecompiled)
+                {
+                    break;
+                }
+            }
+            return isPrecompiled;
         }
 
         private void DisplayDisabledFunctions(IScriptJobHost scriptHost)
