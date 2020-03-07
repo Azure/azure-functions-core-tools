@@ -260,14 +260,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private void ValidateHostJsonConfiguration()
         {
             bool IsPreCompiledApp = IsPreCompiledFunctionApp();
-            if (IsPreCompiledApp && !HostJsonExist())
+            var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
+            if (IsPreCompiledApp && !File.Exists(hostJsonPath))
             {
-                throw new CliException($"Host.json file does not exist. Please make sure host.json file is preset at {Environment.CurrentDirectory}");
+                throw new CliException($"Host.json file in missing. Please make sure host.json file is preset at {Environment.CurrentDirectory}");
             }
 
-            if (IsPreCompiledApp && BundleConfigurationExists())
+            if (IsPreCompiledApp && BundleConfigurationExists(hostJsonPath))
             {
-                throw new CliException($"Extension bundle is configured for the function app with pre-compiled functions. Please remove extension bundle configuration from host.json: {Path.Combine(Environment.CurrentDirectory, "host.json")}");
+                throw new CliException($"Extension bundle configuration should not be present for the function app with pre-compiled functions. Please remove extension bundle configuration from host.json: {Path.Combine(Environment.CurrentDirectory, "host.json")}");
             }
         }
 
@@ -304,17 +305,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private bool HostJsonExist()
+        private bool BundleConfigurationExists(string hostJsonPath)
         {
-            var hostJsonPath = Path.Combine(Environment.CurrentDirectory, "host.json");
-            return File.Exists(hostJsonPath);
-        }
-
-        private bool BundleConfigurationExists()
-        {
-            var hostJsonPath = Path.Combine(Environment.CurrentDirectory, "host.json");
             var hostJson = FileSystemHelpers.ReadAllTextFromFile(hostJsonPath);
-            return hostJson.Contains("extensionBundle", StringComparison.OrdinalIgnoreCase);
+            return hostJson.Contains(Constants.ExtensionBundleConfigPropertyName, StringComparison.OrdinalIgnoreCase);
         }
 
         private bool IsPreCompiledFunctionApp()
@@ -322,12 +316,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             bool isPrecompiled = false;
             foreach (var directory in FileSystemHelpers.GetDirectories(Environment.CurrentDirectory))
             {
-                var functionMetadataFile = Path.Combine(directory, "function.json");
+                var functionMetadataFile = Path.Combine(directory, Constants.FunctionJsonFileName);
                 if (File.Exists(functionMetadataFile))
                 {
                     var functionMetadataFileContent = FileSystemHelpers.ReadAllTextFromFile(functionMetadataFile);
                     var functionMetadata = JsonConvert.DeserializeObject<FunctionMetadata>(functionMetadataFileContent);
-                    isPrecompiled = isPrecompiled || (functionMetadata?.ScriptFile?.EndsWith(".dll") != null && functionMetadata.ScriptFile.EndsWith(".dll"));
+                    string extension = Path.GetExtension(functionMetadata?.ScriptFile).ToLowerInvariant().TrimStart('.');
+                    isPrecompiled = isPrecompiled || (!string.IsNullOrEmpty(extension) && extension == "dll");
                 }
                 if (isPrecompiled)
                 {
