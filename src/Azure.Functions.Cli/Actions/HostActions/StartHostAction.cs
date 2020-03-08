@@ -321,7 +321,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     var functionMetadataFileContent = FileSystemHelpers.ReadAllTextFromFile(functionMetadataFile);
                     var functionMetadata = JsonConvert.DeserializeObject<FunctionMetadata>(functionMetadataFileContent);
-                    string extension = Path.GetExtension(functionMetadata?.ScriptFile).ToLowerInvariant().TrimStart('.');
+                    string extension = Path.GetExtension(functionMetadata?.ScriptFile)?.ToLowerInvariant().TrimStart('.');
                     isPrecompiled = isPrecompiled || (!string.IsNullOrEmpty(extension) && extension == "dll");
                 }
                 if (isPrecompiled)
