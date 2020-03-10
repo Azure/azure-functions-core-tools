@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
         public const string FunctionJsonFileName = "function.json";
+        public const string HostJsonFileName = "host.json";
         public const string ExtenstionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
@@ -44,6 +45,7 @@ namespace Azure.Functions.Cli.Common
         public const string TelemetrySentinelFile = "telemetryDefaultOn.sentinel";
         public const string DefaultManagementURL = "https://management.azure.com/";
         public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
+        public const string ExtensionBundleConfigPropertyName = "extensionBundle";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
