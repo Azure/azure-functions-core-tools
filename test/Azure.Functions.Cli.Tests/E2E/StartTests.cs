@@ -146,6 +146,76 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task start_displays_error_on_invalid_host_json()
+        {
+            var functionName = "HttpTriggerCSharp";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        $"new --template Httptrigger --name {functionName}",
+
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var filePath = Path.Combine(workingDir, "host.json");
+                        string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[1.*, 2.0.0)\" }}";
+                        await File.WriteAllTextAsync(filePath, hostJsonContent);
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = true,
+                    ExitInError = true,
+                    ErrorContains = new[] { "Extension bundle configuration should not be present" },
+                },
+            }, _output, startHost: true);
+        }
+
+       
+        [Fact]
+        public async Task start_displays_error_on_missing_host_json()
+        {
+            var functionName = "HttpTriggerCSharp";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        $"new --template Httptrigger --name {functionName}",
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var hostJsonPath = Path.Combine(workingDir, "host.json");
+                        File.Delete(hostJsonPath);
+
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = true,
+                    ExitInError = true,
+                    ErrorContains = new[] { "Host.json file in missing" },
+                },
+            }, _output);
+        }
+
+        [Fact]
         public async Task start_host_port_in_use()
         {
             var tcpListner = new TcpListener(IPAddress.Any, 8081);
