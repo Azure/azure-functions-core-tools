@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Handlers;
 using System.Threading.Tasks;
@@ -95,6 +97,48 @@ namespace Azure.Functions.Cli.Helpers
 
                 throw new CliException(errorMessage);
             }
+        }
+
+        public static bool IsLinuxFxVersionValid(string linuxFxVersion)
+        {
+            if (string.IsNullOrEmpty(linuxFxVersion))
+            {
+                return false;
+            }
+
+            bool isLegacyImageMatched = Constants.WorkerRuntimeImages.Values
+                .SelectMany(image => image)
+                .Any(image => linuxFxVersion.Contains(image, StringComparison.OrdinalIgnoreCase));
+
+            bool isOfficialImageMatched = Constants.WorkerRuntimeOfficialImages.Values
+                .SelectMany(image => image)
+                .Any(image => linuxFxVersion.Equals(image, StringComparison.OrdinalIgnoreCase));
+
+            return isLegacyImageMatched || isOfficialImageMatched;
+        }
+
+        public static bool DoesLinuxFxVersionMatchRuntime(string linuxFxVersion, WorkerRuntime runtime) {
+            if (string.IsNullOrEmpty(linuxFxVersion) || runtime == WorkerRuntime.None)
+            {
+                return false;
+            }
+
+            // Test if linux fx version matches any legacy runtime image (e.g. mcr.microsoft.com/azure-functions/dotnet)
+            bool isLegacyImageMatched = false;
+            if (Constants.WorkerRuntimeImages.TryGetValue(runtime, out IEnumerable<string> legacyImages)) {
+                isLegacyImageMatched = legacyImages
+                    .Any(image => linuxFxVersion.Contains(image, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Test if linux fx version matches any official runtime image (e.g. DOTNET|2)
+            bool isOfficialImageMatched = false;
+            if (Constants.WorkerRuntimeOfficialImages.TryGetValue(runtime, out IEnumerable<string> officialImages))
+            {
+                isOfficialImageMatched = officialImages
+                    .Any(image => linuxFxVersion.Equals(image, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return isLegacyImageMatched || isOfficialImageMatched;
         }
     }
 }

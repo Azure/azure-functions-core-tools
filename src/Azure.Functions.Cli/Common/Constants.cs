@@ -57,10 +57,20 @@ namespace Azure.Functions.Cli.Common
 
         public static readonly Dictionary<WorkerRuntime, IEnumerable<string>> WorkerRuntimeImages = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
-            { WorkerRuntime.dotnet, new [] { "mcr.microsoft.com/azure-functions/dotnet", "microsoft/azure-functions-dotnet-core2.0", "mcr.microsoft.com/azure-functions/base", "microsoft/azure-functions-base", "DOTNET" } },
-            { WorkerRuntime.node, new [] { "mcr.microsoft.com/azure-functions/node", "microsoft/azure-functions-node8", "NODE" } },
-            { WorkerRuntime.python, new [] { "mcr.microsoft.com/azure-functions/python", "microsoft/azure-functions-python3.6", "PYTHON" } },
-            { WorkerRuntime.powershell, new [] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell", "POWERSHELL" } }
+            { WorkerRuntime.dotnet, new [] { "mcr.microsoft.com/azure-functions/dotnet", "microsoft/azure-functions-dotnet-core2.0", "mcr.microsoft.com/azure-functions/base", "microsoft/azure-functions-base" } },
+            { WorkerRuntime.node, new [] { "mcr.microsoft.com/azure-functions/node", "microsoft/azure-functions-node8" } },
+            { WorkerRuntime.python, new [] { "mcr.microsoft.com/azure-functions/python", "microsoft/azure-functions-python3.6" } },
+            { WorkerRuntime.powershell, new [] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } }
+        };
+
+        // This is used after ANT 86 to in LinuxFxVersion
+        public static readonly Dictionary<WorkerRuntime, IEnumerable<string>> WorkerRuntimeOfficialImages = new Dictionary<WorkerRuntime, IEnumerable<string>>
+        {
+            { WorkerRuntime.dotnet, new [] { "DOTNET|2", "DOTNET|3" } },
+            { WorkerRuntime.node, new [] { "NODE|8", "NODE|10", "NODE|12" } },
+            { WorkerRuntime.python, new [] { "PYTHON|3.6", "PYTHON|3.7", "PYTHON|3.8" } },
+            { WorkerRuntime.powershell, new [] { "POWERSHELL|6" } }
+            // Java project does not use core tool to deploy
         };
 
         public static readonly string[] TriggersWithoutStorage = new[] { "httptrigger", "kafkatrigger" };
