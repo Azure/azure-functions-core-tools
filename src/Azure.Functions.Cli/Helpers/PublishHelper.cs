@@ -99,46 +99,40 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static bool IsLinuxFxVersionValid(string linuxFxVersion)
+        public static bool IsLinuxFxVersionUsingCustomImage(string linuxFxVersion)
         {
             if (string.IsNullOrEmpty(linuxFxVersion))
             {
                 return false;
             }
 
+            bool isStartingWithDocker = linuxFxVersion.StartsWith("docker|", StringComparison.OrdinalIgnoreCase);
             bool isLegacyImageMatched = Constants.WorkerRuntimeImages.Values
                 .SelectMany(image => image)
                 .Any(image => linuxFxVersion.Contains(image, StringComparison.OrdinalIgnoreCase));
 
-            bool isOfficialImageMatched = Constants.WorkerRuntimeOfficialImages.Values
-                .SelectMany(image => image)
-                .Any(image => linuxFxVersion.Equals(image, StringComparison.OrdinalIgnoreCase));
-
-            return isLegacyImageMatched || isOfficialImageMatched;
+            return isStartingWithDocker && !isLegacyImageMatched;
         }
 
-        public static bool DoesLinuxFxVersionMatchRuntime(string linuxFxVersion, WorkerRuntime runtime) {
-            if (string.IsNullOrEmpty(linuxFxVersion) || runtime == WorkerRuntime.None)
+        public static bool IsLinuxFxVersionRuntimeMatched(string linuxFxVersion, WorkerRuntime runtime) {
+            if (string.IsNullOrEmpty(linuxFxVersion))
             {
-                return false;
+                // Suppress the check since when LinuxFxVersion == "", runtime image will depends on FUNCTIONS_WORKER_RUNTIME setting
+                return true;
             }
 
-            // Test if linux fx version matches any legacy runtime image (e.g. mcr.microsoft.com/azure-functions/dotnet)
+            // Test if linux fx version matches any legacy runtime image (e.g. DOCKER|mcr.microsoft.com/azure-functions/dotnet)
+            bool isStartingWithDocker = linuxFxVersion.StartsWith("docker|", StringComparison.OrdinalIgnoreCase);
             bool isLegacyImageMatched = false;
             if (Constants.WorkerRuntimeImages.TryGetValue(runtime, out IEnumerable<string> legacyImages)) {
                 isLegacyImageMatched = legacyImages
                     .Any(image => linuxFxVersion.Contains(image, StringComparison.OrdinalIgnoreCase));
             }
 
-            // Test if linux fx version matches any official runtime image (e.g. DOTNET|2)
-            bool isOfficialImageMatched = false;
-            if (Constants.WorkerRuntimeOfficialImages.TryGetValue(runtime, out IEnumerable<string> officialImages))
-            {
-                isOfficialImageMatched = officialImages
-                    .Any(image => linuxFxVersion.Equals(image, StringComparison.OrdinalIgnoreCase));
-            }
+            // Test if linux fx version matches any official runtime image (e.g. DOTNET, DOTNET|2)
+            bool isOfficialImageMatched = linuxFxVersion.StartsWith(runtime.ToString(), StringComparison.OrdinalIgnoreCase);
 
-            return isLegacyImageMatched || isOfficialImageMatched;
+            return isOfficialImageMatched || (isStartingWithDocker && isLegacyImageMatched);
         }
     }
 }

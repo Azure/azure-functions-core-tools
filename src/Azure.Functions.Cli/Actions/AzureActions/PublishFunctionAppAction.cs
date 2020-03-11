@@ -240,12 +240,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
                 // If linuxFxVersion does not match any of our images
-                if (!PublishHelper.IsLinuxFxVersionValid(functionApp.LinuxFxVersion))
+                if (PublishHelper.IsLinuxFxVersionUsingCustomImage(functionApp.LinuxFxVersion))
                 {
                     ColoredConsole.WriteLine($"Your functionapp is using a custom image {functionApp.LinuxFxVersion}.\nAssuming that the image contains the correct framework.\n");
                 }
                 // If there the functionapp is our image but does not match the worker runtime image, we either fail or force update
-                else if (!PublishHelper.DoesLinuxFxVersionMatchRuntime(functionApp.LinuxFxVersion, workerRuntime))
+                else if (!PublishHelper.IsLinuxFxVersionRuntimeMatched(functionApp.LinuxFxVersion, workerRuntime))
                 {
                     if (Force)
                     {
