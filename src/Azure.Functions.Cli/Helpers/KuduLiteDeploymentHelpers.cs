@@ -62,13 +62,21 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
-            var json = await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, $"/deployments/{id}");
-
-            if (json.TryGetValue("status", out string statusString))
+            Dictionary<string, string> json;
+            try
             {
-                return ConvertToDeployementStatus(statusString);
+                json = await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, $"/deployments/{id}");
+            } catch (HttpRequestException)
+            {
+                return DeployStatus.Unknown;
             }
-            return DeployStatus.Unknown;
+
+            if (!json.TryGetValue("status", out string statusString))
+            {
+                return DeployStatus.Unknown;
+            }
+
+            return ConvertToDeployementStatus(statusString);
         }
 
         private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
