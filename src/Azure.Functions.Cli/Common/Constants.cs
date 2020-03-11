@@ -63,16 +63,6 @@ namespace Azure.Functions.Cli.Common
             { WorkerRuntime.powershell, new [] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } }
         };
 
-        // This is used after ANT 86 to in LinuxFxVersion
-        public static readonly Dictionary<WorkerRuntime, IEnumerable<string>> WorkerRuntimeOfficialImages = new Dictionary<WorkerRuntime, IEnumerable<string>>
-        {
-            { WorkerRuntime.dotnet, new [] { "DOTNET|2", "DOTNET|3" } },
-            { WorkerRuntime.node, new [] { "NODE|8", "NODE|10", "NODE|12" } },
-            { WorkerRuntime.python, new [] { "PYTHON|3.6", "PYTHON|3.7", "PYTHON|3.8" } },
-            { WorkerRuntime.powershell, new [] { "POWERSHELL|6" } }
-            // Java project does not use core tool to deploy
-        };
-
         public static readonly string[] TriggersWithoutStorage = new[] { "httptrigger", "kafkatrigger" };
 
         public static class Errors
