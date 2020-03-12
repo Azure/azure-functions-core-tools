@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
-using Ionic.Zip;
 using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
@@ -59,10 +58,7 @@ namespace Azure.Functions.Cli.Helpers
                 return await CreateGoZip(files, rootPath, zipFilePath, goZipLocation);
             }
 
-            ColoredConsole.WriteLine(Yellow("Could not find gozip for packaging. Using DotNetZip to package. " +
-                "This may cause problems preserving file permissions when using in a Linux based environment."));
-
-            return CreateDotNetZip(files, rootPath, zipFilePath);
+            throw new CliException("Could not find gozip for packaging.");
         }
 
         public static bool GoZipExists(out string fileLocation)
@@ -78,23 +74,6 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return false;
-        }
-
-        public static Stream CreateDotNetZip(IEnumerable<string> files, string rootPath, string zipFilePath)
-        {
-            const int defaultBufferSize = 4096;
-            var fileStream = new FileStream(zipFilePath, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite, defaultBufferSize, FileOptions.DeleteOnClose);
-            using (ZipFile zip = new ZipFile())
-            {
-                zip.CompressionLevel = Ionic.Zlib.CompressionLevel.BestSpeed;
-                foreach (var file in files)
-                {
-                    zip.AddFile(file.FixFileNameForZip(rootPath));
-                }
-                zip.Save(fileStream);
-            }
-            fileStream.Seek(0, SeekOrigin.Begin);
-            return fileStream;
         }
 
         public static async Task<Stream> CreateGoZip(IEnumerable<string> files, string rootPath, string zipFilePath, string goZipLocation)
