@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0 AS installer-env
+FROM mcr.microsoft.com/dotnet/core/sdk:3.1 AS installer-env
 
 COPY . /src/dotnet-function-app
 RUN cd /src/dotnet-function-app && \
