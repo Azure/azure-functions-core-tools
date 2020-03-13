@@ -113,9 +113,16 @@ sudo chown root:root /etc/apt/sources.list.d/microsoft-prod.list
 
 2. Install
 
+##### v2
 ```bash
 sudo apt-get update
 sudo apt-get install azure-functions-core-tools
+```
+
+##### v3
+```bash
+sudo apt-get update
+sudo apt-get install azure-functions-core-tools-3
 ```
 
 #### Other Linux Distributions

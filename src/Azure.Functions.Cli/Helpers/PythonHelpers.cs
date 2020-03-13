@@ -125,15 +125,20 @@ namespace Azure.Functions.Cli.Helpers
                 return await GetVersion(pythonDefaultExecutablePath);
             }
 
-            var pythonGetVersionTask = GetVersion("python");
+            // Windows Python Launcher (https://www.python.org/dev/peps/pep-0486/)
+            var pyGetVersionTask = PlatformHelper.IsWindows ? GetVersion("py") : Task.FromResult<WorkerLanguageVersionInfo>(null);
+
+            // Linux / OSX / Venv Interpreter Entrypoints
             var python3GetVersionTask = GetVersion("python3");
+            var pythonGetVersionTask = GetVersion("python");
             var python36GetVersionTask = GetVersion("python3.6");
             var python37GetVersionTask = GetVersion("python3.7");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
-                await pythonGetVersionTask,
+                await pyGetVersionTask,
                 await python3GetVersionTask,
+                await pythonGetVersionTask,
                 await python36GetVersionTask,
                 await python37GetVersionTask
             };
