@@ -430,7 +430,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new []
                         {
                             "applicationInsights",
-                            "samplingExcludedTypes",
+                            "excludedTypes",
                             "Request",
                             "logging"
                         }
