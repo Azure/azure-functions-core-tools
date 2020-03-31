@@ -16,6 +16,8 @@ Publish
 /tools/NuGet.exe
 node_modules/
 
+__pycache__
+
 *.ncrunchproject
 *.ncrunchsolution
 nCrunchTemp*
