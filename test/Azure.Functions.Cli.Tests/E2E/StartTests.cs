@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
-                        result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
+                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
             }, _output);
@@ -142,6 +142,76 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                     }
                 }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_displays_error_on_invalid_host_json()
+        {
+            var functionName = "HttpTriggerCSharp";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        $"new --template Httptrigger --name {functionName}",
+
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var filePath = Path.Combine(workingDir, "host.json");
+                        string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[1.*, 2.0.0)\" }}";
+                        await File.WriteAllTextAsync(filePath, hostJsonContent);
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = true,
+                    ExitInError = true,
+                    ErrorContains = new[] { "Extension bundle configuration should not be present" },
+                },
+            }, _output, startHost: true);
+        }
+
+
+        [Fact]
+        public async Task start_displays_error_on_missing_host_json()
+        {
+            var functionName = "HttpTriggerCSharp";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        $"new --template Httptrigger --name {functionName}",
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var hostJsonPath = Path.Combine(workingDir, "host.json");
+                        File.Delete(hostJsonPath);
+
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = true,
+                    ExitInError = true,
+                    ErrorContains = new[] { "Host.json file in missing" },
+                },
             }, _output);
         }
 
@@ -249,7 +319,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
-                        result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
+                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
             }, _output);

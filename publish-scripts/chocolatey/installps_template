@@ -1,0 +1,57 @@
+$ErrorActionPreference = 'Stop';
+
+$packageName= '$PACKAGENAME'
+$toolsDir   = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
+$url_x86        = '$ZIPURL_X86'
+$url_x64        = '$ZIPURL_X64'
+$checksum_x86   = '$CHECKSUM_X86'
+$checksum_x64   = '$CHECKSUM_X64'
+
+# By default, we want 32-bit installer
+$url = $url_x86
+$checksum = $checksum_x86
+
+# If specifically asked for 64-bit, we use that
+$pp = Get-PackageParameters
+if ($pp['x64'] -eq 'true')
+{
+  $url = $url_x64
+  $checksum = $checksum_x64
+}
+
+$packageArgs = @{
+  packageName   = $packageName
+  unzipLocation = $toolsDir
+  url           = $url
+  checksum      = $checksum
+  checksumType  = '$HASHALG'
+}
+
+Install-ChocolateyZipPackage @packageArgs
+
+# only symlink for func.exe
+$files = get-childitem $toolsDir -include *.exe -recurse
+foreach ($file in $files) {
+  if (!$file.Name.Equals("func.exe")) {
+    #generate an ignore file
+    New-Item "$file.ignore" -type file -force | Out-Null
+  }
+}
+
+try {
+  New-Item -type File -Path $toolsDir -Name "telemetryDefaultOn.sentinel" | Out-Null
+
+  # show telemetry information
+  ""
+  "Telemetry"
+  "---------"
+  "The Azure Functions Core tools collect usage data in order to help us improve your experience."
+  "The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft."
+  ""
+  "You can opt-out of telemetry by setting the FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your favorite shell."
+  ""
+}
+catch
+{
+  # That's ok
+}
