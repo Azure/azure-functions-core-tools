@@ -56,6 +56,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool UseHttps { get; set; }
 
+        public bool UseDefaultCert { get; set; }
 
         public string CertPath { get; set; }
 
