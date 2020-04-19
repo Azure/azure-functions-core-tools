@@ -56,6 +56,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool UseHttps { get; set; }
 
+
         public string CertPath { get; set; }
 
         public string CertPassword { get; set; }
@@ -106,6 +107,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription("Bind to https://localhost:{port} rather than http://localhost:{port}. By default it creates and trusts a certificate.")
                 .SetDefault(false)
                 .Callback(s => UseHttps = s);
+
+            Parser
+                .Setup<bool>("useDefaultCert")
+                .WithDescription("Configure Kestrel to use HTTPS with the default certificate.")
+                .SetDefault(false)
+                .Callback(d => UseDefaultCert = d);
 
             Parser
                 .Setup<string>("cert")
@@ -163,7 +170,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     options.Listen(IPAddress.Any, listenAddress.Port, listenOptins =>
                     {
-                        listenOptins.UseHttps(certificate);
+                        if (UseDefaultCert)
+                        {
+                            listenOptins.UseHttps();
+                        }
+                        else
+                        {
+                            listenOptins.UseHttps(certificate);
+                        }
                     });
                 });
             }
@@ -476,7 +490,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             var protocol = UseHttps ? "https" : "http";
             X509Certificate2 cert = UseHttps
-                ? await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
+                ? UseDefaultCert ? null : await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
