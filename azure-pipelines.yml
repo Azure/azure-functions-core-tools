@@ -126,7 +126,7 @@ steps:
   condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/3.0')))
 - pwsh: |
     .\repackageBinaries.ps1
-  displayName: Sign and repackage binaries
+  displayName: Repackage signed binaries
   env:
     AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
     BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -141,36 +141,15 @@ steps:
   displayName: 'Verify signed binaries'
   condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/3.0')))
 - pwsh: |
-    .\generateMsiFiles.ps1 -MsiGenBranches @("v3.x") -CommitMessage '$(Build.SourceVersionMessage)'
+    .\generateMsiFiles.ps1 -MsiGenBranches @("release/3.0") -CommitMessage '$(Build.SourceVersionMessage)'
   env:
     AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
   displayName: 'Generate MSI files'
-- task: PowerShell@2
-  inputs:
-    targetType: 'inline'
-    script: |
-      function GenerateSha([string]$filePath,[string]$artifactsPath, [string]$shaFileName)
-      {
-        $sha = (Get-FileHash $filePath).Hash.ToLower()
-        $shaPath = Join-Path $artifactsPath "$shaFileName.sha"
-        Out-File -InputObject $sha -Encoding ascii -FilePath $shaPath
-      }
-
-      Set-Location ".\build"
-      
-      $artifactsPath = Resolve-Path "..\artifacts\"
-      $zipFilesSearchPath = Join-Path $artifactsPath "*.zip"
-      $zipFiles  = Get-ChildItem -File $zipFilesSearchPath
-      
-      foreach($zipFile in $zipFiles)
-      {
-          $zipFullPath = $zipFile.FullName
-          $fileName = $zipFile.Name
-          GenerateSha $zipFullPath $artifactsPath $fileName
-      }
+- pwsh: |
+    .\generateSha.ps1
   displayName: 'Generate sha files'
 - task: PublishTestResults@2
   inputs:
