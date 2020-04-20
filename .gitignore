@@ -23,3 +23,4 @@ nCrunchTemp*
 .fake/
 artifacts/
 /src/Azure.Functions.Cli/Properties/launchSettings.json
+launchSettings.json

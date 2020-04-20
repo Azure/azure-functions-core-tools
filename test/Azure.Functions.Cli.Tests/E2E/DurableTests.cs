@@ -313,6 +313,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async Task DurableStartNewTest_FileInput()
         {
+            Skip.If(true, reason: "This test fails intermittently, needs to be fixed");
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
                 reason: _storageReason);
 

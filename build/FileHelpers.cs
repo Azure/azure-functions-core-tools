@@ -93,6 +93,15 @@ namespace Build
             return allFiles;
         }
 
+        public static void CopyFileRelativeToBase(string sourceFilePath, string targetDirectory, string baseDirectory)
+        {
+            string relativePath = Path.GetRelativePath(baseDirectory, sourceFilePath);
+            string fullFilePath = Path.Combine(targetDirectory, relativePath);
+            string directoryPath = Path.GetDirectoryName(fullFilePath);
+            Directory.CreateDirectory(directoryPath);
+            File.Copy(sourceFilePath, fullFilePath);
+        }
+
         public static void CreateZipFile(IEnumerable<string> files, string baseDir, string zipFilePath)
         {
             using (var zipfile = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))

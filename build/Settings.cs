@@ -97,6 +97,10 @@ namespace Build
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
+        public static readonly string PreSignTestDir = "PreSignTest";
+
+        public static readonly string SignTestDir = "SignTest";
+
         public static readonly string ItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{ItemTemplatesVersion}";
 
         public static readonly string ProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{ProjectTemplatesVersion}";
@@ -121,10 +125,12 @@ namespace Build
             public static readonly string AzureSigningJobName = "signing-jobs";
             public static readonly string ToSignZipName = $"{BuildNumber}-authenticode.zip";
             public static readonly string ToSignThirdPartyName = $"{BuildNumber}-third.zip";
-            public static readonly string ToSignDir = "unsigned";
+            public static readonly string ToSignDir = "ToSign";
             public static readonly string SignedDir = "signed";
             public static readonly string Authenticode = "SignAuthenticode";
+            public static readonly string ToAuthenticodeSign = "Authenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
+            public static readonly string ToThirdPartySign = "ThirdParty";
             public static readonly string[] RuntimesToSign = new[] { "min.win-x86", "min.win-x64" };
             public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
@@ -181,7 +187,13 @@ namespace Build
                 "Microsoft.AI.*.dll",
                 "Microsoft.Build.Framework.dll",
                 "Microsoft.Build.dll",
-                "Microsoft.CodeAnalysis.*.dll",
+                "Microsoft.CodeAnalysis.CSharp.Scripting.dll",
+                "Microsoft.CodeAnalysis.CSharp.Workspaces.dll",
+                "Microsoft.CodeAnalysis.Razor.dll",
+                "Microsoft.CodeAnalysis.Scripting.dll",
+                "Microsoft.CodeAnalysis.VisualBasic.dll",
+                "Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll",
+                "Microsoft.CodeAnalysis.Workspaces.dll",
                 "Microsoft.DotNet.PlatformAbstractions.dll",
                 "Microsoft.Extensions.DependencyModel.dll",
                 "Microsoft.Extensions.DiagnosticAdapter.dll",
