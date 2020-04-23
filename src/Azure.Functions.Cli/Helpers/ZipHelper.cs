@@ -102,7 +102,7 @@ namespace Azure.Functions.Cli.Helpers
             var contentsFile = Path.GetTempFileName();
             await File.WriteAllLinesAsync(contentsFile, files);
 
-            var goZipExe = new Executable(goZipLocation, $"-base-dir {rootPath} -input-file {contentsFile} -output {zipFilePath}");
+            var goZipExe = new Executable(goZipLocation, $"-base-dir \"{rootPath}\" -input-file \"{contentsFile}\" -output \"{zipFilePath}\"");
             await goZipExe.RunAsync();
             return new FileStream(zipFilePath, FileMode.Open, FileAccess.Read);
         }
