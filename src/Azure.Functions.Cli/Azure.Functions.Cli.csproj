@@ -324,15 +324,15 @@
       <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Logging.ApplicationInsights.2.4.0-beta1-11673\lib\net45\Microsoft.Azure.WebJobs.Logging.ApplicationInsights.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.1.0.0-beta3-13021\lib\net451\Microsoft.Azure.WebJobs.Script.dll</HintPath>
       <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.1.0.0-beta3-13078\lib\net451\Microsoft.Azure.WebJobs.Script.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.Extensibility, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.Extensibility.1.0.0-beta3-10955\lib\net45\Microsoft.Azure.WebJobs.Script.Extensibility.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.Script.WebHost">
-      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.WebHost.1.0.0-beta3-13021\lib\net451\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
       <Private>True</Private>
+      <HintPath>..\..\packages\Microsoft.Azure.WebJobs.Script.WebHost.1.0.0-beta3-13078\lib\net451\Microsoft.Azure.WebJobs.Script.WebHost.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Azure.WebJobs.ServiceBus, Version=2.4.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.Azure.WebJobs.ServiceBus.2.4.0-beta1-11673\lib\net45\Microsoft.Azure.WebJobs.ServiceBus.dll</HintPath>
