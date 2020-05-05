@@ -27,7 +27,7 @@ def getChocoVersion(version):
 # assume buildFolder is clean
 # output a deb nupkg
 # depends on chocolatey
-def preparePackage():
+def preparePackage(packageName):
     fileName_x86 = f"Azure.Functions.Cli.win-x86.{constants.VERSION}.zip"
     fileName_x64 = f"Azure.Functions.Cli.win-x64.{constants.VERSION}.zip"
     url_x86 = f'https://functionscdn.azureedge.net/public/{constants.VERSION}/{fileName_x86}'
@@ -63,17 +63,17 @@ def preparePackage():
     t = Template(stringData)
     with open(os.path.join(tools, "chocolateyinstall.ps1"), "w") as f:
         print("writing install powershell script")
-        f.write(t.safe_substitute(ZIPURL_X86=url_x86, ZIPURL_X64=url_x64, PACKAGENAME=constants.PACKAGENAME,
+        f.write(t.safe_substitute(ZIPURL_X86=url_x86, ZIPURL_X64=url_x64, PACKAGENAME=packageName,
                                   CHECKSUM_X86=fileHash_x86, CHECKSUM_X64=fileHash_x64, HASHALG=HASH))
 
     # write nuspec package metadata
     with open(os.path.join(scriptDir,"nuspec_template")) as f:
         stringData = f.read()
     t = Template(stringData)
-    nuspecFile = os.path.join(constants.BUILDFOLDER, constants.PACKAGENAME+".nuspec")
+    nuspecFile = os.path.join(constants.BUILDFOLDER, packageName+".nuspec")
     with open(nuspecFile,'w') as f:
         print("writing nuspec")
-        f.write(t.safe_substitute(PACKAGENAME=constants.PACKAGENAME, CHOCOVERSION=chocoVersion))
+        f.write(t.safe_substitute(PACKAGENAME=packageName, CHOCOVERSION=chocoVersion))
 
     # run choco pack, stdout is merged into python interpreter stdout
     output = printReturnOutput(["choco", "pack", nuspecFile, "--outputdirectory", constants.ARTIFACTFOLDER])

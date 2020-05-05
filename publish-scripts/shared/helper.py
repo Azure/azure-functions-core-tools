@@ -53,7 +53,7 @@ def produceHashForfile(filePath, hashType, Upper = True):
         return hashobj.hexdigest().lower()
 
 @restoreDirectory
-def linuxOutput(buildFolder):
+def linuxOutput(buildFolder, packageName):
     os.chdir(constants.DRIVERROOTDIR)
 
     # ubuntu dropped 64, fedora supports both
@@ -69,7 +69,7 @@ def linuxOutput(buildFolder):
 
     usr = os.path.join(buildFolder, "usr")
     usrlib = os.path.join(usr, "lib")
-    usrlibFunc = os.path.join(usrlib, constants.PACKAGENAME)
+    usrlibFunc = os.path.join(usrlib, packageName)
     os.makedirs(usrlibFunc)
     # unzip here
     import zipfile
@@ -83,7 +83,7 @@ def linuxOutput(buildFolder):
     # cd into usr/bin, create relative symlink
     os.chdir(usrbin)
     print("create symlink for func")
-    os.symlink(f"../lib/{constants.PACKAGENAME}/func", "func")
+    os.symlink(f"../lib/{packageName}/func", "func")
     # executable to be returned
     exeFullPath = os.path.abspath("func")
 

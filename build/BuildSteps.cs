@@ -37,6 +37,7 @@ namespace Build
                 "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/",
                 "https://www.myget.org/F/xunit/api/v3/index.json",
                 "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/index.json",
+                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json",
             }
             .Aggregate(string.Empty, (a, b) => $"{a} --source {b}");
 
@@ -219,29 +220,98 @@ namespace Build
             Shell.Run("dotnet", $"test {Settings.TestProjectFile} --logger trx");
         }
 
-        public static void GenerateZipToSign()
+        public static void CopyBinariesToSign()
+        {
+            string toSignDirPath = Path.Combine(Settings.OutputDir, Settings.SignInfo.ToSignDir);
+            string authentiCodeDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToAuthenticodeSign);
+            string thirdPartyDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToThirdPartySign);
+
+            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            {
+                var sourceDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(sourceDir, el));
+                // Grab all the files and filter the extensions not to be signed
+                var toAuthenticodeSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
+                                  .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+
+                string dirName = $"Azure.Functions.Cli.{supportedRuntime}.{CurrentVersion}";
+                string targetDirectory = Path.Combine(authentiCodeDirectory, dirName);
+                toAuthenticodeSignFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetDirectory, sourceDir));
+
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(sourceDir, el));
+                // Grab all the files and filter the extensions not to be signed
+                var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
+                                            .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                string targetThirdPartyDirectory = Path.Combine(thirdPartyDirectory, dirName);
+                toSignThirdPartyFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetThirdPartyDirectory, sourceDir));
+            }
+
+            // binaries we know are unsigned via sigcheck.exe
+            var unSignedBinaries = GetUnsignedBinaries(toSignDirPath);
+
+            // binaries to be signed via signed tool
+            var allFiles = Directory.GetFiles(toSignDirPath, "*.*", new EnumerationOptions() { RecurseSubdirectories = true }).ToList();
+
+            // remove all entries for binaries that are actually unsigned (checked via sigcheck.exe)
+            unSignedBinaries.ForEach(f => allFiles.RemoveAll(n => n.Equals(f, StringComparison.OrdinalIgnoreCase)));
+
+            // all the files that are remaining are signed files, delete the signed files since they don't need to be signed again
+            allFiles.ForEach(f => File.Delete(f));
+        }
+
+        public static void TestPreSignedArtifacts()
         {
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
-                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
-                Directory.CreateDirectory(Path.Combine(targetDir, Settings.SignInfo.ToSignDir));
+                var sourceDir = Path.Combine(Settings.OutputDir, supportedRuntime);
+                var targetDir = Path.Combine(Settings.OutputDir, Settings.PreSignTestDir, supportedRuntime);
+                Directory.CreateDirectory(targetDir);
+                FileHelpers.RecursiveCopy(sourceDir, targetDir);
 
                 var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
-                // Grab all the files and filter the extensions not to be signed
-                var toSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths)).Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext)));
-                FileHelpers.CreateZipFile(toSignFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignZipName));
-
                 var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
-                // Grab all the files and filter the extensions not to be signed
-                var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths)).Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext)));
-                FileHelpers.CreateZipFile(toSignThirdPartyFiles, targetDir, Path.Combine(targetDir, Settings.SignInfo.ToSignDir, Settings.SignInfo.ToSignThirdPartyName));
+                var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
+                                    .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+
+                unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
+                                        .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))));
+
+                unSignedFiles.ForEach(filePath => File.Delete(filePath));
+
+                var unSignedPackages = GetUnsignedBinaries(targetDir);
+                if (unSignedPackages.Count() != 0)
+                {
+                    var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
+                    ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
+                    throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
+                }
             }
         }
 
-        public static void UploadZipToSign()
+        public static void TestSignedArtifacts()
         {
-            UploadZipToSignAsync().Wait();
+            string[] zipFiles = Directory.GetFiles(Settings.OutputDir, "*.zip");
+
+            foreach (string zipFilePath in zipFiles)
+            {
+                bool isSignedRuntime = Settings.SignInfo.RuntimesToSign.Any(r => zipFilePath.Contains(r));
+                if (isSignedRuntime)
+                {
+                    string targetDir = Path.Combine(Settings.OutputDir, "PostSignTest", Path.GetFileNameWithoutExtension(zipFilePath));
+                    Directory.CreateDirectory(targetDir);
+                    ZipFile.ExtractToDirectory(zipFilePath, targetDir);
+
+                    var unSignedPackages = GetUnsignedBinaries(targetDir);
+                    if (unSignedPackages.Count() != 0)
+                    {
+                        var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
+                        ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
+                        throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
+                    }
+                }
+            }
         }
+
 
         public static async Task UploadZipToSignAsync()
         {
@@ -351,7 +421,7 @@ namespace Build
             }
         }
 
-        public static void TestSignedArtifacts()
+        public static List<string> GetUnsignedBinaries(string targetDir)
         {
             // Download sigcheck.exe
             var sigcheckPath = Path.Combine(Settings.OutputDir, "sigcheck.exe");
@@ -366,48 +436,39 @@ namespace Build
             Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKCU\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
             Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKU\\.DEFAULT\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
 
-            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            // sigcheck.exe will exit with error codes if unsigned binaries present
+            var csvOutputLines = Shell.GetOutput(sigcheckPath, $" -s -u -c -q {targetDir}", ignoreExitCode: true).Split(Environment.NewLine);
+
+            // CSV separators can differ between languages and regions.
+            var csvSep = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ListSeparator;
+            var unSignedPackages = new List<string>();
+
+            foreach (var line in csvOutputLines)
             {
-                var targetDir = Path.Combine(Settings.OutputDir, supportedRuntime);
-                // sigcheck.exe will exit with error codes if unsigned binaries present
-                var csvOutputLines = Shell.GetOutput(sigcheckPath, $" -s -u -c -q {targetDir}", ignoreExitCode: true).Split(Environment.NewLine);
-
-                // CSV separators can differ between languages and regions.
-                var csvSep = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ListSeparator;
-                var unSignedPackages = new List<string>();
-
-                foreach (var line in csvOutputLines)
+                // Some lines contain sigcheck header info and we filter them out by making sure
+                // there's at least six commas in each valid line.
+                if (line.Split(csvSep).Length - 1 > 6)
                 {
-                    // Some lines contain sigcheck header info and we filter them out by making sure
-                    // there's at least six commas in each valid line.
-                    if (line.Split(csvSep).Length - 1 > 6)
-                    {
-                        // Package name is the first element in each line.
-                        var fileName = line.Split(csvSep)[0].Trim('"');
-                        unSignedPackages.Add(fileName);
-                    }
-                }
-
-                if (unSignedPackages.Count() < 1)
-                {
-                    throw new Exception("Something went wrong while testing for signed packages. There must be a few unsigned allowed binaries");
-                }
-
-                // The first element is simply the column heading
-                unSignedPackages = unSignedPackages.Skip(1).ToList();
-
-                // Filter out the extensions we didn't want to sign
-                unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
-
-                // Filter out files we don't want to verify
-                unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.SkipSigcheckTest.Any(ext => file.EndsWith(ext))).ToList();
-                if (unSignedPackages.Count() != 0)
-                {
-                    var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
-                    ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
-                    throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
+                    // Package name is the first element in each line.
+                    var fileName = line.Split(csvSep)[0].Trim('"');
+                    unSignedPackages.Add(fileName);
                 }
             }
+
+            if (unSignedPackages.Count() < 1)
+            {
+                throw new Exception("Something went wrong while testing for signed packages. There must be a few unsigned allowed binaries");
+            }
+
+            // The first element is simply the column heading
+            unSignedPackages = unSignedPackages.Skip(1).ToList();
+
+            // Filter out the extensions we didn't want to sign
+            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+
+            // Filter out files we don't want to verify
+            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.SkipSigcheckTest.Any(ext => file.EndsWith(ext))).ToList();
+            return unSignedPackages;
         }
 
         public static void Zip()
@@ -421,10 +482,6 @@ namespace Build
                 ColoredConsole.WriteLine($"Creating {zipPath}");
                 ZipFile.CreateFromDirectory(path, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
 
-                var shaPath = $"{zipPath}.sha2";
-                ColoredConsole.WriteLine($"Creating {shaPath}");
-                File.WriteAllText(shaPath, ComputeSha256(zipPath));
-
                 try
                 {
                     Directory.Delete(path, recursive: true);
@@ -435,15 +492,6 @@ namespace Build
                 }
 
                 ColoredConsole.WriteLine();
-            }
-
-            string ComputeSha256(string file)
-            {
-                using (var fileStream = File.OpenRead(file))
-                {
-                    var sha1 = new SHA256Managed();
-                    return BitConverter.ToString(sha1.ComputeHash(fileStream)).Replace("-", string.Empty).ToLower();
-                }
             }
         }
 

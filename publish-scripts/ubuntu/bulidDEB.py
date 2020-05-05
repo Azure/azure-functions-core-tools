@@ -24,16 +24,16 @@ def returnDebVersion(version):
 # output a deb package
 # depends on gzip, dpkg-deb, strip
 @helper.restoreDirectory
-def preparePackage():
+def preparePackage(packageName):
     os.chdir(constants.DRIVERROOTDIR)
 
     debianVersion = returnDebVersion(constants.VERSION)
-    packageFolder = f"{constants.PACKAGENAME}_{debianVersion}"
+    packageFolder = f"{packageName}_{debianVersion}"
     buildFolder = os.path.join(os.getcwd(), constants.BUILDFOLDER, packageFolder)
-    helper.linuxOutput(buildFolder)
+    helper.linuxOutput(buildFolder, packageName)
 
     os.chdir(buildFolder)
-    document = os.path.join("usr", "share", "doc", constants.PACKAGENAME)
+    document = os.path.join("usr", "share", "doc", packageName)
     os.makedirs(document)
     # write copywrite
     print("include MIT copyright")
@@ -47,7 +47,7 @@ def preparePackage():
     time = datetime.datetime.utcnow().strftime("%a, %d %b %Y %X")
     with open(os.path.join(document, "changelog.Debian"), "w") as f:
         print(f"writing changelog with date utc: {time}")
-        f.write(t.safe_substitute(DEBIANVERSION=debianVersion, DATETIME=time, VERSION=constants.VERSION, PACKAGENAME=constants.PACKAGENAME))
+        f.write(t.safe_substitute(DEBIANVERSION=debianVersion, DATETIME=time, VERSION=constants.VERSION, PACKAGENAME=packageName))
     # by default gzip compress file in place
     output = helper.printReturnOutput(["gzip", "-9", "-n", os.path.join(document, "changelog.Debian")])
     helper.chmodFolderAndFiles(os.path.join("usr", "share"))
@@ -77,7 +77,7 @@ def preparePackage():
     t = Template(stringData)
     with open(os.path.join(debian, "control"), "w") as f:
         print("trying to write control file")
-        f.write(t.safe_substitute(DEBIANVERSION=debianVersion, PACKAGENAME=constants.PACKAGENAME, DEPENDENCY=deps))
+        f.write(t.safe_substitute(DEBIANVERSION=debianVersion, PACKAGENAME=packageName, DEPENDENCY=deps))
     helper.chmodFolderAndFiles(debian)
 
     postinst = ''
@@ -93,4 +93,4 @@ def preparePackage():
     os.chdir(constants.DRIVERROOTDIR)
     output = helper.printReturnOutput(["fakeroot", "dpkg-deb", "--build",
                    os.path.join(constants.BUILDFOLDER, packageFolder), os.path.join(constants.ARTIFACTFOLDER, packageFolder+".deb")])
-    assert(f"building package '{constants.PACKAGENAME}'" in output)
+    assert(f"building package '{packageName}'" in output)
