@@ -2,7 +2,7 @@ function GenerateSha([string]$filePath,[string]$artifactsPath, [string]$shaFileN
 {
 $sha = (Get-FileHash $filePath).Hash.ToLower()
 $shaPath = Join-Path $artifactsPath "$shaFileName.sha2"
-Out-File -InputObject $sha -Encoding ascii -FilePath $shaPath
+Out-File -InputObject $sha -Encoding ascii -FilePath $shaPath -NoNewline
 }
 
 Set-Location ".\build"
