@@ -223,6 +223,7 @@ namespace Build
                 "Microsoft.OData.Core.dll",
                 "Microsoft.OData.Edm.dll",
                 "Microsoft.Spatial.dll",
+				"Mono.Posix.NETStandard.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
             };
         }
