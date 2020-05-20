@@ -4,7 +4,10 @@ using Newtonsoft.Json;
 namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 {
     public class ServiceV1 : BaseKubernetesResource<ServiceSpecV1>
-    { }
+    {
+        [JsonProperty("status")]
+        public ServiceStatus Status { get; set; }
+    }
 
     public class ServiceSpecV1 : IKubernetesSpec
     {
@@ -31,5 +34,23 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 
         [JsonProperty("targetPort")]
         public int TargetPort { get; set; }
+    }
+
+    public class ServiceStatus
+    {
+        [JsonProperty("loadBalancer")]
+        public ServiceLoadBalancer LoadBalancer { get; set; }
+    }
+
+    public class ServiceLoadBalancer
+    {
+        [JsonProperty("ingress")]
+        public IEnumerable<ServiceIp> Ingress { get; set; }
+    }
+
+    public class ServiceIp
+    {
+        [JsonProperty("ip")]
+        public string Ip { get; set; }
     }
 }

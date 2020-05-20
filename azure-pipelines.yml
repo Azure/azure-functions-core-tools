@@ -15,7 +15,7 @@ trigger:
     - master
     - v3.x
     - release_3.0
-    
+
 pool:
   vmImage: 'vs2017-win2016'
 
@@ -65,7 +65,7 @@ steps:
     Pattern: '*.dll, *.exe'
     signConfigType: 'inlineSignParams'
     inlineOperation: |
-      [    
+      [
           {
             "KeyCode": "CP-230012",
             "OperationCode": "SigntoolSign",

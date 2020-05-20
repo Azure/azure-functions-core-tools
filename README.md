@@ -39,7 +39,10 @@ To install with chocolatey:
 ```bash
 choco install azure-functions-core-tools
 ```
-
+#### Notice: To debug functions under vscode, x64 bitness is required
+```bash
+choco install azure-functions-core-tools --params "'/x64'"
+```
 ### Mac
 
 **Homebrew**:
@@ -110,9 +113,16 @@ sudo chown root:root /etc/apt/sources.list.d/microsoft-prod.list
 
 2. Install
 
+##### v2
 ```bash
 sudo apt-get update
 sudo apt-get install azure-functions-core-tools
+```
+
+##### v3
+```bash
+sudo apt-get update
+sudo apt-get install azure-functions-core-tools-3
 ```
 
 #### Other Linux Distributions
@@ -131,11 +141,12 @@ unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip
 
 3. Make the `func` command executable
 
-Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary executable. Assuming you used the instructions above to unzip:
+Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary, as well as `gozip` (used by func during packaging) executables. Assuming you used the instructions above to unzip:
 
 ```bash
 cd azure-functions-cli
 chmod +x func
+chmod +x gozip
 ./func
 ```
 
@@ -166,18 +177,17 @@ Using the Core Tools, you can easily configure a Kubernetes cluster and run Azur
 
 ### Installing Kubernetes scalers
 
-This deploys [KEDA](https://github.com/kedacore/keda) and [Osiris](https://github.com/deislabs/osiris) to your cluster which allows you to deploy your functions in a scale-to-zero by default.
+This deploys [KEDA](https://github.com/kedacore/keda) to your cluster which allows you to deploy your functions in a scale-to-zero by default for non-http scenarios only.
 
 ```bash
 func kubernetes install --namespace {namespace}
 ```
 
 **KEDA:** Handles monitoring polling event sources currently QueueTrigger and ServiceBusTrigger.
-**Osiris:**: Handles Http traffic monitoring and on demand scale your deployment to and from 0
 
 ### Deploy to Kubernetes
 
-**First make sure you have Dockerfile for your project.** You can generate one using 
+**First make sure you have Dockerfile for your project.** You can generate one using
 ```bash
 func init --docker # or --docker-only (for existing projects)
 ```
@@ -238,16 +248,16 @@ aks-agentpool-20257154-2   Ready     agent     1d        v1.11.5
 An ACR instance can be created using the Azure Portal or the [Azure CLI](https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-azure-cli#create-a-container-registry)
 
 #### Login to the ACR Registry
-Before pushing and pulling container images, you must log in to the ACR instance. 
+Before pushing and pulling container images, you must log in to the ACR instance.
 
 ```azurecli
 az acr login --name <acrName>
 ```
 
 #### Give the AKS cluster access to the ACR Registry
-The AKS cluster needs access to the ACR Registry to pull the container. Azure creates a service principal to support cluster operability with other Azure resources. This can be used for authentication with an ACR registry. See here for how to grant the right access here: [Authenticate with Azure Container Registry from Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/container-registry/container-registry-auth-aks)  
+The AKS cluster needs access to the ACR Registry to pull the container. Azure creates a service principal to support cluster operability with other Azure resources. This can be used for authentication with an ACR registry. See here for how to grant the right access here: [Authenticate with Azure Container Registry from Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/container-registry/container-registry-auth-aks)
 
-#### Run the deployment 
+#### Run the deployment
 The deployment will build the docker container and upload the container image to your referenced ACR instance (Note: Specify the ACR Login Server in the --registry parameter this is usually of the form <container_registry_name>.azurecr.io) and then your AKS cluster will use that as a source to obtain the container and deploy it.
 
 ```bash
@@ -259,7 +269,7 @@ If the deployment is successful, you should see this:
 Function deployed successfully!
 Function IP: 40.121.21.192
 
-#### Verifying your deployment 
+#### Verifying your deployment
 You can verify your deployment by using the Kubernetes web dashboard. To start the Kubernetes dashboard, use the [az aks browse](https://docs.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-browse) command.
 
 ```azurecli

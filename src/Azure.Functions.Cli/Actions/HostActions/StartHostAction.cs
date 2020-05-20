@@ -66,6 +66,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public bool EnableAuth { get; set; }
         public List<string> EnabledFunctions { get; private set; }
+        public bool SkipAzureStorageCheck { get; private set; }
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -123,7 +124,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Do no build current project before running. For dotnet projects only. Default is set to false.")
+                .WithDescription("Do not build current project before running. For dotnet projects only. Default is set to false.")
                 .SetDefault(false)
                 .Callback(b => NoBuild = b);
 
@@ -137,6 +138,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Setup<List<string>>("functions")
                 .WithDescription("A space seperated list of functions to load.")
                 .Callback(f => EnabledFunctions = f);
+
+            Parser
+                .Setup<bool>("skip-azure-storage-check")
+                .WithDescription("Skip the check for AzureWebJobsStorage being set. WARNING: Proceed with caution, only set this flag if you are sure you know what you're doing.")
+                .SetDefault(false)
+                .Callback(skip => SkipAzureStorageCheck = skip);
 
             return base.ParseArgs(args);
         }
@@ -181,22 +188,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
             var settings = _secretsManager.GetSecrets();
-            settings.Add(Constants.WebsiteHostname, uri.Authority);
+            settings.TryAdd(Constants.WebsiteHostname, uri.Authority);
 
             // Add our connection strings
             var connectionStrings = _secretsManager.GetConnectionStrings();
             settings.AddRange(connectionStrings.ToDictionary(c => $"ConnectionStrings:{c.Name}", c => c.Value));
-            settings.Add(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
+            settings.TryAdd(EnvironmentSettingNames.AzureWebJobsScriptRoot, scriptPath);
 
             var environment = Environment
                     .GetEnvironmentVariables()
                     .Cast<DictionaryEntry>()
                     .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
-            await CheckNonOptionalSettings(settings.Union(environment), scriptPath);
+            await CheckNonOptionalSettings(settings.Union(environment), scriptPath, SkipAzureStorageCheck);
 
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
-            settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+            settings.TryAdd(Constants.AzureFunctionsEnvorinmentEnvironmentVariable, "Development");
+            settings.TryAdd(Constants.AspNetCoreEnvironmentEnvironmentVariable, "Development");
             return settings;
         }
 
@@ -204,7 +212,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var secret in secrets)
             {
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
+                if (string.Equals(secret.Key, Constants.AzureFunctionsEnvorinmentEnvironmentVariable, StringComparison.OrdinalIgnoreCase))
+                {
+                    ColoredConsole.WriteLine($"{Constants.AzureFunctionsEnvorinmentEnvironmentVariable}: {secret.Value}");
+                    Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
+                }
+                else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' from local settings as it's already defined in current environment variables."));
                 }
@@ -212,7 +225,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     Environment.SetEnvironmentVariable(secret.Key, secret.Value, EnvironmentVariableTarget.Process);
                 }
-                else if (secret.Value == string.Empty)
+                else if (!string.IsNullOrEmpty(secret.Key) && secret.Value == string.Empty)
                 {
                     EnvironmentNativeMethods.SetEnvironmentVariable(secret.Key, secret.Value);
                 }
@@ -393,7 +406,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Replace("\"", string.Empty).ToUpperInvariant();
         }
 
-        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
+        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool skipAzureWebJobsStorageCheck = false)
         {
             try
             {
@@ -418,7 +431,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
+                if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "

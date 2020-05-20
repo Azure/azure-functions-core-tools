@@ -46,6 +46,9 @@ namespace Azure.Functions.Cli.Common
         public const string DefaultManagementURL = "https://management.azure.com/";
         public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
+        public const string AzureFunctionsEnvorinmentEnvironmentVariable = "AZURE_FUNCTIONS_ENVIRONMENT";
+        public const string ExtensionBundleConfigPropertyName = "extensionBundle";
+        public const string AspNetCoreEnvironmentEnvironmentVariable = "ASPNETCORE_ENVIRONMENT";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -163,27 +166,33 @@ namespace Azure.Functions.Cli.Common
                     },
                     { "token",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.Extensions.AuthTokens", Version = "1.0.0-beta6" }
+                        Name = "Microsoft.Azure.WebJobs.Extensions.AuthTokens",
+                        Version =  "1.0.0-beta6" }
                     },
                     { "excel",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph", Version = "1.0.0-beta6" }
+                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                        Version =  "1.0.0-beta6" }
                     },
                     { "outlook",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph", Version = "1.0.0-beta6" }
+                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                        Version =  "1.0.0-beta6" }
                     },
                     { "graphwebhooksubscription",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph", Version = "1.0.0-beta6" }
+                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                        Version =  "1.0.0-beta6" }
                     },
                     { "onedrive",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph", Version = "1.0.0-beta6" }
+                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                        Version =  "1.0.0-beta6" }
                     },
                     { "graphwebhooktrigger",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph", Version = "1.0.0-beta6" }
+                        Name = "Microsoft.Azure.WebJobs.Extensions.MicrosoftGraph",
+                        Version =  "1.0.0-beta6" }
                     },
                     { "activitytrigger",
                         new ExtensionPackage() {
@@ -195,7 +204,7 @@ namespace Azure.Functions.Cli.Common
                     },
                     { "orchestrationclient",
                         new ExtensionPackage() {
-                        Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask"}
+                        Name = "Microsoft.Azure.WebJobs.Extensions.DurableTask" }
                     },
                     { "eventgridtrigger",
                         new ExtensionPackage() {

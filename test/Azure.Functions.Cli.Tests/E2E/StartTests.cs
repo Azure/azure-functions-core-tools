@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                    }   
+                    }
                 },
             }, _output);
         }
@@ -180,7 +180,6 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output, startHost: true);
         }
 
-       
         [Fact]
         public async Task start_displays_error_on_missing_host_json()
         {
