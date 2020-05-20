@@ -47,7 +47,6 @@ namespace Azure.Functions.Cli.Common
         public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
         public const string AzureFunctionsEnvorinmentEnvironmentVariable = "AZURE_FUNCTIONS_ENVIRONMENT";
-        public const string ExtensionBundleConfigPropertyName = "extensionBundle";
         public const string AspNetCoreEnvironmentEnvironmentVariable = "ASPNETCORE_ENVIRONMENT";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);

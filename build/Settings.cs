@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Build
@@ -209,13 +210,11 @@ namespace Build
                 "Microsoft.WindowsAzure.Storage.dll",
                 "Microsoft.AspNetCore.*",
                 "NuGet.*.dll",
-                "protobuf-net.Core.dll",
                 "System.Composition.*",
                 "System.IdentityModel.Tokens.Jwt.dll",
                 "System.Net.Http.Formatting.dll",
                 "System.Reactive.*.dll",
                 "YamlDotNet.dll",
-                "Marklio.Metadata.dll",
                 "Microsoft.Azure.Cosmos.Table.dll",
                 "Microsoft.Azure.DocumentDB.Core.dll",
                 "Microsoft.Azure.Storage.Blob.dll",
@@ -227,7 +226,9 @@ namespace Build
                 "Microsoft.Spatial.dll",
 				"Mono.Posix.NETStandard.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
-            };
+            }
+            .ToHashSet()
+            .ToArray();
         }
     }
 }
