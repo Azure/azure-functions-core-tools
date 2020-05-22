@@ -46,6 +46,7 @@ namespace Azure.Functions.Cli.Common
         public const string DefaultManagementURL = "https://management.azure.com/";
         public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
+        public const string ManagedDependencyConfigPropertyName = "managedDependency";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
