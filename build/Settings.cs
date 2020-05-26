@@ -36,7 +36,7 @@ namespace Build
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
-        public static readonly string[] TargetRuntimes = new[] { "win-x86", "win-x64", "linux-x64", "osx-x64", "no-runtime", "min.win-x86", "min.win-x64" };
+        public static readonly string[] TargetRuntimes = new[] {"linux-x64", "osx-x64", "no-runtime", "win-x86", "win-x64", "min.win-x86", "min.win-x64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
