@@ -336,7 +336,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (scriptHost != null)
             {
-                foreach (var function in scriptHost.Functions.Where(f => f.Metadata.IsDisabled))
+                foreach (var function in scriptHost.Functions.Where(f => f.Metadata.IsDisabled()))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
                 }
@@ -347,7 +347,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (scriptHost != null)
             {
-                var httpFunctions = scriptHost.Functions.Where(f => f.Metadata.IsHttpFunction() && !f.Metadata.IsDisabled);
+                var httpFunctions = scriptHost.Functions.Where(f => f.Metadata.IsHttpFunction() && !f.Metadata.IsDisabled());
                 if (httpFunctions.Any())
                 {
                     ColoredConsole
@@ -370,7 +370,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     }
 
                     string hostRoutePrefix = "";
-                    if (!function.Metadata.IsProxy)
+                    if (!function.Metadata.IsProxy())
                     {
                         hostRoutePrefix = httpOptions.RoutePrefix ?? "api/";
                         hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
