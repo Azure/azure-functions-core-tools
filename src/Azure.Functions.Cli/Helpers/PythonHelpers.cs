@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. Python 3.6.x, 3.7.x or 3.8.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. Python 3.6.x, 3.7.x or 3.8.x is recommended, and used in Azure Functions 3.x.";
                 if (errorIfNoVersion) throw new CliException(message);
                 ColoredConsole.WriteLine(WarningColor(message));
                 return;
@@ -97,9 +97,9 @@ namespace Azure.Functions.Cli.Helpers
             // Python 3.x (but not 3.6 | 3.7 | 3.8), not recommended, may fail
             if (pythonVersion.Major == 3)
             {
-                if (errorIfNotSupported) throw new CliException($"Python 3.6.x, 3.7.x, 3.8.x is required for this operation. "
+                if (errorIfNotSupported) throw new CliException($"Python 3.6.x, 3.7.x, 3.8.x is required for the version of Azure Functions you are using (3.x). "
                 + "Please install Python 3.6, 3.7 or 3.8, and use a virtual environment to switch to Python 3.6, 3.7 or 3.8.");
-                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x or 3.8.x is recommended, and used in Azure Functions."));
+                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x or 3.8.x is recommended, and used in Azure Functions 3.x."));
             }
 
             // No Python 3
