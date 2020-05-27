@@ -26,7 +26,7 @@ namespace Build
                 .Then(AddGoZip)
                 .Then(TestPreSignedArtifacts)
                 .Then(CopyBinariesToSign)
-                .Then(Test)
+                // .Then(Test)
                 .Then(Zip)
                 .Then(UploadToStorage)
                 .Run();
