@@ -36,15 +36,9 @@ namespace Azure.Functions.Cli.Helpers
                 try
                 {
                     statusCode = await GetDeploymentStatusById(client, functionApp, id);
-                } catch (HttpRequestException)
-                {
-                    return DeployStatus.Unknown;
-                }
-
-                try
-                {
                     logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
-                } catch (HttpRequestException)
+                }
+                catch (HttpRequestException)
                 {
                     return DeployStatus.Unknown;
                 }
