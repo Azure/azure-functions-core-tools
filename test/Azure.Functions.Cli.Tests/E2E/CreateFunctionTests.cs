@@ -256,5 +256,40 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public async Task create_function_no_init_csx()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "new --csx --template \"http trigger\" --name testfunc"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("testfunc", "function.json"),
+                        ContentContains = new []
+                        {
+                            "httpTrigger"
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = Path.Combine("local.settings.json"),
+                        ContentContains = new []
+                        {
+                            "\"FUNCTIONS_WORKER_RUNTIME\": \"dotnet\""
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
+                }
+            }, _output);
+        }
     }
 }
