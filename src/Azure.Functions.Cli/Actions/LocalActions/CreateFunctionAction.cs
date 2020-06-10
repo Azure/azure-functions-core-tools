@@ -26,6 +26,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
 
+        private readonly InitAction _initAction;
+
         public string Language { get; set; }
         public string TemplateName { get; set; }
         public string FunctionName { get; set; }
@@ -40,6 +42,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
             _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
+            _initAction = new InitAction(_templatesManager, _secretsManager);
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -68,6 +71,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("csx")
                 .WithDescription("use old style csx dotnet functions")
                 .Callback(csx => Csx = csx);
+
+            _initAction.ParseArgs(args);
+
             return base.ParseArgs(args);
         }
 
@@ -87,7 +93,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            if (!FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json")))
+            {
+                // we're assuming "func init" has not been run
+                await _initAction.RunAsync();
+                workerRuntime = _initAction.ResolvedWorkerRuntime;
+                Language = _initAction.ResolvedLanguage;
+            }
 
+            var templates = await _templatesManager.Templates;
 
             if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
             {

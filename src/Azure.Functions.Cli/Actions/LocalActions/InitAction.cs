@@ -42,6 +42,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool? ManagedDependencies { get; set; }
 
+        public WorkerRuntime ResolvedWorkerRuntime { get; set; }
+
+        public string ResolvedLanguage { get; set; }
+
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
@@ -149,30 +153,28 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitFunctionAppProject()
         {
-            WorkerRuntime workerRuntime;
-            string language = string.Empty;
             if (Csx)
             {
-                workerRuntime = Helpers.WorkerRuntime.dotnet;
+                ResolvedWorkerRuntime = Helpers.WorkerRuntime.dotnet;
             }
             else
             {
-                (workerRuntime, language) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
+                (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
             }
 
-            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", workerRuntime.ToString());
+            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
-            if (workerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
+            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
             {
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force);
             }
             else
             {
-                bool managedDependenciesOption = ResolveManagedDependencies(workerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(workerRuntime, language, managedDependenciesOption);
+                bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
+                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, managedDependenciesOption);
                 await WriteFiles();
-                await WriteHostJson(workerRuntime, managedDependenciesOption, ExtensionBundle);
-                await WriteLocalSettingsJson(workerRuntime);
+                await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
+                await WriteLocalSettingsJson(ResolvedWorkerRuntime);
             }
 
             await WriteExtensionsJson();
@@ -183,7 +185,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(workerRuntime, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, Csx);
             }
         }
 
