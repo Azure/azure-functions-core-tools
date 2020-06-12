@@ -133,7 +133,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     ExpectExit = false,
                     OutputContains = new []
                     {
-                        "The binding type(s) 'http2' are not registered. Please ensure the type is correct and the binding extension is installed."
+                        "The binding type(s) 'http2' were not found in the configured extension bundle. Please ensure the type is correct and the correct version of extension bundle is configured."
                     },
                     Test = async (_, p) =>
                     {

@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Helpers
             var latestDeployment = json.First();
             if (latestDeployment.TryGetValue("status", out string statusString))
             {
-                DeployStatus status = ConvertToDeployementStatus(statusString);
+                DeployStatus status = ConvertToDeploymentStatus(statusString);
                 if (status == DeployStatus.Building || status == DeployStatus.Deploying
                  || status == DeployStatus.Success || status == DeployStatus.Failed)
                 {
@@ -76,7 +76,7 @@ namespace Azure.Functions.Cli.Helpers
                 return DeployStatus.Unknown;
             }
 
-            return ConvertToDeployementStatus(statusString);
+            return ConvertToDeploymentStatus(statusString);
         }
 
         private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
@@ -141,7 +141,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static DeployStatus ConvertToDeployementStatus(string statusString)
+        private static DeployStatus ConvertToDeploymentStatus(string statusString)
         {
             if (Enum.TryParse(statusString, out DeployStatus result))
             {
