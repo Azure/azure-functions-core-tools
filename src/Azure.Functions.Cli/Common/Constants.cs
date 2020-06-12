@@ -48,6 +48,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureFunctionsEnvorinmentEnvironmentVariable = "AZURE_FUNCTIONS_ENVIRONMENT";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
         public const string AspNetCoreEnvironmentEnvironmentVariable = "ASPNETCORE_ENVIRONMENT";
+        public const string ManagedDependencyConfigPropertyName = "managedDependency";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
