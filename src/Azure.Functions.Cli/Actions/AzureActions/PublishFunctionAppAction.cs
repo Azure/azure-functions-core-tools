@@ -195,8 +195,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         }
                         else
                         {
-                            throw new CliException("You're trying to publish to a v1 function app from v2 tooling.\n" +
-                            "You can pass --force to force update the app to v2, or downgrade to v1 tooling for publishing");
+                            throw new CliException("You're trying to publish to a non-v2 function app from v2 tooling.\n" +
+                            "You can pass --force to force update the app to v2, or switch to v1 or v3 tooling for publishing");
                         }
                     }
                 }
