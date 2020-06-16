@@ -67,10 +67,7 @@ brew link --overwrite azure-functions-core-tools@3
 
 ### Linux
 
-#### Ubuntu
-
-1. Set up package feed
-
+#### 1. Set up package feed
 
 ##### Ubuntu 19.04
 
@@ -100,18 +97,21 @@ wget -q https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-pr
 sudo dpkg -i packages-microsoft-prod.deb
 ```
 
-##### Debian 9
+##### Debian 9 / 10
 
 ```bash
+# set to 9 or 10
+DEBIAN_VERSION=10
+
 wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.asc.gpg
 sudo mv microsoft.asc.gpg /etc/apt/trusted.gpg.d/
-wget -q https://packages.microsoft.com/config/debian/9/prod.list
+wget -q https://packages.microsoft.com/config/debian/$DEBIAN_VERSION/prod.list
 sudo mv prod.list /etc/apt/sources.list.d/microsoft-prod.list
 sudo chown root:root /etc/apt/trusted.gpg.d/microsoft.asc.gpg
 sudo chown root:root /etc/apt/sources.list.d/microsoft-prod.list
 ```
 
-2. Install
+#### 2. Install
 
 ##### v2
 ```bash
@@ -129,35 +129,35 @@ sudo apt-get install azure-functions-core-tools-3
 
 1. Download latest release
 
-Download the latest release for your platform from [here](https://github.com/Azure/azure-functions-core-tools/releases).
+    Download the latest release for your platform from [here](https://github.com/Azure/azure-functions-core-tools/releases).
 
 2. Unzip release zip
 
-Using your preferred tool, unzip the downloaded release. To unzip into an `azure-functions-cli` directory using the `unzip` tool, run this command from the directory containing the downloaded release zip:
+    Using your preferred tool, unzip the downloaded release. To unzip into an `azure-functions-cli` directory using the `unzip` tool, run this command from the directory containing the downloaded release zip:
 
-```bash
-unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip
-```
+    ```bash
+    unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip
+    ```
 
 3. Make the `func` command executable
 
-Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary, as well as `gozip` (used by func during packaging) executables. Assuming you used the instructions above to unzip:
+    Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary, as well as `gozip` (used by func during packaging) executables. Assuming you used the instructions above to unzip:
 
-```bash
-cd azure-functions-cli
-chmod +x func
-chmod +x gozip
-./func
-```
+    ```bash
+    cd azure-functions-cli
+    chmod +x func
+    chmod +x gozip
+    ./func
+    ```
 
 4. Optionally add `func` to your `$PATH`
 
-To execute the `func` command without specifying the full path to the binary, add its directory to your `$PATH` environment variable. Assuming you're still following along from above:
+    To execute the `func` command without specifying the full path to the binary, add its directory to your `$PATH` environment variable. Assuming you're still following along from above:
 
-```bash
-export PATH=`pwd`:$PATH
-func
-```
+    ```bash
+    export PATH=`pwd`:$PATH
+    func
+    ```
 
 [Code and test Azure Functions locally](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)
 
