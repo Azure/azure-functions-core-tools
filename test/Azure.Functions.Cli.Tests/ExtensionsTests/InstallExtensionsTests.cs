@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 OutputContains = new[]
                 {
                     "Restoring packages for",
-                    "Restore completed"
+                    "Restored"
                 },
                 OutputDoesntContain = new[]
                 {
@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 OutputContains = new[]
                 {
                     "Restoring packages for",
-                    "Restore completed"
+                    "Restored"
                 },
                 OutputDoesntContain = new[]
                 {

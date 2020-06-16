@@ -6,12 +6,12 @@ if ($env:APPVEYOR_REPO_BRANCH -eq "disabled") {
     $javaWorkerVersion = $result.Split()[1]
     Write-host "Adding Microsoft.Azure.Functions.JavaWorker $javaWorkerVersion to project" -ForegroundColor Green
     Invoke-Expression -Command "dotnet add package Microsoft.Azure.Functions.JavaWorker -v $javaWorkerVersion -s  https://ci.appveyor.com/NuGet/azure-functions-java-worker-fejnnsvmrkqg"
-    
+
     $result = Invoke-Expression -Command "NuGet list Microsoft.Azure.Functions.PowerShellWorker.PS6 -Source https://ci.appveyor.com/nuget/azure-functions-powershell-wor-0842fakagqy6 -PreRelease"
     $powerShellWorkerVersion = $result.Split()[1]
     Write-host "Adding Microsoft.Azure.Functions.PowerShellWorker.PS6 $powerShellWorkerVersion to project" -ForegroundColor Green
     Invoke-Expression -Command "dotnet add package Microsoft.Azure.Functions.PowerShellWorker.PS6 -v $powerShellWorkerVersion -s https://ci.appveyor.com/nuget/azure-functions-powershell-wor-0842fakagqy6"
-    
+
     $result = Invoke-Expression -Command "NuGet list Microsoft.Azure.Functions.PowerShellWorker.PS7 -Source https://ci.appveyor.com/nuget/azure-functions-powershell-wor-0842fakagqy6 -PreRelease"
     $powerShellWorkerVersion = $result.Split()[1]
     Write-host "Adding Microsoft.Azure.Functions.PowerShellWorker.PS7 $powerShellWorkerVersion to project" -ForegroundColor Green
@@ -32,5 +32,5 @@ else {
     Set-Location ".\build"
 }
 
-Invoke-Expression -Command  "dotnet run"
+Invoke-Expression -Command  "dotnet run --ci"
 if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
