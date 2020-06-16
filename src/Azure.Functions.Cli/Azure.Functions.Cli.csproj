@@ -51,8 +51,8 @@
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\powershell.host.json">
-      <LogicalName>$(AssemblyName).powershell.host.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\managedDependenciesConfig.json">
+      <LogicalName>$(AssemblyName).managedDependenciesConfig.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\host.json">
       <LogicalName>$(AssemblyName).host.json</LogicalName>
@@ -113,7 +113,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.2.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="2.0.281" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.13616" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="1.0.2020022812" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="1.0.202005032" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
