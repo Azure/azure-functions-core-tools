@@ -1,7 +1,6 @@
 ﻿using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
-using static Colors.Net.StringStaticMethods;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -34,8 +33,16 @@ namespace Azure.Functions.Cli.Helpers
 
             while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown)
             {
-                statusCode = await GetDeploymentStatusById(client, functionApp, id);
-                logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
+                try
+                {
+                    statusCode = await GetDeploymentStatusById(client, functionApp, id);
+                    logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
+                }
+                catch (HttpRequestException)
+                {
+                    return DeployStatus.Unknown;
+                }
+
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
 
@@ -62,15 +69,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
-            Dictionary<string, string> json;
-            try
-            {
-                json = await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, $"/deployments/{id}");
-            } catch (HttpRequestException)
-            {
-                return DeployStatus.Unknown;
-            }
-
+            Dictionary<string, string> json = await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, $"/deployments/{id}");
             if (!json.TryGetValue("status", out string statusString))
             {
                 return DeployStatus.Unknown;
