@@ -210,6 +210,7 @@ namespace Build
                 "protobuf-net.Core.dll",
                 "System.Composition.*",
                 "System.IdentityModel.Tokens.Jwt.dll",
+                "System.Interactive.Async.dll",
                 "System.Net.Http.Formatting.dll",
                 "System.Reactive.*.dll",
                 "YamlDotNet.dll",
