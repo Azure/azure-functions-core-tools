@@ -293,6 +293,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", storageConnectionStringValue);
 
+            if (workerRuntime == Helpers.WorkerRuntime.powershell)
+            {
+                localSettingsJsonContent = AddWorkerVersion(localSettingsJsonContent, Constants.PowerShellWorkerDefaultVersion);
+            }
+
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
@@ -441,6 +446,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var managedDependenciesConfig = JsonConvert.DeserializeObject<JToken>(managedDependenciesConfigContent);
             hostJsonObj.Add(Constants.ManagedDependencyConfigPropertyName, managedDependenciesConfig);
             return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+        }
+
+        private static string AddWorkerVersion(string localSettingsContent, string workerVersion)
+        {
+            var localSettingsObj = JsonConvert.DeserializeObject<JObject>(localSettingsContent);
+
+            if (localSettingsObj.TryGetValue("Values", StringComparison.OrdinalIgnoreCase, out var valuesContent))
+            {
+                var values = valuesContent as JObject;
+                values.Property(Constants.FunctionsWorkerRuntime).AddAfterSelf(
+                        new JProperty(Constants.FunctionsWorkerRuntimeVersion, workerVersion));
+            }
+
+            return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
         }
     }
 }
