@@ -49,6 +49,7 @@ namespace Azure.Functions.Cli.Common
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
         public const string AspNetCoreEnvironmentEnvironmentVariable = "ASPNETCORE_ENVIRONMENT";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
+        public const string PowerShellWorkerDefaultVersion = "~6";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

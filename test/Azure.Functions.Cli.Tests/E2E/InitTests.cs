@@ -378,7 +378,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public Task init_function_app_powershell_and_enable_managed_dependencies()
+        public Task init_function_app_powershell_enable_managed_dependencies_and_set_default_version()
         {
             return CliTester.Run(new RunConfiguration
             {
@@ -422,7 +422,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new []
                         {
                             "FUNCTIONS_WORKER_RUNTIME",
-                            "powershell"
+                            "powershell",
+                            "FUNCTIONS_WORKER_RUNTIME_VERSION",
+                            "~6"
                         }
                     }
                 },
