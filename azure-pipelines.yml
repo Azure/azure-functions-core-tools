@@ -141,7 +141,7 @@ steps:
     workingDirectory: '.\build'
     arguments: 'TestSignedArtifacts --signTest'
   displayName: 'Verify signed binaries'
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
 - pwsh: |
     .\generateMsiFiles.ps1 -MsiGenBranches @("release_3.0") -CommitMessage '$(Build.SourceVersionMessage)'
   env:
@@ -150,6 +150,41 @@ steps:
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
   displayName: 'Generate MSI files'
+- task: EsrpCodeSigning@1
+  displayName: 'MSI Code Signing'
+  inputs:
+    ConnectedServiceName: 'ESRP Service'
+    FolderPath: '$(Build.Repository.LocalPath)\artifacts'
+    Pattern: '*.msi'
+    signConfigType: 'inlineSignParams'
+    inlineOperation: |
+      [
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolSign",
+            "Parameters": {
+              "OpusName": "Microsoft",
+              "OpusInfo": "http://www.microsoft.com",
+              "FileDigest": "/fd \"SHA256\"",
+              "PageHash": "/NPH",
+              "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+            },
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          },
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolVerify",
+            "Parameters": {},
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          }
+      ]
+    SessionTimeout: '60'
+    MaxConcurrency: '50'
+    MaxRetryAttempts: '5'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0'))
+
 - pwsh: |
     .\generateSha.ps1
   displayName: 'Generate sha files'
