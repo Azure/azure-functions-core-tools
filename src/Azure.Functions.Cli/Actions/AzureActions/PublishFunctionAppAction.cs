@@ -760,7 +760,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
                     }                    
-                    throw new CliException($"Error creating a Blob container reference. {ex.Message}. Please make sure your connection string in \"AzureWebJobsStorage\" is valid");
+                    throw new CliException($"Error creating a Blob container reference. {ex.Message} Please make sure your connection string in \"AzureWebJobsStorage\" is valid");
                 }
 
                 var blob = blobContainer.GetBlockBlobReference(blobName);
