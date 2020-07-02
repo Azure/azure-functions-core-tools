@@ -34,6 +34,14 @@ npm i -g azure-functions-core-tools@2 --unsafe-perm true
 npm i -g azure-functions-core-tools@3 --unsafe-perm true
 ```
 
+To install with winget:
+
+```bash
+winget install Microsoft.AzureFunctionsCoreTools
+```
+
+_winget only supports x64_
+
 To install with chocolatey:
 
 ```bash
