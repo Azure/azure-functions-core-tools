@@ -37,8 +37,14 @@ npm i -g azure-functions-core-tools@3 --unsafe-perm true
 To install with chocolatey:
 
 ```bash
+**v2**
 choco install azure-functions-core-tools
 ```
+```bash
+**v3**
+choco install azure-functions-core-tools-3
+```
+
 #### Notice: To debug functions under vscode, x64 bitness is required
 ```bash
 choco install azure-functions-core-tools --params "'/x64'"
