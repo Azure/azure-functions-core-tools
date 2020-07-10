@@ -424,7 +424,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             "FUNCTIONS_WORKER_RUNTIME",
                             "powershell",
                             "FUNCTIONS_WORKER_RUNTIME_VERSION",
-                            "~6"
+                            "~7"
                         }
                     }
                 },
