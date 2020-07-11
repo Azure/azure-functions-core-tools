@@ -4791,7 +4791,7 @@ spec:
         - name: keda
           securityContext:
             {}
-          image: "docker.io/kedacore/keda:1.4.1"
+          image: "docker.io/kedacore/keda:1.5.0"
           command:
           - keda
           args:
@@ -4834,7 +4834,7 @@ spec:
         - name: keda-metrics-apiserver
           securityContext:
             {}
-          image: "docker.io/kedacore/keda-metrics-adapter:1.4.1"
+          image: "docker.io/kedacore/keda-metrics-adapter:1.5.0"
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
