@@ -16,60 +16,62 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 **v2** (master branch): Self-contained cross-platform package
 
-**v3**: Self-contained cross-platform package
+**v3**: (v3.x branch): Self-contained cross-platform package **(recommended)**
 
 ## Installing
 
 ### Windows
 
-To download and install with MSI (recommended):
+To download and install with MSI:
 
 **v3**
 
-- [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2135274)
+- [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2135274) - Required for VS Code debugging
 - [Windows 32-bit](https://go.microsoft.com/fwlink/?linkid=2135275)
 
 To install with npm:
-
-**v2**
-```bash
-npm i -g azure-functions-core-tools@2 --unsafe-perm true
-```
 
 **v3**
 ```bash
 npm i -g azure-functions-core-tools@3 --unsafe-perm true
 ```
 
-To install with chocolatey:
-
 **v2**
 ```bash
-choco install azure-functions-core-tools-2
+npm i -g azure-functions-core-tools@2 --unsafe-perm true
 ```
+
+To install with chocolatey:
+
 **v3**
 ```bash
 choco install azure-functions-core-tools-3
 ```
 
-#### Notice: To debug functions under vscode, x64 bitness is required
+**v2**
 ```bash
-choco install azure-functions-core-tools --params "'/x64'"
+choco install azure-functions-core-tools-2
 ```
+
+*Notice: To debug functions under vscode, x64 bitness is required*
+```bash
+choco install azure-functions-core-tools-3 --params "'/x64'"
+```
+
 ### Mac
 
 **Homebrew**:
-
-**v2**
-```bash
-brew tap azure/functions
-brew install azure-functions-core-tools@2
-```
 
 **v3**
 ```bash
 brew tap azure/functions
 brew install azure-functions-core-tools@3
+```
+
+**v2**
+```bash
+brew tap azure/functions
+brew install azure-functions-core-tools@2
 ```
 
 Homebrew allow side by side installation of v2 and v3, you can switch between the versions using
@@ -133,16 +135,16 @@ sudo chown root:root /etc/apt/sources.list.d/microsoft-prod.list
 
 #### 2. Install
 
-##### v2
-```bash
-sudo apt-get update
-sudo apt-get install azure-functions-core-tools-2
-```
-
 ##### v3
 ```bash
 sudo apt-get update
 sudo apt-get install azure-functions-core-tools-3
+```
+
+##### v2
+```bash
+sudo apt-get update
+sudo apt-get install azure-functions-core-tools-2
 ```
 
 #### Other Linux Distributions
