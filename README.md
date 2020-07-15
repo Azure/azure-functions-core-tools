@@ -22,7 +22,14 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 ### Windows
 
-To install runtime with npm:
+To download and install with MSI (recommended):
+
+**v3**
+
+- [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2135274)
+- [Windows 32-bit](https://go.microsoft.com/fwlink/?linkid=2135275)
+
+To install with npm:
 
 **v2**
 ```bash
