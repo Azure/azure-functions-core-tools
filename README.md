@@ -36,11 +36,11 @@ npm i -g azure-functions-core-tools@3 --unsafe-perm true
 
 To install with chocolatey:
 
-"**v2**"
+**v2**
 ```bash
-choco install azure-functions-core-tools
+choco install azure-functions-core-tools-2
 ```
-"**v3**"
+**v3**
 ```bash
 choco install azure-functions-core-tools-3
 ```
