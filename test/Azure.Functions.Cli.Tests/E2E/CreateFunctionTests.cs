@@ -142,6 +142,23 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task create_function_custom()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime custom",
+                    "new --template \"Http Trigger\" --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"Http Trigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
         public async Task create_template_function_js_no_space_name()
         {
             await CliTester.Run(new RunConfiguration

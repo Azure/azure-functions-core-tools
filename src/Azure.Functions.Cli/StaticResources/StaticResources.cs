@@ -51,6 +51,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> BundleConfig => GetValue("bundleConfig.json");
 
+        public static Task<string> CustomHandlerConfig => GetValue("customHandler.json");
+
         public static Task<string> ManagedDependenciesConfig => GetValue("managedDependenciesConfig.json");
 
         public static Task<string> PythonDockerBuildScript => GetValue(Constants.StaticResourcesNames.PythonDockerBuild);
