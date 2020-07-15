@@ -292,6 +292,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 : string.Empty;
 
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", storageConnectionStringValue);
+
+            if (workerRuntime == Helpers.WorkerRuntime.powershell)
+            {
+                localSettingsJsonContent = AddWorkerVersion(localSettingsJsonContent, Constants.PowerShellWorkerDefaultVersion);
+            }
+
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
@@ -409,9 +415,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
         {
-            var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
-                ? await StaticResources.PowerShellHostJson
-                : await StaticResources.HostJson;
+            var hostJsonContent = await StaticResources.HostJson;
+
+            if (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
+            {
+                hostJsonContent = await AddManagedDependencyConfig(hostJsonContent);
+            }
 
             if (extensionBundle)
             {
@@ -426,8 +435,31 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
             var bundleConfigContent = await StaticResources.BundleConfig;
             var bundleConfig = JsonConvert.DeserializeObject<JToken>(bundleConfigContent);
-            hostJsonObj.Add("extensionBundle", bundleConfig);
+            hostJsonObj.Add(Constants.ExtensionBundleConfigPropertyName, bundleConfig);
             return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+        }
+
+        private static async Task<string> AddManagedDependencyConfig(string hostJsonContent)
+        {
+            var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
+            var managedDependenciesConfigContent = await StaticResources.ManagedDependenciesConfig;
+            var managedDependenciesConfig = JsonConvert.DeserializeObject<JToken>(managedDependenciesConfigContent);
+            hostJsonObj.Add(Constants.ManagedDependencyConfigPropertyName, managedDependenciesConfig);
+            return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+        }
+
+        private static string AddWorkerVersion(string localSettingsContent, string workerVersion)
+        {
+            var localSettingsObj = JsonConvert.DeserializeObject<JObject>(localSettingsContent);
+
+            if (localSettingsObj.TryGetValue("Values", StringComparison.OrdinalIgnoreCase, out var valuesContent))
+            {
+                var values = valuesContent as JObject;
+                values.Property(Constants.FunctionsWorkerRuntime).AddAfterSelf(
+                        new JProperty(Constants.FunctionsWorkerRuntimeVersion, workerVersion));
+            }
+
+            return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
         }
     }
 }
