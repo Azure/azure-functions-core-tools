@@ -513,6 +513,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 services.AddMvc()
                     .AddApplicationPart(typeof(HostController).Assembly);
 
+                // workaround for https://github.com/Azure/azure-functions-core-tools/issues/2097
                 SetBundlesEnvironmentVariables();
 
                 services.AddWebJobsScriptHost(_builderContext.Configuration);
