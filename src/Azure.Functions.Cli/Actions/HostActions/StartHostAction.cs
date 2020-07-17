@@ -6,8 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
-using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
@@ -22,6 +20,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
 using Microsoft.Azure.WebJobs.Script.WebHost.Controllers;
@@ -34,7 +33,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Microsoft.Azure.WebJobs.Script.Description;
+using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -513,6 +513,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 services.AddMvc()
                     .AddApplicationPart(typeof(HostController).Assembly);
 
+                // workaround for https://github.com/Azure/azure-functions-core-tools/issues/2097
+                SetBundlesEnvironmentVariables();
+
                 services.AddWebJobsScriptHost(_builderContext.Configuration);
 
                 services.Configure<ScriptApplicationHostOptions>(o =>
@@ -530,6 +533,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
 
                 return services.BuildServiceProvider();
+            }
+
+            private void SetBundlesEnvironmentVariables()
+            {
+                var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
+                if (!string.IsNullOrEmpty(bundleId))
+                {
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", Path.Combine(Path.GetTempPath(), "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId));
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
+                }
             }
 
             public void Configure(IApplicationBuilder app)
