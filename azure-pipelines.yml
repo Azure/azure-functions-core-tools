@@ -197,6 +197,7 @@ steps:
 - pwsh: |
     Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
     Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
+  displayName: 'Move artifacts'
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
