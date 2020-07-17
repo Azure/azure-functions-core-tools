@@ -24,31 +24,31 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 #### To download and install with MSI:
 
-**v3**
+##### v3
 
 - [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2135274) (Required for VS Code debugging)
 - [Windows 32-bit](https://go.microsoft.com/fwlink/?linkid=2135275)
 
 #### To install with npm:
 
-**v3**
+##### v3
 ```bash
 npm i -g azure-functions-core-tools@3 --unsafe-perm true
 ```
 
-**v2**
+##### v2
 ```bash
 npm i -g azure-functions-core-tools@2 --unsafe-perm true
 ```
 
 #### To install with chocolatey:
 
-**v3**
+##### v3
 ```bash
 choco install azure-functions-core-tools-3
 ```
 
-**v2**
+##### v2
 ```bash
 choco install azure-functions-core-tools-2
 ```
@@ -62,13 +62,13 @@ choco install azure-functions-core-tools-3 --params "'/x64'"
 
 #### Homebrew:
 
-**v3**
+##### v3
 ```bash
 brew tap azure/functions
 brew install azure-functions-core-tools@3
 ```
 
-**v2**
+##### v2
 ```bash
 brew tap azure/functions
 brew install azure-functions-core-tools@2
