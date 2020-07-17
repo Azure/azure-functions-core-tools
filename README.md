@@ -26,7 +26,7 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 ##### v3
 
-- [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2135274) (Required for VS Code debugging)
+- [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2135274) (VS Code debugging requires 64-bit)
 - [Windows 32-bit](https://go.microsoft.com/fwlink/?linkid=2135275)
 
 #### To install with npm:
