@@ -48,14 +48,14 @@ npm i -g azure-functions-core-tools@2 --unsafe-perm true
 choco install azure-functions-core-tools-3
 ```
 
-##### v2
-```bash
-choco install azure-functions-core-tools-2
-```
-
 *Notice: To debug functions under vscode, the 64-bit version is required*
 ```bash
 choco install azure-functions-core-tools-3 --params "'/x64'"
+```
+
+##### v2
+```bash
+choco install azure-functions-core-tools-2
 ```
 
 ### Mac
