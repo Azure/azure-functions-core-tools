@@ -194,14 +194,9 @@ steps:
     testResultsFiles: '**/*.trx'
     failTaskOnFailedTests: true
   condition: succeededOrFailed()
-- task: CopyFiles@2
-  inputs:
-    SourceFolder: '$(Build.Repository.LocalPath)\artifacts'
-    Contents: |
-      Azure.Functions.Cli.*
-      func-cli*.msi
-    TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    CleanTargetFolder: true
+- pwsh: |
+    Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
+    Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
