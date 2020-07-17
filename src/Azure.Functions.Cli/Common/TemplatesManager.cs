@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
 using System.Linq;
 using System.Reflection;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -33,17 +34,16 @@ namespace Azure.Functions.Cli.Common
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+            string templatesJson; 
 
-            string templatesJson = null;
-            if (extensionBundleManager.IsExtensionBundleConfigured())
+            if(GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.custom || !extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                templatesJson = GetTemplatesJson();
+            }
+            else
             {
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                 templatesJson = await contentProvider.GetTemplates();
-            }
-
-            if(string.IsNullOrEmpty(templatesJson))
-            {
-                templatesJson = GetTemplatesJson();
             }
 
             return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);

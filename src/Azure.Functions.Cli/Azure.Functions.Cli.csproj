@@ -27,8 +27,8 @@
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\customHandler.json">
-      <LogicalName>$(AssemblyName).customHandler.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
+      <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>

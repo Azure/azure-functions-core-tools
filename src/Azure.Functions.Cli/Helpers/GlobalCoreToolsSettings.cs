@@ -9,6 +9,7 @@ namespace Azure.Functions.Cli.Helpers
     public static class GlobalCoreToolsSettings
     {
         private static WorkerRuntime _currentWorkerRuntime;
+
         public static WorkerRuntime CurrentWorkerRuntime
         {
             get

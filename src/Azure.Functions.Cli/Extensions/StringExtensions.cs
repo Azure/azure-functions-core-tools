@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.Extensions
             return cleanImageName.ToLowerInvariant().Substring(0, Math.Min(cleanImageName.Length, 128)).Trim();
         }
 
-        public static async Task<string> AppendContent(this string hostJsonContent, Task<string> contentSource, string contentPropertyName)
+        public static async Task<string> AppendContent(this string hostJsonContent, string contentPropertyName, Task<string> contentSource)
         {
             var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
             var additionalContent = await contentSource;

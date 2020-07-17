@@ -423,20 +423,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
             {
-                hostJsonContent = await hostJsonContent.AppendContent(StaticResources.ManagedDependenciesConfig, Constants.ManagedDependencyConfigPropertyName);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.ManagedDependencyConfigPropertyName, StaticResources.ManagedDependenciesConfig);
             }
 
             if (extensionBundle)
             {
-                hostJsonContent = await hostJsonContent.AppendContent(StaticResources.BundleConfig, Constants.ExtensionBundleConfigPropertyName);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
             }
 
             if(workerRuntime == Helpers.WorkerRuntime.custom)
             {
-                hostJsonContent = await hostJsonContent.AppendContent(StaticResources.CustomHandlerConfig, Constants.CustomHandlerPropertyName);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.CustomHandlerPropertyName, StaticResources.CustomHandlerConfig);
             }
 
-            await WriteFiles("host.json", hostJsonContent);
+            await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
         }
 
         private static string AddWorkerVersion(string localSettingsContent, string workerVersion)

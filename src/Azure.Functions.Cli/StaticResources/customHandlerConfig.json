@@ -3,6 +3,5 @@
     "defaultExecutablePath": "",
     "workingDirectory": "",
     "arguments": [ ]
-  },
-  "enableForwardingHttpRequest": true
+  }
 }
