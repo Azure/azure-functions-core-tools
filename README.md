@@ -45,6 +45,11 @@ choco install azure-functions-core-tools
 choco install azure-functions-core-tools-3
 ```
 
+To install with WinGet:
+```bash
+Winget install "Azure Funrtions Core Tools"
+```
+
 #### Notice: To debug functions under vscode, x64 bitness is required
 ```bash
 choco install azure-functions-core-tools --params "'/x64'"
