@@ -36,14 +36,14 @@ namespace Azure.Functions.Cli.Common
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             string templatesJson; 
 
-            if(GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.custom || !extensionBundleManager.IsExtensionBundleConfigured())
-            {
-                templatesJson = GetTemplatesJson();
-            }
-            else
+            if(extensionBundleManager.IsExtensionBundleConfigured())
             {
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                 templatesJson = await contentProvider.GetTemplates();
+            }
+            else
+            {
+                templatesJson = GetTemplatesJson();
             }
 
             return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
