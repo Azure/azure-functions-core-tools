@@ -454,8 +454,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (PublishBuildOption == BuildOption.Remote)
             {
                 await EnsureRemoteBuildIsSupported(functionApp);
-                // We don't need to remove WEBSITE_RUN_FROM_PACKAGE since Linux Consumption will set the app setting pointing to the latest package
-                await RemoveFunctionAppAppSetting(functionApp, Constants.WebsiteContentAzureFileConnectionString, Constants.WebsiteContentShared);
+                await RemoveFunctionAppAppSetting(functionApp, Constants.WebsiteRunFromPackage, Constants.WebsiteContentAzureFileConnectionString, Constants.WebsiteContentShared);
                 Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
                 var deployStatus = await PerformServerSideBuild(functionApp, zipFileFactory, pollConsumptionBuild);
                 return deployStatus == DeployStatus.Success;
@@ -703,7 +702,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
-                $"api/zipdeploy?isAsync=true&author={Environment.MachineName}&forceremotebuild=true", UriKind.Relative)))
+                $"api/zipdeploy?isAsync=true&author={Environment.MachineName}", UriKind.Relative)))
             {
                 ColoredConsole.WriteLine("Creating archive for current directory...");
 
