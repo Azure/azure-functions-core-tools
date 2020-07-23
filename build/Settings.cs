@@ -111,6 +111,8 @@ namespace Build
 
         public static string BuildNumber => config(null, "devops_buildNumber") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
 
+        public static string IntegrationBuildNumber => config(null, "integrationBuildNumber") ?? string.Empty;
+
         public static string CommitId => config(null, "Build.SourceVersion") ?? config("N/A", "APPVEYOR_REPO_COMMIT");
 
         public static string TelemetryInstrumentationKey => config(null, "TELEMETRY_INSTRUMENTATION_KEY");

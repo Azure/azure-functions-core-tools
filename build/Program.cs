@@ -16,8 +16,9 @@ namespace Build
                 .Then(TestSignedArtifacts, skip: !args.Contains("--signTest"))
                 .Then(Clean)
                 .Then(LogIntoAzure, skip: !args.Contains("--ci"))
+                .Then(UpdatePackageVersionForIntegrationTests, skip: !args.Contains("--integrationTests"))
                 .Then(RestorePackages)
-                .Then(ReplaceTelemetryInstrumentationKey, skip: !args.Contains("--ci"))
+                .Then(ReplaceTelemetryInstrumentationKey, skip: !args.Contains("--ci") || !args.Contains("--integrationTests"))
                 .Then(DotnetPublish)
                 .Then(FilterPowershellRuntimes)
                 .Then(FilterPythonRuntimes)
@@ -25,12 +26,13 @@ namespace Build
                 .Then(AddTemplatesNupkgs)
                 .Then(AddTemplatesJson)
                 .Then(AddGoZip)
-                .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
-                .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
+                .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci") || !args.Contains("--integrationTests"))
+                .Then(CopyBinariesToSign, skip: !args.Contains("--ci") || !args.Contains("--integrationTests"))
                 .Then(Test)
                 .Then(Zip)
-                .Then(UploadToStorage, skip: !args.Contains("--ci"))
+                .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
                 .Run();
         }
     }
 }
+
