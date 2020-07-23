@@ -1,25 +1,20 @@
 using Colors.Net;
-using Colors.Net.StringColorExtensions;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.Queue;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 
 namespace Build
 {
     public static class BuildSteps
     {
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
+        private static IntegrationTestBuildManifest _manifest;
 
         public static void Clean()
         {
@@ -37,11 +32,62 @@ namespace Build
                 "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/",
                 "https://www.myget.org/F/xunit/api/v3/index.json",
                 "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/index.json",
-                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json"
+                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json",
+                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json"
             }
             .Aggregate(string.Empty, (a, b) => $"{a} --source {b}");
 
             Shell.Run("dotnet", $"restore {Settings.ProjectFile} {feeds}");
+        }
+
+        public static void UpdatePackageVersionForIntegrationTests()
+        {
+            if (string.IsNullOrEmpty(Settings.IntegrationBuildNumber))
+            {
+                throw new Exception($"Environment variable 'integrationBuildNumber' cannot be null or empty for an integration build.");
+            }
+
+            const string AzureFunctionsPreReleaseFeedName = "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json";
+            var packagesToUpdate = GetV3PackageList();
+            string currentDirectory = null;
+
+            Dictionary<string, string> buildPackages = new Dictionary<string, string>();
+
+            _manifest = new IntegrationTestBuildManifest();
+
+            try
+            {
+                currentDirectory = Directory.GetCurrentDirectory();
+                var projectFolder = Path.GetFullPath(Settings.SrcProjectPath);
+                Directory.SetCurrentDirectory(projectFolder);
+
+                foreach (var package in packagesToUpdate)
+                {
+                    string packageInfo = Shell.GetOutput("NuGet", $"list {package} -Source {AzureFunctionsPreReleaseFeedName} -prerelease").Split(Environment.NewLine)[0];
+
+                    if (string.IsNullOrEmpty(packageInfo))
+                    {
+                        throw new Exception($"Failed to get {package} package information from {AzureFunctionsPreReleaseFeedName}.");
+                    }
+
+                    var parts = packageInfo.Split(" ");
+                    var packageName = parts[0];
+                    var packageVersion = parts[1];
+
+                    Shell.Run("dotnet", $"add package {packageName} -v {packageVersion} -s {AzureFunctionsPreReleaseFeedName} --no-restore");
+
+                    buildPackages.Add(packageName, packageVersion);
+                }
+            }
+            finally
+            {
+                if (buildPackages.Count > 0)
+                {
+                    _manifest.Packages = buildPackages;
+                }
+
+                Directory.SetCurrentDirectory(currentDirectory);
+            }
         }
 
         public static void ReplaceTelemetryInstrumentationKey()
@@ -83,6 +129,7 @@ namespace Build
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                    (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                     $"-o {outputPath} -c Release " +
                                     (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
 
@@ -90,6 +137,11 @@ namespace Build
                 {
                     RemoveLanguageWorkers(outputPath);
                 }
+            }
+
+            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
+            {
+                _manifest.CommitId = Settings.CommitId;
             }
         }
 
@@ -416,6 +468,7 @@ namespace Build
         public static void Zip()
         {
             var version = CurrentVersion;
+
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var path = Path.Combine(Settings.OutputDir, runtime);
@@ -455,45 +508,6 @@ namespace Build
                     _version = Shell.GetOutput(funcPath, "--version");
                 }
                 return _version;
-            }
-        }
-
-        public static void UploadToStorage()
-        {
-            if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
-            {
-                var version = new Version(CurrentVersion);
-                var storageAccount = CloudStorageAccount.Parse(Settings.BuildArtifactsStorage);
-                var blobClient = storageAccount.CreateCloudBlobClient();
-                var container = blobClient.GetContainerReference("builds");
-                container.CreateIfNotExistsAsync().Wait();
-
-                container.SetPermissionsAsync(new BlobContainerPermissions
-                {
-                    PublicAccess = BlobContainerPublicAccessType.Blob
-                });
-
-                foreach (var file in Directory.GetFiles(Settings.OutputDir, "Azure.Functions.Cli.*", SearchOption.TopDirectoryOnly))
-                {
-                    var fileName = Path.GetFileName(file);
-                    ColoredConsole.Write($"Uploading {fileName}...");
-
-                    var versionedBlob = container.GetBlockBlobReference($"{version.ToString()}/{fileName}");
-                    var latestBlob = container.GetBlockBlobReference($"{version.Major}/latest/{fileName.Replace($".{version.ToString()}", string.Empty)}");
-                    versionedBlob.UploadFromFileAsync(file).Wait();
-                    latestBlob.StartCopyAsync(versionedBlob).Wait();
-
-                    ColoredConsole.WriteLine("Done");
-                }
-
-                var latestVersionBlob = container.GetBlockBlobReference($"{version.Major}/latest/version.txt");
-                latestVersionBlob.UploadTextAsync(version.ToString()).Wait();
-            }
-            else
-            {
-                var error = $"{nameof(Settings.BuildArtifactsStorage)} is null or empty. Can't run {nameof(UploadToStorage)} target";
-                ColoredConsole.Error.WriteLine(error.Red());
-                throw new Exception(error);
             }
         }
 
@@ -543,6 +557,40 @@ namespace Build
                     Shell.Run("go", $"build -o {outputPath} {goFile}");
                 }
             }
+        }
+
+        public static void CreateIntegrationTestsBuildManifest()
+        {
+            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
+            {
+                _manifest.CoreToolsVersion = _version;
+                _manifest.Build = Settings.IntegrationBuildNumber;
+
+                var json = JsonConvert.SerializeObject(_manifest, Formatting.Indented);
+                var manifestFilePath = Path.Combine(Settings.OutputDir, "integrationTestBuildManifest.json");
+                File.WriteAllText(manifestFilePath, json);
+            }
+        }
+
+        private static List<string> GetV3PackageList()
+        {
+            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/dev/integrationTestsBuild/V3/CoreToolsBuild.json";
+            Uri address = new Uri(CoreToolsBuildPackageList);
+
+            string content = null;
+            using (var client = new WebClient())
+            {
+                content = client.DownloadString(address);
+            }
+
+            if (string.IsNullOrEmpty(content))
+            {
+                throw new Exception($"Failed to download package list from {CoreToolsBuildPackageList}");
+            }
+
+            var packageList = JsonConvert.DeserializeObject<List<string>>(content);
+
+            return packageList;
         }
     }
 }

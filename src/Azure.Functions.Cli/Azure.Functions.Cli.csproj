@@ -12,7 +12,8 @@
     <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
     <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
-    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash)</InformationalVersion>
+    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
+    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
 
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
