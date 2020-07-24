@@ -1,4 +1,5 @@
-﻿using Azure.Functions.Cli.Tests.E2E.Helpers;
+﻿using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Tests.E2E.Helpers;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -29,6 +30,75 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task create_timerTrigger_authConfigured_returns_error()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "new --template TimerTrigger --name testfunc --authorizationLevel function"
+                },
+                HasStandardError = true,
+                ErrorContains = new[]
+                {
+                    Constants.AuthLevelErrorMessage
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_httpTrigger_Invalid_AuthConfig_returns_error()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "new --template httpTrigger --name testfunc --authorizationLevel invalid"
+                },
+                OutputContains = new[]
+                {
+                    "Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools"
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_httpTrigger_with_authConfigured_node()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "new --template HttpTrigger --name testfunc --authorizationLevel function"
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_httpTrigger_with_authConfigured_dotnet()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet",
+                    "new --template HttpTrigger --name testfunc --authorizationLevel function"
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
         public async Task create_template_function_sanitization_dotnet()
         {
             await CliTester.Run(new RunConfiguration
@@ -39,7 +109,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "new --prefix 12n.e.0w-file$ --template HttpTrigger --name 12@n.other-file$"
                 },
                 CommandTimeout = new TimeSpan(0, 1, 0),
-                CheckFiles =  new[]
+                CheckFiles = new[]
                 {
                     new FileResult
                     {

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Azure.Functions.Cli.Common
 {
-    class ExtensionPackage
+    public class ExtensionPackage
     {
         public string Name { get; set; }
         public string Version { get; set; }

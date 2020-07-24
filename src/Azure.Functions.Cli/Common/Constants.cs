@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace Azure.Functions.Cli.Common
 {
-    internal static class Constants
+    public static class Constants
     {
         public const string StorageConnectionStringTemplate = "DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}";
         public const string FunctionsStorageAccountNamePrefix = "AzureFunctions";
@@ -52,6 +52,8 @@ namespace Azure.Functions.Cli.Common
         public const string OSXRootPath = "~/";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
         public const string PowerShellWorkerDefaultVersion = "~6";
+        public const string AuthLevelErrorMessage = "Unable to configure Authorization level, the selected template does not use Http Trigger";
+        public const string HttpTriggerTemplateName = "HttpTrigger";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -233,5 +235,12 @@ namespace Azure.Functions.Cli.Common
                         Name = "Microsoft.Azure.WebJobs.Extensions.Twilio" }
                     }
                 });
+
+        public enum HttpAuthorizationLevel
+        {
+            function,
+            anonymous,
+            admin
+        }
     }
 }
