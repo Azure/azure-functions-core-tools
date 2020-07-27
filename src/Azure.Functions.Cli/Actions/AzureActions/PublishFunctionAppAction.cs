@@ -270,6 +270,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
+            // Check if azure-functions-worker exists in requirements.txt for Python function app
+            if (workerRuntime == WorkerRuntime.python)
+            {
+                await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
+            }
+
             return result;
         }
 

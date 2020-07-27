@@ -93,6 +93,9 @@
     <EmbeddedResource Include="StaticResources\requirements.psd1">
       <LogicalName>$(AssemblyName).requirements.psd1</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\requirements.txt">
+      <LogicalName>$(AssemblyName).requirements.txt</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\dockerignore">
       <LogicalName>$(AssemblyName).dockerignore</LogicalName>
     </EmbeddedResource>
