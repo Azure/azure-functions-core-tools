@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Azure.Functions.Cli.ExtensionBundle
@@ -41,6 +42,12 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()
         {
             return new ExtensionBundleContentProvider(GetExtensionBundleManager(), NullLogger<ExtensionBundleContentProvider>.Instance);
+        }
+
+        public static string GetDownloadPath(string bundleId)
+        {
+            string rootDirectoryPath = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? Path.Combine(Constants.OSXRootPath, Constants.OSXCoreToolsTempDirectoryName) : Path.GetTempPath();
+            return Path.Combine(rootDirectoryPath, "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
         }
     }
 }
