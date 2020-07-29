@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
@@ -38,7 +39,7 @@ namespace Azure.Functions.Cli.Helpers
             });
         }
 
-        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, Constants.HttpAuthorizationLevel? httpAuthorizationLevel = null)
+        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             await TemplateOperation(async () =>
             {

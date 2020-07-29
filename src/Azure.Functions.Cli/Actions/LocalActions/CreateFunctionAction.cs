@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.Constants;
@@ -29,7 +30,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string TemplateName { get; set; }
         public string FunctionName { get; set; }
         public bool Csx { get; set; }
-        public HttpAuthorizationLevel? AuthorizationLevel { get; set; }
+        public AuthorizationLevel? AuthorizationLevel { get; set; }
 
         Lazy<IEnumerable<Template>> _templates;
 
@@ -59,7 +60,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(n => FunctionName = n);
 
             Parser
-                .Setup<HttpAuthorizationLevel?>('a', "authorizationLevel")
+                .Setup<AuthorizationLevel?>('a', "authlevel")
                 .WithDescription("Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools")
                 .Callback(a => AuthorizationLevel = a);
 

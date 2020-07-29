@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace Azure.Functions.Cli.Common
 {
-    public static class Constants
+    internal static class Constants
     {
         public const string StorageConnectionStringTemplate = "DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}";
         public const string FunctionsStorageAccountNamePrefix = "AzureFunctions";
@@ -235,12 +235,5 @@ namespace Azure.Functions.Cli.Common
                         Name = "Microsoft.Azure.WebJobs.Extensions.Twilio" }
                     }
                 });
-
-        public enum HttpAuthorizationLevel
-        {
-            function,
-            anonymous,
-            admin
-        }
     }
 }

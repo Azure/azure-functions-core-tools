@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime node",
-                    "new --template TimerTrigger --name testfunc --authorizationLevel function"
+                    "new --template TimerTrigger --name testfunc --authlevel function"
                 },
                 HasStandardError = true,
                 ErrorContains = new[]
@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime node",
-                    "new --template httpTrigger --name testfunc --authorizationLevel invalid"
+                    "new --template httpTrigger --name testfunc --authlevel invalid"
                 },
                 OutputContains = new[]
                 {
@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime node",
-                    "new --template HttpTrigger --name testfunc --authorizationLevel function"
+                    "new --template HttpTrigger --name testfunc --authlevel function"
                 },
                 OutputContains = new[]
                 {
@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template HttpTrigger --name testfunc --authorizationLevel function"
+                    "new --template HttpTrigger --name testfunc --authlevel function"
                 },
                 OutputContains = new[]
                 {
