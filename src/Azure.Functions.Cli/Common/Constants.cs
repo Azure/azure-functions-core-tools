@@ -52,6 +52,8 @@ namespace Azure.Functions.Cli.Common
         public const string OSXRootPath = "~/";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
         public const string PowerShellWorkerDefaultVersion = "~6";
+        public const string AuthLevelErrorMessage = "Unable to configure Authorization level. The selected template does not use Http Trigger";
+        public const string HttpTriggerTemplateName = "HttpTrigger";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

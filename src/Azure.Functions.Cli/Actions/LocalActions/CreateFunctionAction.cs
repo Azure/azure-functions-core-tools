@@ -10,8 +10,10 @@ using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using static Azure.Functions.Cli.Common.Constants;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -21,18 +23,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "create", Context = Context.Function, HelpText = "Create a new function from a template.")]
     internal class CreateFunctionAction : BaseAction
     {
-        private readonly ITemplatesManager _templatesManager;
+        private ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
 
         public string Language { get; set; }
         public string TemplateName { get; set; }
         public string FunctionName { get; set; }
         public bool Csx { get; set; }
+        public AuthorizationLevel? AuthorizationLevel { get; set; }
+
+        Lazy<IEnumerable<Template>> _templates;
+
 
         public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
+            _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -51,6 +58,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>('n', "name")
                 .WithDescription("Function name")
                 .Callback(n => FunctionName = n);
+
+            Parser
+                .Setup<AuthorizationLevel?>('a', "authlevel")
+                .WithDescription("Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools")
+                .Callback(a => AuthorizationLevel = a);
 
             Parser
                 .Setup<bool>("csx")
@@ -75,7 +87,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
-            var templates = await _templatesManager.Templates;
+
 
             if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
             {
@@ -92,13 +104,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (workerRuntime == WorkerRuntime.None)
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                    Language = SelectionMenuHelper.DisplaySelectionWizard(templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
                 else if (workerRuntime != WorkerRuntime.dotnet || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
-                    var displayList = templates
+                    var displayList = _templates.Value
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct()
@@ -127,7 +139,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr));
+                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), AuthorizationLevel);
             }
             else
             {
@@ -144,10 +156,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
                 TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
-                var template = templates.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                var template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
 
                 if (template == null)
                 {
@@ -164,6 +176,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         throw new CliException($"The {template.Metadata.Name} template has extensions. {Constants.Errors.ExtensionsNeedDotnet}");
                     }
 
+                    if (AuthorizationLevel.HasValue)
+                    {
+                        ConfigureAuthorizationLevel(template);
+                    }
+
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
                     FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
@@ -172,6 +189,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
+        }
+
+        private void ConfigureAuthorizationLevel(Template template)
+        {
+            var bindings = template.Function["bindings"];
+            bool IsHttpTriggerTemplate = bindings.Any(b => b["type"].ToString() == "httpTrigger");
+
+            if (!IsHttpTriggerTemplate)
+            {
+                throw new CliException(AuthLevelErrorMessage);
+            }
+            else
+            {
+                var binding = bindings.Where(b => b["type"].ToString().Equals(HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+                binding["authLevel"] = AuthorizationLevel.ToString();
+            }
         }
 
         private bool InferAndUpdateLanguage(WorkerRuntime workerRuntime)
