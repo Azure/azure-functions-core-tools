@@ -1,8 +1,5 @@
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Kubernetes;
-using FluentAssertions;
 using Newtonsoft.Json.Linq;
-using System;
 using System.Collections.Generic;
 using Xunit;
 
