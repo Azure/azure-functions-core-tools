@@ -37,17 +37,17 @@ namespace Azure.Functions.Cli.Common
                 {
                     GroupCollection groups = match.Groups;
 
-                    groups.TryGetValue("name", out Group packageName);
-                    groups.TryGetValue("spec", out Group packageSpec);
-                    groups.TryGetValue("envmarker", out Group packageEnvMarker);
-                    groups.TryGetValue("directref", out Group packageDirectRef);
+                    Group packageName = groups["name"];
+                    Group packageSpec = groups["spec"];
+                    Group packageEnvMarker = groups["envmarker"];
+                    Group packageDirectRef = groups["directref"];
 
                     packages.Add(new PythonPackage()
                     {
-                        Name = packageName.Value.ToLower().Replace('_', '-').Replace('.', '-').Trim(),
-                        Specification = packageSpec?.Value?.Trim() ?? string.Empty,
-                        EnvironmentMarkers = packageEnvMarker?.Value?.Trim() ?? string.Empty,
-                        DirectReference = packageDirectRef?.Value?.Trim() ?? string.Empty
+                        Name = packageName.Success ? packageName.Value.ToLower().Replace('_', '-').Replace('.', '-').Trim() : string.Empty,
+                        Specification = packageSpec.Success ? packageSpec.Value.Trim() : string.Empty,
+                        EnvironmentMarkers = packageEnvMarker.Success ? packageEnvMarker.Value.Trim() : string.Empty,
+                        DirectReference = packageDirectRef.Success ? packageDirectRef.Value.Trim() : string.Empty
                     });
                 }
             });
