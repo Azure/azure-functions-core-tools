@@ -36,6 +36,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.csx.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.csx.dotnet</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.custom">
+      <LogicalName>$(AssemblyName).Dockerfile.custom</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>

@@ -323,6 +323,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell);
             }
+            else if(workerRuntime == Helpers.WorkerRuntime.custom)
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfileCustom);
+            }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
             {
                 throw new CliException("Can't find WorkerRuntime None");
