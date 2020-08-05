@@ -529,6 +529,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
+                if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+                {
+                    services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new UserSecretsConfigurationBuilder(_hostOptions.ScriptPath));
+                }
 
                 services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
 
