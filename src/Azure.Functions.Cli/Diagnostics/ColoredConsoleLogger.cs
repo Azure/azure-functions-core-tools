@@ -5,6 +5,7 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Logging;
 using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using System.Linq;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
@@ -13,12 +14,15 @@ namespace Azure.Functions.Cli.Diagnostics
         private readonly Func<string, LogLevel, bool> _filter;
         private readonly bool _verboseErrors;
         private readonly string _category;
+        private readonly LogLevel _defaultLogLevel = LogLevel.Information;
+        private readonly string[] whitelistedLogsPrefixes = new string[] { "Worker process started and initialized.", "Host lock lease acquired by instance ID" };
 
-        public ColoredConsoleLogger(string category, Func<string, LogLevel, bool> filter = null)
+        public ColoredConsoleLogger(string category, Func<string, LogLevel, bool> filter = null, LogLevel logLevel = LogLevel.Information)
         {
             _category = category;
             _filter = filter;
             _verboseErrors = StaticSettings.IsDebug;
+            _defaultLogLevel = logLevel;
         }
 
         public bool IsEnabled(LogLevel logLevel)
@@ -33,11 +37,6 @@ namespace Azure.Functions.Cli.Diagnostics
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            if (!IsEnabled(logLevel))
-            {
-                return;
-            }
-
             string formattedMessage = formatter(state, exception);
 
             if (string.IsNullOrEmpty(formattedMessage))
@@ -45,10 +44,29 @@ namespace Azure.Functions.Cli.Diagnostics
                 return;
             }
 
+            if (!IsEnabled(logLevel))
+            {
+                return;
+            }
+
+            if (_defaultLogLevel == LogLevel.None)
+            {
+                if (!DoesMessageStartsWithWhiteListedPrefix(formattedMessage))
+                {
+                    return;
+                }
+            }
+
             foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
             {
                 ColoredConsole.WriteLine($"[{DateTime.UtcNow}] {line}");
             }
+        }
+
+        private bool DoesMessageStartsWithWhiteListedPrefix(string formattedMessage)
+        {
+            var formattedMessagesWithWhiteListePrefixes = whitelistedLogsPrefixes.Where(s => formattedMessage.StartsWith(s, StringComparison.OrdinalIgnoreCase));
+            return formattedMessagesWithWhiteListePrefixes.Any();
         }
 
         private IEnumerable<RichString> GetMessageString(LogLevel level, string formattedMessage, Exception exception)
