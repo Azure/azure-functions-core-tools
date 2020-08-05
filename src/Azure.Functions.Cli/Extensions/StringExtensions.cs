@@ -1,7 +1,9 @@
 ﻿using Azure.Functions.Cli.Exceptions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Extensions
 {
@@ -40,6 +42,15 @@ namespace Azure.Functions.Cli.Extensions
             }
 
             return cleanImageName.ToLowerInvariant().Substring(0, Math.Min(cleanImageName.Length, 128)).Trim();
+        }
+
+        public static async Task<string> AppendContent(this string hostJsonContent, string contentPropertyName, Task<string> contentSource)
+        {
+            var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
+            var additionalContent = await contentSource;
+            var additionalConfig = JsonConvert.DeserializeObject<JToken>(additionalContent);
+            hostJsonObj.Add(contentPropertyName, additionalConfig);
+            return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
         }
     }
 }
