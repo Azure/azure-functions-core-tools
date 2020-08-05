@@ -49,6 +49,7 @@ namespace Azure.Functions.Cli.Common
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
         public const string CustomHandlerPropertyName = "customHandler";
         public const string PowerShellWorkerDefaultVersion = "~7";
+        public const string UserSecretsIdElementName = "UserSecretsId";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
