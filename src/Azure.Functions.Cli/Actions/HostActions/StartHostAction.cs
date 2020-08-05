@@ -140,7 +140,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
-            
+
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
 
             if (UseHttps)
@@ -162,12 +162,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     configBuilder.AddEnvironmentVariables();
                 })
-                .ConfigureLogging( (context, loggingBuilder) =>
+                .ConfigureLogging(loggingBuilder =>
                 {
-                    loggingBuilder.ClearProviders();
-                    // ensure webhost level are not logged if LogLevel is explicity set to None.
                     if (_hostJsonDefaulLogLevel != LogLevel.None)
                     {
+                        loggingBuilder.ClearProviders();
                         loggingBuilder.AddDefaultWebJobsFilters();
                         loggingBuilder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
                     }
@@ -465,18 +464,5 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
-                // workaround for https://github.com/Azure/azure-functions-core-tools/issues/2097
-                SetBundlesEnvironmentVariables();
-
-            }
-
-            private void SetBundlesEnvironmentVariables()
-            {
-                var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
-                if (!string.IsNullOrEmpty(bundleId))
-                {
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetDownloadPath(bundleId));
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
-                }
     }
 }

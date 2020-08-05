@@ -24,14 +24,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private readonly string[] _corsOrigins;
         private readonly bool _corsCredentials;
         private readonly bool _enableAuth;
-        private readonly LogLevel _hostJsonDefaultLogLevel;
+        private readonly LogLevel _defaultLogLevel;
 
-        public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials, bool enableAuth, LogLevel hostJsonDefaultLogLevel)
+        public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials, bool enableAuth, LogLevel defaultLogLevel)
         {
             _builderContext = builderContext;
             _hostOptions = hostOptions;
             _enableAuth = enableAuth;
-            _hostJsonDefaultLogLevel = hostJsonDefaultLogLevel;
+            _defaultLogLevel = defaultLogLevel;
 
             if (!string.IsNullOrEmpty(corsOrigins))
             {
@@ -64,6 +64,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             services.AddMvc()
                 .AddApplicationPart(typeof(HostController).Assembly);
 
+            // workaround for https://github.com/Azure/azure-functions-core-tools/issues/2097
+            SetBundlesEnvironmentVariables();
+
             services.AddWebJobsScriptHost(_builderContext.Configuration);
 
             services.Configure<ScriptApplicationHostOptions>(o =>
@@ -76,11 +79,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
-            services.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(_ => new LoggingBuilder(_hostJsonDefaultLogLevel));
+            services.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(_ => new LoggingBuilder(_defaultLogLevel));
 
             services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
 
             return services.BuildServiceProvider();
+        }
+
+        private void SetBundlesEnvironmentVariables()
+        {
+            var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
+            if (!string.IsNullOrEmpty(bundleId))
+            {
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetDownloadPath(bundleId));
+                Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
+            }
         }
 
         public void Configure(IApplicationBuilder app)
