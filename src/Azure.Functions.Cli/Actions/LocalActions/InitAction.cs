@@ -6,12 +6,11 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
-using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp;
-using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -326,6 +325,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell);
             }
+            else if(workerRuntime == Helpers.WorkerRuntime.custom)
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfileCustom);
+            }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
             {
                 throw new CliException("Can't find WorkerRuntime None");
@@ -419,33 +422,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
             {
-                hostJsonContent = await AddManagedDependencyConfig(hostJsonContent);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.ManagedDependencyConfigPropertyName, StaticResources.ManagedDependenciesConfig);
             }
 
             if (extensionBundle)
             {
-                hostJsonContent = await AddBundleConfig(hostJsonContent);
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
             }
 
-            await WriteFiles("host.json", hostJsonContent);
-        }
+            if(workerRuntime == Helpers.WorkerRuntime.custom)
+            {
+                hostJsonContent = await hostJsonContent.AppendContent(Constants.CustomHandlerPropertyName, StaticResources.CustomHandlerConfig);
+            }
 
-        private static async Task<string> AddBundleConfig(string hostJsonContent)
-        {
-            var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
-            var bundleConfigContent = await StaticResources.BundleConfig;
-            var bundleConfig = JsonConvert.DeserializeObject<JToken>(bundleConfigContent);
-            hostJsonObj.Add(Constants.ExtensionBundleConfigPropertyName, bundleConfig);
-            return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
-        }
-
-        private static async Task<string> AddManagedDependencyConfig(string hostJsonContent)
-        {
-            var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
-            var managedDependenciesConfigContent = await StaticResources.ManagedDependenciesConfig;
-            var managedDependenciesConfig = JsonConvert.DeserializeObject<JToken>(managedDependenciesConfigContent);
-            hostJsonObj.Add(Constants.ManagedDependencyConfigPropertyName, managedDependenciesConfig);
-            return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+            await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
         }
 
         private static string AddWorkerVersion(string localSettingsContent, string workerVersion)

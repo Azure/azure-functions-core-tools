@@ -15,7 +15,8 @@ namespace Azure.Functions.Cli.Helpers
         node,
         python,
         java,
-        powershell
+        powershell,
+        custom
     }
 
     public static class WorkerRuntimeLanguageHelper
@@ -26,7 +27,8 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.node, new [] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.python, new []  { "py" } },
             { WorkerRuntime.java, new string[] { } },
-            { WorkerRuntime.powershell, new [] { "pwsh" } }
+            { WorkerRuntime.powershell, new [] { "pwsh" } },
+            { WorkerRuntime.custom, new string[] { } }
         };
 
         private static readonly IDictionary<string, WorkerRuntime> normalizeMap = availableWorkersRuntime
@@ -39,7 +41,8 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.dotnet, Constants.Languages.CSharp },
             { WorkerRuntime.node, Constants.Languages.JavaScript },
             { WorkerRuntime.python, Constants.Languages.Python },
-            { WorkerRuntime.powershell, Constants.Languages.Powershell }
+            { WorkerRuntime.powershell, Constants.Languages.Powershell },
+            { WorkerRuntime.custom, Constants.Languages.Custom },
         };
 
         private static readonly IDictionary<string, IEnumerable<string>> languageToAlias = new Dictionary<string, IEnumerable<string>>
@@ -50,7 +53,8 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.Python, new [] { "py" } },
             { Constants.Languages.Powershell, new [] { "pwsh" } },
             { Constants.Languages.CSharp, new [] { "csharp", "dotnet" } },
-            { Constants.Languages.Java, new string[] { } }
+            { Constants.Languages.Java, new string[] { } },
+            { Constants.Languages.Custom, new string[] { } }
         };
 
         public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = languageToAlias
@@ -65,7 +69,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", availableWorkersRuntime.Keys
-                .Where(k => k != WorkerRuntime.java)
+                .Where(k => (k != WorkerRuntime.java))
                 .Select(s => s.ToString()));
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys

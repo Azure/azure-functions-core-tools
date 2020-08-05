@@ -49,6 +49,7 @@ namespace Azure.Functions.Cli.Common
         public const string OSXCoreToolsTempDirectoryName = ".azure-functions-core-tools";
         public const string OSXRootPath = "~/";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
+        public const string CustomHandlerPropertyName = "customHandler";
         public const string PowerShellWorkerDefaultVersion = "~7";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
@@ -84,6 +85,7 @@ namespace Azure.Functions.Cli.Common
             public const string CSharp = "c#";
             public const string Powershell = "powershell";
             public const string Java = "java";
+            public const string Custom = "custom";
         }
 
         public static class ArmConstants

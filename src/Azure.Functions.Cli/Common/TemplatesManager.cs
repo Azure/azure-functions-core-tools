@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Http;
 using System.Threading.Tasks;
 using Colors.Net;
 using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
-using Newtonsoft.Json.Linq;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
 using System.Linq;
@@ -34,9 +32,9 @@ namespace Azure.Functions.Cli.Common
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+            string templatesJson; 
 
-            string templatesJson;
-            if (extensionBundleManager.IsExtensionBundleConfigured())
+            if(extensionBundleManager.IsExtensionBundleConfigured())
             {
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                 templatesJson = await contentProvider.GetTemplates();
@@ -45,6 +43,7 @@ namespace Azure.Functions.Cli.Common
             {
                 templatesJson = GetTemplatesJson();
             }
+
             return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
         }
 

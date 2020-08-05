@@ -31,6 +31,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileDotNet => GetValue("Dockerfile.dotnet");
 
+        public static Task<string> DockerfileCustom => GetValue("Dockerfile.custom");
+
         public static Task<string> DockerfileCsxDotNet => GetValue("Dockerfile.csx.dotnet");
 
         public static Task<string> DockerfilePython36 => GetValue("Dockerfile.python36");
@@ -52,6 +54,8 @@ namespace Azure.Functions.Cli
         public static Task<string> HostJson => GetValue("host.json");
 
         public static Task<string> BundleConfig => GetValue("bundleConfig.json");
+
+        public static Task<string> CustomHandlerConfig => GetValue("customHandlerConfig.json");
 
         public static Task<string> ManagedDependenciesConfig => GetValue("managedDependenciesConfig.json");
 
