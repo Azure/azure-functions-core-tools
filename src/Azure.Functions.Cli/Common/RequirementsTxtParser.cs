@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.Collections.Concurrent;
+using System.IO;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -13,7 +14,7 @@ namespace Azure.Functions.Cli.Common
         public static async Task<List<PythonPackage>> ParseRequirementsTxtFile(string functionAppRoot)
         {
             // Check if requirements.txt exist
-            string requirementsTxtPath = $"{functionAppRoot}/{Constants.RequirementsTxt}";
+            string requirementsTxtPath = Path.Join(functionAppRoot, Constants.RequirementsTxt);
             if (!FileSystemHelpers.FileExists(requirementsTxtPath))
             {
                 return new List<PythonPackage>();
