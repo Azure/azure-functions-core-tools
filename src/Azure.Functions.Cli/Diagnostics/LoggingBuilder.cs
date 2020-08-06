@@ -10,27 +10,9 @@ namespace Azure.Functions.Cli.Diagnostics
 {
     internal class LoggingBuilder : IConfigureBuilder<ILoggingBuilder>
     {
-        private LogLevel _hostJsonDefaultLogLevel = LogLevel.Information;
-
-        public LoggingBuilder(LogLevel logLevel)
-        {
-            _hostJsonDefaultLogLevel = logLevel;
-        }
-
         public void Configure(ILoggingBuilder builder)
         {
-            builder.AddProvider(new ColoredConsoleLoggerProvider(_hostJsonDefaultLogLevel)).AddFilter((cat, level) =>
-            {
-                if (_hostJsonDefaultLogLevel == LogLevel.None)
-                {
-                    // Filter logs based on content in ConsoleLogger
-                    return true;
-                }
-                else
-                {
-                    return level >= _hostJsonDefaultLogLevel;
-                }
-            });
+            builder.AddProvider(new ColoredConsoleLoggerProvider());
 
             builder.Services.AddSingleton<TelemetryClient>(provider =>
             {
