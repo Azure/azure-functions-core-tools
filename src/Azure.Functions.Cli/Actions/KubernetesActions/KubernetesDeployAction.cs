@@ -191,7 +191,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         {
             if (!string.IsNullOrEmpty(Registry))
             {
-                return ($"{Registry}/{Name}", true);
+                return ($"{Registry}/{Name}", true && !NoDocker);
             }
             else if (!string.IsNullOrEmpty(ImageName))
             {

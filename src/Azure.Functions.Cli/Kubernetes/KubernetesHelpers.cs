@@ -72,56 +72,12 @@ namespace Azure.Functions.Cli.Kubernetes
             }
         }
 
-        internal static string GetOsirisResources(string @namespace)
-        {
-            var injectorCaCert = SecurityHelpers.CreateCACertificate("osiris-proxy-injector-ca");
-            var hijackerCaCert = SecurityHelpers.CreateCACertificate("osiris-endpoints-hijacker-ca");
-
-            var injectorAltNames = new[]
-            {
-                $"osiris-osiris-edge-proxy-injector.{@namespace}",
-                $"osiris-osiris-edge-proxy-injector.{@namespace}.svc",
-                $"osiris-osiris-edge-proxy-injector.{@namespace}.svc.cluster",
-                $"osiris-osiris-edge-proxy-injector.{@namespace}.svc.cluster.local",
-            };
-
-            var hijackerAltnames = new[]
-            {
-                $"osiris-osiris-edge-endpoints-hijacker.{@namespace}",
-                $"osiris-osiris-edge-endpoints-hijacker.{@namespace}.svc",
-                $"osiris-osiris-edge-endpoints-hijacker.{@namespace}.svc.cluster",
-                $"osiris-osiris-edge-endpoints-hijacker.{@namespace}.svc.cluster.local",
-            };
-
-            var injectorTlsCert = SecurityHelpers.CreateCertificateFromCA(injectorCaCert, "osiris-osiris-edge-proxy-injector", injectorAltNames);
-            var hijackerTlsCert = SecurityHelpers.CreateCertificateFromCA(hijackerCaCert, "osiris-osiris-edge-endpoints-hijacker", hijackerAltnames);
-
-            var caCertForEdgePointHijacker = SecurityHelpers.GetPemCert(hijackerCaCert);
-            var tlsCertForEdgeEndpointHijacker = SecurityHelpers.GetPemCert(hijackerTlsCert);
-            var tlsKeyForEdgeEndpointHijacker = SecurityHelpers.GetPemRsaKey(hijackerTlsCert);
-
-            var caCertForProxyInjector = SecurityHelpers.GetPemCert(injectorCaCert);
-            var tlsCertForProxyInjector = SecurityHelpers.GetPemCert(injectorTlsCert);
-            var tlsKeyForProxyInjector = SecurityHelpers.GetPemRsaKey(injectorTlsCert);
-
-            return StaticResources
-                .OsirisTemplate
-                .Result
-                .Replace("OSIRIS_NAMESPACE_PLACEHOLDER", @namespace)
-                .Replace("TLS_CERT_FOR_EDGE_ENDPOINTS_HIJACKER", tlsCertForEdgeEndpointHijacker)
-                .Replace("TLS_KEY_FOR_EDGE_ENDPOINTS_HIJACKER", tlsKeyForEdgeEndpointHijacker)
-                .Replace("CA_CERT_FOR_EDGE_ENDPOINT_HIJACKER", caCertForEdgePointHijacker)
-                .Replace("TLS_CERT_FOR_EDGE_PROXY_INJECTOR", tlsCertForProxyInjector)
-                .Replace("TLS_KEY_FOR_EDGE_PROXY_INJECTOR", tlsKeyForProxyInjector)
-                .Replace("CA_CERT_FOR_EDGE_PROXY_INJECTOR", caCertForProxyInjector);
-        }
-
         internal static async Task<bool> NamespaceExists(string @namespace)
         {
             (_, _, var exitCode) = await KubectlHelper.RunKubectl($"get namespace {@namespace}", ignoreError: true, showOutput: false);
             return exitCode == 0;
         }
-		
+
         internal static async Task<(string, bool)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
         {
             var cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
@@ -179,17 +135,9 @@ namespace Azure.Functions.Cli.Kubernetes
                 //Environment variables for the func app keys kubernetes secret
                 var kubernetesSecretEnvironmentVariable = FuncAppKeysHelper.FuncKeysKubernetesEnvironVariables(keysSecretCollectionName, mountKeysAsContainerVolume);
                 var additionalEnvVars = enabledFunctions.Concat(kubernetesSecretEnvironmentVariable).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, additionalEnvVars, new Dictionary<string, string>
-                {
-                    { "osiris.deislabs.io/enabled", "true" },
-                    { "osiris.deislabs.io/minReplicas", "1" }
-                }, port: 80);
+                var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, additionalEnvVars, port: 80);
                 deployments.Add(deployment);
-                var service = GetService(name + "-http", @namespace, deployment, serviceType, new Dictionary<string, string>
-                {
-                    { "osiris.deislabs.io/enabled", "true" },
-                    { "osiris.deislabs.io/deployment", deployment.Metadata.Name }
-                });
+                var service = GetService(name + "-http", @namespace, deployment, serviceType);
                 result.Add(service);
             }
 
@@ -207,7 +155,7 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 secrets[Constants.FunctionsWorkerRuntime] = GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString();
             }
-			
+
             int resourceIndex = 0;
             if (useConfigMap)
             {
