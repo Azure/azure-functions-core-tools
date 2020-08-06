@@ -13,6 +13,7 @@ namespace Azure.Functions.Cli.Helpers
             { WorkerRuntime.java, "languageWorkers:java:arguments" },
             { WorkerRuntime.powershell, "languageWorkers:powershell:arguments" },
             { WorkerRuntime.dotnet, string.Empty },
+            { WorkerRuntime.custom, string.Empty },
             { WorkerRuntime.None, string.Empty }
         }
         .Select(p => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)

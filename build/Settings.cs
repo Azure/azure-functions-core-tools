@@ -20,9 +20,9 @@ namespace Build
                 : value;
         }
 
-        public const string ItemTemplatesVersion = "2.1.1517";
-        public const string ProjectTemplatesVersion = "2.1.1517";
-        public const string TemplateJsonVersion = "2.1.1517";
+        public const string ItemTemplatesVersion = "2.1.1579";
+        public const string ProjectTemplatesVersion = "2.1.1579";
+        public const string TemplateJsonVersion = "2.1.1579";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 

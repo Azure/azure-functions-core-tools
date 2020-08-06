@@ -50,6 +50,7 @@ namespace Azure.Functions.Cli.Common
         public const string OSXCoreToolsTempDirectoryName = ".azure-functions-core-tools";
         public const string OSXRootPath = "~/";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
+        public const string CustomHandlerPropertyName = "customHandler";
         public const string PowerShellWorkerDefaultVersion = "~6";
         public const string AuthLevelErrorMessage = "Unable to configure Authorization level. The selected template does not use Http Trigger";
         public const string HttpTriggerTemplateName = "HttpTrigger";
@@ -87,6 +88,7 @@ namespace Azure.Functions.Cli.Common
             public const string CSharp = "c#";
             public const string Powershell = "powershell";
             public const string Java = "java";
+            public const string Custom = "custom";
         }
 
         public static class ArmConstants
