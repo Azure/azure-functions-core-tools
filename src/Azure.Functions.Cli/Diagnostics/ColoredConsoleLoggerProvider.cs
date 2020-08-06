@@ -5,16 +5,16 @@ namespace Azure.Functions.Cli.Diagnostics
 {
     public class ColoredConsoleLoggerProvider : ILoggerProvider
     {
-        private readonly Func<string, LogLevel, bool> _filter;
+        private readonly LoggingFilterHelper _loggingFilterHelper;
 
-        public ColoredConsoleLoggerProvider(Func<string, LogLevel, bool> filter = null)
+        public ColoredConsoleLoggerProvider(LoggingFilterHelper loggingFilterHelper)
         {
-            _filter = filter;
+            _loggingFilterHelper = loggingFilterHelper;
         }
 
         public ILogger CreateLogger(string categoryName)
         {
-            return new ColoredConsoleLogger(categoryName, _filter);
+            return new ColoredConsoleLogger(categoryName, _loggingFilterHelper);
         }
 
         public void Dispose()
