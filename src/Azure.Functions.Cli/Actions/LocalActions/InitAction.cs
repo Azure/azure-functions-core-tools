@@ -43,6 +43,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool? ManagedDependencies { get; set; }
 
+        public WorkerRuntime ResolvedWorkerRuntime { get; set; }
+
+        public string ResolvedLanguage { get; set; }
+
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
@@ -150,30 +154,28 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitFunctionAppProject()
         {
-            WorkerRuntime workerRuntime;
-            string language = string.Empty;
             if (Csx)
             {
-                workerRuntime = Helpers.WorkerRuntime.dotnet;
+                ResolvedWorkerRuntime = Helpers.WorkerRuntime.dotnet;
             }
             else
             {
-                (workerRuntime, language) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
+                (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
             }
 
-            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", workerRuntime.ToString());
+            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
-            if (workerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
+            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
             {
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force);
             }
             else
             {
-                bool managedDependenciesOption = ResolveManagedDependencies(workerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(workerRuntime, language, managedDependenciesOption);
+                bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
+                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, managedDependenciesOption);
                 await WriteFiles();
-                await WriteHostJson(workerRuntime, managedDependenciesOption, ExtensionBundle);
-                await WriteLocalSettingsJson(workerRuntime);
+                await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
+                await WriteLocalSettingsJson(ResolvedWorkerRuntime);
             }
 
             await WriteExtensionsJson();
@@ -184,7 +186,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(workerRuntime, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, Csx);
             }
         }
 
@@ -290,6 +292,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 : string.Empty;
 
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", storageConnectionStringValue);
+
+            if (workerRuntime == Helpers.WorkerRuntime.powershell)
+            {
+                localSettingsJsonContent = AddWorkerVersion(localSettingsJsonContent, Constants.PowerShellWorkerDefaultVersion);
+            }
+
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
@@ -407,9 +415,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
         {
-            var hostJsonContent = (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
-                ? await StaticResources.PowerShellHostJson
-                : await StaticResources.HostJson;
+            var hostJsonContent = await StaticResources.HostJson;
+
+            if (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
+            {
+                hostJsonContent = await AddManagedDependencyConfig(hostJsonContent);
+            }
 
             if (extensionBundle)
             {
@@ -424,8 +435,31 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
             var bundleConfigContent = await StaticResources.BundleConfig;
             var bundleConfig = JsonConvert.DeserializeObject<JToken>(bundleConfigContent);
-            hostJsonObj.Add("extensionBundle", bundleConfig);
+            hostJsonObj.Add(Constants.ExtensionBundleConfigPropertyName, bundleConfig);
             return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+        }
+
+        private static async Task<string> AddManagedDependencyConfig(string hostJsonContent)
+        {
+            var hostJsonObj = JsonConvert.DeserializeObject<JObject>(hostJsonContent);
+            var managedDependenciesConfigContent = await StaticResources.ManagedDependenciesConfig;
+            var managedDependenciesConfig = JsonConvert.DeserializeObject<JToken>(managedDependenciesConfigContent);
+            hostJsonObj.Add(Constants.ManagedDependencyConfigPropertyName, managedDependenciesConfig);
+            return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
+        }
+
+        private static string AddWorkerVersion(string localSettingsContent, string workerVersion)
+        {
+            var localSettingsObj = JsonConvert.DeserializeObject<JObject>(localSettingsContent);
+
+            if (localSettingsObj.TryGetValue("Values", StringComparison.OrdinalIgnoreCase, out var valuesContent))
+            {
+                var values = valuesContent as JObject;
+                values.Property(Constants.FunctionsWorkerRuntime).AddAfterSelf(
+                        new JProperty(Constants.FunctionsWorkerRuntimeVersion, workerVersion));
+            }
+
+            return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
         }
     }
 }
