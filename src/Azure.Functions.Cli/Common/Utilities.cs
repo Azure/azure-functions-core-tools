@@ -2,6 +2,9 @@
 using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -99,7 +102,7 @@ namespace Azure.Functions.Cli
                 Match match = Regex.Match(sanitizedString, removeRegex);
                 string matchString;
                 // Keep removing the matching regex until no more match is found
-                while(!string.IsNullOrEmpty(matchString = match.Value))
+                while (!string.IsNullOrEmpty(matchString = match.Value))
                 {
                     sanitizedString = sanitizedString.Replace(matchString, new string(fillerChar, matchString.Length));
                     match = Regex.Match(sanitizedString, removeRegex);
@@ -170,6 +173,23 @@ namespace Azure.Functions.Cli
             var localPath = Path.Combine(appDataDir, "azure-functions-core-tools");
             FileSystemHelpers.EnsureDirectory(localPath);
             return localPath;
+        }
+
+        internal static LogLevel GetHostJsonDefaultLogLevel(string hostJsonFileContent)
+        {
+            var hostJson = JsonConvert.DeserializeObject<JObject>(hostJsonFileContent.ToLower());
+            try
+            {
+                if (Enum.TryParse(typeof(LogLevel), hostJson["logging"]["loglevel"]["default"].ToString(), true, out object outLevel))
+                {
+                    return (LogLevel)outLevel;
+                }
+            }
+            catch
+            {
+            }
+            // Default log level
+            return LogLevel.Information;
         }
     }
 }
