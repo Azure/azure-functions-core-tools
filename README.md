@@ -235,7 +235,7 @@ func kubernetes deploy --name myfunction --registry <docker-hub-id or registry-s
 
 #### Prerequisites
 
-* [Knative](https://github.com/knative/docs/tree/master/install/)
+* [Knative](https://github.com/knative/docs/tree/master/docs/install)
 
 Deploying Azure Functions to knative is supported with the ```--platform knative``` flag.
 The Core Tools CLI identifies non HTTP trigger functions and annotates the knative manifest with the the ```minScale``` annotation to opt out of scale-to-zero.
