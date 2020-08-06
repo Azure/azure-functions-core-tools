@@ -2,9 +2,6 @@
 using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Script;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -173,20 +170,6 @@ namespace Azure.Functions.Cli
             var localPath = Path.Combine(appDataDir, "azure-functions-core-tools");
             FileSystemHelpers.EnsureDirectory(localPath);
             return localPath;
-        }
-
-        internal static LogLevel GetHostJsonDefaultLogLevel()
-        {
-            try
-            {
-                var hostJson = JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile("host.json"));
-                return (LogLevel)Enum.Parse(typeof(LogLevel), hostJson["Logging"]["LogLevel"]["Default"].ToString());
-            }
-            catch (Exception)
-            {
-                // Default log level
-                return LogLevel.Information;
-            }
         }
     }
 }
