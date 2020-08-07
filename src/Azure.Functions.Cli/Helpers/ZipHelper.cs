@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -22,13 +23,13 @@ namespace Azure.Functions.Cli.Helpers
 
             if (noBuild)
             {
-                ColoredConsole.WriteLine(Yellow("Skipping build event for functions project (--no-build)."));
+                ColoredConsole.WriteLine(DarkYellow("Skipping build event for functions project (--no-build)."));
             } else if (buildOption == BuildOption.Remote)
             {
-                ColoredConsole.WriteLine(Yellow("Performing remote build for functions project."));
+                ColoredConsole.WriteLine(DarkYellow("Performing remote build for functions project."));
             } else if (buildOption == BuildOption.Local)
             {
-                ColoredConsole.WriteLine(Yellow("Performing local build for functions project."));
+                ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project."));
             }
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !noBuild)

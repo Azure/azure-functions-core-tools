@@ -93,9 +93,9 @@ namespace Azure.Functions.Cli.Helpers
                 .WriteLine("On Windows you can run:")
                 .WriteLine()
                 .Write(DarkCyan("PS> "))
-                .WriteLine($"$cert = {Yellow("New-SelfSignedCertificate")} -Subject localhost -DnsName localhost -FriendlyName \"Functions Development\" -KeyUsage DigitalSignature -TextExtension @(\"2.5.29.37={{text}}1.3.6.1.5.5.7.3.1\")")
+                .WriteLine($"$cert = {DarkYellow("New-SelfSignedCertificate")} -Subject localhost -DnsName localhost -FriendlyName \"Functions Development\" -KeyUsage DigitalSignature -TextExtension @(\"2.5.29.37={{text}}1.3.6.1.5.5.7.3.1\")")
                 .Write(DarkCyan("PS> "))
-                .WriteLine($"{Yellow("Export-PfxCertificate")} -Cert $cert -FilePath certificate.pfx -Password (ConvertTo-SecureString -String {Red("<password>")} -Force -AsPlainText)")
+                .WriteLine($"{DarkYellow("Export-PfxCertificate")} -Cert $cert -FilePath certificate.pfx -Password (ConvertTo-SecureString -String {Red("<password>")} -Force -AsPlainText)")
                 .WriteLine()
                 .WriteLine("For more checkout https://docs.microsoft.com/en-us/aspnet/core/security/https")
                 .WriteLine();
