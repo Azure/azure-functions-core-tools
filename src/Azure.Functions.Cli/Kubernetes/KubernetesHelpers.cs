@@ -598,10 +598,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 {
                     Name = name,
                     Namespace = @namespace,
-                    Labels = new Dictionary<string, string>
-                    {
-                        { "deploymentName" , deployment.Metadata.Name }
-                    }
+                    Labels = new Dictionary<string, string>()
                 },
                 Spec = new ScaledObjectSpecV1Alpha1
                 {
@@ -678,19 +675,6 @@ namespace Azure.Functions.Cli.Kubernetes
                 default:
                     return triggerType;
             }
-        }
-
-        private static async Task<bool> HasKeda()
-        {
-            var kedaEdgeResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda-edge --all-namespaces");
-            var kedaResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda --all-namespaces");
-            return kedaResult.Items.Any() || kedaEdgeResult.Items.Any();
-        }
-
-        private static async Task<bool> HasScaledObjectCrd()
-        {
-            var crdResult = await KubectlHelper.KubectlGet<SearchResultV1<CustomResourceDefinitionV1Beta1>>("crd");
-            return crdResult.Items.Any(i => i.Metadata.Name == "scaledobjects.keda.k8s.io");
         }
 
 
