@@ -352,7 +352,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole
                         .WriteLine()
-                        .WriteLine(Yellow("Http Functions:"))
+                        .WriteLine(DarkYellow("Http Functions:"))
                         .WriteLine();
                 }
 
@@ -381,7 +381,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     var functionMethods = methods != null ? $"{CleanAndFormatHttpMethods(string.Join(",", methods))}" : null;
                     var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
                     ColoredConsole
-                        .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(functionMethods)} {Green(url)}")
+                        .WriteLine($"\t{HttpFunctionNameColor($"{function.Name}:")} {HttpFunctionUrlColor(functionMethods)} {HttpFunctionUrlColor(url)}")
                         .WriteLine();
                 }
             }

@@ -118,7 +118,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 if (StaticSettings.IsDebug)
                 {
-                    ColoredConsole.WriteLine(Yellow("Unable to retrieve the resource manager URL from az CLI"));
+                    ColoredConsole.WriteLine(WarningColor("Unable to retrieve the resource manager URL from az CLI"));
                 }
                 return (false, null);
             }
@@ -156,7 +156,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 if (StaticSettings.IsDebug)
                 {
-                    ColoredConsole.WriteLine(Yellow("Unable to fetch access token from az CLI"));
+                    ColoredConsole.WriteLine(WarningColor("Unable to fetch access token from az CLI"));
                 }
                 return (false, null);
             }
