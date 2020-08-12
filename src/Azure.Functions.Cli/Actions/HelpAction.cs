@@ -161,7 +161,7 @@ namespace Azure.Functions.Cli.Actions
                 ColoredConsole.WriteLine(TitleColor("Contexts:"));
                 foreach (var context in contexts)
                 {
-                    ColoredConsole.WriteLine(string.Format($"{{0, {-longestName}}}  {{1}}", context.ToLowerCaseString().Yellow(), GetDescriptionOfContext(context)));
+                    ColoredConsole.WriteLine(string.Format($"{{0, {-longestName}}}  {{1}}", context.ToLowerCaseString().DarkYellow(), GetDescriptionOfContext(context)));
                 }
                 ColoredConsole.WriteLine();
             }
@@ -311,7 +311,7 @@ namespace Azure.Functions.Cli.Actions
                 ? action.Names.Distinct().Aggregate((a, b) => string.Join(", ", a, b))
                 : string.Empty;
             var description = action.Type.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
-            return string.Format($"{{0, {-formattingSpace}}}  {{1}} {(aliases.Any() ? "Aliases:" : "")} {{2}}", name.Yellow(), description, aliases);
+            return string.Format($"{{0, {-formattingSpace}}}  {{1}} {(aliases.Any() ? "Aliases:" : "")} {{2}}", name.DarkYellow(), description, aliases);
         }
 
         // http://stackoverflow.com/a/1799401
