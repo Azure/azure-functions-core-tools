@@ -73,6 +73,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PowerShellRequirementsPsd1 => GetValue("requirements.psd1");
 
+        public static Task<string> PythonRequirementsTxt => GetValue("requirements.txt");
+
         public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
 
 

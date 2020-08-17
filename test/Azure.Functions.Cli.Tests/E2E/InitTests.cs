@@ -508,5 +508,33 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public Task init_python_app_generates_requirements_txt()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime python"
+                },
+                OutputContains = new[]
+                {
+                    "Writing requirements.txt"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "requirements.txt",
+                        ContentContains = new []
+                        {
+                            "# Do not include azure-functions-worker as it may conflict with the Azure Functions platform",
+                            "azure-functions"
+                        }
+                    }
+                },
+            }, _output);
+        }
     }
 }
