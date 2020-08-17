@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.PublishHelperTests
         [InlineData("", false)]
         public void IsLinuxFxVersionUsingCustomImageTest(string linuxFxVersion, bool expected)
         {
-            Assert.Equal(expected, PublishHelper.IsLinuxFxVersionUsingCustomImage(linuxFxVersion)); 
+            Assert.Equal(expected, PublishHelper.IsLinuxFxVersionUsingCustomImage(linuxFxVersion));
         }
 
         [Theory]
