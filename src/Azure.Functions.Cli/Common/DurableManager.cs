@@ -14,6 +14,7 @@ using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Colors.Net.StringStaticMethods;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -83,13 +84,13 @@ namespace Azure.Functions.Cli.Common
                 }
                 else
                 {
-                    ColoredConsole.WriteLine(Yellow($"Could not find local host metadata file '{ScriptConstants.HostMetadataFileName}'"));
+                    ColoredConsole.WriteLine(WarningColor($"Could not find local host metadata file '{ScriptConstants.HostMetadataFileName}'"));
                 }
             }
             catch (Exception e)
             {
-                ColoredConsole.WriteLine(Yellow($"Exception thrown while attempting to parse override connection string and task hub name from '{ScriptConstants.HostMetadataFileName}':"));
-                ColoredConsole.WriteLine(Yellow(e.Message));
+                ColoredConsole.WriteLine(WarningColor($"Exception thrown while attempting to parse override connection string and task hub name from '{ScriptConstants.HostMetadataFileName}':"));
+                ColoredConsole.WriteLine(WarningColor(e.Message));
             }
         }
 
@@ -131,7 +132,7 @@ namespace Azure.Functions.Cli.Common
 
             if (assemblyFilePaths.Count() == 0)
             {
-                ColoredConsole.WriteLine(Yellow($"Could not find {DurableAzureStorageExtensionName}. The functions host must be running a" +
+                ColoredConsole.WriteLine(WarningColor($"Could not find {DurableAzureStorageExtensionName}. The functions host must be running a" +
                     $" Durable Functions app in order for Durable Functions CLI commands to work."));
                 return;
             }
@@ -156,7 +157,7 @@ namespace Azure.Functions.Cli.Common
 
             await _orchestrationService.DeleteAsync();
 
-            ColoredConsole.Write(Green($"Task hub '{_taskHubName}' successfully deleted."));
+            ColoredConsole.Write(VerboseColor($"Task hub '{_taskHubName}' successfully deleted."));
         }
 
         public async Task GetHistory(string connectionStringKey, string taskHubName, string instanceId)
@@ -188,7 +189,7 @@ namespace Azure.Functions.Cli.Common
             // TODO? Status of each instance prints as an integer, rather than the string of the OrchestrationStatus enum
             ColoredConsole.WriteLine(JsonConvert.SerializeObject(queryResult.OrchestrationState, Formatting.Indented));
 
-            ColoredConsole.WriteLine(Green($"Continuation token for next set of results: '{queryResult.ContinuationToken}'"));
+            ColoredConsole.WriteLine(VerboseColor($"Continuation token for next set of results: '{queryResult.ContinuationToken}'"));
         }
 
         public async Task GetRuntimeStatus(string connectionStringKey, string taskHubName, string instanceId, bool showInput, bool showOutput)
@@ -223,7 +224,7 @@ namespace Azure.Functions.Cli.Common
                 messageToPrint += $" and whose runtime status matched one of the following: [{statuses}]";
             }
 
-            ColoredConsole.WriteLine(Green(messageToPrint));
+            ColoredConsole.WriteLine(VerboseColor(messageToPrint));
             ColoredConsole.WriteLine($"Instances deleted: {stats.InstancesDeleted}");
             ColoredConsole.WriteLine($"Rows deleted: {stats.RowsDeleted}");
         }
@@ -239,7 +240,7 @@ namespace Azure.Functions.Cli.Common
 
             await _client.RaiseEventAsync(orchestrationInstance, eventName, data);
 
-            ColoredConsole.WriteLine(Green($"Raised event '{eventName}' to instance '{instanceId}'."));
+            ColoredConsole.WriteLine(VerboseColor($"Raised event '{eventName}' to instance '{instanceId}'."));
         }
 
         public async Task Rewind(string connectionStringKey, string taskHubName, string instanceId, string reason)
@@ -267,9 +268,9 @@ namespace Azure.Functions.Cli.Common
             if (oldStatus != null && oldStatus.Count > 0
                 && newStatus != null && newStatus.Count > 0)
             {
-                ColoredConsole.Write(Green("Status before rewind: "));
+                ColoredConsole.Write(VerboseColor("Status before rewind: "));
                 ColoredConsole.WriteLine($"{oldStatus[0].OrchestrationStatus}");
-                ColoredConsole.Write(Green("Status after rewind: "));
+                ColoredConsole.Write(VerboseColor("Status after rewind: "));
                 ColoredConsole.WriteLine($"{newStatus[0].OrchestrationStatus}");
             }
         }
@@ -283,7 +284,7 @@ namespace Azure.Functions.Cli.Common
             var status = await _client.GetOrchestrationStateAsync(instanceId, false);
             if (status != null && status.Count > 0)
             {
-                ColoredConsole.WriteLine(Green($"Started '{status[0].Name}' at {status[0].CreatedTime}. " +
+                ColoredConsole.WriteLine(VerboseColor($"Started '{status[0].Name}' at {status[0].CreatedTime}. " +
                     $"Instance ID: '{status[0].OrchestrationInstance.InstanceId}'."));
             }
             else
@@ -318,7 +319,7 @@ namespace Azure.Functions.Cli.Common
 
                 if (status?.OrchestrationStatus == OrchestrationStatus.Terminated)
                 {
-                    ColoredConsole.WriteLine(Green($"Successfully terminated '{instanceId}'"));
+                    ColoredConsole.WriteLine(VerboseColor($"Successfully terminated '{instanceId}'"));
                 }
                 else
                 {
@@ -327,7 +328,7 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                ColoredConsole.WriteLine(Yellow($"Failed to find instance '{instanceId}'. No instance was terminated."));
+                ColoredConsole.WriteLine(WarningColor($"Failed to find instance '{instanceId}'. No instance was terminated."));
             }
         }
 
