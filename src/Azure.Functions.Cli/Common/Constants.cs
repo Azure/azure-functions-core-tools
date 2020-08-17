@@ -45,11 +45,10 @@ namespace Azure.Functions.Cli.Common
         public const string DefaultManagementURL = "https://management.azure.com/";
         public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
-        public const string OSXCoreToolsTempDirectoryName = ".azure-functions-core-tools";
-        public const string OSXRootPath = "~/";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
         public const string CustomHandlerPropertyName = "customHandler";
         public const string PowerShellWorkerDefaultVersion = "~7";
+        public const string UserSecretsIdElementName = "UserSecretsId";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
