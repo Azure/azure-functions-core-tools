@@ -47,6 +47,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureFunctionsEnvorinmentEnvironmentVariable = "AZURE_FUNCTIONS_ENVIRONMENT";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
         public const string AspNetCoreEnvironmentEnvironmentVariable = "ASPNETCORE_ENVIRONMENT";
+        public const string UserCoreToolsDirectory = ".azure-functions-core-tools";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
         public const string CustomHandlerPropertyName = "customHandler";
         public const string PowerShellWorkerDefaultVersion = "~6";
