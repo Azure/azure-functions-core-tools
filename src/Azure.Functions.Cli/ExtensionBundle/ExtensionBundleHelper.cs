@@ -7,11 +7,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.IO;
-using static System.Environment;
 
 namespace Azure.Functions.Cli.ExtensionBundle
 {
-    class ExtensionBundleHelper
+    internal class ExtensionBundleHelper
     {
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
@@ -44,7 +43,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
 
         public static string GetBundleDownloadPath(string bundleId)
         {
-            return Path.Combine(GetFolderPath(SpecialFolder.UserProfile), Constants.UserCoreToolsDirectory, "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Constants.UserCoreToolsDirectory, "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
         }
     }
 }
