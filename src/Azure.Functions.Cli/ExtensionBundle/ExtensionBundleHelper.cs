@@ -6,13 +6,11 @@ using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace Azure.Functions.Cli.ExtensionBundle
 {
-    class ExtensionBundleHelper
+    internal class ExtensionBundleHelper
     {
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
@@ -41,6 +39,11 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()
         {
             return new ExtensionBundleContentProvider(GetExtensionBundleManager(), NullLogger<ExtensionBundleContentProvider>.Instance);
+        }
+
+        public static string GetBundleDownloadPath(string bundleId)
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Constants.UserCoreToolsDirectory, "Functions", ScriptConstants.ExtensionBundleDirectory, bundleId);
         }
     }
 }
