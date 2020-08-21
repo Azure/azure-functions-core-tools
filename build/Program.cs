@@ -30,6 +30,7 @@ namespace Build
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci") || !args.Contains("--integrationTests"))
                 .Then(Test, skip: args.Contains("--integrationTests"))
                 .Then(Zip)
+                .Then(DotnetPack)
                 .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
                 .Run();
         }
