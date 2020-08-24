@@ -306,7 +306,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime powershell",
+                    "init . --worker-runtime powershell --managed-dependencies false",
                     "new --template \"Http trigger\" --name HttpTrigger",
                     "start"
                 },
@@ -318,8 +318,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+                        p.Kill();
                     }
                 },
             }, _output);
