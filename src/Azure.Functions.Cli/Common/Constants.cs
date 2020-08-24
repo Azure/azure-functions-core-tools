@@ -33,7 +33,6 @@ namespace Azure.Functions.Cli.Common
         public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
         public const string PythonDockerImageSkipPull = "FUNCTIONS_PYTHON_DOCKER_SKIP_PULL";
         public const string PythonDockerRunCommand = "FUNCTIONS_PYTHON_DOCKER_RUN_COMMAND";
-        public const string PythonFunctionsLibrary = "azure-functions";
         public const string FunctionsCoreToolsEnvironment = "FUNCTIONS_CORETOOLS_ENVIRONMENT";
         public const string EnablePersistenceChannelDebugSetting = "FUNCTIONS_CORE_TOOLS_ENABLE_PERSISTENCE_CHANNEL_DEBUG_OUTPUT";
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
@@ -46,11 +45,11 @@ namespace Azure.Functions.Cli.Common
         public const string DefaultManagementURL = "https://management.azure.com/";
         public const string AzureManagementAccessToken = "AZURE_MANAGEMENT_ACCESS_TOKEN";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
-        public const string OSXCoreToolsTempDirectoryName = ".azure-functions-core-tools";
-        public const string OSXRootPath = "~/";
+        public const string UserCoreToolsDirectory = ".azure-functions-core-tools";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
         public const string CustomHandlerPropertyName = "customHandler";
         public const string PowerShellWorkerDefaultVersion = "~7";
+        public const string UserSecretsIdElementName = "UserSecretsId";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

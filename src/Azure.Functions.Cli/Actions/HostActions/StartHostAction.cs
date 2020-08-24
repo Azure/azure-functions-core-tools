@@ -352,7 +352,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole
                         .WriteLine()
-                        .WriteLine(Yellow("Http Functions:"))
+                        .WriteLine(DarkYellow("Http Functions:"))
                         .WriteLine();
                 }
 
@@ -381,7 +381,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     var functionMethods = methods != null ? $"{CleanAndFormatHttpMethods(string.Join(",", methods))}" : null;
                     var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
                     ColoredConsole
-                        .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(functionMethods)} {Green(url)}")
+                        .WriteLine($"\t{HttpFunctionNameColor($"{function.Name}:")} {HttpFunctionUrlColor(functionMethods)} {HttpFunctionUrlColor(url)}")
                         .WriteLine();
                 }
             }
@@ -529,6 +529,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
+                if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+                {
+                    services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new UserSecretsConfigurationBuilder(_hostOptions.ScriptPath));
+                }
 
                 services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
 
@@ -540,7 +544,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
                 if (!string.IsNullOrEmpty(bundleId))
                 {
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetDownloadPath(bundleId));
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId));
                     Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
                 }
             }
