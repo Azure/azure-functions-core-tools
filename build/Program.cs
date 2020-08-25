@@ -20,6 +20,7 @@ namespace Build
                 .Then(ReplaceTelemetryInstrumentationKey, skip: !args.Contains("--ci"))
                 .Then(DotnetPublish)
                 .Then(FilterPowershellRuntimes)
+                .Then(FilterPythonRuntimes)
                 .Then(AddDistLib)
                 .Then(AddTemplatesNupkgs)
                 .Then(AddTemplatesJson)

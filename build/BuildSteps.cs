@@ -142,6 +142,39 @@ namespace Build
             }
         }
 
+        public static void FilterPythonRuntimes()
+        {
+            var minifiedRuntimes = Settings.TargetRuntimes.Where(r => r.StartsWith(Settings.MinifiedVersionPrefix));
+            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
+            {
+                var pythonWorkerPath = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
+                var allPythonVersions = Directory.GetDirectories(pythonWorkerPath);
+
+                foreach (var pyVersionPath in allPythonVersions)
+                {
+                    var allOs = Directory.GetDirectories(pyVersionPath).Select(Path.GetFileName).ToList();
+                    bool atLeastOne = false;
+                    foreach (var os in allOs)
+                    {
+                        if (!string.Equals(Settings.RuntimesToOS[runtime], os, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Directory.Delete(Path.Combine(pyVersionPath, os), recursive: true);
+                        }
+                        else
+                        {
+                            atLeastOne = true;
+                        }
+                    }
+
+                    if (!atLeastOne)
+                    {
+                        throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for runtime '{runtime}'. " +
+                            $"Something went wrong.");
+                    }
+                }
+            }
+        }
+
         private static void RemoveLanguageWorkers(string outputPath)
         {
             foreach (var languageWorker in Settings.LanguageWorkers)
@@ -171,6 +204,9 @@ namespace Build
                 Directory.CreateDirectory(dist);
                 FileHelpers.RecursiveCopy(Path.Combine(distLibDir, Directory.GetDirectories(distLibDir).First(), "distlib"), dist);
             }
+
+            File.Delete(distLibZip);
+            Directory.Delete(distLibDir, recursive: true);
         }
 
         public static void AddTemplatesNupkgs()
@@ -191,6 +227,8 @@ namespace Build
             {
                 FileHelpers.RecursiveCopy(templatesPath, Path.Combine(Settings.OutputDir, runtime, "templates"));
             }
+
+            Directory.Delete(templatesPath, recursive: true);
         }
 
         public static void AddTemplatesJson()
