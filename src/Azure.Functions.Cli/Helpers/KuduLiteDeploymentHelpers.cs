@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Helpers
@@ -17,7 +18,7 @@ namespace Azure.Functions.Cli.Helpers
             return await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, "/api/settings");
         }
 
-        public static async Task<DeployStatus> WaitForConsumptionServerSideBuild(HttpClient client, Site functionApp, string accessToken, string managementUrl)
+        public static async Task<DeployStatus> WaitForRemoteBuild(HttpClient client, Site functionApp)
         {
             ColoredConsole.WriteLine("Remote build in progress, please wait...");
             DeployStatus statusCode = DeployStatus.Pending;
@@ -30,43 +31,22 @@ namespace Azure.Functions.Cli.Helpers
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
 
-            while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed)
+            while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown)
             {
-                statusCode = await GetDeploymentStatusById(client, functionApp, id);
-                logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
+                try
+                {
+                    statusCode = await GetDeploymentStatusById(client, functionApp, id);
+                    logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
+                }
+                catch (HttpRequestException)
+                {
+                    return DeployStatus.Unknown;
+                }
+
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
 
             return statusCode;
-        }
-
-        public static async Task<DeployStatus> WaitForDedicatedBuildToComplete(HttpClient client, Site functionApp)
-        {
-            // There is a tracked Locking issue in kudulite causing Race conditions, so we have to use this API
-            // to gather deployment progress.
-            ColoredConsole.Write("Remote build in progress, please wait");
-            while (true)
-            {
-                var json = await InvokeRequest<IDictionary<string, string>>(client, HttpMethod.Get, "/api/isdeploying");
-
-                if (bool.TryParse(json["value"], out bool isDeploying))
-                {
-                    if (!isDeploying)
-                    {
-                        string deploymentId = await GetLatestDeploymentId(client, functionApp);
-                        DeployStatus status = await GetDeploymentStatusById(client, functionApp, id: deploymentId);
-                        ColoredConsole.Write($"done{Environment.NewLine}");
-                        return status;
-                    }
-                }
-                else
-                {
-                    throw new CliException($"Expected \"value\" from /api/isdeploying endpoing to be a boolean. Actual: {json["value"]}");
-                }
-
-                ColoredConsole.Write(".");
-                await Task.Delay(5000);
-            }
         }
 
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
@@ -77,8 +57,9 @@ namespace Azure.Functions.Cli.Helpers
             var latestDeployment = json.First();
             if (latestDeployment.TryGetValue("status", out string statusString))
             {
-                DeployStatus status = ConvertToDeployementStatus(statusString);
-                if (status != DeployStatus.Pending)
+                DeployStatus status = ConvertToDeploymentStatus(statusString);
+                if (status == DeployStatus.Building || status == DeployStatus.Deploying
+                 || status == DeployStatus.Success || status == DeployStatus.Failed)
                 {
                     return latestDeployment["id"];
                 }
@@ -88,36 +69,36 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
-            var json = await InvokeRequest<Dictionary<string, string>>(client,
-                HttpMethod.Get, $"/deployments/{id}");
-
-            if (json.TryGetValue("status", out string statusString))
+            Dictionary<string, string> json = await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, $"/deployments/{id}");
+            if (!json.TryGetValue("status", out string statusString))
             {
-                return ConvertToDeployementStatus(json["status"]);
+                return DeployStatus.Unknown;
             }
-            return DeployStatus.Failed;
+
+            return ConvertToDeploymentStatus(statusString);
         }
 
-        private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null)
+        private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
         {
             string logUrl = innerUrl != null ? innerUrl.ToString() : $"/deployments/{id}/log";
-            var json = await InvokeRequest<List<Dictionary<string, string>>>(client,
-                HttpMethod.Get, logUrl);
+            StringBuilder sbLogger = innerLogger != null ? innerLogger : new StringBuilder();
 
+            var json = await InvokeRequest<List<Dictionary<string, string>>>(client, HttpMethod.Get, logUrl);
             var logs = json.Where(dict => DateTime.Parse(dict["log_time"]) > lastUpdate || dict["details_url"] != null);
             DateTime currentLogDatetime = lastUpdate;
+
             foreach (var log in logs)
             {
                 // Filter out details_url log
                 if (DateTime.Parse(log["log_time"]) > lastUpdate)
                 {
-                    ColoredConsole.WriteLine(log["message"]);
+                    sbLogger.AppendLine(log["message"]);
                 }
 
                 // Recursively log details_url from scm/api/deployments/xxx/log endpoint
                 if (log["details_url"] != null && Uri.TryCreate(log["details_url"], UriKind.Absolute, out Uri detailsUrl))
                 {
-                    DateTime innerLogDatetime = await DisplayDeploymentLog(client, functionApp, id, currentLogDatetime, detailsUrl);
+                    DateTime innerLogDatetime = await DisplayDeploymentLog(client, functionApp, id, currentLogDatetime, detailsUrl, sbLogger);
                     currentLogDatetime = innerLogDatetime > currentLogDatetime ? innerLogDatetime : currentLogDatetime;
                 }
             }
@@ -127,6 +108,13 @@ namespace Azure.Functions.Cli.Helpers
                 DateTime lastLogDatetime = DateTime.Parse(logs.Last()["log_time"]);
                 currentLogDatetime = lastLogDatetime > currentLogDatetime ? lastLogDatetime : currentLogDatetime;
             }
+
+            // Report build status on the root level parser
+            if (innerUrl == null && sbLogger.Length > 0)
+            {
+                ColoredConsole.Write(sbLogger.ToString());
+            }
+
             return currentLogDatetime;
         }
 
@@ -152,9 +140,13 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static DeployStatus ConvertToDeployementStatus(string statusString)
+        private static DeployStatus ConvertToDeploymentStatus(string statusString)
         {
-            return Enum.Parse<DeployStatus>(statusString);
+            if (Enum.TryParse(statusString, out DeployStatus result))
+            {
+                return result;
+            }
+            return DeployStatus.Unknown;
         }
     }
 }

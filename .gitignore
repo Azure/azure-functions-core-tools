@@ -16,6 +16,8 @@ Publish
 /tools/NuGet.exe
 node_modules/
 
+__pycache__
+
 *.ncrunchproject
 *.ncrunchsolution
 nCrunchTemp*
@@ -23,3 +25,4 @@ nCrunchTemp*
 .fake/
 artifacts/
 /src/Azure.Functions.Cli/Properties/launchSettings.json
+launchSettings.json

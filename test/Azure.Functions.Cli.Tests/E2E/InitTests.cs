@@ -252,7 +252,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-                [Fact]
+        [Fact]
         public Task javascript_adds_packagejson()
         {
             return CliTester.Run(new RunConfiguration
@@ -378,7 +378,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public Task init_function_app_powershell_supports_managed_dependencies()
+        public Task init_function_app_powershell_enable_managed_dependencies_and_set_default_version()
         {
             return CliTester.Run(new RunConfiguration
             {
@@ -390,6 +390,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = "host.json",
                         ContentContains = new []
                         {
+                            "logging",
+                            "applicationInsights",
+                            "extensionBundle",
                             "managedDependency",
                             "enabled",
                             "true"
@@ -401,6 +404,27 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new []
                         {
                             "Az",
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = "profile.ps1",
+                        ContentContains = new []
+                        {
+                            "env:MSI_SECRET",
+                            "Disable-AzContextAutosave",
+                            "Connect-AzAccount -Identity"
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = "local.settings.json",
+                        ContentContains = new []
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "powershell",
+                            "FUNCTIONS_WORKER_RUNTIME_VERSION",
+                            "~6"
                         }
                     }
                 },
@@ -430,7 +454,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new []
                         {
                             "applicationInsights",
-                            "samplingExcludedTypes",
+                            "excludedTypes",
                             "Request",
                             "logging"
                         }

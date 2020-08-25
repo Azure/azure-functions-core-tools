@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Handlers;
 using System.Threading.Tasks;
@@ -95,6 +97,42 @@ namespace Azure.Functions.Cli.Helpers
 
                 throw new CliException(errorMessage);
             }
+        }
+
+        public static bool IsLinuxFxVersionUsingCustomImage(string linuxFxVersion)
+        {
+            if (string.IsNullOrEmpty(linuxFxVersion))
+            {
+                return false;
+            }
+
+            bool isStartingWithDocker = linuxFxVersion.StartsWith("docker|", StringComparison.OrdinalIgnoreCase);
+            bool isLegacyImageMatched = Constants.WorkerRuntimeImages.Values
+                .SelectMany(image => image)
+                .Any(image => linuxFxVersion.Contains(image, StringComparison.OrdinalIgnoreCase));
+
+            return isStartingWithDocker && !isLegacyImageMatched;
+        }
+
+        public static bool IsLinuxFxVersionRuntimeMatched(string linuxFxVersion, WorkerRuntime runtime) {
+            if (string.IsNullOrEmpty(linuxFxVersion))
+            {
+                // Suppress the check since when LinuxFxVersion == "", runtime image will depends on FUNCTIONS_WORKER_RUNTIME setting
+                return true;
+            }
+
+            // Test if linux fx version matches any legacy runtime image (e.g. DOCKER|mcr.microsoft.com/azure-functions/dotnet)
+            bool isStartingWithDocker = linuxFxVersion.StartsWith("docker|", StringComparison.OrdinalIgnoreCase);
+            bool isLegacyImageMatched = false;
+            if (Constants.WorkerRuntimeImages.TryGetValue(runtime, out IEnumerable<string> legacyImages)) {
+                isLegacyImageMatched = legacyImages
+                    .Any(image => linuxFxVersion.Contains(image, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Test if linux fx version matches any official runtime image (e.g. DOTNET, DOTNET|2)
+            bool isOfficialImageMatched = linuxFxVersion.StartsWith(runtime.ToString(), StringComparison.OrdinalIgnoreCase);
+
+            return isOfficialImageMatched || (isStartingWithDocker && isLegacyImageMatched);
         }
     }
 }

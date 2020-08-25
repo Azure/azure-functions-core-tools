@@ -160,7 +160,14 @@ namespace Azure.Functions.Cli
 
         internal static string EnsureCoreToolsLocalData()
         {
-            var localPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "azure-functions-core-tools");
+            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+            if (string.IsNullOrEmpty(appDataDir))
+            {
+                throw new Exception("Cannot find the Local Application Data.");
+            }
+
+            var localPath = Path.Combine(appDataDir, "azure-functions-core-tools");
             FileSystemHelpers.EnsureDirectory(localPath);
             return localPath;
         }

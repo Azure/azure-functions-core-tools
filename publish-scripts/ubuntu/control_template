@@ -1,0 +1,13 @@
+Maintainer: Ahmed ElSayed <ahmels@microsoft.com>
+Version: $DEBIANVERSION
+Section: devel
+Priority: optional
+Homepage: https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local#run-azure-functions-core-tools
+Vcs-Git: https://github.com/Azure/azure-functions-core-tools.git
+Package: $PACKAGENAME
+Architecture: amd64
+Depends: $DEPENDENCY
+Conflicts: azure-functions-core-tools, azure-functions-core-tools-2
+Replaces: azure-functions-core-tools, azure-functions-core-tools-2
+Description: Azure Function Core Tools v2
+ The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.

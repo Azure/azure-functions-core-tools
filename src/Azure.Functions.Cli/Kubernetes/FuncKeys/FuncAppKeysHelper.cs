@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
                 { AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes" }
             };
 
-            //if keys needs are not to be mounted as container volume then add "AzureWebJobsKubernetesSecretName" enviornment varibale to the container 
+            //if keys needs are not to be mounted as container volume then add "AzureWebJobsKubernetesSecretName" environment variable to the container 
             if (!mountKeysAsContainerVolume)
             {
                 funcKeysKubernetesEnvironVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"secrets/{keysSecretCollectionName}");

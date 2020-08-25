@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.IO;
+using System.Linq;
 using System.Net;
 using static Build.BuildSteps;
 
@@ -12,25 +13,22 @@ namespace Build
 
             Orchestrator
                 .CreateForTarget(args)
+                .Then(TestSignedArtifacts, skip: !args.Contains("--signTest"))
                 .Then(Clean)
-                .Then(LogIntoAzure)
+                .Then(LogIntoAzure, skip: !args.Contains("--ci"))
                 .Then(RestorePackages)
-                .Then(ReplaceTelemetryInstrumentationKey)
+                .Then(ReplaceTelemetryInstrumentationKey, skip: !args.Contains("--ci"))
                 .Then(DotnetPublish)
                 .Then(FilterPowershellRuntimes)
                 .Then(AddDistLib)
                 .Then(AddTemplatesNupkgs)
                 .Then(AddTemplatesJson)
                 .Then(AddGoZip)
-                .Then(GenerateZipToSign, skip: !args.Contains("--sign"))
-                .Then(UploadZipToSign, skip: !args.Contains("--sign"))
-                .Then(EnqueueSignMessage, skip: !args.Contains("--sign"))
-                .Then(WaitForSigning, skip: !args.Contains("--sign"))
-                .Then(ReplaceSignedZipAndCleanup, skip: !args.Contains("--sign"))
-                .Then(TestSignedArtifacts, skip: !args.Contains("--sign"))
+                .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
+                .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
                 .Then(Test)
                 .Then(Zip)
-                .Then(UploadToStorage)
+                .Then(UploadToStorage, skip: !args.Contains("--ci"))
                 .Run();
         }
     }

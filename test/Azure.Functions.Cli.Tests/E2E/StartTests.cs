@@ -44,8 +44,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
-                        result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
-                    }
+                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+                    }   
                 },
             }, _output);
         }
@@ -133,7 +133,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     ExpectExit = false,
                     OutputContains = new []
                     {
-                        "The binding type(s) 'http2' are not registered. Please ensure the type is correct and the binding extension is installed."
+                        "The binding type(s) 'http2' were not found in the configured extension bundle. Please ensure the type is correct and the correct version of extension bundle is configured."
                     },
                     Test = async (_, p) =>
                     {
@@ -180,7 +180,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output, startHost: true);
         }
 
-       
+
         [Fact]
         public async Task start_displays_error_on_missing_host_json()
         {
@@ -319,7 +319,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
-                        result.Should().Be("Hello Test", because: "response from default function should be 'Hello {name}'");
+                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
             }, _output);

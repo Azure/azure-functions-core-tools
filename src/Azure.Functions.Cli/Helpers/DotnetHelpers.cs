@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
@@ -38,11 +39,24 @@ namespace Azure.Functions.Cli.Helpers
             });
         }
 
-        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr)
+        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             await TemplateOperation(async () =>
             {
-                var exe = new Executable("dotnet", $"new {templateName} --name {functionName} --namespace {namespaceStr}");
+                string exeCommandArguments = $"new {templateName} --name {functionName} --namespace {namespaceStr}";
+                if (httpAuthorizationLevel != null)
+                {
+                    if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        exeCommandArguments += $" --AccessRights {httpAuthorizationLevel}";
+                    }
+                    else
+                    {
+                        throw new CliException(Constants.AuthLevelErrorMessage);
+                    }
+                }
+
+                var exe = new Executable("dotnet", exeCommandArguments);
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {

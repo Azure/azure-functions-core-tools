@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. Python 3.6.x or 3.7.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. Python 3.6.x or 3.7.x is recommended, and used in Azure Functions 2.x.";
                 if (errorIfNoVersion) throw new CliException(message);
                 ColoredConsole.WriteLine(WarningColor(message));
                 return;
@@ -97,9 +97,9 @@ namespace Azure.Functions.Cli.Helpers
             // Python 3.x (but not 3.6 or 3.7), not recommended, may fail
             if (pythonVersion.Major == 3)
             {
-                if (errorIfNotSupported) throw new CliException($"Python 3.6.x or 3.7.x is required for this operation. "
-                + "Please install Python 3.6 or 3.7, and use a virtual environment to switch to Python 3.6 or 3.7.");
-                ColoredConsole.WriteLine(WarningColor("Python 3.6.x or 3.7.x is recommended, and used in Azure Functions."));
+                if (errorIfNotSupported) throw new CliException($"Python 3.6.x or 3.7.x is required for the version of Azure Functions you are using (2.x). "
+                + "Please see if another version of Functions supports your version (https://aka.ms/functions-python-versions). Otherwise, please install Python 3.6 or 3.7 and use a virtual environment to switch to Python 3.6 or 3.7.");
+                ColoredConsole.WriteLine(WarningColor("Python 3.6.x or 3.7.x is recommended, and used in Azure Functions 2.x."));
             }
 
             // No Python 3
@@ -125,15 +125,20 @@ namespace Azure.Functions.Cli.Helpers
                 return await GetVersion(pythonDefaultExecutablePath);
             }
 
-            var pythonGetVersionTask = GetVersion("python");
+            // Windows Python Launcher (https://www.python.org/dev/peps/pep-0486/)
+            var pyGetVersionTask = PlatformHelper.IsWindows ? GetVersion("py") : Task.FromResult<WorkerLanguageVersionInfo>(null);
+
+            // Linux / OSX / Venv Interpreter Entrypoints
             var python3GetVersionTask = GetVersion("python3");
+            var pythonGetVersionTask = GetVersion("python");
             var python36GetVersionTask = GetVersion("python3.6");
             var python37GetVersionTask = GetVersion("python3.7");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
-                await pythonGetVersionTask,
+                await pyGetVersionTask,
                 await python3GetVersionTask,
+                await pythonGetVersionTask,
                 await python36GetVersionTask,
                 await python37GetVersionTask
             };
