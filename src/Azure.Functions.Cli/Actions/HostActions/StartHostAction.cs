@@ -157,7 +157,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
 
-            _hostJsonConfig = Utilities.BuildHostJsonConfigutation(hostOptions);
             _loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
@@ -254,8 +253,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
-            _hostJsonConfig = Utilities.BuildHostJsonConfigutation(hostOptions);
-            ValidateHostJsonConfiguration();
+           
+            ValidateAndBuildHostJsonConfigurationIfFileExists(hostOptions);
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
@@ -279,15 +278,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private void ValidateHostJsonConfiguration()
+        private void ValidateAndBuildHostJsonConfigurationIfFileExists(ScriptApplicationHostOptions hostOptions)
         {
             bool IsPreCompiledApp = IsPreCompiledFunctionApp();
             var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
             if (IsPreCompiledApp && !File.Exists(hostJsonPath))
             {
-                throw new CliException($"Host.json file in missing. Please make sure host.json file is preset at {Environment.CurrentDirectory}");
+                throw new CliException($"Host.json file in missing. Please make sure host.json file is present at {Environment.CurrentDirectory}");
             }
 
+            //BuildHostJsonConfigutation only if host.json file exists.
+            _hostJsonConfig = Utilities.BuildHostJsonConfigutation(hostOptions);
             if (IsPreCompiledApp && Utilities.JobHostConfigSectionExists(_hostJsonConfig, ConfigurationSectionNames.ExtensionBundle))
             {
                 throw new CliException($"Extension bundle configuration should not be present for the function app with pre-compiled functions. Please remove extension bundle configuration from host.json: {Path.Combine(Environment.CurrentDirectory, "host.json")}");
@@ -347,7 +348,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             return isPrecompiled;
         }
-
                        
         internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
         {
