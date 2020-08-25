@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Microsoft.Azure.WebJobs.Script;
@@ -10,9 +9,11 @@ namespace Azure.Functions.Cli.Diagnostics
     internal class UserSecretsConfigurationBuilder : IConfigureBuilder<IConfigurationBuilder>
     {
         private readonly string _scriptPath;
+        private readonly LoggingFilterHelper _loggingFilterHelper;
 
-        public UserSecretsConfigurationBuilder(string scriptPath)
+        public UserSecretsConfigurationBuilder(string scriptPath, LoggingFilterHelper loggingFilterHelper)
         {
+            _loggingFilterHelper = loggingFilterHelper;
             if (string.IsNullOrEmpty(scriptPath))
             {
                 _scriptPath = Environment.CurrentDirectory;
@@ -25,17 +26,21 @@ namespace Azure.Functions.Cli.Diagnostics
 
         public void Configure(IConfigurationBuilder builder)
         {
-            string userSecretsId = GetUserSecretsId(_scriptPath);
-            if (userSecretsId == null) return;
-
+            string userSecretsId = GetUserSecretsId();
+            if (userSecretsId == null)
+            {
+                return;
+            }
             builder.AddUserSecrets(userSecretsId);
         }
 
-        private string GetUserSecretsId(string scriptPath)
+        private string GetUserSecretsId()
         {
-            if (string.IsNullOrEmpty(scriptPath)) return null;
-
-            string projectFilePath = ProjectHelpers.FindProjectFile(scriptPath);
+            if (string.IsNullOrEmpty(_scriptPath))
+            {
+                return null;
+            }
+            string projectFilePath = ProjectHelpers.FindProjectFile(_scriptPath, _loggingFilterHelper);
             if (projectFilePath == null) return null;
 
             var projectRoot = ProjectHelpers.GetProject(projectFilePath);

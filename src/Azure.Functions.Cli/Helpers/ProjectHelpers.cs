@@ -12,11 +12,10 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal static class ProjectHelpers
     {
-        public static string FindProjectFile(string path)
+        public static string FindProjectFile(string path, LoggingFilterHelper loggingFilterHelper)
         {
-            ColoredConsoleLogger logger = new ColoredConsoleLogger("ProjectHelpers");
+            ColoredConsoleLogger logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper);
             DirectoryInfo filePath = new DirectoryInfo(path);
-
             do
             {
                 var projectFiles = filePath.GetFiles("*.csproj");

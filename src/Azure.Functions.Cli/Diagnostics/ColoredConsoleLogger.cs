@@ -5,39 +5,31 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Logging;
 using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using System.Linq;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
     public class ColoredConsoleLogger : ILogger
     {
-        private readonly Func<string, LogLevel, bool> _filter;
         private readonly bool _verboseErrors;
         private readonly string _category;
+        private readonly LoggingFilterHelper _loggingFilterHelper;
+        private readonly string[] allowedLogsPrefixes = new string[] { "Worker process started and initialized.", "Host lock lease acquired by instance ID" };
 
-        public ColoredConsoleLogger(string category, Func<string, LogLevel, bool> filter = null)
+        public ColoredConsoleLogger(string category, LoggingFilterHelper loggingFilterHelper)
         {
             _category = category;
-            _filter = filter;
+            _loggingFilterHelper = loggingFilterHelper;
             _verboseErrors = StaticSettings.IsDebug;
         }
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            if (_filter == null)
-            {
-                return true;
-            }
-
-            return _filter(_category, logLevel);
+            return _loggingFilterHelper.IsEnabled(_category, logLevel);
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            if (!IsEnabled(logLevel))
-            {
-                return;
-            }
-
             string formattedMessage = formatter(state, exception);
 
             if (string.IsNullOrEmpty(formattedMessage))
@@ -45,10 +37,40 @@ namespace Azure.Functions.Cli.Diagnostics
                 return;
             }
 
+            if (DoesMessageStartsWithAllowedLogsPrefix(formattedMessage))
+            {
+                LogToConsole(logLevel, exception, formattedMessage);
+                return;
+            }
+
+            if (!IsEnabled(logLevel))
+            {
+                return;
+            }
+
+            LogToConsole(logLevel, exception, formattedMessage);
+        }
+
+        private void LogToConsole(LogLevel logLevel, Exception exception, string formattedMessage)
+        {
             foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
             {
-                ColoredConsole.WriteLine($"[{DateTime.UtcNow}] {line}");
+                var outputline = $"{line}";
+                if (_loggingFilterHelper.VerboseLogging)
+                {
+                    outputline = $"[{DateTime.UtcNow}] {outputline}";
+                }
+                ColoredConsole.WriteLine($"{outputline}");
             }
+        }
+
+        internal bool DoesMessageStartsWithAllowedLogsPrefix(string formattedMessage)
+        {
+            if (formattedMessage == null)
+            {
+                throw new ArgumentNullException(nameof(formattedMessage));
+            }
+            return allowedLogsPrefixes.Any(s => formattedMessage.StartsWith(s, StringComparison.OrdinalIgnoreCase));
         }
 
         private IEnumerable<RichString> GetMessageString(LogLevel level, string formattedMessage, Exception exception)
