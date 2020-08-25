@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli
         public LogLevel DefaultLogLevel { get; private set; } = LogLevel.Information;
 
         /// <summary>
-        /// Is set to true if `func start` is with `--verbose` flag. If set, SystemLogDefaultLogLevel is set to Information
+        /// Is set to true if `func start` is started with `--verbose` flag. If set, SystemLogDefaultLogLevel is set to Information
         /// </summary>
         public bool VerboseLogging { get; private set; }
 

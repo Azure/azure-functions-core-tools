@@ -37,7 +37,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
         private readonly ISecretsManager _secretsManager;
-        private LoggingFilterHelper _loggingFilterHelper;
         private IConfigurationRoot _hostJsonConfig;
 
         public int Port { get; set; }
@@ -141,7 +140,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(v => VerboseLogging = v);
 
             var parserResult = base.ParseArgs(args);
-            bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Where(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase)).Any();
+            bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
             // Input args do not contain --verbose flag
             if (!VerboseLogging.Value && verboseLoggingArgExists)
             {
@@ -157,7 +156,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
 
-            _loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
             
@@ -182,13 +181,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .ConfigureLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders();
-                    _loggingFilterHelper.AddConsoleLoggingProvider(loggingBuilder);
+                    loggingFilterHelper.AddConsoleLoggingProvider(loggingBuilder);
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, _loggingFilterHelper)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, loggingFilterHelper)))
                 .Build();
         }
-
-       
 
         private async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {
