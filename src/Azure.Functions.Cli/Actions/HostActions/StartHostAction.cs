@@ -110,7 +110,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Callback(s => UseHttps = s);
 
             Parser
-                .Setup<bool>("useDefaultCert")
+                .Setup<bool>("use-default-cert")
                 .WithDescription("Configure Kestrel to use HTTPS with the default certificate.")
                 .SetDefault(false)
                 .Callback(d => UseDefaultCert = d);
