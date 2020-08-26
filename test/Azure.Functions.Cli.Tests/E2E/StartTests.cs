@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ExpectExit = false,
                 OutputContains = new[]
                 {
-                    "Http Functions:",
+                    "Functions:",
                     "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
                 },
                 Test = async (workingDir, p) =>
@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --language-worker -- \"--inspect=5050\""
+                    "start --verbose --language-worker -- \"--inspect=5050\""
                 },
                 ExpectExit = false,
                 OutputContains = new[]
