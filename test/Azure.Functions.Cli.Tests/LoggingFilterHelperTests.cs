@@ -20,14 +20,7 @@ namespace Azure.Functions.Cli.Tests
             try
             {
                 _workerDir = Path.GetTempFileName();
-                if (File.Exists(_workerDir))
-                {
-                    File.Delete(_workerDir);
-                }
-                else if (Directory.Exists(_workerDir))
-                {
-                    Directory.Delete(_workerDir, recursive: true);
-                }
+                DeleteIfExists(_workerDir);
                 Directory.CreateDirectory(_workerDir);
                 _hostOptions = new ScriptApplicationHostOptions
                 {
@@ -44,6 +37,24 @@ namespace Azure.Functions.Cli.Tests
             _hostJsonFilePath = Path.Combine(_hostOptions.ScriptPath, Constants.HostJsonFileName);
         }
 
+        private void DeleteIfExists(string filePath)
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+                else if (Directory.Exists(filePath))
+                {
+                    Directory.Delete(filePath, recursive: true);
+                }
+            }
+            catch
+            {
+            }
+        }
+
         [Theory]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"None\"}}}", true, LogLevel.None)]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"DEBUG\"}}}", true, LogLevel.Debug)]
@@ -51,38 +62,45 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", true, LogLevel.Information)]
         public void LoggingFilterHelper_Tests(string hostJsonContent, bool? verboseLogging, LogLevel expectedDefaultLogLevel)
         {
-            FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
-            var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(configuration, verboseLogging);
-            if (verboseLogging == null)
+            try
             {
-                Assert.False(loggingFilterHelper.VerboseLogging);
-            }
-            Assert.Equal(loggingFilterHelper.DefaultLogLevel, expectedDefaultLogLevel);
-            if (hostJsonContent.Contains("Default"))
-            {
-                Assert.Equal(loggingFilterHelper.DefaultLogLevel, loggingFilterHelper.UserLogDefaultLogLevel);
-                Assert.Equal(loggingFilterHelper.DefaultLogLevel, loggingFilterHelper.SystemLogDefaultLogLevel);
-            }
-            else
-            {
-                Assert.Equal(LogLevel.Information, loggingFilterHelper.UserLogDefaultLogLevel);
-                if (verboseLogging.HasValue && verboseLogging.Value)
+                FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
+                var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
+                LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(configuration, verboseLogging);
+                if (verboseLogging == null)
                 {
-                    Assert.Equal(LogLevel.Information, loggingFilterHelper.SystemLogDefaultLogLevel);
+                    Assert.False(loggingFilterHelper.VerboseLogging);
+                }
+                Assert.Equal(loggingFilterHelper.DefaultLogLevel, expectedDefaultLogLevel);
+                if (hostJsonContent.Contains("Default"))
+                {
+                    Assert.Equal(loggingFilterHelper.DefaultLogLevel, loggingFilterHelper.UserLogDefaultLogLevel);
+                    Assert.Equal(loggingFilterHelper.DefaultLogLevel, loggingFilterHelper.SystemLogDefaultLogLevel);
                 }
                 else
                 {
-                    Assert.Equal(LogLevel.Warning, loggingFilterHelper.SystemLogDefaultLogLevel);
+                    Assert.Equal(LogLevel.Information, loggingFilterHelper.UserLogDefaultLogLevel);
+                    if (verboseLogging.HasValue && verboseLogging.Value)
+                    {
+                        Assert.Equal(LogLevel.Information, loggingFilterHelper.SystemLogDefaultLogLevel);
+                    }
+                    else
+                    {
+                        Assert.Equal(LogLevel.Warning, loggingFilterHelper.SystemLogDefaultLogLevel);
+                    }
                 }
+                var loggerFactory = LoggerFactory.Create(builder =>
+                {
+                    loggingFilterHelper.AddConsoleLoggingProvider(builder);
+                    var serviceProvider = builder.Services.BuildServiceProvider();
+                    var coloredConsoleLoggerProvider = (ColoredConsoleLoggerProvider)serviceProvider.GetService<ILoggerProvider>();
+                    Assert.NotNull(coloredConsoleLoggerProvider);
+                });
             }
-            var loggerFactory = LoggerFactory.Create(builder =>
+            finally
             {
-                loggingFilterHelper.AddConsoleLoggingProvider(builder);
-                var serviceProvider = builder.Services.BuildServiceProvider();
-                var coloredConsoleLoggerProvider = (ColoredConsoleLoggerProvider)serviceProvider.GetService<ILoggerProvider>();
-                Assert.NotNull(coloredConsoleLoggerProvider);
-            });
+                DeleteIfExists(_workerDir);
+            }
         }
 
         [Theory]
@@ -92,10 +110,17 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.General", LogLevel.Warning, true)]
         public void IsEnabled_Tests(string hostJsonContent, string category, LogLevel logLevel, bool expected)
         {
-            FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
-            var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(configuration, false);
-            Assert.Equal(expected, loggingFilterHelper.IsEnabled(category, logLevel));
+            try
+            {
+                FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
+                var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
+                LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(configuration, false);
+                Assert.Equal(expected, loggingFilterHelper.IsEnabled(category, logLevel));
+            }
+            finally
+            {
+                DeleteIfExists(_workerDir);
+            }
         }
 
         [Theory]
@@ -104,16 +129,23 @@ namespace Azure.Functions.Cli.Tests
         [InlineData(true, null, true)]
         public void IsCI_Tests(bool isCiEnv, bool? verboseLogging, bool expected)
         {
-            if (isCiEnv)
+            try
             {
-                Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "90l99");
+                if (isCiEnv)
+                {
+                    Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "90l99");
+                }
+                string defaultJson = "{\"version\": \"2.0\"}";
+                FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, defaultJson);
+                var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
+                LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(configuration, verboseLogging);
+                Assert.Equal(expected, loggingFilterHelper.IsCiEnvironment(verboseLogging.HasValue));
+                Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "");
             }
-            string defaultJson = "{\"version\": \"2.0\"}";
-            FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, defaultJson);
-            var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(configuration, verboseLogging);
-            Assert.Equal(expected, loggingFilterHelper.IsCiEnvironment(verboseLogging.HasValue));
-            Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "");
+            finally
+            {
+                DeleteIfExists(_workerDir);
+            }
         }
     }
 }
