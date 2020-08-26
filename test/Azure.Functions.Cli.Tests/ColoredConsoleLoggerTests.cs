@@ -1,23 +1,15 @@
-﻿using Azure.Functions.Cli.Diagnostics;
+﻿using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests
 {
     public class ColoredConsoleLoggerTests
     {
-        private IConfigurationRoot _testConfiguration;
-
-        public ColoredConsoleLoggerTests()
-        {
-            string defaultJson = "{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}";
-            _testConfiguration = new ConfigurationBuilder().AddJsonStream(new MemoryStream(Encoding.ASCII.GetBytes(defaultJson))).Build();
-        }
-
         [Theory]
         [InlineData("somelog", false)]
         [InlineData("Worker process started and initialized.", true)]
@@ -26,9 +18,12 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("Host lock lease acquired by instance ID", true)]
         [InlineData("Host lock lease acquired by instance id", true)]
         [InlineData("Host lock lease", false)]
-        public void DoesMessageStartsWithWhiteListedPrefix_Tests(string formattedMessage, bool expected)
+        public async Task DoesMessageStartsWithWhiteListedPrefix_Tests(string formattedMessage, bool expected)
         {
-            ColoredConsoleLogger coloredConsoleLogger = new ColoredConsoleLogger("test", new LoggingFilterHelper(_testConfiguration, true));
+            string defaultJson = "{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}";
+            await FileSystemHelpers.WriteToFile("host.json", new MemoryStream(Encoding.ASCII.GetBytes(defaultJson)));
+            var testConfiguration = new ConfigurationBuilder().AddJsonFile("host.json").Build();
+            ColoredConsoleLogger coloredConsoleLogger = new ColoredConsoleLogger("test", new LoggingFilterHelper(testConfiguration, true));
             Assert.Equal(expected, coloredConsoleLogger.DoesMessageStartsWithAllowedLogsPrefix(formattedMessage));
         }
 
@@ -40,9 +35,12 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("Host lock lease acquired by instance ID", true)]
         [InlineData("Host lock lease acquired by instance id", true)]
         [InlineData("Host lock lease", false)]
-        public void IsEnabled_Tests(string formattedMessage, bool expected)
+        public async Task IsEnabled_Tests(string formattedMessage, bool expected)
         {
-            ColoredConsoleLogger coloredConsoleLogger = new ColoredConsoleLogger("test", new LoggingFilterHelper(_testConfiguration, true));
+            string defaultJson = "{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}";
+            await FileSystemHelpers.WriteToFile("host.json", new MemoryStream(Encoding.ASCII.GetBytes(defaultJson)));
+            var testConfiguration = new ConfigurationBuilder().AddJsonFile("host.json").Build();
+            ColoredConsoleLogger coloredConsoleLogger = new ColoredConsoleLogger("test", new LoggingFilterHelper(testConfiguration, true));
             Assert.Equal(expected, coloredConsoleLogger.DoesMessageStartsWithAllowedLogsPrefix(formattedMessage));
         }
     }

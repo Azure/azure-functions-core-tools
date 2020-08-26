@@ -55,13 +55,6 @@ namespace Azure.Functions.Cli.Tests
                     Assert.Equal(LogLevel.Warning, loggingFilterHelper.SystemLogDefaultLogLevel);
                 }
             }
-            var loggerFactory = LoggerFactory.Create(builder =>
-            {
-                loggingFilterHelper.AddConsoleLoggingProvider(builder);
-                var serviceProvider = builder.Services.BuildServiceProvider();
-                var coloredConsoleLoggerProvider = (ColoredConsoleLoggerProvider)serviceProvider.GetService<ILoggerProvider>();
-                Assert.NotNull(coloredConsoleLoggerProvider);
-            });
         }
 
         [Theory]
