@@ -17,6 +17,13 @@ namespace Azure.Functions.Cli.Tests
 
         public LoggingFilterHelperTests()
         {
+            try
+            {
+                FileSystemHelpers.FileDelete(Constants.HostJsonFileName);
+            }
+            catch
+            {
+            }
             _hostOptions = new ScriptApplicationHostOptions
             {
                 ScriptPath = Directory.GetCurrentDirectory()

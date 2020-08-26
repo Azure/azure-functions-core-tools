@@ -10,6 +10,17 @@ namespace Azure.Functions.Cli.Tests
 {
     public class UtilitiesTests
     {
+        public UtilitiesTests()
+        {
+            try
+            {
+                FileSystemHelpers.FileDelete(Constants.HostJsonFileName);
+            }
+            catch
+            {
+            }
+        }
+
         [Theory]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"None\"}}}", LogLevel.None)]
         [InlineData("{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"NONE\"}}}", LogLevel.None)]
