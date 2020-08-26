@@ -1,24 +1,44 @@
 ﻿using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.IO;
-using System.Text;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests
 {
     public class UtilitiesTests
     {
+        private string _workerDir;
+        private ScriptApplicationHostOptions _hostOptions;
+        private string _hostJsonFilePath;
+
         public UtilitiesTests()
         {
             try
             {
-                FileSystemHelpers.FileDelete(Constants.HostJsonFileName);
+                _workerDir = Path.GetTempFileName();
+                if (File.Exists(_workerDir))
+                {
+                    File.Delete(_workerDir);
+                }
+                else if (Directory.Exists(_workerDir))
+                {
+                    Directory.Delete(_workerDir, recursive: true);
+                }
+                Directory.CreateDirectory(_workerDir);
+                _hostOptions = new ScriptApplicationHostOptions
+                {
+                    ScriptPath = _workerDir
+                };
             }
             catch
             {
+                _hostOptions = new ScriptApplicationHostOptions
+                {
+                    ScriptPath = Directory.GetCurrentDirectory()
+                };
             }
+            _hostJsonFilePath = Path.Combine(_hostOptions.ScriptPath, Constants.HostJsonFileName);
         }
 
         [Theory]
@@ -28,12 +48,8 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("{\"version\": \"2.0\"}", LogLevel.Information)]
         public void GetHostJsonDefaultLogLevel_Test(string hostJsonContent, LogLevel expectedLogLevel)
         {
-            FileSystemHelpers.WriteAllTextToFile(Constants.HostJsonFileName, hostJsonContent);
-            ScriptApplicationHostOptions hostOptions = new ScriptApplicationHostOptions
-            {
-                ScriptPath = Directory.GetCurrentDirectory()
-            };
-            var configuration = Utilities.BuildHostJsonConfigutation(hostOptions);
+            FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
+            var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
             LogLevel actualLogLevel = Utilities.GetHostJsonDefaultLogLevel(configuration);
             Assert.Equal(actualLogLevel, expectedLogLevel);
         }
@@ -44,12 +60,9 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("{\"version\": \"2.0\"}", "Function.HttpFunction", false)]
         public void LogLevelExists_Test(string hostJsonContent, string category, bool expected)
         {
-            FileSystemHelpers.WriteAllTextToFile(Constants.HostJsonFileName, hostJsonContent);
-            ScriptApplicationHostOptions hostOptions = new ScriptApplicationHostOptions
-            {
-                ScriptPath = Directory.GetCurrentDirectory()
-            };
-            var configuration = Utilities.BuildHostJsonConfigutation(hostOptions); 
+            FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
+            
+            var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions); 
             Assert.Equal(expected, Utilities.LogLevelExists(configuration, category));
         }
 
@@ -59,12 +72,8 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("{\"version\": \"2.0\"}", "extensionBundle", false)]
         public void JobHostConfigSectionExists_Test(string hostJsonContent, string section, bool expected)
         {
-            FileSystemHelpers.WriteAllTextToFile(Constants.HostJsonFileName, hostJsonContent);
-            ScriptApplicationHostOptions hostOptions = new ScriptApplicationHostOptions
-            {
-                ScriptPath = Directory.GetCurrentDirectory()
-            };
-            var configuration = Utilities.BuildHostJsonConfigutation(hostOptions);
+            FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
+            var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
             Assert.Equal(expected, Utilities.JobHostConfigSectionExists(configuration, section));
         }
 
