@@ -41,7 +41,7 @@ namespace Azure.Functions.Cli.Tests
             _hostJsonFilePath = Path.Combine(_hostOptions.ScriptPath, Constants.HostJsonFileName);
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174"]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"None\"}}}", LogLevel.None)]
         [InlineData("{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"NONE\"}}}", LogLevel.None)]
         [InlineData("{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}", LogLevel.Debug)]
@@ -61,7 +61,7 @@ namespace Azure.Functions.Cli.Tests
             }
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174"]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.General\": \"Debug\"}}}", "Host.General", true)]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.General", false)]
         [InlineData("{\"version\": \"2.0\"}", "Function.HttpFunction", false)]
@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Tests
             }
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174"]
         [InlineData("{\"version\": \"2.0\",\"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\",\"version\": \"[1.*, 2.0.0)\"}}", "extensionBundle", true)]
         [InlineData("{\"version\": \"2.0\",\"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\",\"version\": \"[1.*, 2.0.0)\"}}", "ExtensionBundle", true)]
         [InlineData("{\"version\": \"2.0\"}", "extensionBundle", false)]

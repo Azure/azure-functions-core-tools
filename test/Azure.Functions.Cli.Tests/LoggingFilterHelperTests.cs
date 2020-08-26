@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Tests
             }
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174"]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"None\"}}}", true, LogLevel.None)]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"DEBUG\"}}}", true, LogLevel.Debug)]
         [InlineData("{\"version\": \"2.0\"}", null, LogLevel.Information)]
@@ -103,7 +103,7 @@ namespace Azure.Functions.Cli.Tests
             }
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174"]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"None\"}}}", "test", LogLevel.Information, false)]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.Startup", LogLevel.Information, true)]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.General", LogLevel.Information, false)]
@@ -123,7 +123,7 @@ namespace Azure.Functions.Cli.Tests
             }
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174"]
         [InlineData(false, null, false)]
         [InlineData(true, false, false)]
         [InlineData(true, null, true)]
