@@ -1,8 +1,4 @@
-﻿using Azure.Functions.Cli.Common;
-using Colors.Net;
-using Colors.Net.StringColorExtensions;
-using Microsoft.Azure.WebJobs.Script;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,11 +6,26 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Colors.Net;
+using Colors.Net.StringColorExtensions;
+using Microsoft.Azure.WebJobs.Logging;
+using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Configuration;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli
 {
     internal static class Utilities
     {
+        public const string LogLevelSection = "loglevel";
+        public const string LogLevelDefaultSection = "Default";
+
         internal static void PrintLogo()
         {
             ColoredConsole.WriteLine($@"
@@ -99,7 +110,7 @@ namespace Azure.Functions.Cli
                 Match match = Regex.Match(sanitizedString, removeRegex);
                 string matchString;
                 // Keep removing the matching regex until no more match is found
-                while(!string.IsNullOrEmpty(matchString = match.Value))
+                while (!string.IsNullOrEmpty(matchString = match.Value))
                 {
                     sanitizedString = sanitizedString.Replace(matchString, new string(fillerChar, matchString.Length));
                     match = Regex.Match(sanitizedString, removeRegex);
@@ -170,6 +181,91 @@ namespace Azure.Functions.Cli
             var localPath = Path.Combine(appDataDir, "azure-functions-core-tools");
             FileSystemHelpers.EnsureDirectory(localPath);
             return localPath;
+        }
+
+        internal static LogLevel GetHostJsonDefaultLogLevel(IConfigurationRoot hostJsonConfig)
+        {
+            string defaultLogLevelKey = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, LogLevelSection, LogLevelDefaultSection);
+            try
+            {
+                if (Enum.TryParse(typeof(LogLevel), hostJsonConfig[defaultLogLevelKey].ToString(), true, out object outLevel))
+                {
+                    return (LogLevel)outLevel;
+                }
+            }
+            catch
+            {
+            }
+            // Default log level
+            return LogLevel.Information;
+        }
+
+        internal static bool LogLevelExists(IConfigurationRoot hostJsonConfig, string category)
+        {
+            string categoryKey = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, LogLevelSection, category);
+            try
+            {
+                if (Enum.TryParse(typeof(LogLevel), hostJsonConfig[categoryKey].ToString(), true, out object outLevel))
+                {
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        internal static bool JobHostConfigSectionExists(IConfigurationRoot hostJsonConfig, string sectioName)
+        {
+            string configSection = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, sectioName);
+            try
+            {
+                if (hostJsonConfig.GetSection(configSection).Exists())
+                {
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// For user logs, returns true if actualLevel of the log is >= default user log level - Information unless overridden in host.json
+        /// For system logs, returns true if actualLevel of the log is >= default system log level - Warning unless overridden in host.json
+        /// </summary>
+        /// <param name="category"></param>
+        /// <param name="actualLevel"></param>
+        /// <param name="userLogMinLevel"></param>
+        /// <param name="systemLogMinLevel"></param>
+        /// <returns></returns>
+        internal static bool DefaultLoggingFilter(string category, LogLevel actualLevel, LogLevel userLogMinLevel, LogLevel systemLogMinLevel)
+        {
+            if (LogCategories.IsFunctionUserCategory(category))
+            {
+                return actualLevel >= userLogMinLevel;
+            }
+            return actualLevel >= systemLogMinLevel;
+        }
+
+        /// <summary>
+        /// Returns true for user logs >= Trace level. Returns false, if log level is explicitly set to None.
+        /// </summary>
+        /// <param name="actualLevel"></param>
+        /// <returns></returns>
+        internal static bool UserLoggingFilter(LogLevel actualLevel)
+        {
+            if (actualLevel == LogLevel.None)
+            {
+                return false;
+            }
+            return actualLevel >= LogLevel.Trace;
+        }
+
+        internal static IConfigurationRoot BuildHostJsonConfigutation(ScriptApplicationHostOptions hostOptions)
+        {
+            IConfigurationBuilder builder = new ConfigurationBuilder();
+            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance, metricsLogger: new MetricsLogger()));
+            var configuration = builder.Build();
+            return configuration;
         }
     }
 }

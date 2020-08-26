@@ -15,16 +15,13 @@ namespace Azure.Functions.Cli.ExtensionBundle
         public static ExtensionBundleOptions GetExtensionBundleOptions(ScriptApplicationHostOptions hostOptions = null)
         {
             hostOptions = hostOptions ?? SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
-            IConfigurationBuilder builder = new ConfigurationBuilder();
-            builder.Add(new HostJsonFileConfigurationSource(hostOptions, SystemEnvironment.Instance, loggerFactory: NullLoggerFactory.Instance, metricsLogger: new MetricsLogger()));
-            var configuration = builder.Build();
-
+            IConfigurationRoot configuration = Utilities.BuildHostJsonConfigutation(hostOptions);
             var configurationHelper = new ExtensionBundleConfigurationHelper(configuration, SystemEnvironment.Instance);
             var options = new ExtensionBundleOptions();
             configurationHelper.Configure(options);
             return options;
         }
-
+        
         public static ExtensionBundleManager GetExtensionBundleManager()
         {
             var extensionBundleOption = GetExtensionBundleOptions();
