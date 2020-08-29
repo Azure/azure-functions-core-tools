@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Parser
                 .Setup<bool>("no-bundler")
                 .WithDescription("[Deprecated] Skips generating a bundle when publishing python function apps with build-native-deps.")
-                .Callback(nb => ColoredConsole.WriteLine(Yellow($"Warning: Argument {Cyan("--no-bundler")} is deprecated and a no-op. Python function apps are not bundled anymore.")));
+                .Callback(nb => ColoredConsole.WriteLine(WarningColor($"Warning: Argument {AdditionalInfoColor("--no-bundler")} is deprecated and a no-op. Python function apps are not bundled anymore.")));
             Parser
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
@@ -271,6 +271,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
+            // Check if azure-functions-worker exists in requirements.txt for Python function app
+            if (workerRuntime == WorkerRuntime.python)
+            {
+                await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
+            }
+
             return result;
         }
 
@@ -290,7 +296,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Recommend Linux scm users to use --build remote instead of --build-native-deps
             if (BuildNativeDeps && functionApp.IsLinux && !string.IsNullOrEmpty(functionApp.ScmUri))
             {
-                ColoredConsole.WriteLine(Yellow("Recommend using '--build remote' to resolve project dependencies remotely on Azure"));
+                ColoredConsole.WriteLine(WarningColor("Recommend using '--build remote' to resolve project dependencies remotely on Azure"));
             }
 
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption,
@@ -585,7 +591,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_ZIP");
                 if (StaticSettings.IsDebug)
                 {
-                    ColoredConsole.WriteLine(Yellow("Removing WEBSITE_RUN_FROM_ZIP App Setting"));
+                    ColoredConsole.WriteLine(WarningColor("Removing WEBSITE_RUN_FROM_ZIP App Setting"));
                 }
             }
 
@@ -633,7 +639,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (functionApp.AzureAppSettings.ContainsKey(appSettingName))
                 {
                     var appSettingValue = functionApp.AzureAppSettings[appSettingName];
-                    ColoredConsole.WriteLine(Yellow($"Removing {appSettingName} app setting ({appSettingValue})"));
+                    ColoredConsole.WriteLine(WarningColor($"Removing {appSettingName} app setting ({appSettingValue})"));
                     functionApp.AzureAppSettings.Remove(appSettingName);
                     isAppSettingUpdated = true;
                 }
@@ -719,7 +725,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 if (status == DeployStatus.Success)
                 {
-                    ColoredConsole.WriteLine(Green("Remote build succeeded!"));
+                    ColoredConsole.WriteLine(VerboseColor("Remote build succeeded!"));
                 }
                 else if (status == DeployStatus.Failed)
                 {
@@ -727,7 +733,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
                 else if (status == DeployStatus.Unknown)
                 {
-                    ColoredConsole.WriteLine(Yellow($"Failed to retrieve remote build status, please visit https://{functionApp.ScmUri}/api/deployments"));
+                    ColoredConsole.WriteLine(WarningColor($"Failed to retrieve remote build status, please visit https://{functionApp.ScmUri}/api/deployments"));
                 }
                 return status;
             }

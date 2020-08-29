@@ -9,6 +9,7 @@ namespace Azure.Functions.Cli.Helpers
     public static class GlobalCoreToolsSettings
     {
         private static WorkerRuntime _currentWorkerRuntime;
+
         public static WorkerRuntime CurrentWorkerRuntime
         {
             get
@@ -69,6 +70,10 @@ namespace Azure.Functions.Cli.Helpers
                 else if (args.Contains("--powershell"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.powershell;
+                }
+                else if(args.Contains("--custom"))
+                {
+                    _currentWorkerRuntime = WorkerRuntime.custom;
                 }
                 else
                 {

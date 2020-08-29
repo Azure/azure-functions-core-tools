@@ -33,7 +33,6 @@ namespace Azure.Functions.Cli.Common
         public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
         public const string PythonDockerImageSkipPull = "FUNCTIONS_PYTHON_DOCKER_SKIP_PULL";
         public const string PythonDockerRunCommand = "FUNCTIONS_PYTHON_DOCKER_RUN_COMMAND";
-        public const string PythonFunctionsLibrary = "azure-functions";
         public const string FunctionsCoreToolsEnvironment = "FUNCTIONS_CORETOOLS_ENVIRONMENT";
         public const string EnablePersistenceChannelDebugSetting = "FUNCTIONS_CORE_TOOLS_ENABLE_PERSISTENCE_CHANNEL_DEBUG_OUTPUT";
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
@@ -48,9 +47,9 @@ namespace Azure.Functions.Cli.Common
         public const string AzureFunctionsEnvorinmentEnvironmentVariable = "AZURE_FUNCTIONS_ENVIRONMENT";
         public const string ExtensionBundleConfigPropertyName = "extensionBundle";
         public const string AspNetCoreEnvironmentEnvironmentVariable = "ASPNETCORE_ENVIRONMENT";
-        public const string OSXCoreToolsTempDirectoryName = ".azure-functions-core-tools";
-        public const string OSXRootPath = "~/";
+        public const string UserCoreToolsDirectory = ".azure-functions-core-tools";
         public const string ManagedDependencyConfigPropertyName = "managedDependency";
+        public const string CustomHandlerPropertyName = "customHandler";
         public const string PowerShellWorkerDefaultVersion = "~6";
         public const string AuthLevelErrorMessage = "Unable to configure Authorization level. The selected template does not use Http Trigger";
         public const string HttpTriggerTemplateName = "HttpTrigger";
@@ -88,6 +87,7 @@ namespace Azure.Functions.Cli.Common
             public const string CSharp = "c#";
             public const string Powershell = "powershell";
             public const string Java = "java";
+            public const string Custom = "custom";
         }
 
         public static class ArmConstants

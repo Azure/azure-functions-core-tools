@@ -6,27 +6,19 @@ using System.Linq;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Diagnostics;
-using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.NativeMethods;
 using Colors.Net;
 using Fclp;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
-using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
-using Microsoft.Azure.WebJobs.Script.WebHost.Controllers;
-using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -45,6 +37,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
         private readonly ISecretsManager _secretsManager;
+        private IConfigurationRoot _hostJsonConfig;
 
         public int Port { get; set; }
 
@@ -67,6 +60,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public bool NoBuild { get; set; }
 
         public bool EnableAuth { get; set; }
+
+        public bool? VerboseLogging { get; set; }
+
         public List<string> EnabledFunctions { get; private set; }
         public bool SkipAzureStorageCheck { get; private set; }
 
@@ -78,7 +74,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             var hostSettings = _secretsManager.GetHostStartSettings();
-
             Parser
                 .Setup<int>('p', "port")
                 .WithDescription($"Local port to listen on. Default: {DefaultPort}")
@@ -153,17 +148,33 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .SetDefault(false)
                 .Callback(skip => SkipAzureStorageCheck = skip);
 
-            return base.ParseArgs(args);
+            Parser
+                .Setup<bool>("verbose")
+                .WithDescription("When false, hides system logs other than warnings and errors.")
+                .SetDefault(false)
+                .Callback(v => VerboseLogging = v);
+
+            var parserResult = base.ParseArgs(args);
+            bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
+            // Input args do not contain --verbose flag
+            if (!VerboseLogging.Value && verboseLoggingArgExists)
+            {
+                VerboseLogging = null;
+            }
+            return parserResult;
         }
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
+           
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
 
-            var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
 
+            var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
+            
             if (UseHttps)
             {
                 defaultBuilder
@@ -182,7 +193,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     });
                 });
             }
-
             return defaultBuilder
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(listenAddress.ToString())
@@ -193,10 +203,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .ConfigureLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders();
-                    loggingBuilder.AddDefaultWebJobsFilters();
-                    loggingBuilder.AddProvider(new ColoredConsoleLoggerProvider((cat, level) => level >= LogLevel.Information));
+                    loggingFilterHelper.AddConsoleLoggingProvider(loggingBuilder);
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, loggingFilterHelper)))
                 .Build();
         }
 
@@ -262,15 +271,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             await PreRunConditions();
-            Utilities.PrintLogo();
+            if (VerboseLogging.HasValue && VerboseLogging.Value)
+            {
+                Utilities.PrintLogo();
+            }
             Utilities.PrintVersion();
-            ValidateHostJsonConfiguration();
 
-            var settings = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
+            ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
+           
+            ValidateAndBuildHostJsonConfigurationIfFileExists(hostOptions);
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
-            IWebHost host = await BuildWebHost(settings, listenUri, baseUri, certificate);
+            IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();
 
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
@@ -279,22 +292,29 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             var scriptHost = hostService.Services.GetRequiredService<IScriptJobHost>();
             var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
-            DisplayHttpFunctionsInfo(scriptHost, httpOptions.Value, baseUri);
-            DisplayDisabledFunctions(scriptHost);
-
+            if (scriptHost != null && scriptHost.Functions.Any())
+            {
+                DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
+            }
+            if (VerboseLogging == null || !VerboseLogging.Value)
+            {
+                ColoredConsole.WriteLine(AdditionalInfoColor("For detailed output, run func with --verbose flag."));
+            }
             await runTask;
         }
 
-        private void ValidateHostJsonConfiguration()
+        private void ValidateAndBuildHostJsonConfigurationIfFileExists(ScriptApplicationHostOptions hostOptions)
         {
             bool IsPreCompiledApp = IsPreCompiledFunctionApp();
             var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
             if (IsPreCompiledApp && !File.Exists(hostJsonPath))
             {
-                throw new CliException($"Host.json file in missing. Please make sure host.json file is preset at {Environment.CurrentDirectory}");
+                throw new CliException($"Host.json file in missing. Please make sure host.json file is present at {Environment.CurrentDirectory}");
             }
 
-            if (IsPreCompiledApp && BundleConfigurationExists(hostJsonPath))
+            //BuildHostJsonConfigutation only if host.json file exists.
+            _hostJsonConfig = Utilities.BuildHostJsonConfigutation(hostOptions);
+            if (IsPreCompiledApp && Utilities.JobHostConfigSectionExists(_hostJsonConfig, ConfigurationSectionNames.ExtensionBundle))
             {
                 throw new CliException($"Extension bundle configuration should not be present for the function app with pre-compiled functions. Please remove extension bundle configuration from host.json: {Path.Combine(Environment.CurrentDirectory, "host.json")}");
             }
@@ -332,13 +352,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 throw new CliException($"Port {Port} is unavailable. Close the process using that port, or specify another port using --port [-p].");
             }
         }
-
-        private bool BundleConfigurationExists(string hostJsonPath)
-        {
-            var hostJson = FileSystemHelpers.ReadAllTextFromFile(hostJsonPath);
-            return hostJson.Contains(Constants.ExtensionBundleConfigPropertyName, StringComparison.OrdinalIgnoreCase);
-        }
-
+       
         private bool IsPreCompiledFunctionApp()
         {
             bool isPrecompiled = false;
@@ -359,68 +373,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             return isPrecompiled;
         }
-
-        private void DisplayDisabledFunctions(IScriptJobHost scriptHost)
-        {
-            if (scriptHost != null)
-            {
-                foreach (var function in scriptHost.Functions.Where(f => f.Metadata.IsDisabled()))
-                {
-                    ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
-                }
-            }
-        }
-
-        private void DisplayHttpFunctionsInfo(IScriptJobHost scriptHost, HttpOptions httpOptions, Uri baseUri)
-        {
-            if (scriptHost != null)
-            {
-                var httpFunctions = scriptHost.Functions.Where(f => f.Metadata.IsHttpFunction() && !f.Metadata.IsDisabled());
-                if (httpFunctions.Any())
-                {
-                    ColoredConsole
-                        .WriteLine()
-                        .WriteLine(Yellow("Http Functions:"))
-                        .WriteLine();
-                }
-
-                foreach (var function in httpFunctions)
-                {
-                    var binding = function.Metadata.Bindings.FirstOrDefault(b => b.Type != null && b.Type.Equals("httpTrigger", StringComparison.OrdinalIgnoreCase));
-                    var httpRoute = binding?.Raw?.GetValue("route", StringComparison.OrdinalIgnoreCase)?.ToString();
-                    httpRoute = httpRoute ?? function.Name;
-
-                    string[] methods = null;
-                    var methodsRaw = binding?.Raw?.GetValue("methods", StringComparison.OrdinalIgnoreCase)?.ToString();
-                    if (string.IsNullOrEmpty(methodsRaw) == false)
-                    {
-                        methods = methodsRaw.Split(',');
-                    }
-
-                    string hostRoutePrefix = "";
-                    if (!function.Metadata.IsProxy())
-                    {
-                        hostRoutePrefix = httpOptions.RoutePrefix ?? "api/";
-                        hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
-                            ? hostRoutePrefix
-                            : $"{hostRoutePrefix}/";
-                    }
-
-                    var functionMethods = methods != null ? $"{CleanAndFormatHttpMethods(string.Join(",", methods))}" : null;
-                    var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
-                    ColoredConsole
-                        .WriteLine($"\t{Yellow($"{function.Name}:")} {Green(functionMethods)} {Green(url)}")
-                        .WriteLine();
-                }
-            }
-        }
-
-        private string CleanAndFormatHttpMethods(string httpMethods)
-        {
-            return httpMethods.Replace(Environment.NewLine, string.Empty).Replace(" ", string.Empty)
-                .Replace("\"", string.Empty).ToUpperInvariant();
-        }
-
+                       
         internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool skipAzureWebJobsStorageCheck = false)
         {
             try
@@ -494,123 +447,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 ? UseDefaultCert ? null : await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
-        }
-
-        public class Startup : IStartup
-        {
-            private readonly WebHostBuilderContext _builderContext;
-            private readonly ScriptApplicationHostOptions _hostOptions;
-            private readonly string[] _corsOrigins;
-            private readonly bool _corsCredentials;
-            private readonly bool _enableAuth;
-
-            public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials, bool enableAuth)
-            {
-                _builderContext = builderContext;
-                _hostOptions = hostOptions;
-                _enableAuth = enableAuth;
-
-                if (!string.IsNullOrEmpty(corsOrigins))
-                {
-                    _corsOrigins = corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries);
-                    _corsCredentials = corsCredentials;
-                }
-            }
-
-            public IServiceProvider ConfigureServices(IServiceCollection services)
-            {
-                if (_corsOrigins != null)
-                {
-                    services.AddCors();
-                }
-
-                if (_enableAuth)
-                {
-                    services.AddWebJobsScriptHostAuthentication();
-                }
-                else
-                {
-                    services.AddAuthentication()
-                        .AddScriptJwtBearer()
-                        .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
-                        .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
-                }
-
-                services.AddWebJobsScriptHostAuthorization();
-
-                services.AddMvc()
-                    .AddApplicationPart(typeof(HostController).Assembly);
-
-                // workaround for https://github.com/Azure/azure-functions-core-tools/issues/2097
-                SetBundlesEnvironmentVariables();
-
-                services.AddWebJobsScriptHost(_builderContext.Configuration);
-
-                services.Configure<ScriptApplicationHostOptions>(o =>
-                {
-                    o.ScriptPath = _hostOptions.ScriptPath;
-                    o.LogPath = _hostOptions.LogPath;
-                    o.IsSelfHost = _hostOptions.IsSelfHost;
-                    o.SecretsPath = _hostOptions.SecretsPath;
-                });
-
-                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
-                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
-                services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, LoggingBuilder>();
-
-                services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
-
-                return services.BuildServiceProvider();
-            }
-
-            private void SetBundlesEnvironmentVariables()
-            {
-                var bundleId = ExtensionBundleHelper.GetExtensionBundleOptions(_hostOptions).Id;
-                if (!string.IsNullOrEmpty(bundleId))
-                {
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__downloadPath", ExtensionBundleHelper.GetDownloadPath(bundleId));
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__extensionBundle__ensureLatest", "true");
-                }
-            }
-
-            public void Configure(IApplicationBuilder app)
-            {
-                if (_corsOrigins != null)
-                {
-                    app.UseCors(builder =>
-                    {
-                        var origins = builder.WithOrigins(_corsOrigins)
-                            .AllowAnyHeader()
-                            .AllowAnyMethod();
-                        if (_corsCredentials)
-                        {
-                            origins.AllowCredentials();
-                        }
-                    });
-                }
-
-                IApplicationLifetime applicationLifetime = app.ApplicationServices
-                    .GetRequiredService<IApplicationLifetime>();
-
-                app.UseWebJobsScriptHost(applicationLifetime);
-            }
-
-            private class ThrowingDependencyValidator : DependencyValidator
-            {
-                public override void Validate(IServiceCollection services)
-                {
-                    try
-                    {
-                        base.Validate(services);
-                    }
-                    catch (InvalidHostServicesException ex)
-                    {
-                        // Rethrow this as an InvalidOperationException to bypass the handling
-                        // in the host. This will stop invalid services in the CLI only.
-                        throw new InvalidOperationException("Invalid host services.", ex);
-                    }
-                }
-            }
         }
     }
 }

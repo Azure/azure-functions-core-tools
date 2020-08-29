@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
-                    { "AzureFunctionsJobHost:extensionBundle:downloadPath", ExtensionBundleHelper.GetDownloadPath(bundleId) },
+                    { "AzureFunctionsJobHost:extensionBundle:downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
                     { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "true"}
                 });
             }

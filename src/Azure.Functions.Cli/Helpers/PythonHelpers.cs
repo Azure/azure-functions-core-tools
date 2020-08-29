@@ -24,8 +24,20 @@ namespace Azure.Functions.Cli.Helpers
             var pyVersion = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pyVersion, errorIfNoVersion: false);
 
-            CreateRequirements();
+            await CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
+        }
+
+        public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
+        {
+            if (FileSystemHelpers.FileExists(Path.Join(Environment.CurrentDirectory, Constants.RequirementsTxt))) {
+                List<PythonPackage> packages = await RequirementsTxtParser.ParseRequirementsTxtFile(Environment.CurrentDirectory);
+                PythonPackage workerPackage = packages.FirstOrDefault(p => p.Name == "azure-functions-worker");
+                if (workerPackage != null)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Please remove '{workerPackage.Name}{workerPackage.Specification}' from requirements.txt as it may conflict with the Azure Functions platform."));
+                }
+            }
         }
 
         public static async Task EnsureVirtualEnvrionmentIgnored()
@@ -64,11 +76,13 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static void CreateRequirements()
+        private async static Task CreateRequirements()
         {
             if (!FileSystemHelpers.FileExists(Constants.RequirementsTxt))
             {
-                FileSystemHelpers.WriteAllTextToFile(Constants.RequirementsTxt, Constants.PythonFunctionsLibrary);
+                ColoredConsole.WriteLine($"Writing {Constants.RequirementsTxt}");
+                string requirementsTxtContent = await StaticResources.PythonRequirementsTxt;
+                await FileSystemHelpers.WriteAllTextToFileAsync(Constants.RequirementsTxt, requirementsTxtContent);
             }
             else
             {
@@ -300,7 +314,7 @@ namespace Azure.Functions.Cli.Helpers
                 // If build option is remote, we don't need to verify if packages are in sync, as we need to delete them regardless
                 if (buildOption != BuildOption.Remote && await ArePackagesInSync(reqTxtFile, packagesLocation))
                 {
-                    ColoredConsole.WriteLine(Yellow($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
+                    ColoredConsole.WriteLine(WarningColor($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
                     return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
                 }
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");

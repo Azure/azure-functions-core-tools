@@ -31,6 +31,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileDotNet => GetValue("Dockerfile.dotnet");
 
+        public static Task<string> DockerfileCustom => GetValue("Dockerfile.custom");
+
         public static Task<string> DockerfileCsxDotNet => GetValue("Dockerfile.csx.dotnet");
 
         public static Task<string> DockerfilePython36 => GetValue("Dockerfile.python36");
@@ -51,6 +53,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> BundleConfig => GetValue("bundleConfig.json");
 
+        public static Task<string> CustomHandlerConfig => GetValue("customHandlerConfig.json");
+
         public static Task<string> ManagedDependenciesConfig => GetValue("managedDependenciesConfig.json");
 
         public static Task<string> PythonDockerBuildScript => GetValue(Constants.StaticResourcesNames.PythonDockerBuild);
@@ -66,6 +70,8 @@ namespace Azure.Functions.Cli
         public static Task<string> TsConfig => GetValue("tsconfig.json");
 
         public static Task<string> PowerShellRequirementsPsd1 => GetValue("requirements.psd1");
+
+        public static Task<string> PythonRequirementsTxt => GetValue("requirements.txt");
 
         public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
 
