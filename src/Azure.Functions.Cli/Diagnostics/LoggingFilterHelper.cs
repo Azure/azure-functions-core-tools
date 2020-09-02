@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Azure.Functions.Cli
 {
@@ -64,7 +65,7 @@ namespace Azure.Functions.Cli
 
         internal void AddConsoleLoggingProvider(ILoggingBuilder loggingBuilder)
         {
-            // Filter is needed to force all the logs.
+            // Filter is needed to force all the logs at jobhost level
             loggingBuilder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => true).AddProvider(new ColoredConsoleLoggerProvider(this));
         }
 
