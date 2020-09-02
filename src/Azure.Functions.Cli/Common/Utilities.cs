@@ -250,7 +250,7 @@ namespace Azure.Functions.Cli
             {
                 return actualLevel >= userLogMinLevel;
             }
-            if (AllowedCategoryPrefixes.Where(p => category.StartsWith(p)).Any())
+            if (IsSystemLogCategory(category))
             {
                 // System logs
                 return actualLevel >= systemLogMinLevel;
@@ -275,7 +275,12 @@ namespace Azure.Functions.Cli
 
         internal static bool SystemLoggingFilter(string category, LogLevel actualLevel, LogLevel minLevel)
         {
-            return actualLevel >= minLevel && AllowedCategoryPrefixes.Where(p => category.StartsWith(p)).Any();
+            return actualLevel >= minLevel && IsSystemLogCategory(category);
+        }
+
+        internal static bool IsSystemLogCategory(string category)
+        {
+            return SystemCategoryPrefixes.Where(p => category.StartsWith(p)).Any();
         }
 
         internal static IConfigurationRoot BuildHostJsonConfigutation(ScriptApplicationHostOptions hostOptions)
