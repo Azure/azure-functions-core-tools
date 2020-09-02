@@ -181,6 +181,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .ConfigureLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders();
+                    loggingBuilder.AddDefaultWebJobsFilters();
                     loggingFilterHelper.AddConsoleLoggingProvider(loggingBuilder);
                 })
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, loggingFilterHelper)))
