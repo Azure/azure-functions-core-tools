@@ -205,12 +205,14 @@ namespace Azure.Functions.Cli
             string categoryKey = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, LogLevelSection, category);
             try
             {
-                if (Enum.TryParse(typeof(LogLevel), hostJsonConfig[categoryKey].ToString(), true, out object outLevel))
+                if (hostJsonConfig[categoryKey] != null && Enum.TryParse(typeof(LogLevel), hostJsonConfig[categoryKey].ToString(), true, out object outLevel))
                 {
                     return true;
                 }
             }
-            catch { }
+            catch 
+            { 
+            }
             return false;
         }
 
