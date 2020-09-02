@@ -119,6 +119,17 @@ namespace Azure.Functions.Cli.Tests
             Assert.Equal(expected, Utilities.DefaultLoggingFilter(inputCategory, inputLogLevel, LogLevel.Information, LogLevel.Warning));
         }
 
+        [Theory]
+        [InlineData("Function.Function1", true)]
+        [InlineData("Random", false)]
+        [InlineData("Host.Startup", true)]
+        [InlineData("Microsoft.Azure.WebJobs.TestLogger", true)]
+        [InlineData("Microsoft.Azure.TestLogger", false)]
+        public void IsSystemLogCategory_Test(string inputCategory, bool expected)
+        {
+            Assert.Equal(expected, Utilities.IsSystemLogCategory(inputCategory));
+        }
+
         private void DeleteIfExists(string filePath)
         {
             try

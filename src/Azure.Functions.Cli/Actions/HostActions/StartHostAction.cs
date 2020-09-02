@@ -7,6 +7,7 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -188,7 +189,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .ConfigureLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders();
-                    loggingFilterHelper.AddConsoleLoggingProvider(loggingBuilder);
+                    // This is needed to filter system logs only for known categories
+                    loggingBuilder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => Utilities.SystemLoggingFilter(category, level, LogLevel.Trace)).AddProvider(new ColoredConsoleLoggerProvider(loggingFilterHelper));
                 })
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, loggingFilterHelper)))
                 .Build();
