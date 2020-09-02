@@ -16,8 +16,6 @@ using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli
 {
@@ -25,6 +23,13 @@ namespace Azure.Functions.Cli
     {
         public const string LogLevelSection = "loglevel";
         public const string LogLevelDefaultSection = "Default";
+        internal static readonly string[] AllowedCategoryPrefixes = new[]
+        {
+            "Microsoft.Azure.WebJobs.",
+            "Function.",
+            "Worker.",
+            "Host."
+        };
 
         internal static void PrintLogo()
         {
@@ -245,7 +250,13 @@ namespace Azure.Functions.Cli
             {
                 return actualLevel >= userLogMinLevel;
             }
-            return actualLevel >= systemLogMinLevel;
+            if (AllowedCategoryPrefixes.Where(p => category.StartsWith(p)).Any())
+            {
+                // System logs
+                return actualLevel >= systemLogMinLevel;
+            }
+            // consider any other category as user log
+            return actualLevel >= userLogMinLevel;
         }
 
         /// <summary>
@@ -260,6 +271,11 @@ namespace Azure.Functions.Cli
                 return false;
             }
             return actualLevel >= LogLevel.Trace;
+        }
+
+        internal static bool SystemLoggingFilter(string category, LogLevel actualLevel, LogLevel minLevel)
+        {
+            return actualLevel >= minLevel && AllowedCategoryPrefixes.Where(p => category.StartsWith(p)).Any();
         }
 
         internal static IConfigurationRoot BuildHostJsonConfigutation(ScriptApplicationHostOptions hostOptions)

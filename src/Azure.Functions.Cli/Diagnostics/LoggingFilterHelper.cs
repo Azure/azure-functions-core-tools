@@ -14,14 +14,6 @@ namespace Azure.Functions.Cli
         private const string DefaultLogLevelKey = "default";
         private IConfigurationRoot _hostJsonConfig = null;
 
-        internal static readonly string[] AllowedCategoryPrefixes = new[]
-        {
-            "Microsoft.Azure.WebJobs",
-            "Function",
-            "Worker",
-            "Host"
-        };
-
         // CI EnvironmentSettings
         // https://github.com/watson/ci-info/blob/master/index.js#L52-L59
         public const string Ci = "CI"; // Travis CI, CircleCI, Cirrus CI, Gitlab CI, Appveyor, CodeShip, dsari
@@ -73,13 +65,8 @@ namespace Azure.Functions.Cli
 
         internal void AddConsoleLoggingProvider(ILoggingBuilder loggingBuilder)
         {
-            // Filter is needed to force all the logs.
-            loggingBuilder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => Filter(category, level, LogLevel.Trace)).AddProvider(new ColoredConsoleLoggerProvider(this));
-        }
-
-        private static bool Filter(string category, LogLevel actualLevel, LogLevel minLevel)
-        {
-            return actualLevel >= minLevel && AllowedCategoryPrefixes.Where(p => category.StartsWith(p)).Any();
+            // Filter is needed to force all the logs at jobhost level
+            loggingBuilder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => true).AddProvider(new ColoredConsoleLoggerProvider(this));
         }
 
         internal bool IsEnabled(string category, LogLevel logLevel)

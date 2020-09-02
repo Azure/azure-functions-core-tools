@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Helpers
                     foreach (FileInfo file in projectFiles)
                     {
                         if (string.Equals(projectFiles[0].Name, Constants.ExtenstionsCsProjFile, StringComparison.OrdinalIgnoreCase)) continue;
-                        logger.LogInformation($"Found {file.FullName}. Using for user secrets file configuration.");
+                        logger.LogDebug($"Found {file.FullName}. Using for user secrets file configuration.");
                         return file.FullName;
                     }
                 }
@@ -32,7 +32,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             while (filePath.FullName != filePath.Root.FullName);
 
-            logger.LogInformation($"Csproj not found in {path} directory tree. Skipping user secrets file configuration.");
+            logger.LogDebug($"Csproj not found in {path} directory tree. Skipping user secrets file configuration.");
             return null;
         }
 
