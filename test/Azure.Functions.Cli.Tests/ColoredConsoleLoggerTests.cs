@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Tests
 {
     public class ColoredConsoleLoggerTests
     {
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174")]
         [InlineData("somelog", false)]
         [InlineData("Worker process started and initialized.", true)]
         [InlineData("Worker PROCESS started and initialized.", true)]
@@ -27,7 +27,7 @@ namespace Azure.Functions.Cli.Tests
             Assert.Equal(expected, coloredConsoleLogger.DoesMessageStartsWithAllowedLogsPrefix(formattedMessage));
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174")]
         [InlineData("somelog", false)]
         [InlineData("Worker process started and initialized.", true)]
         [InlineData("Worker PROCESS started and initialized.", true)]
