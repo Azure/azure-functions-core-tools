@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli
     {
         public const string LogLevelSection = "loglevel";
         public const string LogLevelDefaultSection = "Default";
-        internal static readonly string[] AllowedCategoryPrefixes = new[]
+        internal static readonly string[] SystemCategoryPrefixes = new[]
         {
             "Microsoft.Azure.WebJobs.",
             "Function.",
