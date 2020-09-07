@@ -412,7 +412,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new []
                         {
                             "env:MSI_SECRET",
-                            "Disable-AzContextAutosave",
+                            "Disable-AzContextAutosave -Scope Process | Out-Null",
                             "Connect-AzAccount -Identity"
                         }
                     },
