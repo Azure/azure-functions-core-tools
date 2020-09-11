@@ -6,7 +6,7 @@ pr:
     - master
     - dev
     - v3.x
-    - release_3.0
+    - signed-3.0.2881
 
 trigger:
   branches:
@@ -14,7 +14,7 @@ trigger:
     - dev
     - master
     - v3.x
-    - release_3.0
+    - signed-3.0.2881
     
 pool:
   vmImage: 'vs2017-win2016'
@@ -90,7 +90,7 @@ steps:
     SessionTimeout: '60'
     MaxConcurrency: '50'
     MaxRetryAttempts: '5'
-  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/signed-3.0.2881')))
 - task: EsrpCodeSigning@1
   displayName: 'Third party signing'
   inputs:
@@ -125,7 +125,7 @@ steps:
     SessionTimeout: '60'
     MaxConcurrency: '50'
     MaxRetryAttempts: '5'
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/signed-3.0.2881')))
 - pwsh: |
     .\repackageBinaries.ps1
   displayName: Repackage signed binaries
@@ -134,16 +134,16 @@ steps:
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/signed-3.0.2881')))
 - task: DotNetCoreCLI@2
   inputs:
     command: 'run'
     workingDirectory: '.\build'
     arguments: 'TestSignedArtifacts --signTest'
   displayName: 'Verify signed binaries'
-  condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/signed-3.0.2881')))
 - pwsh: |
-    .\generateMsiFiles.ps1 -MsiGenBranches @("release_3.0") -CommitMessage '$(Build.SourceVersionMessage)'
+    .\generateMsiFiles.ps1 -MsiGenBranches @("signed-3.0.2881") -CommitMessage '$(Build.SourceVersionMessage)'
   env:
     AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
     BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -183,7 +183,7 @@ steps:
     SessionTimeout: '60'
     MaxConcurrency: '50'
     MaxRetryAttempts: '5'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/signed-3.0.2881'))
 
 - pwsh: |
     .\generateSha.ps1
