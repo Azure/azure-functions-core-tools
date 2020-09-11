@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
@@ -16,6 +15,7 @@ using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -78,13 +78,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 o.IsSelfHost = _hostOptions.IsSelfHost;
                 o.SecretsPath = _hostOptions.SecretsPath;
             });
-
+            
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
             services.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(_ => new LoggingBuilder(_loggingFilterHelper));
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
             {
-                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new UserSecretsConfigurationBuilder(_hostOptions.ScriptPath, _loggingFilterHelper));
+                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>((provider) => new UserSecretsConfigurationBuilder(_hostOptions.ScriptPath, _loggingFilterHelper, provider.GetService<IOptions<LoggerFilterOptions>>().Value));
             }
 
             services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();

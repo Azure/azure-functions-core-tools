@@ -3,6 +3,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
@@ -10,10 +11,12 @@ namespace Azure.Functions.Cli.Diagnostics
     {
         private readonly string _scriptPath;
         private readonly LoggingFilterHelper _loggingFilterHelper;
+        private readonly LoggerFilterOptions _loggerFilterOptions;
 
-        public UserSecretsConfigurationBuilder(string scriptPath, LoggingFilterHelper loggingFilterHelper)
+        public UserSecretsConfigurationBuilder(string scriptPath, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
         {
             _loggingFilterHelper = loggingFilterHelper;
+            _loggerFilterOptions = loggerFilterOptions;
             if (string.IsNullOrEmpty(scriptPath))
             {
                 _scriptPath = Environment.CurrentDirectory;
@@ -40,7 +43,7 @@ namespace Azure.Functions.Cli.Diagnostics
             {
                 return null;
             }
-            string projectFilePath = ProjectHelpers.FindProjectFile(_scriptPath, _loggingFilterHelper);
+            string projectFilePath = ProjectHelpers.FindProjectFile(_scriptPath, _loggingFilterHelper, _loggerFilterOptions);
             if (projectFilePath == null) return null;
 
             var projectRoot = ProjectHelpers.GetProject(projectFilePath);
