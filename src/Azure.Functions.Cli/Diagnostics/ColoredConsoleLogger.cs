@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Diagnostics
             {
                 return Utilities.DefaultLoggingFilter(category, logLevel, filterRule.LogLevel.Value, filterRule.LogLevel.Value);
             }
-            return Utilities.DefaultLoggingFilter(category, logLevel, filterRule.LogLevel.Value, filterRule.LogLevel.Value);
+            return Utilities.DefaultLoggingFilter(category, logLevel, _loggingFilterHelper.UserLogDefaultLogLevel, _loggingFilterHelper.SystemLogDefaultLogLevel);
         }
 
         public bool IsEnabled(LogLevel logLevel)
