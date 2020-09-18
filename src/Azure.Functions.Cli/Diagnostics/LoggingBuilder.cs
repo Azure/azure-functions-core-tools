@@ -5,6 +5,7 @@ using Microsoft.ApplicationInsights.Extensibility.Implementation;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
@@ -19,7 +20,14 @@ namespace Azure.Functions.Cli.Diagnostics
 
         public void Configure(ILoggingBuilder builder)
         {
-            _loggingFilterHelper.AddConsoleLoggingProvider(builder);
+            builder.Services.AddSingleton<ILoggerProvider>(p =>
+            {
+                //Cache LoggerFilterOptions to be used by the logger to filter logs based on content
+                var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>();
+                return new ColoredConsoleLoggerProvider(_loggingFilterHelper, filterOptions.Value);
+            });
+
+            builder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => true);
 
             builder.Services.AddSingleton<TelemetryClient>(provider =>
             {

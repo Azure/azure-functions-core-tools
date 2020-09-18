@@ -24,13 +24,6 @@ namespace Azure.Functions.Cli
     {
         public const string LogLevelSection = "loglevel";
         public const string LogLevelDefaultSection = "Default";
-        internal static readonly string[] SystemCategoryPrefixes = new[]
-        {
-            "Microsoft.Azure.WebJobs.",
-            "Function.",
-            "Worker.",
-            "Host."
-        };
 
         internal static void PrintLogo()
         {
@@ -189,29 +182,12 @@ namespace Azure.Functions.Cli
             return localPath;
         }
 
-        internal static LogLevel GetHostJsonDefaultLogLevel(IConfigurationRoot hostJsonConfig)
-        {
-            string defaultLogLevelKey = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, LogLevelSection, LogLevelDefaultSection);
-            try
-            {
-                if (Enum.TryParse(typeof(LogLevel), hostJsonConfig[defaultLogLevelKey].ToString(), true, out object outLevel))
-                {
-                    return (LogLevel)outLevel;
-                }
-            }
-            catch
-            {
-            }
-            // Default log level
-            return LogLevel.Information;
-        }
-
-        internal static bool LogLevelExists(IConfigurationRoot hostJsonConfig, string category)
+        internal static bool LogLevelExists(IConfigurationRoot hostJsonConfig, string category, out LogLevel outLogLevel)
         {
             string categoryKey = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, LogLevelSection, category);
             try
             {
-                if (Enum.TryParse(typeof(LogLevel), hostJsonConfig[categoryKey], true, out object outLevel))
+                if (Enum.TryParse(hostJsonConfig[categoryKey], true, out outLogLevel))
                 {
                     return true;
                 }
@@ -219,6 +195,7 @@ namespace Azure.Functions.Cli
             catch 
             { 
             }
+            outLogLevel = LogLevel.Information;
             return false;
         }
 
@@ -247,7 +224,9 @@ namespace Azure.Functions.Cli
         /// <returns></returns>
         internal static bool DefaultLoggingFilter(string category, LogLevel actualLevel, LogLevel userLogMinLevel, LogLevel systemLogMinLevel)
         {
-            if (LogCategories.IsFunctionUserCategory(category) || category.Equals(WorkerConstants.FunctionConsoleLogCategoryName, StringComparison.OrdinalIgnoreCase))
+            if (LogCategories.IsFunctionUserCategory(category)
+                || LogCategories.IsFunctionCategory(category)
+                || category.Equals(WorkerConstants.FunctionConsoleLogCategoryName, StringComparison.OrdinalIgnoreCase))
             {
                 return actualLevel >= userLogMinLevel;
             }
@@ -260,28 +239,9 @@ namespace Azure.Functions.Cli
             return actualLevel >= userLogMinLevel;
         }
 
-        /// <summary>
-        /// Returns true for user logs >= Trace level. Returns false, if log level is explicitly set to None.
-        /// </summary>
-        /// <param name="actualLevel"></param>
-        /// <returns></returns>
-        internal static bool UserLoggingFilter(LogLevel actualLevel)
-        {
-            if (actualLevel == LogLevel.None)
-            {
-                return false;
-            }
-            return actualLevel >= LogLevel.Trace;
-        }
-
-        internal static bool SystemLoggingFilter(string category, LogLevel actualLevel, LogLevel minLevel)
-        {
-            return actualLevel >= minLevel && IsSystemLogCategory(category);
-        }
-
         internal static bool IsSystemLogCategory(string category)
         {
-            return SystemCategoryPrefixes.Where(p => category.StartsWith(p)).Any();
+            return ScriptConstants.SystemLogCategoryPrefixes.Where(p => category.StartsWith(p)).Any();
         }
 
         internal static IConfigurationRoot BuildHostJsonConfigutation(ScriptApplicationHostOptions hostOptions)

@@ -1,7 +1,6 @@
 ﻿using System.Linq;
 using Microsoft.Build.Construction;
 using Azure.Functions.Cli.Common;
-using System.Threading.Tasks;
 using System.IO;
 using System.Xml;
 using System;
@@ -12,9 +11,9 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal static class ProjectHelpers
     {
-        public static string FindProjectFile(string path, LoggingFilterHelper loggingFilterHelper)
+        public static string FindProjectFile(string path, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
         {
-            ColoredConsoleLogger logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper);
+            ColoredConsoleLogger logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper, loggerFilterOptions);
             DirectoryInfo filePath = new DirectoryInfo(path);
             do
             {

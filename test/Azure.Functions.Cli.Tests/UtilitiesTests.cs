@@ -1,6 +1,7 @@
 ﻿using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Logging;
+using System;
 using System.IO;
 using Xunit;
 
@@ -52,7 +53,8 @@ namespace Azure.Functions.Cli.Tests
             {
                 FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
                 var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
-                LogLevel actualLogLevel = Utilities.GetHostJsonDefaultLogLevel(configuration);
+                LogLevel actualLogLevel;
+                bool result = Utilities.LogLevelExists(configuration, Utilities.LogLevelDefaultSection, out actualLogLevel);
                 Assert.Equal(actualLogLevel, expectedLogLevel);
             }
             finally
@@ -65,6 +67,8 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.General\": \"Debug\"}}}", "Host.General", true)]
         [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.General", false)]
         [InlineData("{\"version\": \"2.0\"}", "Function.HttpFunction", false)]
+        [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Function.HttpFunction\": \"Debug\"}}}", "Function.HttpFunction.User", true)]
+        [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Function.HttpFunction\": \"Debug\"}}}", "Function.HTTPFunction.USER", true)]
         public void LogLevelExists_Test(string hostJsonContent, string category, bool expected)
         {
             try
@@ -72,7 +76,13 @@ namespace Azure.Functions.Cli.Tests
                 FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
 
                 var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
-                Assert.Equal(expected, Utilities.LogLevelExists(configuration, category));
+                LogLevel logLevel;
+                bool result = Utilities.LogLevelExists(configuration, category, out logLevel);
+                Assert.Equal(expected, result);
+                if (result)
+                {
+                    Assert.Equal(LogLevel.Debug, logLevel);
+                }
             }
             finally
             {
@@ -96,15 +106,6 @@ namespace Azure.Functions.Cli.Tests
             {
                 DeleteIfExists(_workerDir);
             }
-        }
-
-        [Theory]
-        [InlineData(LogLevel.None, false)]
-        [InlineData(LogLevel.Debug, true)]
-        [InlineData(LogLevel.Information, true)]
-        public void UserLoggingFilter_Test(LogLevel inputLogLevel, bool expected)
-        {
-            Assert.Equal(expected, Utilities.UserLoggingFilter(inputLogLevel));
         }
 
         [Theory]
