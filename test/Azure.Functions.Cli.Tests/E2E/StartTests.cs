@@ -36,6 +36,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Functions:",
                     "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
                 },
+                OutputDoesntContain = new string[]
+                {
+                        "Initializing function HTTP routes"
+                },
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
@@ -73,6 +77,119 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
             }, _output);
 
+        }
+
+        [Fact]
+        public async Task start_nodejs_loglevel_overrriden_in_settings()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "settings add AzureFunctionsJobHost__logging__logLevel__Default Debug",
+                    "new --template \"Http trigger\" --name HttpTrigger",
+                    "start"
+                },
+                ExpectExit = false,
+                OutputContains = new[]
+                {
+                    "Worker path for language worker node"
+                },
+                Test = async (_, p) =>
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(15));
+                    p.Kill();
+                },
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_loglevel_overrriden_in_host_json()
+        {
+            var functionName = "HttpTriggerCSharp";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        $"new --template Httptrigger --name {functionName}",
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var filePath = Path.Combine(workingDir, "host.json");
+                        string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
+                        await File.WriteAllTextAsync(filePath, hostJsonContent);
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new []
+                    {
+                        "Workers Directory set to"
+                    },
+                    Test = async (_, p) =>
+                    {
+                        // give the host time to load functions and print any errors
+                        await Task.Delay(TimeSpan.FromSeconds(10));
+                        p.Kill();
+                    }
+                },
+            }, _output, startHost: true);
+        }
+
+        [Fact]
+        public async Task start_loglevel_None_overrriden_in_host_json()
+        {
+            var functionName = "HttpTrigger";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime node",
+                        $"new --template Httptrigger --name {functionName}",
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var filePath = Path.Combine(workingDir, "host.json");
+                        string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
+                        await File.WriteAllTextAsync(filePath, hostJsonContent);
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new []
+                    {
+                        "Worker process started and initialized"
+                    },
+                    OutputDoesntContain = new string[]
+                    {
+                        "Initializing function HTTP routes"
+                    },
+                    Test = async (_, p) =>
+                    {
+                        // give the host time to load functions and print any errors
+                        await Task.Delay(TimeSpan.FromSeconds(10));
+                        p.Kill();
+                    }
+                },
+            }, _output, startHost: true);
         }
 
         [Fact]
