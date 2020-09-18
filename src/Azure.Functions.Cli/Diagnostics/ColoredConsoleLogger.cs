@@ -90,7 +90,7 @@ namespace Azure.Functions.Cli.Diagnostics
         {
             foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
             {
-                ColoredConsole.WriteLine($"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss")}] {line}");
+                ColoredConsole.WriteLine($"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff")}] {line}");
             }
         }
 
