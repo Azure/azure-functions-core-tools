@@ -257,6 +257,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 Utilities.PrintLogo();
             }
+            else
+            {
+                Environment.SetEnvironmentVariable("ASPNETCORE_SUPPRESSSTATUSMESSAGES", "true");
+            }
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
