@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli
         internal static void PrintVersion()
         {
             ColoredConsole
-                .WriteLine($"\n\x1b[1m{"<".DarkCyan()}{"\u26A1".DarkYellow()}{">".DarkCyan()} Azure Functions Core Tools\x1b[0m")
+                .WriteLine($"\nAzure Functions Core Tools")
                 .WriteLine($"Core Tools Version:       {Constants.CliDetailedVersion}".DarkGray())
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
         }
