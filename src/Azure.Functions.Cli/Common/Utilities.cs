@@ -46,8 +46,9 @@ namespace Azure.Functions.Cli
         internal static void PrintVersion()
         {
             ColoredConsole
-                .WriteLine($"Azure Functions Core Tools ({Constants.CliDetailedVersion})")
-                .WriteLine($"Function Runtime Version: {ScriptHost.Version}");
+                .WriteLine($"\n\x1b[1m<⚡️>".DarkCyan() + " Azure Functions Core Tools\x1b[0m")
+                .WriteLine($"Core Tools Version:       {Constants.CliDetailedVersion}".DarkGray())
+                .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
         }
 
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)
