@@ -11,6 +11,9 @@ namespace Azure.Functions.Cli.Common
 {
     class KeyVaultReferencesManager
     {
+        private const string directiveStart = "@Microsoft.KeyVault(";
+        private const string directiveEnd = ")";
+        private const string vaultUriSuffix = "vault.azure.net";
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
         private readonly TokenCredential credential = new AzureCliCredential();
 
@@ -26,11 +29,11 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        public string GetSecretValue(string secretIdentifier)
+        private string GetSecretValue(string value)
         {
-            var result = ParseSecret(secretIdentifier);
+            var result = ParseSecret(value);
 
-            if (result.IsSecret)
+            if (result != null)
             {
                 var client = GetSecretClient(result.Uri);
                 var secret = client.GetSecret(result.Name, result.Version);
@@ -40,21 +43,53 @@ namespace Azure.Functions.Cli.Common
             return null;
         }
 
-        private ParseSecretResult ParseSecret(string secretIdentifier)
+        private ParseSecretResult ParseSecret(string value)
         {
-            var uriMatches = Regex.Match(secretIdentifier, @"^@Microsoft.KeyVault\(SecretUri=(https://.+?)/secrets/([^/]+)/?(.*)\)$");
-            if (uriMatches.Success)
+            var referenceString = ExtractReferenceString(value);
+            if (string.IsNullOrEmpty(referenceString))
             {
-                return new ParseSecretResult
-                {
-                    IsSecret = true,
-                    Uri = new Uri(uriMatches.Groups[1].Value),
-                    Name = uriMatches.Groups[2].Value,
-                    Version = uriMatches.Groups[3].Value
-                };
+                return null;
             }
 
-            return new ParseSecretResult();
+            try
+            {
+                var uriMatches = Regex.Match(value, @"SecretUri=(https://.+?)/secrets/([^/]+)/?(.*)");
+                if (uriMatches.Success)
+                {
+                    return new ParseSecretResult
+                    {
+                        Uri = new Uri(uriMatches.Groups[1].Value),
+                        Name = uriMatches.Groups[2].Value,
+                        Version = uriMatches.Groups[3].Value
+                    };
+                }
+
+                var keyValuePairs = referenceString.Split(";")
+                                                .Select(item => item.Split("="))
+                                                .ToDictionary(pair => pair[0], pair => pair[1]);
+
+                return new ParseSecretResult
+                {
+                    Uri = new Uri($"https://{keyValuePairs["VaultName"]}.{vaultUriSuffix}"),
+                    Name = keyValuePairs["SecretName"],
+                    Version = keyValuePairs["SecretVersion"]
+                };
+            }
+            catch
+            {
+                throw new FormatException($"Key Vault Reference format invalid: {value}");
+            }
+        }
+
+        private string ExtractReferenceString(string value)
+        {
+            if (value == null || 
+                !(value.StartsWith(directiveStart) && value.EndsWith(directiveEnd)))
+            {
+                return null;
+            }
+
+            return value.Substring(directiveStart.Length, value.Length - directiveStart.Length - directiveEnd.Length);
         }
 
         private SecretClient GetSecretClient(Uri vaultUri)
@@ -64,7 +99,6 @@ namespace Azure.Functions.Cli.Common
 
         private class ParseSecretResult
         {
-            public bool IsSecret { get; set; }
             public Uri Uri { get; set; }
             public string Name { get; set; }
             public string Version { get; set; }
