@@ -253,14 +253,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             await PreRunConditions();
-            if (VerboseLogging.HasValue && VerboseLogging.Value)
+            var displayLogo = Environment.GetEnvironmentVariable(Constants.DisplayLogoVariable) == "1";
+            var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
+            if (isVerbose || displayLogo)
             {
                 Utilities.PrintLogo();
             }
-            else
+
+            if (!isVerbose)
             {
                 Environment.SetEnvironmentVariable("ASPNETCORE_SUPPRESSSTATUSMESSAGES", "true");
             }
+
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);

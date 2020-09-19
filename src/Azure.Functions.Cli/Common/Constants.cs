@@ -52,6 +52,7 @@ namespace Azure.Functions.Cli.Common
         public const string HttpTriggerTemplateName = "HttpTrigger";
         public const string PowerShellWorkerDefaultVersion = "~7";
         public const string UserSecretsIdElementName = "UserSecretsId";
+        public const string DisplayLogoVariable = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
