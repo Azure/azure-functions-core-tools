@@ -97,26 +97,6 @@ namespace Azure.Functions.Cli.Tests
         }
 
         [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174")]
-        [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Default\": \"None\"}}}", "test", LogLevel.Information, false)]
-        [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.Startup", LogLevel.Information, true)]
-        [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.General", LogLevel.Information, false)]
-        [InlineData("{\"version\": \"2.0\",\"Logging\": {\"LogLevel\": {\"Host.Startup\": \"Debug\"}}}", "Host.General", LogLevel.Warning, true)]
-        public void IsEnabled_Tests(string hostJsonContent, string category, LogLevel logLevel, bool expected)
-        {
-            try
-            {
-                FileSystemHelpers.WriteAllTextToFile(_hostJsonFilePath, hostJsonContent);
-                var configuration = Utilities.BuildHostJsonConfigutation(_hostOptions);
-                LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(configuration, false);
-                Assert.Equal(expected, loggingFilterHelper.IsEnabled(category, logLevel));
-            }
-            finally
-            {
-                DeleteIfExists(_workerDir);
-            }
-        }
-
-        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/2174")]
         [InlineData(false, null, false)]
         [InlineData(true, false, false)]
         [InlineData(true, null, true)]

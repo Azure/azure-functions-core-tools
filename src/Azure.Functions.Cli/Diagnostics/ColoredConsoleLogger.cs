@@ -14,18 +14,53 @@ namespace Azure.Functions.Cli.Diagnostics
         private readonly bool _verboseErrors;
         private readonly string _category;
         private readonly LoggingFilterHelper _loggingFilterHelper;
+        private readonly LoggerFilterOptions _loggerFilterOptions;
         private readonly string[] allowedLogsPrefixes = new string[] { "Worker process started and initialized.", "Host lock lease acquired by instance ID" };
+        private static readonly LoggerRuleSelector RuleSelector = new LoggerRuleSelector();
+        private static readonly Type ProviderType = typeof(ColoredConsoleLoggerProvider);
 
-        public ColoredConsoleLogger(string category, LoggingFilterHelper loggingFilterHelper)
+        public ColoredConsoleLogger(string category, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
         {
             _category = category;
-            _loggingFilterHelper = loggingFilterHelper;
+            _loggerFilterOptions = loggerFilterOptions ?? throw new ArgumentNullException(nameof(loggerFilterOptions));
+            _loggingFilterHelper = loggingFilterHelper ?? throw new ArgumentNullException(nameof(loggingFilterHelper));
             _verboseErrors = StaticSettings.IsDebug;
+        }
+
+        internal LoggerFilterRule SelectRule(string categoryName, LoggerFilterOptions loggerFilterOptions)
+        {
+            RuleSelector.Select(loggerFilterOptions, ProviderType, categoryName,
+                out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter);
+
+            return new LoggerFilterRule(ProviderType.FullName, categoryName, minLevel, filter);
+        }
+
+        internal bool IsEnabled(string category, LogLevel logLevel)
+        {
+            LoggerFilterRule filterRule = SelectRule(category, _loggerFilterOptions);
+
+            if (filterRule.LogLevel != null && logLevel < filterRule.LogLevel)
+            {
+                return false;
+            }
+            if (filterRule.Filter != null)
+            {
+                bool enabled = filterRule.Filter(ProviderType.FullName, category, logLevel);
+                if (!enabled)
+                {
+                    return false;
+                }
+            }
+            if (filterRule.LogLevel != null)
+            {
+                return Utilities.DefaultLoggingFilter(category, logLevel, filterRule.LogLevel.Value, filterRule.LogLevel.Value);
+            }
+            return Utilities.DefaultLoggingFilter(category, logLevel, _loggingFilterHelper.UserLogDefaultLogLevel, _loggingFilterHelper.SystemLogDefaultLogLevel);
         }
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return _loggingFilterHelper.IsEnabled(_category, logLevel);
+            return IsEnabled(_category, logLevel);
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
@@ -55,12 +90,7 @@ namespace Azure.Functions.Cli.Diagnostics
         {
             foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
             {
-                var outputline = $"{line}";
-                if (_loggingFilterHelper.VerboseLogging)
-                {
-                    outputline = $"[{DateTime.UtcNow}] {outputline}";
-                }
-                ColoredConsole.WriteLine($"{outputline}");
+                ColoredConsole.WriteLine($"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff")}] {line}");
             }
         }
 
