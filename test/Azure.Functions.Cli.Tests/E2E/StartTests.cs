@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                    }   
+                    }
                 },
             }, _output);
         }
@@ -184,9 +184,16 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (_, p) =>
                     {
-                        // give the host time to load functions and print any errors
-                        await Task.Delay(TimeSpan.FromSeconds(10));
-                        p.Kill();
+                        try
+                        {
+                            // give the host time to load functions and print any errors
+                            await Task.Delay(TimeSpan.FromSeconds(15));
+                            p.Kill();
+                        }
+                        catch
+                        {
+                            //ignore
+                        }
                     }
                 },
             }, _output, startHost: true);
