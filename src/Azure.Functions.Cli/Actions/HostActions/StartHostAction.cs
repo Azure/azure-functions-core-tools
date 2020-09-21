@@ -253,9 +253,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             await PreRunConditions();
-            var displayLogo = Environment.GetEnvironmentVariable(Constants.DisplayLogoVariable) == "1";
+
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            if (isVerbose || displayLogo)
+            if (isVerbose || Utilities.ShouldPrintLogo())
             {
                 Utilities.PrintLogo();
             }

@@ -252,5 +252,11 @@ namespace Azure.Functions.Cli
             var configuration = builder.Build();
             return configuration;
         }
+
+        internal static bool ShouldPrintLogo()
+        {
+            var displayLogoVariable = Environment.GetEnvironmentVariable(Constants.DisplayLogoVariable);
+            return displayLogoVariable == "1" || displayLogoVariable == "true";
+        }
     }
 }
