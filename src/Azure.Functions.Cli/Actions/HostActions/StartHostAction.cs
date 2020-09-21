@@ -260,9 +260,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 Utilities.PrintLogo();
             }
 
-            if (!isVerbose)
+            var aspnetVerbosityAlreadySet = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.AspNetCoreSuppressStatusMessagesVariable));
+            if (!isVerbose && !aspnetVerbosityAlreadySet)
             {
-                Environment.SetEnvironmentVariable("ASPNETCORE_SUPPRESSSTATUSMESSAGES", "true");
+                Environment.SetEnvironmentVariable(Constants.AspNetCoreSuppressStatusMessagesVariable, "true");
             }
 
             Utilities.PrintVersion();
