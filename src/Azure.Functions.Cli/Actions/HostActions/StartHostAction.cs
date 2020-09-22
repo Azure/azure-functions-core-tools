@@ -255,16 +255,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await PreRunConditions();
 
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            if (isVerbose || Utilities.ShouldPrintLogo())
+            if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
                 Utilities.PrintLogo();
             }
 
-            var aspnetVerbosityAlreadySet = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.AspNetCoreSuppressStatusMessagesVariable));
-            if (!isVerbose && !aspnetVerbosityAlreadySet)
-            {
-                Environment.SetEnvironmentVariable(Constants.AspNetCoreSuppressStatusMessagesVariable, "true");
-            }
+            // Suppress AspNetCoreSupressStatusMessages
+            EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.AspNetCoreSupressStatusMessages);
 
             Utilities.PrintVersion();
 
