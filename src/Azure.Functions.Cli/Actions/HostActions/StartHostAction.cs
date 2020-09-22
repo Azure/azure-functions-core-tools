@@ -266,10 +266,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             await PreRunConditions();
-            if (VerboseLogging.HasValue && VerboseLogging.Value)
+
+            var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
+            if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
                 Utilities.PrintLogo();
             }
+
+            // Suppress AspNetCoreSupressStatusMessages
+            EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.AspNetCoreSupressStatusMessages);
+
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
