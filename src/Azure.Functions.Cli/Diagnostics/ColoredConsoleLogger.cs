@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using System.Linq;
 using Colors.Net.StringColorExtensions;
+using System.Globalization;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
@@ -91,7 +92,7 @@ namespace Azure.Functions.Cli.Diagnostics
         {
             foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
             {
-                ColoredConsole.WriteLine($"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff")}] ".DarkGray() + line);
+                ColoredConsole.WriteLine($"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".DarkGray() + line);
             }
         }
 
