@@ -49,11 +49,6 @@ namespace Azure.Functions.Cli
         public LogLevel UserLogDefaultLogLevel { get; } = LogLevel.Information;
 
         /// <summary>
-        /// Default log level set in host.json. If not present, deafaults to Information
-        /// </summary>
-        public LogLevel DefaultLogLevel { get; private set; } = LogLevel.Information;
-
-        /// <summary>
         /// Is set to true if `func start` is started with `--verbose` flag. If set, SystemLogDefaultLogLevel is set to Information
         /// </summary>
         public bool VerboseLogging { get; private set; }
