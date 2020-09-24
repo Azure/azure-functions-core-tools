@@ -3,8 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests
@@ -55,15 +53,21 @@ namespace Azure.Functions.Cli.Tests
         [InlineData(true, null, true)]
         public void IsCI_Tests(bool isCiEnv, bool? verboseLogging, bool expected)
         {
-            if (isCiEnv)
+            try
             {
-                Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "90l99");
+                if (isCiEnv)
+                {
+                    Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "90l99");
+                }
+                var testConfiguration = TestUtils.CreateSetupWithConfiguration(null);
+                LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(testConfiguration, verboseLogging);
+                Assert.Equal(expected, loggingFilterHelper.IsCiEnvironment(verboseLogging.HasValue));
+               
             }
-            string defaultJson = "{\"version\": \"2.0\"}";
-            var testConfiguration = new ConfigurationBuilder().AddJsonStream(new MemoryStream(Encoding.ASCII.GetBytes(defaultJson))).Build();
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(testConfiguration, verboseLogging);
-            Assert.Equal(expected, loggingFilterHelper.IsCiEnvironment(verboseLogging.HasValue));
-            Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "");
+            finally
+            {
+                Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "");
+            }
         }
     }
 }
