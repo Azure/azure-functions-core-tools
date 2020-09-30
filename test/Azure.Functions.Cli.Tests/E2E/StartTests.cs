@@ -148,6 +148,52 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task start_loglevel_overrriden_in_host_json_category_filter()
+        {
+            var functionName = "HttpTriggerCSharp";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        $"new --template Httptrigger --name {functionName}",
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var filePath = Path.Combine(workingDir, "host.json");
+                        string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\", \"Host.Startup\": \"Information\"}}}";
+                        await File.WriteAllTextAsync(filePath, hostJsonContent);
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "start"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new []
+                    {
+                        "Found the following functions:"
+                    },
+                    OutputDoesntContain = new string[]
+                    {
+                        "Reading host configuration file"
+                    },
+                    Test = async (_, p) =>
+                    {
+                        // give the host time to load functions and print any errors
+                        await Task.Delay(TimeSpan.FromSeconds(10));
+                        p.Kill();
+                    }
+                },
+            }, _output, startHost: true);
+        }
+
+        [Fact]
         public async Task start_loglevel_None_overrriden_in_host_json()
         {
             var functionName = "HttpTrigger";
