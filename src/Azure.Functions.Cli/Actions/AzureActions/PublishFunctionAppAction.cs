@@ -119,6 +119,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Get function app
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription);
 
+            if (!functionApp.IsLinux && (PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.Remote))
+            {
+                throw new CliException($"--build {PublishBuildOption} is not supported for Windows Function Apps.");
+            }
+
             // Get the GitIgnoreParser from the functionApp root
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
             var ignoreParser = PublishHelper.GetIgnoreParser(functionAppRoot);
