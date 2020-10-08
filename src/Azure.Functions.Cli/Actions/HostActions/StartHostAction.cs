@@ -185,8 +185,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .ConfigureLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders();
+                    loggingBuilder.Services.AddSingleton<ILoggerProvider>(p =>
+                    {
+                        //Cache LoggerFilterOptions to be used by the logger to filter logs based on content
+                        var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>().Value;
+                        // Set min level to SystemLogDefaultLogLevel.
+                        filterOptions.MinLevel = loggingFilterHelper.SystemLogDefaultLogLevel;
+                        return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions);
+                    });
                     // This is needed to filter system logs only for known categories
-                    loggingBuilder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => Utilities.SystemLoggingFilter(category, level, LogLevel.Trace)).AddProvider(new ColoredConsoleLoggerProvider(loggingFilterHelper));
+                    loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
                 })
                 .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, loggingFilterHelper)))
                 .Build();
@@ -248,10 +256,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             await PreRunConditions();
-            if (VerboseLogging.HasValue && VerboseLogging.Value)
+
+            var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
+            if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
                 Utilities.PrintLogo();
             }
+
+            // Suppress AspNetCoreSupressStatusMessages
+            EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.AspNetCoreSupressStatusMessages);
+
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);

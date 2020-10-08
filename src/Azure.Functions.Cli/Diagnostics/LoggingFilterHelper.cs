@@ -1,5 +1,6 @@
 ﻿using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
+using Dynamitey;
 using Microsoft.Azure.WebJobs.Script.Eventing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -11,9 +12,6 @@ namespace Azure.Functions.Cli
 {
     public class LoggingFilterHelper
     {
-        private const string DefaultLogLevelKey = "default";
-        private IConfigurationRoot _hostJsonConfig = null;
-
         // CI EnvironmentSettings
         // https://github.com/watson/ci-info/blob/master/index.js#L52-L59
         public const string Ci = "CI"; // Travis CI, CircleCI, Cirrus CI, Gitlab CI, Appveyor, CodeShip, dsari
@@ -23,7 +21,6 @@ namespace Azure.Functions.Cli
 
         public LoggingFilterHelper(IConfigurationRoot hostJsonConfig, bool? verboseLogging)
         {
-            _hostJsonConfig = hostJsonConfig;
             VerboseLogging = verboseLogging.HasValue && verboseLogging.Value;
 
             if (IsCiEnvironment(verboseLogging.HasValue))
@@ -34,12 +31,10 @@ namespace Azure.Functions.Cli
             {
                 SystemLogDefaultLogLevel = LogLevel.Information;
             }
-            bool defaultLogLevelExists = Utilities.LogLevelExists(hostJsonConfig, DefaultLogLevelKey);
-            if (defaultLogLevelExists)
+            if (Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelDefaultSection, out LogLevel logLevel))
             {
-                DefaultLogLevel = Utilities.GetHostJsonDefaultLogLevel(hostJsonConfig);
-                SystemLogDefaultLogLevel = DefaultLogLevel;
-                UserLogDefaultLogLevel = DefaultLogLevel;
+                SystemLogDefaultLogLevel = logLevel;
+                UserLogDefaultLogLevel = logLevel;
             }
         }
 
@@ -54,34 +49,9 @@ namespace Azure.Functions.Cli
         public LogLevel UserLogDefaultLogLevel { get; } = LogLevel.Information;
 
         /// <summary>
-        /// Default log level set in host.json. If not present, deafaults to Information
-        /// </summary>
-        public LogLevel DefaultLogLevel { get; private set; } = LogLevel.Information;
-
-        /// <summary>
         /// Is set to true if `func start` is started with `--verbose` flag. If set, SystemLogDefaultLogLevel is set to Information
         /// </summary>
         public bool VerboseLogging { get; private set; }
-
-        internal void AddConsoleLoggingProvider(ILoggingBuilder loggingBuilder)
-        {
-            // Filter is needed to force all the logs at jobhost level
-            loggingBuilder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => true).AddProvider(new ColoredConsoleLoggerProvider(this));
-        }
-
-        internal bool IsEnabled(string category, LogLevel logLevel)
-        {
-            if (_hostJsonConfig != null && Utilities.LogLevelExists(_hostJsonConfig, category))
-            {
-                // If category exists in `loglevel` section, ensure defaults do not apply.
-                return Utilities.UserLoggingFilter(logLevel);
-            }
-            if (DefaultLogLevel == LogLevel.None)
-            {
-                return false;
-            }
-            return Utilities.DefaultLoggingFilter(category, logLevel, UserLogDefaultLogLevel, SystemLogDefaultLogLevel);
-        }
 
         internal bool IsCiEnvironment(bool verboseLoggingArgExists)
         {

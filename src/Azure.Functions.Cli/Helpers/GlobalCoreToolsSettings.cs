@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (_currentWorkerRuntime == WorkerRuntime.None)
                 {
-                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--csharp, --javascript, --typescript, --java, --python, --powershell], --custom"));
+                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--csharp, --javascript, --typescript, --java, --python, --powershell, --custom]"));
                 }
                 return _currentWorkerRuntime;
             }
