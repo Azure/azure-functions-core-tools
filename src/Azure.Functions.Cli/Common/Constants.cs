@@ -78,6 +78,10 @@ namespace Azure.Functions.Cli.Common
             public const string EitherPidOrAllMustBeSpecified = "Must specify either -a/--all or -p/--processId <Pid>";
             public const string ExtensionsNeedDotnet = "Extensions command requires dotnet on your path. Please make sure to install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download";
             public const string UnableToUpdateAppSettings = "Error updating Application Settings for the Function App for deployment.";
+            public const string WebJobsStorageNotFound = "Missing value for AzureWebJobsStorage in {0}. This is required for all triggers other than {1}. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {2}.";
+            public const string WebJobsStorageNotFoundWithUserSecrets = "Missing value for AzureWebJobsStorage in {0} and User Secrets. This is required for all triggers other than {1}. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {2} or User Secrets.";
+            public const string AppSettingNotFound = "Warning: Cannot find value named '{0}' in {1} that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5}.";
+            public const string AppSettingNotFoundWithUserSecrets = "Warning: Cannot find value named '{0}' in {1} or User Secrets that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5} or User Secrets.";
         }
 
         public static class Languages

@@ -13,6 +13,7 @@ using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.UserSecrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -26,13 +27,22 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private readonly string[] _corsOrigins;
         private readonly bool _corsCredentials;
         private readonly bool _enableAuth;
+        private readonly string _userSecretsId;
         private readonly LoggingFilterHelper _loggingFilterHelper;
 
-        public Startup(WebHostBuilderContext builderContext, ScriptApplicationHostOptions hostOptions, string corsOrigins, bool corsCredentials, bool enableAuth, LoggingFilterHelper loggingFilterHelper)
+        public Startup(
+            WebHostBuilderContext builderContext,
+            ScriptApplicationHostOptions hostOptions,
+            string corsOrigins,
+            bool corsCredentials,
+            bool enableAuth,
+            string userSecretsId,
+            LoggingFilterHelper loggingFilterHelper)
         {
             _builderContext = builderContext;
             _hostOptions = hostOptions;
             _enableAuth = enableAuth;
+            _userSecretsId = userSecretsId;
             _loggingFilterHelper = loggingFilterHelper;
 
             if (!string.IsNullOrEmpty(corsOrigins))
@@ -82,9 +92,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
             services.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(_ => new LoggingBuilder(_loggingFilterHelper));
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+            if (!string.IsNullOrEmpty(_userSecretsId))
             {
-                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>((provider) => new UserSecretsConfigurationBuilder(_hostOptions.ScriptPath, _loggingFilterHelper, provider.GetService<IOptions<LoggerFilterOptions>>().Value));
+                services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>((provider) => new UserSecretsConfigurationBuilder(_userSecretsId, _loggingFilterHelper, provider.GetService<IOptions<LoggerFilterOptions>>().Value));
             }
 
             services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
