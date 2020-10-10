@@ -172,9 +172,19 @@ namespace Azure.Functions.Cli.Helpers
 
         private async static Task<Site> LoadConnectionStrings(Site site, string accessToken, string managementURL)
         {
-            var url = new Uri($"{managementURL}{site.SiteId}/config/ConnectionStrings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
-            var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, AppServiceConnectionString>>>(HttpMethod.Post, url, accessToken);
-            site.ConnectionStrings = armResponse.properties;
+            try
+            {
+                var url = new Uri($"{managementURL}{site.SiteId}/config/ConnectionStrings/list?api-version={ArmUriTemplates.WebsitesApiVersion}");
+                var armResponse = await ArmHttpAsync<ArmWrapper<Dictionary<string, AppServiceConnectionString>>>(HttpMethod.Post, url, accessToken);
+                site.ConnectionStrings = armResponse.properties;
+            }
+            catch (Exception e)
+            {
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine(e);
+                }
+            }
             return site;
         }
 

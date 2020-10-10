@@ -307,7 +307,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
-            if (functionApp.IsLinux && functionApp.IsDynamic)
+            if (functionApp.IsKubeApp)
+            {
+                shouldSyncTriggers = false;
+                await PublishZipDeploy(functionApp, zipStreamFactory);
+            }
+            else if (functionApp.IsLinux && functionApp.IsDynamic)
             {
                 // Consumption Linux
                 shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionApp, zipStreamFactory);
@@ -358,6 +363,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // So, we only show the info, if Function App is not Linux Elastic Premium
             // or a Linux Dedicated Function App with remote build
             if (!(functionApp.IsLinux && functionApp.IsElasticPremium)
+                && !functionApp.IsKubeApp
                 && !(isFunctionAppDedicatedLinux && PublishBuildOption == BuildOption.Remote))
             {
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
@@ -520,7 +526,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             while (DateTime.Now < waitUntil)
             {
-                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                using (var client = GetRemoteZipClient(functionApp))
                 using (var request = new HttpRequestMessage(HttpMethod.Get, new Uri("api/settings", UriKind.Relative)))
                 {
                     var response = await client.SendAsync(request);
@@ -675,7 +681,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException(errorMessage);
                 }
 
-                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}")))
+                using (var client = GetRemoteZipClient(functionApp))
                 {
                     var kuduAppSettings = await KuduLiteDeploymentHelpers.GetAppSettings(client);
                     if (!kuduAppSettings.ContainsKey(Constants.ScmRunFromPackage))
@@ -691,7 +697,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             await RetryHelper.Retry(async () =>
             {
                 using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
-                using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
+                using (var client = GetRemoteZipClient(functionApp, handler))
                 using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri("api/zipdeploy", UriKind.Relative)))
                 {
                     request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
@@ -711,7 +717,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask)
         {
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
-            using (var client = GetRemoteZipClient(new Uri($"https://{functionApp.ScmUri}"), handler))
+            using (var client = GetRemoteZipClient(functionApp, handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
                 $"api/zipdeploy?isAsync=true&author={Environment.MachineName}", UriKind.Relative)))
             {
@@ -916,16 +922,25 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return (content, zipFile.Length);
         }
 
-        private HttpClient GetRemoteZipClient(Uri url, HttpMessageHandler handler = null)
+        private HttpClient GetRemoteZipClient(Site functionApp, HttpMessageHandler handler = null)
         {
             handler = handler ?? new HttpClientHandler();
             var client = new HttpClient(handler)
             {
-                BaseAddress = url,
+                BaseAddress = new Uri($"https://{functionApp.ScmUri}"),
                 MaxResponseContentBufferSize = 30 * 1024 * 1024,
                 Timeout = Timeout.InfiniteTimeSpan
             };
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+
+            if (functionApp.IsKubeApp)
+            {
+                var basicToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{functionApp.PublishingUserName}:{functionApp.PublishingPassword}"));
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basicToken);
+            }
+            else
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+            }
             client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
             return client;
         }
