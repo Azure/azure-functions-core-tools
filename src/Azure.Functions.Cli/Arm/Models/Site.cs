@@ -41,6 +41,9 @@ namespace Azure.Functions.Cli.Arm.Models
         public bool IsElasticPremium
             => Sku?.Equals("elasticpremium", StringComparison.OrdinalIgnoreCase) == true;
 
+        public bool IsKubeApp
+            => Kind?.IndexOf("kubeapp", StringComparison.OrdinalIgnoreCase) >= 0;
+
         public Site(string siteId)
         {
             SiteId = siteId;
