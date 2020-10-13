@@ -185,9 +185,6 @@ sudo apt-get install azure-functions-core-tools-2
 
 **NOTE**: npm can be used on all platforms. On unix platforms, you may need to specify `--unsafe-perm` if you are running npm with sudo. That's due to npm behavior of post install script.
 
-
-**NOTE**: If you're running the v2 on Windows, Linux, or Mac, make sure to [enable the `beta` runtime](https://docs.microsoft.com/en-us/azure/azure-functions/functions-versions#target-the-version-20-runtime) in function app settings, otherwise you may not see the same results as running locally.
-
 ## Getting Started on Kubernetes
 
 Using the Core Tools, you can easily configure a Kubernetes cluster and run Azure Functions on it.
