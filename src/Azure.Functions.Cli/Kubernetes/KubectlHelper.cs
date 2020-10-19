@@ -26,6 +26,11 @@ namespace Azure.Functions.Cli.Kubernetes
             await RunKubectl($"apply {(@namespace == null ? string.Empty : $"--namespace {@namespace}")} -f -", showOutput: showOutput, ignoreError: ignoreError, stdIn: content);
         }
 
+        public static async Task KubectlDelete(string content, bool showOutput, bool ignoreError = false, string @namespace = null)
+        {
+            await RunKubectl($"delete {(@namespace == null ? string.Empty : $"--namespace {@namespace}")} -f -", showOutput: showOutput, ignoreError: ignoreError, stdIn: content);
+        }
+
         public static async Task<T> KubectlGet<T>(string resource)
         {
 

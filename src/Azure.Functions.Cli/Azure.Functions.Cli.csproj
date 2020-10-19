@@ -24,6 +24,9 @@
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="StaticResources\keda-v2.yaml" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
@@ -56,6 +59,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\keda-v2.yaml">
+      <LogicalName>$(AssemblyName).keda-v2.yaml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\managedDependenciesConfig.json">
       <LogicalName>$(AssemblyName).managedDependenciesConfig.json</LogicalName>
@@ -99,8 +105,8 @@
     <EmbeddedResource Include="StaticResources\print-functions.sh">
       <LogicalName>$(AssemblyName).print-functions.sh</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\keda.yaml">
-      <LogicalName>$(AssemblyName).keda.yaml</LogicalName>
+    <EmbeddedResource Include="StaticResources\keda-v1.yaml">
+      <LogicalName>$(AssemblyName).keda-v1.yaml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ziptofs.sh">
         <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
@@ -125,5 +131,8 @@
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="2.0.14494" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Kubernetes\KEDA\V2\Models\" />
   </ItemGroup>
 </Project>

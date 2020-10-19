@@ -11,6 +11,8 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Kubernetes.FuncKeys;
+using Azure.Functions.Cli.Kubernetes.KEDA;
+using Azure.Functions.Cli.Kubernetes.KEDA.V1.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
@@ -24,39 +26,6 @@ namespace Azure.Functions.Cli.Kubernetes
 {
     public static class KubernetesHelper
     {
-        private static readonly IEnumerable<string> _allResourceNames = new[]
-        {
-            "customresourcedefinition.apiextensions.k8s.io/scaledobjects.keda.k8s.io",
-            "customresourcedefinition.apiextensions.k8s.io/triggerauthentications.keda.k8s.io",
-            "serviceaccount/keda",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda-hpa-role-binding",
-            "clusterrole.rbac.authorization.k8s.io/keda-external-metrics-reader",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda:system:auth-delegator",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda-hpa-controller-external-metrics",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda",
-            "rolebinding.rbac.authorization.k8s.io/keda-auth-reader",
-            "service/keda",
-            "deployment.apps/keda",
-            "apiservice.apiregistration.k8s.io/v1beta1.custom.metrics.k8s.io",
-            "apiservice.apiregistration.k8s.io/v1beta1.external.metrics.k8s.io",
-            "secret/osiris-osiris-edge-endpoints-hijacker-cert",
-            "secret/osiris-osiris-edge",
-            "secret/osiris-osiris-edge-proxy-injector-cert",
-            "serviceaccount/osiris-osiris-edge",
-            "clusterrole.rbac.authorization.k8s.io/osiris-osiris-edge",
-            "clusterrolebinding.rbac.authorization.k8s.io/osiris-osiris-edge",
-            "service/osiris-osiris-edge-endpoints-hijacker",
-            "service/osiris-osiris-edge-proxy-injector",
-            "deployment.apps/osiris-osiris-edge-activator",
-            "deployment.apps/osiris-osiris-edge-endpoints-controller",
-            "deployment.apps/osiris-osiris-edge-endpoints-hijacker",
-            "deployment.apps/osiris-osiris-edge-proxy-injector",
-            "deployment.apps/osiris-osiris-edge-zeroscaler",
-            "mutatingwebhookconfiguration.admissionregistration.k8s.io/osiris-osiris-edge-endpoints-hijacker",
-            "mutatingwebhookconfiguration.admissionregistration.k8s.io/osiris-osiris-edge-proxy-injector"
-        };
-
         public static void ValidateKubernetesName(string name)
         {
             var regExValue = "^[a-z0-9\\-\\.]*$";
@@ -93,14 +62,6 @@ namespace Azure.Functions.Cli.Kubernetes
         internal static Task CreateNamespace(string @namespace)
             => KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
 
-        internal static string GetKedaResources(string @namespace)
-        {
-            return StaticResources
-                .KedaTemplate
-                .Result
-                .Replace("KEDA_NAMESPACE", @namespace);
-        }
-
         internal async static Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
             string name,
             string imageName,
@@ -117,9 +78,10 @@ namespace Azure.Functions.Cli.Kubernetes
             int? minReplicas = null,
             int? maxReplicas = null,
             string keysSecretCollectionName = null,
-            bool mountKeysAsContainerVolume = false)
+            bool mountKeysAsContainerVolume = false,
+            KedaVersion? kedaVersion = null)
         {
-            ScaledObjectV1Alpha1 scaledobject = null;
+            IKubernetesResource scaledObject = null;
             var result = new List<IKubernetesResource>();
             var deployments = new List<DeploymentV1Apps>();
             var httpFunctions = triggers.FunctionsJson
@@ -147,7 +109,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
                 var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
                 deployments.Add(deployment);
-                scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
+                scaledObject = KedaHelper.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas, kedaVersion);
             }
 
             // Set worker runtime if needed.
@@ -270,15 +232,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             result = result.Concat(deployments).ToList();
-            return (scaledobject != null ? result.Append(scaledobject) : result, resultantFunctionKeys);
-        }
-
-        internal static async Task RemoveKeda(string @namespace)
-        {
-            foreach (var name in _allResourceNames)
-            {
-                await KubectlHelper.RunKubectl($"delete {name} --namespace {@namespace}", ignoreError: true, showOutput: true);
-            }
+            return (scaledObject != null ? result.Append(scaledObject) : result, resultantFunctionKeys);
         }
 
         private async static Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
@@ -588,49 +542,6 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        private static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
-        {
-            return new ScaledObjectV1Alpha1
-            {
-                ApiVersion = "keda.k8s.io/v1alpha1",
-                Kind = "ScaledObject",
-                Metadata = new ObjectMetadataV1
-                {
-                    Name = name,
-                    Namespace = @namespace,
-                    Labels = new Dictionary<string, string>
-                    {
-                        { "deploymentName" , deployment.Metadata.Name }
-                    }
-                },
-                Spec = new ScaledObjectSpecV1Alpha1
-                {
-                    ScaleTargetRef = new ScaledObjectScaleTargetRefV1Alpha1
-                    {
-                        DeploymentName = deployment.Metadata.Name
-                    },
-                    PollingInterval = pollingInterval,
-                    CooldownPeriod = cooldownPeriod,
-                    MinReplicaCount = minReplicas,
-                    MaxReplicaCount = maxReplicas,
-                    Triggers = triggers
-                        .FunctionsJson
-                        .Select(kv => kv.Value)
-                        .Where(v => v["bindings"] != null)
-                        .Select(b => b["bindings"])
-                        .SelectMany(i => i)
-                        .Where(b => b?["type"] != null)
-                        .Where(b => b["type"].ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
-                        .Where(b => b["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) == -1)
-                        .Select(t => new ScaledObjectTriggerV1Alpha1
-                        {
-                            Type = GetKedaTrigger(t["type"]?.ToString()),
-                            Metadata = PopulateMetadataDictionary(t)
-                        })
-                }
-            };
-        }
-
         internal static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
         {
             IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
@@ -645,54 +556,6 @@ namespace Azure.Functions.Cli.Kubernetes
 
             return metadata;
         }
-
-        private static string GetKedaTrigger(string triggerType)
-        {
-            if (string.IsNullOrEmpty(triggerType))
-            {
-                throw new ArgumentNullException(nameof(triggerType));
-            }
-
-            triggerType = triggerType.ToLower();
-
-            switch (triggerType)
-            {
-                case "queuetrigger":
-                    return "azure-queue";
-
-                case "kafkatrigger":
-                    return "kafka";
-
-                case "blobtrigger":
-                    return "azure-blob";
-
-                case "servicebustrigger":
-                    return "azure-servicebus";
-
-                case "eventhubtrigger":
-                    return "azure-eventhub";
-
-                case "rabbitmqtrigger":
-                    return "rabbitmq";
-
-                default:
-                    return triggerType;
-            }
-        }
-
-        private static async Task<bool> HasKeda()
-        {
-            var kedaEdgeResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda-edge --all-namespaces");
-            var kedaResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda --all-namespaces");
-            return kedaResult.Items.Any() || kedaEdgeResult.Items.Any();
-        }
-
-        private static async Task<bool> HasScaledObjectCrd()
-        {
-            var crdResult = await KubectlHelper.KubectlGet<SearchResultV1<CustomResourceDefinitionV1Beta1>>("crd");
-            return crdResult.Items.Any(i => i.Metadata.Name == "scaledobjects.keda.k8s.io");
-        }
-
 
         private static SecretsV1 GetSecret(string name, string @namespace, IDictionary<string, string> secrets)
         {
