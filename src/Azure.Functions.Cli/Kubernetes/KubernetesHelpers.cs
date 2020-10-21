@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Kubernetes
             return exitCode == 0;
         }
 
-        internal static async Task<(string, bool)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
+        internal static async Task<(string Output, bool ResourceExists)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
         {
             var cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
             if (returnJsonOutput)
@@ -107,7 +107,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
                 var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
                 deployments.Add(deployment);
-                scaledObject = KedaHelper.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas, kedaVersion);
+                scaledObject = await KedaHelper.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas, kedaVersion);
             }
 
             // Set worker runtime if needed.

@@ -1,8 +1,10 @@
 using System;
+using System.Threading.Tasks;
 using Azure.Functions.Cli.Kubernetes.KEDA.V1;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA
 {
@@ -26,9 +28,9 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
             return rawTemplate.Replace("KEDA_NAMESPACE", @namespace);
         }
 
-        internal static IKubernetesResource GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas, KedaVersion? kedaVersion = null)
+        internal static async Task<IKubernetesResource> GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas, KedaVersion? kedaVersion = null)
         {
-            kedaVersion = kedaVersion ?? DetermineCurrentVersion(@namespace);
+            kedaVersion = kedaVersion ?? await DetermineCurrentVersion(@namespace);
 
             switch (kedaVersion)
             {
@@ -41,10 +43,20 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
             }
         }
 
-        public static KedaVersion DetermineCurrentVersion(string @namespace)
+        public static async Task<KedaVersion> DetermineCurrentVersion(string @namespace)
         {
-            // TODO: discover version
-            return KedaVersion.v2;
+            // Get KEDA resource information
+            var resourceInfo = await KubernetesHelper.ResourceExists("Deployment", "keda-metrics-apiserver", @namespace, returnJsonOutput: true);
+            if (resourceInfo.ResourceExists == false)
+            {
+                // We use KEDA v2 as a default
+                return KedaVersion.v2;
+            }
+
+            var parsedJson = JToken.Parse(resourceInfo.Output);
+            // TODO: Interpret app.kubernetes.io/version label
+            
+            return KedaVersion.v1;
         }
     }
 }
