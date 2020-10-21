@@ -15,8 +15,6 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
         {
             return new ScaledObjectV1Alpha1
             {
-                ApiVersion = "keda.k8s.io/v1alpha1",
-                Kind = "ScaledObject",
                 Metadata = new ObjectMetadataV1
                 {
                     Name = name,

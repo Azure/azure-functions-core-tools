@@ -6,6 +6,8 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2.Models
 {
     public class ScaledObjectV1Alpha1 : BaseKubernetesResource<ScaledObjectSpecV1Alpha1>
     {
+        public override string ApiVersion => "keda.sh/v1alpha1";
+        public override string Kind => "ScaledObject";
     }
 
     public class ScaledObjectSpecV1Alpha1 : IKubernetesSpec

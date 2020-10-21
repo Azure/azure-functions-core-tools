@@ -16,8 +16,6 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
             // TODO: Migrate to new version
             return new ScaledObjectV1Alpha1
             {
-                ApiVersion = "keda.sh/v1alpha1",
-                Kind = "ScaledObject",
                 Metadata = new ObjectMetadataV1
                 {
                     Name = name,
