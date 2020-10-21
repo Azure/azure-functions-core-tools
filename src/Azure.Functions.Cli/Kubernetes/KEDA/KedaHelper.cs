@@ -33,9 +33,9 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
             switch (kedaVersion)
             {
                 case KedaVersion.v1:
-                    return KedaV1Helper.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
+                    return KedaV1ResourceFactory.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
                 case KedaVersion.v2:
-                    return KedaV2Helper.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
+                    return KedaV2ResourceFactory.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kedaVersion), kedaVersion, "Specified KEDA version is not supported");
             }

@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Azure.Functions.Cli.Kubernetes.KEDA.V1.Models;
+using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Newtonsoft.Json.Linq;
 
-namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
+namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
 {
-    public static class KedaV1Helper
+    public static class KedaV2ResourceFactory
     {
         internal static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers,
-            DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
+               DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
         {
             return new ScaledObjectV1Alpha1
             {
@@ -19,16 +19,13 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
                 {
                     Name = name,
                     Namespace = @namespace,
-                    Labels = new Dictionary<string, string>
-                    {
-                        {"deploymentName", deployment.Metadata.Name}
-                    }
+                    Labels = new Dictionary<string, string>()
                 },
                 Spec = new ScaledObjectSpecV1Alpha1
                 {
                     ScaleTargetRef = new ScaledObjectScaleTargetRefV1Alpha1
                     {
-                        DeploymentName = deployment.Metadata.Name
+                        Name = deployment.Metadata.Name
                     },
                     PollingInterval = pollingInterval,
                     CooldownPeriod = cooldownPeriod,
@@ -58,6 +55,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
                 .Where(i => i.Value.Type == JTokenType.String)
                 .ToDictionary(k => k.Key, v => v.Value.ToString());
 
+            // TODO: Check for breaking changes
             if (t["type"].ToString().Equals("rabbitMQTrigger", StringComparison.InvariantCultureIgnoreCase))
             {
                 metadata["host"] = metadata["connectionStringSetting"];
@@ -67,7 +65,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
             return metadata;
         }
 
-        internal static string GetKedaTrigger(string triggerType)
+        private static string GetKedaTrigger(string triggerType)
         {
             if (string.IsNullOrEmpty(triggerType))
             {
@@ -76,6 +74,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
 
             triggerType = triggerType.ToLower();
 
+            // TODO: Check if we need to add new ones
             switch (triggerType)
             {
                 case "queuetrigger":

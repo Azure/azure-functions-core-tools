@@ -12,12 +12,10 @@ using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Kubernetes.FuncKeys;
 using Azure.Functions.Cli.Kubernetes.KEDA;
-using Azure.Functions.Cli.Kubernetes.KEDA.V1.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -540,21 +538,6 @@ namespace Azure.Functions.Cli.Kubernetes
                     Selector = deployment.Spec.Selector.MatchLabels
                 }
             };
-        }
-
-        internal static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
-        {
-            IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
-                                    .Where(i => i.Value.Type == JTokenType.String)
-                                    .ToDictionary(k => k.Key, v => v.Value.ToString());
-
-            if (t["type"].ToString().Equals("rabbitMQTrigger", StringComparison.InvariantCultureIgnoreCase))
-            {
-                metadata["host"] = metadata["connectionStringSetting"];
-                metadata.Remove("connectionStringSetting");
-            }
-
-            return metadata;
         }
 
         private static SecretsV1 GetSecret(string name, string @namespace, IDictionary<string, string> secrets)
