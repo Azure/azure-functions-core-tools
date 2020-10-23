@@ -51,6 +51,11 @@ namespace Azure.Functions.Cli
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
         }
 
+        internal static void PrintUpgradeWarning()
+        {
+            ColoredConsole.WriteLine(OutputTheme.ErrorColor("You are using an outdated version of the Azure Functions Core Tools. For more information, please see: https://aka.ms/func-v2-upgrade"));
+        }
+
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)
         {
             if (str.Length == 1)

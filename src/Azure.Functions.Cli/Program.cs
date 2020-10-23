@@ -1,10 +1,8 @@
 ﻿using System;
+using System.Threading;
 using Autofac;
-using Colors.Net;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
-using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli
 {
@@ -15,6 +13,8 @@ namespace Azure.Functions.Cli
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVaraibles();
+            Utilities.PrintUpgradeWarning();
+            Thread.Sleep(1000);
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
         }
 
