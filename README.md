@@ -8,7 +8,7 @@
 
 # Azure Functions Core Tools
 
-The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
+The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions. <Checking cla>
 
 ## Versions
 
