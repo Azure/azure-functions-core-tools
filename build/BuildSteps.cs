@@ -506,7 +506,8 @@ namespace Build
                         ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
                         : Path.Combine(Settings.OutputDir, "linux-x64", "func");
 
-                    _version = Shell.GetOutput(funcPath, "--version");
+                    var match = Regex.Match(Shell.GetOutput(funcPath, "--version"), "^((([0-9]+)\\.([0-9]+)\\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?)(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?)$", RegexOptions.Multiline);
+                    _version = match.Value;
                 }
                 return _version;
             }
