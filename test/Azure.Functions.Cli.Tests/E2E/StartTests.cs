@@ -11,6 +11,10 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Net.Sockets;
 using System.Net;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using Azure.Functions.Cli.Common;
+using Microsoft.Azure.WebJobs.Script.Description.DotNet.CSharp.Analyzers;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -522,6 +526,179 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
+        [Fact]
+        public async Task start_with_user_secrets()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        "new --template \"Http trigger\" --name http1",
+                        "new --template \"Queue trigger\" --name queue1"
+                    },
+                },
+                new RunConfiguration
+                {
+                    PreTest = (workingDir) =>
+                    {
+                        // add connection string setting to queue code
+                        var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
+                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\""));
+                        _output.WriteLine($"Writing to file {queueCodePath}");
+
+                        // clear local.settings.json
+                        var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
+                        _output.WriteLine($"Writing to file {localSettingsPath}");
+                        FileSystemHelpers.WriteAllTextToFile(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        _output.WriteLine(FileSystemHelpers.ReadAllTextFromFile(localSettingsPath));
+
+                        // init and set user secrets
+                        Dictionary<string, string> userSecrets = new Dictionary<string, string>()
+                        {
+                            { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
+                            { Constants.FunctionsWorkerRuntime, "dotnet" },
+                            { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
+                        };
+                        SetUserSecrets(workingDir, userSecrets);
+                    },
+                    Commands = new[]
+                    {
+                        "start --functions http1 --csharp",
+                    },
+                    ExpectExit = false,
+                    OutputContains = new string[]
+                    {
+                        "Using for user secrets file configuration."
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/http1?name=Test");
+                            response.StatusCode.Should().Be(HttpStatusCode.OK);
+                            p.Kill();
+                        }
+                    }
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_with_user_secrets_missing_storage()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        "new --template \"Http trigger\" --name http1",
+                        "new --template \"Queue trigger\" --name queue1"
+                    },
+                },
+                new RunConfiguration
+                {
+                    PreTest = (workingDir) =>
+                    {
+                        // add connection string setting to queue code
+                        var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
+                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\""));
+                        _output.WriteLine($"Writing to file {queueCodePath}");
+
+                        // clear local.settings.json
+                        var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
+                        _output.WriteLine($"Writing to file {localSettingsPath}");
+                        FileSystemHelpers.WriteAllTextToFile(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        _output.WriteLine(FileSystemHelpers.ReadAllTextFromFile(localSettingsPath));
+
+                        // init and set user secrets
+                        Dictionary<string, string> userSecrets = new Dictionary<string, string>()
+                        {
+                            { Constants.FunctionsWorkerRuntime, "dotnet" },
+                            { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
+                        };
+                        SetUserSecrets(workingDir, userSecrets);
+                    },
+                    Commands = new[]
+                    {
+                        "start --functions http1 --csharp",
+                    },
+                    ExpectExit = true,
+                    ExitInError = true,
+                    ErrorContains = new[] { "Missing value for AzureWebJobsStorage in local.settings.json and User Secrets. This is required for all triggers other than httptrigger, kafkatrigger. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets." },
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_with_user_secrets_missing_binding_setting()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        "new --template \"Http trigger\" --name http1",
+                        "new --template \"Queue trigger\" --name queue1"
+                    },
+                },
+                new RunConfiguration
+                {
+                    PreTest = (workingDir) =>
+                    {
+                        // add connection string setting to queue code
+                        var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
+                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\""));
+                        _output.WriteLine($"Writing to file {queueCodePath}");
+
+                        // clear local.settings.json
+                        var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
+                        _output.WriteLine($"Writing to file {localSettingsPath}");
+                        FileSystemHelpers.WriteAllTextToFile(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        _output.WriteLine(FileSystemHelpers.ReadAllTextFromFile(localSettingsPath));
+
+                        // init and set user secrets
+                        Dictionary<string, string> userSecrets = new Dictionary<string, string>()
+                        {
+                            { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
+                            { Constants.FunctionsWorkerRuntime, "dotnet" },
+                        };
+                        SetUserSecrets(workingDir, userSecrets);
+                    },
+                    Commands = new[]
+                    {
+                        "start --functions http1 --csharp",
+                    },
+                    ExpectExit = false,
+                    OutputContains = new[]
+                    {
+                        "Warning: Cannot find value named 'ConnectionStrings:MyQueueConn' in local.settings.json or User Secrets that matches 'connection' property set on 'queueTrigger' in",
+                        "You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets."
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/http1?name=Test");
+                            response.StatusCode.Should().Be(HttpStatusCode.OK);
+                            p.Kill();
+                        }
+                    }
+                }
+            }, _output);
+        }
+
         private async Task<bool> WaitUntilReady(HttpClient client)
         {
             for (var limit = 0; limit < 10; limit++)
@@ -541,6 +718,36 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }
             return false;
+        }
+
+        private void SetUserSecrets(string workingDir, Dictionary<string, string> userSecrets)
+        {
+            // init and set user secrets
+            string procOutput;
+            Process proc = new Process()
+            {
+                StartInfo = new ProcessStartInfo()
+                {
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    RedirectStandardOutput = true,
+                    FileName = "cmd.exe",
+                    Arguments = "/C dotnet user-secrets init",
+                    WorkingDirectory = workingDir
+                }
+            };
+            proc.Start();
+            procOutput = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            _output.WriteLine(procOutput);
+
+            foreach (KeyValuePair<string, string> pair in userSecrets)
+            {
+                proc.StartInfo.Arguments = $"/C dotnet user-secrets set \"{pair.Key}\" \"{pair.Value}\"";
+                proc.Start();
+                procOutput = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit();
+                _output.WriteLine(procOutput);
+            }
         }
     }
 }

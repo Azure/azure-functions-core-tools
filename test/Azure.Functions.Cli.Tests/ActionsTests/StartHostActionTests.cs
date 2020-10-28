@@ -35,7 +35,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             Exception exception = null;
             try
             {
-                await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\");
+                await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
             }
             catch (Exception e)
             {
@@ -62,7 +62,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             Exception exception = null;
             try
             {
-                await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\");
+                await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
             }
             catch (Exception e)
             {
@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             ColoredConsole.Out = console;
             ColoredConsole.Error = console;
 
-            await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\");
+            await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
             output.ToString().Should().Contain("Warning: Cannot find value named 'blah'");
             output.ToString().Should().Contain("Warning: 'connection' property in 'x:\\folder2\\function.json' is empty.");
         }

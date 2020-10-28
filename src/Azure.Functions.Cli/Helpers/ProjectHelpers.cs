@@ -11,6 +11,24 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal static class ProjectHelpers
     {
+        public static string GetUserSecretsId(string scriptPath, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
+        {
+            if (string.IsNullOrEmpty(scriptPath))
+            {
+                return null;
+            }
+            string projectFilePath = ProjectHelpers.FindProjectFile(scriptPath, loggingFilterHelper, loggerFilterOptions);
+            if (projectFilePath == null)
+            {
+                return null;
+            }
+
+            var projectRoot = ProjectHelpers.GetProject(projectFilePath);
+            var userSecretsId = ProjectHelpers.GetPropertyValue(projectRoot, Constants.UserSecretsIdElementName);
+
+            return userSecretsId;
+        }
+
         public static string FindProjectFile(string path, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
         {
             ColoredConsoleLogger logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper, loggerFilterOptions);

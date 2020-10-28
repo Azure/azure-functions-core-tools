@@ -64,6 +64,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public List<string> EnabledFunctions { get; private set; }
 
+        public string UserSecretsId { get; private set; }
+
         public StartHostAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -152,12 +154,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+            {
+                UserSecretsId = ProjectHelpers.GetUserSecretsId(hostOptions.ScriptPath, loggingFilterHelper, new LoggerFilterOptions());
+            }
+
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
-           
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             UpdateEnvironmentVariables(settings);
-
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
             
@@ -193,7 +198,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, loggingFilterHelper)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper)))
                 .Build();
         }
 
@@ -211,7 +216,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .GetEnvironmentVariables()
                     .Cast<DictionaryEntry>()
                     .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
-            await CheckNonOptionalSettings(settings.Union(environment), scriptPath);
+
+            // Build user secrets in order to read secrets.json file
+            IEnumerable<KeyValuePair<string, string>> userSecrets = new Dictionary<string, string>();
+            bool userSecretsEnabled = !string.IsNullOrEmpty(UserSecretsId);
+            if (userSecretsEnabled)
+            {
+                userSecrets = Utilities.BuildUserSecrets(UserSecretsId, _hostJsonConfig, VerboseLogging);
+            }
+
+            await CheckNonOptionalSettings(settings.Union(environment).Union(userSecrets), scriptPath, userSecretsEnabled);
 
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
@@ -362,7 +376,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return isPrecompiled;
         }
                        
-        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
+        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool userSecretsEnabled)
         {
             try
             {
@@ -389,9 +403,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
                 {
-                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
-                        $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
-                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
+                    string errorMessage = userSecretsEnabled ? Constants.Errors.WebJobsStorageNotFoundWithUserSecrets : Constants.Errors.WebJobsStorageNotFound;
+                    throw new CliException(string.Format(errorMessage,
+                                                         SecretsManager.AppSettingsFileName,
+                                                         string.Join(", ", Constants.TriggersWithoutStorage),
+                                                         SecretsManager.AppSettingsFileName));
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
@@ -409,9 +425,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                                 }
                                 else if (!secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
                                 {
-                                    ColoredConsole
-                                        .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
-                                            $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}."));
+                                    string warningMessage = userSecretsEnabled ? Constants.Errors.AppSettingNotFoundWithUserSecrets : Constants.Errors.AppSettingNotFound;
+                                    ColoredConsole.WriteLine(WarningColor(string.Format(warningMessage,
+                                                                                        appSettingName,
+                                                                                        SecretsManager.AppSettingsFileName,
+                                                                                        token.Key,
+                                                                                        binding["type"]?.ToString(),
+                                                                                        filePath,
+                                                                                        SecretsManager.AppSettingsFileName)));
                                 }
                             }
                         }

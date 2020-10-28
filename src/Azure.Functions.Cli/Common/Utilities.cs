@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Logging;
@@ -212,6 +214,15 @@ namespace Azure.Functions.Cli
             }
             catch { }
             return false;
+        }
+
+        internal static IEnumerable<KeyValuePair<string, string>> BuildUserSecrets(string userSecretsId, IConfigurationRoot hostJsonConfig, bool? verboseLogging)
+        {
+            var configureBuilder = new UserSecretsConfigurationBuilder(userSecretsId, new LoggingFilterHelper(hostJsonConfig, verboseLogging), new LoggerFilterOptions());
+            var configurationBuilder = new ConfigurationBuilder();
+            configureBuilder.Configure(configurationBuilder);
+            var root = configurationBuilder.Build();
+            return root.AsEnumerable();
         }
 
         /// <summary>
