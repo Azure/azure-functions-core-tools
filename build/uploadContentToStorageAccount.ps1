@@ -73,7 +73,7 @@ catch
 }
 
 # Validate and read manifest file
-$manifestFileName = "integrationTestBuildManifest.json"
+$manifestFileName = "integrationTestsBuildManifest.json"
 $manifestFilePath = Join-Path $SourcePath $manifestFileName
 
 if (-not (Test-Path $manifestFilePath))

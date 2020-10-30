@@ -569,7 +569,7 @@ namespace Build
                 _manifest.Build = Settings.IntegrationBuildNumber;
 
                 var json = JsonConvert.SerializeObject(_manifest, Formatting.Indented);
-                var manifestFilePath = Path.Combine(Settings.OutputDir, "integrationTestBuildManifest.json");
+                var manifestFilePath = Path.Combine(Settings.OutputDir, "integrationTestsBuildManifest.json");
                 File.WriteAllText(manifestFilePath, json);
             }
         }
