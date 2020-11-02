@@ -9,10 +9,10 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
     public abstract class BaseKubernetesResource<T> : IKubernetesResource where T : IKubernetesSpec
     {
         [JsonProperty("apiVersion")]
-        public string ApiVersion { get; set; }
+        public virtual string ApiVersion { get; set; }
 
         [JsonProperty("kind")]
-        public string Kind { get; set; }
+        public virtual string Kind { get; set; }
 
         [JsonProperty("metadata")]
         public ObjectMetadataV1 Metadata { get; set; }
