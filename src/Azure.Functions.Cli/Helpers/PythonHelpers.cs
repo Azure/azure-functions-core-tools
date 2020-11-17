@@ -113,7 +113,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (pythonVersion.Major == 3 && pythonVersion.Minor == 9 && PlatformHelper.IsWindows)
                 {
-                    string errorMessage = $"Python 3.9.x is currently not supported on Windows and will be coming soon.";
+                    string errorMessage = "Python 3.9.x is currently not supported on Windows and will be coming soon.";
 
                     if (errorIfNotSupported)
                         throw new CliException(errorMessage);
@@ -128,7 +128,8 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.6, 3.7, 3.8 or 3.9) is required.";
+            var error = "Python 3.x (recommended version 3.6, 3.7, 3.8 or 3.9) is required. " +
+                "Python 3.9.x is currently not supported on Windows and will be coming soon.";
             if (errorIfNoVersion) throw new CliException(error);
             ColoredConsole.WriteLine(WarningColor(error));
         }
