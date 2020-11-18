@@ -94,7 +94,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. Python 3.6.x, 3.7.x or 3.8.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. Python 3.6.x, 3.7.x, 3.8.x or 3.9.x is recommended, and used in Azure Functions.";
                 if (errorIfNoVersion) throw new CliException(message);
                 ColoredConsole.WriteLine(WarningColor(message));
                 return;
@@ -102,22 +102,34 @@ namespace Azure.Functions.Cli.Helpers
 
             ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
 
-            // Python 3.6 | 3.7 | 3.8 (supported)
+            // Python 3.6 | 3.7 | 3.8 | 3.9 (on macOS and Linux) (supported)
             if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
 
-            // Python 3.x (but not 3.6 | 3.7 | 3.8), not recommended, may fail
+            // Python 3.x (but not 3.6 | 3.7 | 3.8 | 3.9 (on macOS and Linux)), not recommended, may fail
             if (pythonVersion.Major == 3)
             {
-                if (errorIfNotSupported) throw new CliException($"Python 3.6.x, 3.7.x, 3.8.x is required for this operation. "
-                + "Please install Python 3.6, 3.7 or 3.8, and use a virtual environment to switch to Python 3.6, 3.7 or 3.8.");
-                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x or 3.8.x is recommended, and used in Azure Functions."));
+                if (pythonVersion.Major == 3 && pythonVersion.Minor == 9 && PlatformHelper.IsWindows)
+                {
+                    string errorMessage = "Python 3.9.x is currently not supported on Windows and will be coming soon.";
+
+                    if (errorIfNotSupported)
+                        throw new CliException(errorMessage);
+                    ColoredConsole.WriteLine(WarningColor(errorMessage + " We recommend you install Python 3.6, 3.7 or 3.8, and " +
+                            $"use a virtual environment to switch to Python 3.6, 3.7 or 3.8."));
+                }
+
+                if (errorIfNotSupported)
+                    throw new CliException($"Python 3.6.x, 3.7.x, 3.8.x, 3.9.x is required for this operation. " +
+                        $"Please install Python 3.6, 3.7, 3.8, or 3.9 and use a virtual environment to switch to Python 3.6, 3.7 or 3.8.");
+                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x, 3.8.x, or 3.9.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.6, 3.7 or 3.8) is required.";
+            var error = "Python 3.x (recommended version 3.6, 3.7, 3.8 or 3.9) is required. " +
+                "Python 3.9.x is currently not supported on Windows and will be coming soon.";
             if (errorIfNoVersion) throw new CliException(error);
             ColoredConsole.WriteLine(WarningColor(error));
         }
@@ -148,6 +160,7 @@ namespace Azure.Functions.Cli.Helpers
             var python36GetVersionTask = GetVersion("python3.6");
             var python37GetVersionTask = GetVersion("python3.7");
             var python38GetVersionTask = GetVersion("python3.8");
+            var python39GetVersionTask = GetVersion("python3.9");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
@@ -156,7 +169,8 @@ namespace Azure.Functions.Cli.Helpers
                 await pythonGetVersionTask,
                 await python36GetVersionTask,
                 await python37GetVersionTask,
-                await python38GetVersionTask
+                await python38GetVersionTask,
+                await python39GetVersionTask
             };
 
             // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
@@ -475,6 +489,8 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython37;
                     case 8:
                         return StaticResources.DockerfilePython38;
+                    case 9:
+                        return StaticResources.DockerfilePython39;
                 }
             }
             return StaticResources.DockerfilePython36;
@@ -492,6 +508,8 @@ namespace Azure.Functions.Cli.Helpers
                         return Constants.DockerImages.LinuxPython37ImageAmd64;
                     case 8:
                         return Constants.DockerImages.LinuxPython38ImageAmd64;
+                    case 9:
+                        return Constants.DockerImages.LinuxPython39ImageAmd64;
                 }
             }
             return Constants.DockerImages.LinuxPython36ImageAmd64;
@@ -499,7 +517,20 @@ namespace Azure.Functions.Cli.Helpers
 
         private static bool IsVersionSupported(WorkerLanguageVersionInfo info)
         {
-            return (info?.Major == 3 && info?.Minor == 6) || (info?.Major == 3 && info?.Minor == 7) || (info?.Major == 3 && info?.Minor == 8);
+            if (info?.Major == 3)
+            {
+                switch (info?.Minor)
+                {
+                    case 9:
+                        // We currently do not support Python 3.9 on Windows.
+                        if (PlatformHelper.IsWindows) { return false; }
+                        else return true;
+                    case 8:
+                    case 7:
+                    case 6: return true;
+                    default: return false;
+                }
+            } else return false;
         }
     }
 }
