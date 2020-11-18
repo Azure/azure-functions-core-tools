@@ -41,6 +41,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfilePython38 => GetValue("Dockerfile.python38");
 
+        public static Task<string> DockerfilePython39 => GetValue("Dockerfile.python39");
+
         public static Task<string> DockerfilePowershell => GetValue("Dockerfile.powershell");
 
         public static Task<string> DockerfileNode => GetValue("Dockerfile.node");

@@ -47,6 +47,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("3.6.8b", false)]
         [InlineData("3.7.2", false)]
         [InlineData("3.8.0", false)]
+        [InlineData("3.9.0", true)] // Only supported in Mac/Linux.
         public void AssertPythonVersion(string pythonVersion, bool expectException)
         {
             WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.python, pythonVersion, "python");
@@ -68,11 +69,11 @@ namespace Azure.Functions.Cli.Tests
             string[] pythons;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                pythons = new string[] { "python.exe", "python3.exe", "python36.exe", "python37.exe", "python38.exe", "py.exe" };
+                pythons = new string[] { "python.exe", "python3.exe", "python36.exe", "python37.exe", "python38.exe", "python39.exe", "py.exe" };
             }
             else
             {
-                pythons = new string[] { "python", "python3", "python36", "python37", "python38" };
+                pythons = new string[] { "python", "python3", "python36", "python37", "python38", "python39" };
             }
 
             string pythonExe = pythons.FirstOrDefault(p => CheckIfPythonExist(p));
