@@ -57,7 +57,7 @@ if ($filesToUploaded.Count -eq 0)
 if (-not (Get-command New-AzStorageContext -ea SilentlyContinue))
 {
     WriteLog "Installing Az.Storage."
-    Install-Module Az.Storage -Force -Verbose -Scope CurrentUser
+    Install-Module Az.Storage -Force -Verbose -AllowClobber -Scope CurrentUser
 }
 
 $context = $null
