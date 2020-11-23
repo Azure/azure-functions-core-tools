@@ -156,17 +156,17 @@ namespace Build
                     var powershellRuntimePath = Path.Combine(powershellWorkerPath, "runtimes");
 
                     var allFoundPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
-                    var powershellForCurrentRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
+                    var powershellRuntimesForCurrentToolsRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
 
                     // Check to make sure all the expected runtimes are available
-                    if (allFoundPowershellRuntimes.All(powershellForCurrentRuntime.Contains))
+                    if (allFoundPowershellRuntimes.All(powershellRuntimesForCurrentToolsRuntime.Contains))
                     {
-                        throw new Exception($"Expected PowerShell runtimes not found for Powershell v{powerShellVersion}. Expected runtimes are {string.Join(", ", powershellForCurrentRuntime)}." +
+                        throw new Exception($"Expected PowerShell runtimes not found for Powershell v{powerShellVersion}. Expected runtimes are {string.Join(", ", powershellRuntimesForCurrentToolsRuntime)}." +
                             $"{Environment.NewLine}Found runtimes are {string.Join(", ", allFoundPowershellRuntimes)}");
                     }
 
                     // Delete all the runtimes that should not belong to the current runtime
-                    allFoundPowershellRuntimes.Except(powershellForCurrentRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
+                    allFoundPowershellRuntimes.Except(powershellRuntimesForCurrentToolsRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
                 }
             }
 
