@@ -218,7 +218,9 @@ namespace Build
                         }
                     }
 
-                    if (!atLeastOne)
+                    // Bypass atLeastOne check for Windows Python 3.9 since we don't have it yet.
+                    bool isPython39 = pyVersionPath.EndsWith("3.9");
+                    if (!atLeastOne && !isPython39)
                     {
                         throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for runtime '{runtime}'. " +
                             $"Something went wrong.");
