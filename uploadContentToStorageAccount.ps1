@@ -57,7 +57,7 @@ if ($filesToUploaded.Count -eq 0)
 if (-not (Get-command New-AzStorageContext -ea SilentlyContinue))
 {
     WriteLog "Installing Az.Storage."
-    Install-Module Az.Storage -Force -Verbose -Scope CurrentUser
+    Install-Module Az.Storage -Force -Verbose -AllowClobber -Scope CurrentUser
 }
 
 $context = $null
@@ -73,7 +73,7 @@ catch
 }
 
 # Validate and read manifest file
-$manifestFileName = "integrationTestBuildManifest.json"
+$manifestFileName = "integrationTestsBuildManifest.json"
 $manifestFilePath = Join-Path $SourcePath $manifestFileName
 
 if (-not (Test-Path $manifestFilePath))

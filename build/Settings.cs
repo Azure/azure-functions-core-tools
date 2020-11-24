@@ -36,7 +36,7 @@ namespace Build
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
-        public static readonly string[] TargetRuntimes = new[] {"min.win-x86", "min.win-x64", "linux-x64", "osx-x64", "no-runtime", "win-x86", "win-x64" };
+        public static readonly string[] TargetRuntimes = new[] { "min.win-x86", "min.win-x64", "linux-x64", "osx-x64", "win-x86", "win-x64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
@@ -44,7 +44,6 @@ namespace Build
             { "win-x64", "WINDOWS" },
             { "linux-x64", "LINUX" },
             { "osx-x64", "OSX" },
-            { "no-runtime", "LINUX" },
             { "min.win-x86", "WINDOWS" },
             { "min.win-x64", "WINDOWS" },
         };
@@ -59,13 +58,7 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "unix" } },
-                    { "no-runtime", new [] {
-                        "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86",
-                        "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64", "linux",
-                        "linux-x64", "unix", "linux-musl-x64",
-                        "osx", "win-arm64", "win-arm", "linux-arm", "linux-arm64"
-                    } }
+                    { "osx-x64", new [] { "osx", "unix" } }
                 }
             },
             {
@@ -75,14 +68,7 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
-                    { "no-runtime", new [] {
-                        "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86",
-                        "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64", "linux",
-                        "linux-x64", "unix", "linux-musl-x64",
-                        "osx", "win-arm64", "win-arm", "linux-arm", "linux-arm64",
-                        "freebsd"
-                    } }
+                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } }
                 }
             }
         };

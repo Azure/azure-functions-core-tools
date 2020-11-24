@@ -25,6 +25,15 @@ variables:
   APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
 steps:
 - pwsh: |
+    $isIntegrationBuild = $false
+    if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
+    {
+        $isIntegrationBuild = $true
+    }
+    Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
+    Write-Host "IsIntegrationBuild: $isIntegrationBuild"
+  displayName: 'Set IsIntegrationBuild variable'
+- pwsh: |
     Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
   displayName: Set up environment variables
 - task: NodeTool@0
@@ -56,6 +65,7 @@ steps:
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+    IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
   displayName: 'Executing build script'
 - task: EsrpCodeSigning@1
   displayName: 'Authenticode signing'
@@ -188,6 +198,7 @@ steps:
 - pwsh: |
     .\generateSha.ps1
   displayName: 'Generate sha files'
+
 - task: PublishTestResults@2
   inputs:
     testResultsFormat: 'VSTest'
@@ -197,9 +208,23 @@ steps:
 - pwsh: |
     Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
     Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
+    if ($env:IntegrationBuildNumber -like "PreRelease*-*")
+    {
+        $sourcePath = Join-Path '$(Build.Repository.LocalPath)\artifacts' 'integrationTestsBuildManifest.json'
+        Move-Item -Path $sourcePath -Destination '$(Build.ArtifactStagingDirectory)'
+    }
+  env:
+    IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
   displayName: 'Move artifacts'
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
     ArtifactName: 'drop'
     publishLocation: 'Container'
+- pwsh: |
+    .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
+  env:
+    IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
+    IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
+  displayName: 'Upload Core Tools build to the storage account for Integration Tests'
+  condition: eq(variables.IsIntegrationBuild, true)
