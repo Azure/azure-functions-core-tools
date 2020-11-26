@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ExpectExit = false,
                 OutputContains = new[]
                 {
-                    "Worker path for language worker node"
+                    "Workers Directory set to"
                 },
                 Test = async (_, p) =>
                 {
