@@ -139,7 +139,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     ExpectExit = false,
                     OutputContains = new []
                     {
-                        "Workers Directory set to"
+                        "Host configuration applied."
                     },
                     Test = async (_, p) =>
                     {
