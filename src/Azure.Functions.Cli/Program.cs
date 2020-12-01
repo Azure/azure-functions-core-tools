@@ -48,6 +48,11 @@ namespace Azure.Functions.Cli
             {
                 Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsEnvironment, "True");
             }
+
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.SequentialJobHostRestart)))
+            {
+                Environment.SetEnvironmentVariable(Constants.SequentialJobHostRestart, "True");
+            }
         }
 
         internal static IContainer InitializeAutofacContainer()
