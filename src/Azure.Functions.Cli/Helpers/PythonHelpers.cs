@@ -508,11 +508,14 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (info?.Major == 3)
             {
-                return (info?.Minor) switch
+                switch (info?.Minor)
                 {
-                    9 or 8 or 7 or 6 => true,
-                    _ => false,
-                };
+                    case 9:
+                    case 8:	
+                    case 7:	
+                    case 6:  return true;	
+                    default: return false;
+                }
             } else return false;
         }
     }
