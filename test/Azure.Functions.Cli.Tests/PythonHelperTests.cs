@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("3.6.8b", false)]
         [InlineData("3.7.2", false)]
         [InlineData("3.8.0", false)]
-        [InlineData("3.9.0", true)] // Only supported in Mac/Linux.
+        [InlineData("3.9.0", false)]
         public void AssertPythonVersion(string pythonVersion, bool expectException)
         {
             WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.python, pythonVersion, "python");
