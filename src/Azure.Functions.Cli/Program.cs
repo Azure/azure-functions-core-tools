@@ -44,15 +44,8 @@ namespace Azure.Functions.Cli
 
         private static void SetCoreToolsEnvironmentVaraibles()
         {
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.FunctionsCoreToolsEnvironment)))
-            {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsEnvironment, "True");
-            }
-
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.SequentialJobHostRestart)))
-            {
-                Environment.SetEnvironmentVariable(Constants.SequentialJobHostRestart, "True");
-            }
+            EnvironmentHelpers.SetEnvironmentVariableAsBoolIfNotExists(Constants.FunctionsCoreToolsEnvironment);
+            EnvironmentHelpers.SetEnvironmentVariableAsBoolIfNotExists(Constants.SequentialJobHostRestart);
         }
 
         internal static IContainer InitializeAutofacContainer()
