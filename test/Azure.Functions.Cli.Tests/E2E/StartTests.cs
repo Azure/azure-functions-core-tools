@@ -594,9 +594,13 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task start_with_user_secrets_missing_storage()
         {
+            string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            Skip.If(!string.IsNullOrEmpty(AzureWebJobsStorageConnectionString),
+                reason: "AzureWebJobsStorage should be not set to verify this test.");
+
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
