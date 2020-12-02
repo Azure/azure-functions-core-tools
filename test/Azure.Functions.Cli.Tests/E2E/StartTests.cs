@@ -467,7 +467,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Flaky test")]
         public async Task start_powershell()
         {
             await CliTester.Run(new RunConfiguration
