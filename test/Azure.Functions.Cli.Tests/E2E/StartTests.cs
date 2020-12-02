@@ -479,6 +479,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start"
                 },
                 ExpectExit = false,
+                CommandTimeout = TimeSpan.FromMinutes(1),
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
