@@ -547,9 +547,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         // add connection string setting to queue code
                         var queueCodePath = Path.Combine(workingDir, "queue1.cs");
-                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
-                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\""));
                         _output.WriteLine($"Writing to file {queueCodePath}");
+                        _output.WriteLine($"Queue File Exists: {File.Exists(queueCodePath)}");
+                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
+                        _output.WriteLine($"Original Queue File: {queueCodeString}");
+                        var replacedText = queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
+                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, replacedText);
+                        _output.WriteLine($"New Queue File: {replacedText}");
 
                         // clear local.settings.json
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
@@ -609,10 +613,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         // add connection string setting to queue code
                         var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        _output.WriteLine($"Writing to file {queueCodePath}");
+                        _output.WriteLine($"Queue File Exists: {File.Exists(queueCodePath)}");
                         var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
+                        _output.WriteLine($"Original Queue File: {queueCodeString}");
                         var replacedText = queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
                         FileSystemHelpers.WriteAllTextToFile(queueCodePath, replacedText);
-                        _output.WriteLine($"Writing to file {queueCodePath}");
                         _output.WriteLine($"New Queue File: {replacedText}");
 
                         // clear local.settings.json
@@ -660,10 +666,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         // add connection string setting to queue code
                         var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        _output.WriteLine($"Writing to file {queueCodePath}");
+                        _output.WriteLine($"Queue File Exists: {File.Exists(queueCodePath)}");
                         var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
+                        _output.WriteLine($"Original Queue File: {queueCodeString}");
                         var replacedText = queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
                         FileSystemHelpers.WriteAllTextToFile(queueCodePath, replacedText);
-                        _output.WriteLine($"Writing to file {queueCodePath}");
                         _output.WriteLine($"New Queue File: {replacedText}");
 
                         // clear local.settings.json
