@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                    }   
+                    }
                 },
             }, _output);
         }
@@ -348,7 +348,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output, startHost: true);
         }
 
-       
+
         [Fact]
         public async Task start_displays_error_on_missing_host_json()
         {
@@ -646,9 +646,13 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task start_with_user_secrets_missing_binding_setting()
         {
+            string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            Skip.If(!string.IsNullOrEmpty(AzureWebJobsStorageConnectionString),
+                reason: "AzureWebJobsStorage should be not set to verify this test.");
+
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
