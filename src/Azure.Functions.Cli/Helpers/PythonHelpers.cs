@@ -102,34 +102,23 @@ namespace Azure.Functions.Cli.Helpers
 
             ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
 
-            // Python 3.6 | 3.7 | 3.8 | 3.9 (on macOS and Linux) (supported)
+            // Python 3.[6|7|8|9] (supported)
             if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
 
-            // Python 3.x (but not 3.6 | 3.7 | 3.8 | 3.9 (on macOS and Linux)), not recommended, may fail
+            // Python 3.x (but not 3.[6|7|8|9]), not recommended, may fail. E.g.: 3.4, 3.5.
             if (pythonVersion.Major == 3)
             {
-                if (pythonVersion.Major == 3 && pythonVersion.Minor == 9 && PlatformHelper.IsWindows)
-                {
-                    string errorMessage = "Python 3.9.x is currently not supported on Windows and will be coming soon.";
-
-                    if (errorIfNotSupported)
-                        throw new CliException(errorMessage);
-                    ColoredConsole.WriteLine(WarningColor(errorMessage + " We recommend you install Python 3.6, 3.7 or 3.8, and " +
-                            $"use a virtual environment to switch to Python 3.6, 3.7 or 3.8."));
-                }
-
                 if (errorIfNotSupported)
-                    throw new CliException($"Python 3.6.x, 3.7.x, 3.8.x, 3.9.x is required for this operation. " +
-                        $"Please install Python 3.6, 3.7, 3.8, or 3.9 and use a virtual environment to switch to Python 3.6, 3.7 or 3.8.");
+                    throw new CliException($"Python 3.6.x to 3.9.x is required for this operation. " +
+                        $"Please install Python 3.6, 3.7, 3.8, or 3.9 and use a virtual environment to switch to Python 3.6, 3.7, 3.8, or 3.9.");
                 ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x, 3.8.x, or 3.9.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.6, 3.7, 3.8 or 3.9) is required. " +
-                "Python 3.9.x is currently not supported on Windows and will be coming soon.";
+            var error = "Python 3.x (recommended version 3.[6|7|8|9]) is required.";
             if (errorIfNoVersion) throw new CliException(error);
             ColoredConsole.WriteLine(WarningColor(error));
         }
@@ -522,12 +511,9 @@ namespace Azure.Functions.Cli.Helpers
                 switch (info?.Minor)
                 {
                     case 9:
-                        // We currently do not support Python 3.9 on Windows.
-                        if (PlatformHelper.IsWindows) { return false; }
-                        else return true;
-                    case 8:
-                    case 7:
-                    case 6: return true;
+                    case 8:	
+                    case 7:	
+                    case 6:  return true;	
                     default: return false;
                 }
             } else return false;

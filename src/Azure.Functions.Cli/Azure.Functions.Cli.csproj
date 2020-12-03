@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
@@ -18,7 +18,7 @@
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
-    <Copyright>© .NET Foundation.  All rights reserved.</Copyright>
+    <Copyright>� .NET Foundation.  All rights reserved.</Copyright>
     <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Azure/azure-functions-cli</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -137,7 +137,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS6" Version="3.0.557" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.560" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.0.15149" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.1.9" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.1.10" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
