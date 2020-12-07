@@ -331,18 +331,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 PythonHelpers.SetWorkerPath(pythonVersion?.ExecutablePath, overwrite: false);
                 PythonHelpers.SetWorkerRuntimeVersionPython(pythonVersion);
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && !NoBuild)
+            else if (WorkerRuntimeLanguageHelper.IsDotnet(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !NoBuild)
             {
-                if (DotnetHelpers.CanDotnetBuild())
-                {
-                    var outputPath = Path.Combine("bin", "output");
-                    await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty);
-                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
-                }
-                else if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
-                }
+                await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
             {
@@ -354,7 +345,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 throw new CliException($"Port {Port} is unavailable. Close the process using that port, or specify another port using --port [-p].");
             }
         }
-       
+
         private bool IsPreCompiledFunctionApp()
         {
             bool isPrecompiled = false;
