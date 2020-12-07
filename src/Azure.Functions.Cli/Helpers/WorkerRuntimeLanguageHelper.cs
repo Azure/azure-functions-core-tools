@@ -12,6 +12,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         None,
         dotnet,
+        dotnetIsolated,
         node,
         python,
         java,
@@ -24,6 +25,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> availableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
             { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
+            { WorkerRuntime.dotnetIsolated, new [] { "dotnet-isolated" } },
             { WorkerRuntime.node, new [] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.python, new []  { "py" } },
             { WorkerRuntime.java, new string[] { } },
@@ -144,6 +146,11 @@ namespace Azure.Functions.Cli.Helpers
                 throw new ArgumentException($"Worker runtime '{worker}' is not a valid worker for a template.");
             }
             return workerToDefaultLanguageMap[worker];
+        }
+
+        public static bool IsDotnet(WorkerRuntime worker)
+        {
+            return worker == WorkerRuntime.dotnet || worker ==  WorkerRuntime.dotnetIsolated;
         }
     }
 }

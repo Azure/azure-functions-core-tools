@@ -138,21 +138,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Update build option
             PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
 
-            if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild && PublishBuildOption != BuildOption.Remote)
+            bool isNonCsxDotnetRuntime = WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx;
+
+            if (isNonCsxDotnetRuntime && !NoBuild && PublishBuildOption != BuildOption.Remote)
             {
-                if (DotnetHelpers.CanDotnetBuild())
-                {
-                    var outputPath = Path.Combine("bin", "publish");
-                    await DotnetHelpers.BuildDotnetProject(outputPath, DotnetCliParameters);
-                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
-                }
-                else if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
-                }
+                await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "publish"), DotnetCliParameters);
             }
 
-            if (workerRuntime != WorkerRuntime.dotnet || Csx)
+            if (!isNonCsxDotnetRuntime)
             {
                 // Restore all valid extensions
                 var installExtensionAction = new InstallExtensionAction(_secretsManager, false);

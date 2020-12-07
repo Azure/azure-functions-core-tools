@@ -102,6 +102,19 @@ namespace Azure.Functions.Cli.Helpers
             return csProjFiles.Count + fsProjFiles.Count == 1;
         }
 
+        public static async Task BuildAndChangeDirectory(string outputPath, string cliParams)
+        {
+            if (CanDotnetBuild())
+            {
+                await BuildDotnetProject(outputPath, cliParams);
+                Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
+            }
+            else if (StaticSettings.IsDebug)
+            {
+                ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
+            }
+        }
+
         public static async Task<bool> BuildDotnetProject(string outputPath, string dotnetCliParams, bool showOutput = true)
         {
             if (FileSystemHelpers.DirectoryExists(outputPath))
