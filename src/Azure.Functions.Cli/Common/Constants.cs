@@ -54,6 +54,7 @@ namespace Azure.Functions.Cli.Common
         public const string UserSecretsIdElementName = "UserSecretsId";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
+        public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

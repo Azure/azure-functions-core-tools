@@ -3,6 +3,7 @@ using Autofac;
 using Colors.Net;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
@@ -44,10 +45,8 @@ namespace Azure.Functions.Cli
 
         private static void SetCoreToolsEnvironmentVaraibles()
         {
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.FunctionsCoreToolsEnvironment)))
-            {
-                Environment.SetEnvironmentVariable(Constants.FunctionsCoreToolsEnvironment, "True");
-            }
+            EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.FunctionsCoreToolsEnvironment);
+            EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.SequentialJobHostRestart);
         }
 
         internal static IContainer InitializeAutofacContainer()
