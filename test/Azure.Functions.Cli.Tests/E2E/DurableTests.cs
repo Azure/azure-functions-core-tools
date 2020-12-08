@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "ExecutionStarted",
                     "OrchestratorCompleted"
                 },
-                CommandTimeout = TimeSpan.FromSeconds(45)
+                CommandTimeout = TimeSpan.FromMinutes(2)
             },
             _output,
             workingDir: WorkingDirPath,
