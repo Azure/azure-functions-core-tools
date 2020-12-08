@@ -72,10 +72,12 @@ namespace Azure.Functions.Cli.Helpers
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", availableWorkersRuntime.Keys
                 .Where(k => (k != WorkerRuntime.java))
+                .Where(k => (k != WorkerRuntime.dotnetIsolated))
                 .Select(s => s.ToString()));
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
-            .Where(k => k != WorkerRuntime.java);
+            .Where(k => k != WorkerRuntime.java)
+            .Where(k => k != WorkerRuntime.dotnetIsolated);
 
         public static WorkerRuntime NormalizeWorkerRuntime(string workerRuntime)
         {
