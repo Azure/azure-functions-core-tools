@@ -30,6 +30,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
+        public const string DotnetFrameworkVersion = "netFrameworkVersion";
         public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
         public const string PythonDockerImageSkipPull = "FUNCTIONS_PYTHON_DOCKER_SKIP_PULL";
         public const string PythonDockerRunCommand = "FUNCTIONS_PYTHON_DOCKER_RUN_COMMAND";
