@@ -15,6 +15,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script.Description.DotNet.CSharp.Analyzers;
+using Microsoft.CodeAnalysis;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -696,6 +697,34 @@ namespace Azure.Functions.Cli.Tests.E2E
                             { Constants.FunctionsWorkerRuntime, "dotnet" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
+
+                        //TODO(gzuber): remove
+                        var testFilePath = Path.Combine(workingDir, "uhoh.txt");
+                        _output.WriteLine($"Test File Exists: {File.Exists(testFilePath)}");
+                        FileSystemHelpers.WriteAllTextToFile(testFilePath, "hello");
+                        _output.WriteLine($"Test File Exists: {File.Exists(testFilePath)}");
+                        _output.WriteLine($"Test File Contents: {FileSystemHelpers.ReadAllTextFromFile(testFilePath)}");
+
+                        var testFilePath2 = Path.Combine(workingDir, "uhoh2.txt");
+                        _output.WriteLine($"Test File Exists: {File.Exists(testFilePath)}");
+                        using (FileStream fs = File.Create(testFilePath2))
+                        {
+                            byte[] info = new UTF8Encoding(true).GetBytes("This is some text in the file.");
+                            // Add some information to the file.
+                            fs.Write(info, 0, info.Length);
+                        }
+                        _output.WriteLine($"Test File Exists: {File.Exists(testFilePath)}");
+                        // Open the stream and read it back.
+                        using (StreamReader sr = File.OpenText(testFilePath2))
+                        {
+                            string s = "";
+                            while ((s = sr.ReadLine()) != null)
+                            {
+                                _output.WriteLine($"Test File 2 Contents: {s}");
+                            }
+                        }
+
+
                     },
                     Commands = new[]
                     {
