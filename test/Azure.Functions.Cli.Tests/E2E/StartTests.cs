@@ -594,7 +594,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact(Skip = "Flaky test")]
+        [Fact]
         public async Task start_with_user_secrets_missing_storage()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
@@ -651,7 +651,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact(Skip = "Flaky test")]
+        [Fact]
         public async Task start_with_user_secrets_missing_binding_setting()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
