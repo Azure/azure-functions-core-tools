@@ -55,6 +55,9 @@ namespace Azure.Functions.Cli
                 var action = app.Parse();
                 if (action != null)
                 {
+                    Utilities.PrintUpgradeWarning();
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+
                     if (action is IInitializableAction)
                     {
                         var initializableAction = action as IInitializableAction;
