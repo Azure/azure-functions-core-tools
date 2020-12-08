@@ -208,6 +208,7 @@ steps:
 - pwsh: |
     Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
     Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
+    Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
     if ($env:IntegrationBuildNumber -like "PreRelease*-*")
     {
         $sourcePath = Join-Path '$(Build.Repository.LocalPath)\artifacts' 'integrationTestsBuildManifest.json'
