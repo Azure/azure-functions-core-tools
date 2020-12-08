@@ -25,6 +25,7 @@
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
 
+    <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
