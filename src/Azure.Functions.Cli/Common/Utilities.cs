@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli
         {
             ColoredConsole
                 .WriteLine($"\nAzure Functions Core Tools")
-                .WriteLine($"Core Tools Version:       {Constants.CliDetailedVersion + (Environment.Is64BitProcess ? " (64-bit)" : " (32-bit)")}".DarkGray())
+                .WriteLine($"Core Tools Version:       {Constants.CliDetailedVersion}".DarkGray())
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
         }
 
