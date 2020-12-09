@@ -548,19 +548,28 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         // add connection string setting to queue code
                         var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {queueCodePath}");
-                        _output.WriteLine($"Queue File Exists: {File.Exists(queueCodePath)}");
-                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
-                        _output.WriteLine($"Original Queue File: {queueCodeString}");
+                        StringBuilder queueCodeStringBuilder = new StringBuilder();
+                        using (StreamReader sr = File.OpenText(queueCodePath))
+                        {
+                            string s = "";
+                            while ((s = sr.ReadLine()) != null)
+                            {
+                                queueCodeStringBuilder.Append(s);
+                            }
+                        }
+                        var queueCodeString = queueCodeStringBuilder.ToString();
+                        _output.WriteLine($"Old Queue File: {queueCodeString}");
                         var replacedText = queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
-                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, replacedText);
                         _output.WriteLine($"New Queue File: {replacedText}");
+                        File.WriteAllText(queueCodePath, replacedText);
 
                         // clear local.settings.json
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
+                        Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        FileSystemHelpers.WriteAllTextToFile(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
-                        _output.WriteLine(FileSystemHelpers.ReadAllTextFromFile(localSettingsPath));
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
@@ -618,19 +627,28 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         // add connection string setting to queue code
                         var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {queueCodePath}");
-                        _output.WriteLine($"Queue File Exists: {File.Exists(queueCodePath)}");
-                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
-                        _output.WriteLine($"Original Queue File: {queueCodeString}");
+                        StringBuilder queueCodeStringBuilder = new StringBuilder();
+                        using (StreamReader sr = File.OpenText(queueCodePath))
+                        {
+                            string s = "";
+                            while ((s = sr.ReadLine()) != null)
+                            {
+                                queueCodeStringBuilder.Append(s);
+                            }
+                        }
+                        var queueCodeString = queueCodeStringBuilder.ToString();
+                        _output.WriteLine($"Old Queue File: {queueCodeString}");
                         var replacedText = queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
-                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, replacedText);
                         _output.WriteLine($"New Queue File: {replacedText}");
+                        File.WriteAllText(queueCodePath, replacedText);
 
                         // clear local.settings.json
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
+                        Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        FileSystemHelpers.WriteAllTextToFile(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
-                        _output.WriteLine(FileSystemHelpers.ReadAllTextFromFile(localSettingsPath));
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
@@ -675,19 +693,28 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         // add connection string setting to queue code
                         var queueCodePath = Path.Combine(workingDir, "queue1.cs");
+                        Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {queueCodePath}");
-                        _output.WriteLine($"Queue File Exists: {File.Exists(queueCodePath)}");
-                        var queueCodeString = FileSystemHelpers.ReadAllTextFromFile(queueCodePath);
-                        _output.WriteLine($"Original Queue File: {queueCodeString}");
+                        StringBuilder queueCodeStringBuilder = new StringBuilder();
+                        using (StreamReader sr = File.OpenText(queueCodePath))
+                        {
+                            string s = "";
+                            while ((s = sr.ReadLine()) != null)
+                            {
+                                queueCodeStringBuilder.Append(s);
+                            }
+                        }
+                        var queueCodeString = queueCodeStringBuilder.ToString();
+                        _output.WriteLine($"Old Queue File: {queueCodeString}");
                         var replacedText = queueCodeString.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
-                        FileSystemHelpers.WriteAllTextToFile(queueCodePath, replacedText);
                         _output.WriteLine($"New Queue File: {replacedText}");
+                        File.WriteAllText(queueCodePath, replacedText);
 
                         // clear local.settings.json
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
+                        Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        FileSystemHelpers.WriteAllTextToFile(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
-                        _output.WriteLine(FileSystemHelpers.ReadAllTextFromFile(localSettingsPath));
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
