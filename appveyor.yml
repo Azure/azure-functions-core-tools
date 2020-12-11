@@ -21,3 +21,5 @@ artifacts:
   name: Release
 - path: artifacts\Azure.Functions.*.sha2
   name: Release
+- path: artifacts\Azure.Functions.*.nupkg
+  name: Release
