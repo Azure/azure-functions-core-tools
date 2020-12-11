@@ -344,7 +344,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 For questions on Azure Functions or the tools, you can ask questions here:
 
-- [Azure Functions MSDN Forum](https://social.msdn.microsoft.com/Forums/azure/en-US/home?forum=AzureFunctions)
+- [Azure Functions Q&A Forum](https://docs.microsoft.com/en-us/answers/topics/azure-functions.html)
 - [Azure-Functions tag on StackOverflow](http://stackoverflow.com/questions/tagged/azure-functions)
 
 File bugs at [Azure Functions Core Tools repo on GitHub](https://github.com/Azure/azure-functions-core-tools/issues).
