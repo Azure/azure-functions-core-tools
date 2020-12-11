@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading;
 using Autofac;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
@@ -13,8 +12,6 @@ namespace Azure.Functions.Cli
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVaraibles();
-            Utilities.PrintUpgradeWarning();
-            Thread.Sleep(1000);
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
         }
 
