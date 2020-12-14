@@ -4,6 +4,7 @@ using Azure.Functions.Cli.Kubernetes.KEDA.V1;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Microsoft.Azure.Documents.SystemFunctions;
 using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA
@@ -44,8 +45,10 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
                 // We use KEDA v2 as a default
                 return KedaVersion.v2;
             }
-            
+
+            Console.WriteLine($"KEDA OUTPUT: {resourceInfo.Output}");
             var parsedJson = JToken.Parse(resourceInfo.Output);	
+            
             // TODO: Interpret app.kubernetes.io/version label	
 
             return KedaVersion.v1;

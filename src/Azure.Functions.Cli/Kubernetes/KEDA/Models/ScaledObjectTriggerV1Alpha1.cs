@@ -1,9 +1,7 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
+using Newtonsoft.Json;
 
-namespace Azure.Functions.Cli.Kubernetes.KEDA
+namespace Azure.Functions.Cli.Kubernetes.KEDA.Models
 {
     public class ScaledObjectTriggerV1Alpha1
     {

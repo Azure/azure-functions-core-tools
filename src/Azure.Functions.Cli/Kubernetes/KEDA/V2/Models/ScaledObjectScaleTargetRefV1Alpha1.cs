@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Newtonsoft.Json;
 
-namespace Azure.Functions.Cli.Kubernetes.KEDA
+namespace Azure.Functions.Cli.Kubernetes.KEDA.V2.Models
 {
     public class ScaledObjectScaleTargetRefV1Alpha1
     {

@@ -19,7 +19,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public async override Task RunAsync()
         {
             var kedaVersion = await KedaHelper.DetermineCurrentVersion(Namespace);
-            await KubectlHelper.KubectlDelete(KedaHelper.GetKedaDeploymentYaml(Namespace, kedaVersion), showOutput: true);
+            var kedaDeploymentYaml = KedaHelper.GetKedaDeploymentYaml(Namespace, kedaVersion);
+            await KubectlHelper.KubectlDelete(kedaDeploymentYaml, showOutput: true);
         }
     }
 }

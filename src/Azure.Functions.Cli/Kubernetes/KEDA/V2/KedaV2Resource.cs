@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Azure.Functions.Cli.Kubernetes.KEDA.Interfaces;
+using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
-using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
 {
-    public class KedaV2Resource
+    public class KedaV2Resource : KedaResource, IKedaResource
     {
         public IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
                DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
@@ -42,8 +43,8 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
                         .Where(b => b["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) == -1)
                         .Select(t => new ScaledObjectTriggerV1Alpha1
                         {
-                            Type = KedaResourceFactory.GetKedaTrigger(t["type"]?.ToString()),
-                            Metadata = KedaResourceFactory.PopulateMetadataDictionary(t)
+                            Type = GetKedaTriggerType(t["type"]?.ToString()),
+                            Metadata = PopulateMetadataDictionary(t)
                         })
                 }
             };

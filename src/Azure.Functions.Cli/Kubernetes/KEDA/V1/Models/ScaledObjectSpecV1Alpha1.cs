@@ -1,11 +1,9 @@
-﻿using Azure.Functions.Cli.Kubernetes.KEDA;
+﻿using System.Collections.Generic;
+using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Azure.Functions.Cli.Kubernetes.KEDA
+namespace Azure.Functions.Cli.Kubernetes.KEDA.V1.Models
 {
     public class ScaledObjectSpecV1Alpha1 : IKubernetesSpec
     {

@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Tests
 
             JToken jsonObj = JToken.Parse(jsonText);
 
-            IDictionary<string, string> metadata = KedaV1ResourceFactory.PopulateMetadataDictionary(jsonObj);
+            IDictionary<string, string> metadata = new KedaV1Resource().PopulateMetadataDictionary(jsonObj);
 
             Assert.Equal(4, metadata.Count);
             Assert.True(metadata.ContainsKey("type"));
@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Tests
 
             JToken jsonObj = JToken.Parse(jsonText);
 
-            IDictionary<string, string> metadata = KedaV2Resource.PopulateMetadataDictionary(jsonObj);
+            IDictionary<string, string> metadata = new KedaV2Resource().PopulateMetadataDictionary(jsonObj);
 
             Assert.Equal(4, metadata.Count);
             Assert.True(metadata.ContainsKey("type"));
