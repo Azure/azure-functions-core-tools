@@ -138,21 +138,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Update build option
             PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
 
-            if (workerRuntime == WorkerRuntime.dotnet && !Csx && !NoBuild && PublishBuildOption != BuildOption.Remote)
+            bool isNonCsxDotnetRuntime = WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx;
+
+            if (isNonCsxDotnetRuntime && !NoBuild && PublishBuildOption != BuildOption.Remote)
             {
-                if (DotnetHelpers.CanDotnetBuild())
-                {
-                    var outputPath = Path.Combine("bin", "publish");
-                    await DotnetHelpers.BuildDotnetProject(outputPath, DotnetCliParameters);
-                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
-                }
-                else if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
-                }
+                await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "publish"), DotnetCliParameters);
             }
 
-            if (workerRuntime != WorkerRuntime.dotnet || Csx)
+            if (!isNonCsxDotnetRuntime)
             {
                 // Restore all valid extensions
                 var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
@@ -219,6 +212,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
                             result[Constants.FunctionsWorkerRuntime] = workerRuntime.ToString();
                         }
+                        else if (workerRuntime == WorkerRuntime.dotnetIsolated)
+                        {
+                            // Temporary: we don't have a create option for Function apps with worker runtime as dotnet-isolated.
+                            // This way we temporarily update worker runtime in Azure if locally they are using dotnet-isolated.
+                            // TODO: Revisit this before GA
+                            ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to 'dotnet-isolated'"));
+                            result[Constants.FunctionsWorkerRuntime] = "dotnet-isolated";
+                        }
                         else
                         {
                             throw new CliException($"Your Azure Function App has '{Constants.FunctionsWorkerRuntime}' set to '{azureWorkerRuntime}' while your local project is set to '{workerRuntime}'.\n"
@@ -279,6 +280,27 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (workerRuntime == WorkerRuntime.python)
             {
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
+            }
+
+            // Temporary: there's no tool support to create a .NET isolated worker runtime app,
+            // so we are temporarily making sure that the framework version is set appropriately from here.
+            // TODO: Revisit this before GA
+            bool isWindowsDotnetFive = workerRuntime == WorkerRuntime.dotnetIsolated && !functionApp.IsLinux;
+            if (isWindowsDotnetFive && !string.Equals(functionApp.NetFrameworkVersion, "v5.0", StringComparison.OrdinalIgnoreCase))
+            {
+                ColoredConsole.WriteLine(WarningColor($"Setting Functions site property '{Constants.DotnetFrameworkVersion}' to 'v5.0'"));
+                var dotnetSiteConfig = new Dictionary<string, string>
+                {
+                    [Constants.DotnetFrameworkVersion] = "v5.0"
+                };
+                var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, dotnetSiteConfig, AccessToken, ManagementURL);
+
+                if (!settingsResult.IsSuccessful)
+                {
+                    ColoredConsole.Error
+                        .WriteLine(ErrorColor("Error updating dotnet version:"))
+                        .WriteLine(ErrorColor(settingsResult.ErrorResult));
+                }
             }
 
             return result;
@@ -501,7 +523,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Upload completed successfully.");
 
             // Set app setting
-            await SetRunFromPackageAppSetting(functionApp, sas, enableMount: fileName.EndsWith("squashfs"));
+            await SetRunFromPackageAppSetting(functionApp, sas);
             ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
@@ -590,7 +612,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             throw new CliException("Timed out waiting for SCM to update the Environment Settings");
         }
 
-        private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue, bool enableMount = false)
+        private async Task SetRunFromPackageAppSetting(Site functionApp, string runFromPackageValue)
         {
             // Set app setting
             functionApp.AzureAppSettings["WEBSITE_RUN_FROM_PACKAGE"] = runFromPackageValue;
@@ -605,7 +627,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (functionApp.IsDynamic && functionApp.IsLinux && enableMount && !functionApp.AzureAppSettings.ContainsKey("WEBSITE_MOUNT_ENABLED"))
+            if (functionApp.IsDynamic && functionApp.IsLinux && !functionApp.AzureAppSettings.ContainsKey("WEBSITE_MOUNT_ENABLED"))
             {
                 functionApp.AzureAppSettings["WEBSITE_MOUNT_ENABLED"] = "1";
             }

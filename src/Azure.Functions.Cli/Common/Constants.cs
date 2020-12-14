@@ -30,6 +30,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
+        public const string DotnetFrameworkVersion = "netFrameworkVersion";
         public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
         public const string PythonDockerImageSkipPull = "FUNCTIONS_PYTHON_DOCKER_SKIP_PULL";
         public const string PythonDockerRunCommand = "FUNCTIONS_PYTHON_DOCKER_RUN_COMMAND";
@@ -54,6 +55,7 @@ namespace Azure.Functions.Cli.Common
         public const string UserSecretsIdElementName = "UserSecretsId";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
+        public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -119,9 +121,10 @@ namespace Azure.Functions.Cli.Common
 
         public static class DockerImages
         {
-            public const string LinuxPython36ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12493-python3.6-buildenv";
-            public const string LinuxPython37ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12763-python3.7-buildenv";
-            public const string LinuxPython38ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.13106-python3.8-buildenv";
+            public const string LinuxPython36ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.14786-python3.6-buildenv";
+            public const string LinuxPython37ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.14786-python3.7-buildenv";
+            public const string LinuxPython38ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.8-buildenv";
+            public const string LinuxPython39ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.9-buildenv";
         }
 
         public static class StaticResourcesNames

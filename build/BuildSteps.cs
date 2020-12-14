@@ -113,13 +113,21 @@ namespace Build
                 case "min.win-x86":
                 case "min.win-x64":
                     return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
-                case "no-runtime":
-                    return string.Empty;
                 default:
                     return runtime;
             }
         }
 
+        public static void DotnetPack()
+        {
+            var outputPath = Path.Combine(Settings.OutputDir);
+            Shell.Run("dotnet", $"pack {Settings.ProjectFile} " +
+                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
+                                $"/p:NoWorkers=\"true\" " +
+                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
+                                $"-o {outputPath} -c Release ");
+        }
         public static void DotnetPublish()
         {
             foreach (var runtime in Settings.TargetRuntimes)
@@ -128,15 +136,11 @@ namespace Build
                 var rid = GetRuntimeId(runtime);
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
+                                    (runtime.StartsWith(Settings.MinifiedVersionPrefix) ? "/p:NoWorkers=\"true\"": string.Empty) +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                     $"-o {outputPath} -c Release " +
                                     (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
-
-                if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
-                {
-                    RemoveLanguageWorkers(outputPath);
-                }
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
@@ -157,19 +161,18 @@ namespace Build
                     var powerShellVersion = Path.GetFileName(powershellWorkerPath);
                     var powershellRuntimePath = Path.Combine(powershellWorkerPath, "runtimes");
 
-                    var allKnownPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion].Values.SelectMany(x => x).Distinct().ToList();
                     var allFoundPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
+                    var powershellRuntimesForCurrentToolsRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
 
-                    // Check to make sure any new runtime is categorizied properly and all the expected runtimes are available
-                    if (allFoundPowershellRuntimes.Count != allKnownPowershellRuntimes.Count || !allKnownPowershellRuntimes.All(allFoundPowershellRuntimes.Contains))
+                    // Check to make sure all the expected runtimes are available
+                    if (allFoundPowershellRuntimes.All(powershellRuntimesForCurrentToolsRuntime.Contains))
                     {
-                        throw new Exception($"Mismatch between classified Powershell runtimes and Powershell runtimes found for Powershell v{powerShellVersion}. Classified runtimes are ${string.Join(", ", allKnownPowershellRuntimes)}." +
-                            $"{Environment.NewLine}Found runtimes are ${string.Join(", ", allFoundPowershellRuntimes)}");
+                        throw new Exception($"Expected PowerShell runtimes not found for Powershell v{powerShellVersion}. Expected runtimes are {string.Join(", ", powershellRuntimesForCurrentToolsRuntime)}." +
+                            $"{Environment.NewLine}Found runtimes are {string.Join(", ", allFoundPowershellRuntimes)}");
                     }
 
                     // Delete all the runtimes that should not belong to the current runtime
-                    var powershellForCurrentRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
-                    allFoundPowershellRuntimes.Except(powershellForCurrentRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
+                    allFoundPowershellRuntimes.Except(powershellRuntimesForCurrentToolsRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
                 }
             }
 
@@ -223,18 +226,6 @@ namespace Build
                         throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for runtime '{runtime}'. " +
                             $"Something went wrong.");
                     }
-                }
-            }
-        }
-
-        private static void RemoveLanguageWorkers(string outputPath)
-        {
-            foreach (var languageWorker in Settings.LanguageWorkers)
-            {
-                var path = Path.Combine(outputPath, "workers", languageWorker);
-                if (Directory.Exists(path))
-                {
-                    Directory.Delete(path, recursive: true);
                 }
             }
         }
@@ -567,7 +558,7 @@ namespace Build
                 _manifest.Build = Settings.IntegrationBuildNumber;
 
                 var json = JsonConvert.SerializeObject(_manifest, Formatting.Indented);
-                var manifestFilePath = Path.Combine(Settings.OutputDir, "integrationTestBuildManifest.json");
+                var manifestFilePath = Path.Combine(Settings.OutputDir, "integrationTestsBuildManifest.json");
                 File.WriteAllText(manifestFilePath, json);
             }
         }
