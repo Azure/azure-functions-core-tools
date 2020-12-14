@@ -4,7 +4,8 @@ using Newtonsoft.Json;
 namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 {
     public interface IKubernetesResource
-    { }
+    { 
+    }
 
     public abstract class BaseKubernetesResource<T> : IKubernetesResource where T : IKubernetesSpec
     {

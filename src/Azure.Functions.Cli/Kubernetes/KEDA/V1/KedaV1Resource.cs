@@ -8,12 +8,12 @@ using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
 {
-    public class KedaV1ResourceFactory
+    public class KedaV1Resource
     {
-        internal static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers,
+        public IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
             DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
         {
-            return new ScaledObjectV1Alpha1
+            return new ScaledObjectKedaV1
             {
                 Metadata = new ObjectMetadataV1
                 {
@@ -45,60 +45,11 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
                         .Where(b => b["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) == -1)
                         .Select(t => new ScaledObjectTriggerV1Alpha1
                         {
-                            Type = GetKedaTrigger(t["type"]?.ToString()),
-                            Metadata = PopulateMetadataDictionary(t)
+                            Type = KedaResourceFactory.GetKedaTrigger(t["type"]?.ToString()),
+                            Metadata = KedaResourceFactory.PopulateMetadataDictionary(t)
                         })
                 }
             };
-        }
-
-        internal static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
-        {
-            IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
-                .Where(i => i.Value.Type == JTokenType.String)
-                .ToDictionary(k => k.Key, v => v.Value.ToString());
-
-            if (t["type"].ToString().Equals("rabbitMQTrigger", StringComparison.InvariantCultureIgnoreCase))
-            {
-                metadata["host"] = metadata["connectionStringSetting"];
-                metadata.Remove("connectionStringSetting");
-            }
-
-            return metadata;
-        }
-
-        private static string GetKedaTrigger(string triggerType)
-        {
-            if (string.IsNullOrEmpty(triggerType))
-            {
-                throw new ArgumentNullException(nameof(triggerType));
-            }
-
-            triggerType = triggerType.ToLower();
-
-            switch (triggerType)
-            {
-                case "queuetrigger":
-                    return "azure-queue";
-
-                case "kafkatrigger":
-                    return "kafka";
-
-                case "blobtrigger":
-                    return "azure-blob";
-
-                case "servicebustrigger":
-                    return "azure-servicebus";
-
-                case "eventhubtrigger":
-                    return "azure-eventhub";
-
-                case "rabbitmqtrigger":
-                    return "rabbitmq";
-
-                default:
-                    return triggerType;
-            }
         }
     }
 }

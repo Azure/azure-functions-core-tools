@@ -31,16 +31,8 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
         internal static async Task<IKubernetesResource> GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas, KedaVersion? kedaVersion = null)
         {
             kedaVersion = kedaVersion ?? await DetermineCurrentVersion(@namespace);
-
-            switch (kedaVersion)
-            {
-                case KedaVersion.v1:
-                    return KedaV1ResourceFactory.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
-                case KedaVersion.v2:
-                    return KedaV2ResourceFactory.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(kedaVersion), kedaVersion, "Specified KEDA version is not supported");
-            }
+            KedaResourceFactory kedaResourceFactory = new KedaResourceFactory(kedaVersion);
+            return kedaResourceFactory.Create(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
         }
 
         public static async Task<KedaVersion> DetermineCurrentVersion(string @namespace)
@@ -52,9 +44,9 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
                 // We use KEDA v2 as a default
                 return KedaVersion.v2;
             }
-
-            var parsedJson = JToken.Parse(resourceInfo.Output);
-            // TODO: Interpret app.kubernetes.io/version label
+            
+            var parsedJson = JToken.Parse(resourceInfo.Output);	
+            // TODO: Interpret app.kubernetes.io/version label	
 
             return KedaVersion.v1;
         }
