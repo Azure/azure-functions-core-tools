@@ -1,6 +1,8 @@
+using System;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Kubernetes;
 using Azure.Functions.Cli.Kubernetes.KEDA;
+using Colors.Net;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
@@ -18,7 +20,15 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public async override Task RunAsync()
         {
+            var isInstalled = await KedaHelper.IsInstalled(Namespace);
+            if (isInstalled == false)
+            {
+                ColoredConsole.WriteLine("KEDA is not installed");
+                return;
+            }
+
             var kedaVersion = await KedaHelper.DetermineCurrentVersion(Namespace);
+            ColoredConsole.WriteLine($"KEDA {kedaVersion} is installed");
             var kedaDeploymentYaml = KedaHelper.GetKedaDeploymentYaml(Namespace, kedaVersion);
             await KubectlHelper.KubectlDelete(kedaDeploymentYaml, showOutput: true);
         }

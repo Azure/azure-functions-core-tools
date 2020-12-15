@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Kubernetes.KEDA.V1;
-using Azure.Functions.Cli.Kubernetes.KEDA.V2;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
-using Microsoft.Azure.Documents.SystemFunctions;
+using Colors.Net;
 using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA
@@ -39,19 +37,45 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
         public static async Task<KedaVersion> DetermineCurrentVersion(string @namespace)
         {
             // Get KEDA resource information
-            var resourceInfo = await KubernetesHelper.ResourceExists("Deployment", "keda-metrics-apiserver", @namespace, returnJsonOutput: true);
+            ColoredConsole.WriteLine("Determining current KEDA version");
+            var resourceInfo = await GetKedaDeployment(@namespace);
             if (resourceInfo.ResourceExists == false)
             {
+                ColoredConsole.WriteLine("KEDA was not found, using KEDA v2 as default");
+
                 // We use KEDA v2 as a default
                 return KedaVersion.v2;
             }
 
-            Console.WriteLine($"KEDA OUTPUT: {resourceInfo.Output}");
-            var parsedJson = JToken.Parse(resourceInfo.Output);	
+            var parsedJson = JToken.Parse(resourceInfo.Output);
+            var rawKedaVersion = parsedJson["metadata"]?["labels"]?["app.kubernetes.io/version"]?.ToString();
             
-            // TODO: Interpret app.kubernetes.io/version label	
+            if (string.IsNullOrWhiteSpace(rawKedaVersion) == false && rawKedaVersion.StartsWith("2."))
+            {
+                return KedaVersion.v2;
+            }
 
+            // We were unable to determine the version, falling back to v1
             return KedaVersion.v1;
+        }
+
+        public static async Task<bool> IsInstalled(string @namespace)
+        {
+            var resourceInfo = await GetKedaDeployment(@namespace);
+            return resourceInfo.ResourceExists;
+        }
+
+        private static async Task<(string Output, bool ResourceExists)> GetKedaDeployment(string @namespace)
+        {
+            // Attempt to look for v2 resource first
+            var resourceInfo = await KubernetesHelper.ResourceExists("Deployment", "keda-operator", @namespace, returnJsonOutput: true);
+            if (resourceInfo.ResourceExists == false)
+            {
+                // As a fallback, look for v1 resource for backwards compatibility
+                resourceInfo = await KubernetesHelper.ResourceExists("Deployment", "keda", @namespace, returnJsonOutput: true);
+            }
+            
+            return resourceInfo;
         }
     }
 }
