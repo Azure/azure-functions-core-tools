@@ -36,7 +36,11 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     await KubernetesHelper.CreateNamespace(Namespace);
                 }
 
+                ColoredConsole.WriteLine($"Installing KEDA {KedaVersion} in namespace {Namespace}");
+
                 await KubectlHelper.KubectlApply(kedaDeploymentYaml, showOutput: true);
+
+                ColoredConsole.WriteLine($"KEDA {KedaVersion} is installed in namespace {Namespace}");
             }
         }
     }

@@ -31,6 +31,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             ColoredConsole.WriteLine($"KEDA {kedaVersion} is installed");
             var kedaDeploymentYaml = KedaHelper.GetKedaDeploymentYaml(Namespace, kedaVersion);
             await KubectlHelper.KubectlDelete(kedaDeploymentYaml, showOutput: true);
+            ColoredConsole.WriteLine($"KEDA {kedaVersion} is removed");
         }
     }
 }
