@@ -3,7 +3,6 @@ using Azure.Functions.Cli.Kubernetes.KEDA.V2;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using System;
-using Azure.Functions.Cli.Kubernetes.KEDA.Interfaces;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA
 {

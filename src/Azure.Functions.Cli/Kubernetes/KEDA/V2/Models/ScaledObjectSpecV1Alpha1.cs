@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
-using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Azure.Functions.Cli.Kubernetes.Models;
 using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA.V2.Models

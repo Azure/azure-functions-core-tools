@@ -3,7 +3,7 @@ using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Newtonsoft.Json.Linq;
 
-namespace Azure.Functions.Cli.Kubernetes.KEDA.Interfaces
+namespace Azure.Functions.Cli.Kubernetes.KEDA
 {
     public interface IKedaResource
     {

@@ -1,18 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Azure.Functions.Cli.Kubernetes.KEDA.Interfaces;
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V1.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
-using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
 {
-    public class KedaV1Resource : KedaResource, IKedaResource
+    public class KedaV1Resource : KedaResourceBase
     {
-        public IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
+        public override IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
             DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
         {
             return new ScaledObjectKedaV1

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Azure.Functions.Cli.Kubernetes.KEDA.Interfaces;
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
@@ -9,9 +8,9 @@ using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
 {
-    public class KedaV2Resource : KedaResource, IKedaResource
+    public class KedaV2Resource : KedaResourceBase
     {
-        public IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
+        public override IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
                DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
         {
             return new ScaledObjectKedaV2

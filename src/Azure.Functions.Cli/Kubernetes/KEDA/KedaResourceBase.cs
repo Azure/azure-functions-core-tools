@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Azure.Functions.Cli.Kubernetes.Models;
+using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA
 {
-    public class KedaResource
+    public abstract class KedaResourceBase : IKedaResource
     {
         public virtual IDictionary<string, string> PopulateMetadataDictionary(JToken t)
         {
@@ -56,5 +58,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
                     return triggerType;
             }
         }
+
+        public abstract IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas);
     }
 }
