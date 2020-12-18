@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Newtonsoft.Json.Linq;
@@ -9,21 +8,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
 {
     public abstract class KedaResourceBase : IKedaResource
     {
-        public virtual IDictionary<string, string> PopulateMetadataDictionary(JToken t)
-        {
-            IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
-                .Where(i => i.Value.Type == JTokenType.String)
-                .ToDictionary(k => k.Key, v => v.Value.ToString());
-
-            // TODO: Check for breaking changes
-            if (t["type"].ToString().Equals("rabbitMQTrigger", StringComparison.InvariantCultureIgnoreCase))
-            {
-                metadata["host"] = metadata["connectionStringSetting"];
-                metadata.Remove("connectionStringSetting");
-            }
-
-            return metadata;
-        }
+        public abstract IDictionary<string, string> PopulateMetadataDictionary(JToken t);
 
         public virtual string GetKedaTriggerType(string triggerType)
         {
@@ -36,22 +21,22 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
 
             switch (triggerType)
             {
-                case "queuetrigger":
+                case TriggerTypes.AzureStorageQueue:
                     return "azure-queue";
 
-                case "kafkatrigger":
+                case TriggerTypes.Kafka:
                     return "kafka";
 
-                case "blobtrigger":
+                case TriggerTypes.AzureBlobStorage:
                     return "azure-blob";
 
-                case "servicebustrigger":
+                case TriggerTypes.AzureServiceBus:
                     return "azure-servicebus";
 
-                case "eventhubtrigger":
+                case TriggerTypes.AzureEventHubs:
                     return "azure-eventhub";
 
-                case "rabbitmqtrigger":
+                case TriggerTypes.RabbitMq:
                     return "rabbitmq";
 
                 default:

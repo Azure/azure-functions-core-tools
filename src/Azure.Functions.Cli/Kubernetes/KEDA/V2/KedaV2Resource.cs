@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
 {
@@ -47,6 +48,48 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
                         })
                 }
             };
+        }
+
+        private const string ConnectionField = "connection";
+        private const string ConnectionFromEnvField = "connectionFromEnv";
+
+        public override IDictionary<string, string> PopulateMetadataDictionary(JToken t)
+        {
+            IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
+                .Where(i => i.Value.Type == JTokenType.String)
+                .ToDictionary(k => k.Key, v => v.Value.ToString());
+
+            var triggerType = t["type"].ToString().ToLower();
+
+            switch (triggerType)
+            {
+                case TriggerTypes.AzureBlobStorage:
+                case TriggerTypes.AzureEventHubs:
+                case TriggerTypes.AzureServiceBus:
+                case TriggerTypes.AzureStorageQueue:
+                    metadata[ConnectionFromEnvField] = metadata[ConnectionField];
+                    metadata.Remove(ConnectionField);
+                    break;
+
+                case TriggerTypes.Kafka:
+                    metadata["bootstrapServers"] = metadata["brokerList"];
+                    metadata.Remove("brokerList");
+                    metadata.Remove("protocol");
+                    metadata.Remove("authenticationMode");
+                    break;
+
+                case TriggerTypes.RabbitMq:
+                    metadata["hostFromEnv"] = metadata["connectionStringSetting"];
+                    metadata.Remove("connectionStringSetting");
+                    break;
+            }
+
+            // Clean-up for all triggers
+
+            metadata.Remove("type");
+            metadata.Remove("name");
+
+            return metadata;
         }
     }
 }
