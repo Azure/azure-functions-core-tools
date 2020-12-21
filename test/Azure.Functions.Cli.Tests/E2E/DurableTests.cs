@@ -183,6 +183,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
             string taskHubName = "raiseEventTest";
+            string eventName = "parse";
             DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
@@ -191,11 +192,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}"
+                    $"durable raise-event --id {instanceId} --event-name {eventName} --event-data add --task-hub-name {taskHubName}"
                 },
                 OutputContains = new string[]
                 {
-                    $"Raised event 'operation' to instance '{instanceId}'"
+                    $"Raised event '{eventName}' to instance '{instanceId}'"
                 }
             }, 
             _output, 
