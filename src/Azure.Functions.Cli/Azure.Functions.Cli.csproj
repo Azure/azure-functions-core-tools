@@ -137,7 +137,7 @@
     <PackageReference Include="DotNetZip" Version="1.13.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.0.15185" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.0.15193" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
