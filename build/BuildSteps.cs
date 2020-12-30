@@ -136,7 +136,7 @@ namespace Build
                 var rid = GetRuntimeId(runtime);
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                    (runtime.StartsWith(Settings.MinifiedVersionPrefix) ? "/p:NoWorkers=\"true\"": string.Empty) +
+                                    (runtime.StartsWith(Settings.MinifiedVersionPrefix) ? "/p:NoWorkers=\"true\" ": string.Empty) +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                     $"-o {outputPath} -c Release " +
