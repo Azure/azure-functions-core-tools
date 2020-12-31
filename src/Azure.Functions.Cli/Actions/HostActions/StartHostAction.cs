@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<int>('t', "timeout")
-                .WithDescription($"Timeout for on the functions host to start in seconds. Default: {DefaultTimeout} seconds.")
+                .WithDescription($"Timeout for the functions host to start in seconds. Default: {DefaultTimeout} seconds.")
                 .SetDefault(DefaultTimeout)
                 .Callback(t => Timeout = t);
 
