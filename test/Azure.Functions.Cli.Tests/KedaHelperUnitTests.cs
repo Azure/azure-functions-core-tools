@@ -49,15 +49,11 @@ namespace Azure.Functions.Cli.Tests
 
             IDictionary<string, string> metadata = new KedaV2Resource().PopulateMetadataDictionary(jsonObj);
 
-            Assert.Equal(4, metadata.Count);
-            Assert.True(metadata.ContainsKey("type"));
-            Assert.True(metadata.ContainsKey("host"));
-            Assert.True(metadata.ContainsKey("name"));
+            Assert.Equal(2, metadata.Count);
             Assert.True(metadata.ContainsKey("queueName"));
-            Assert.Equal("rabbitMQTrigger", metadata["type"]);
-            Assert.Equal("RabbitMQConnection", metadata["host"]);
-            Assert.Equal("message", metadata["name"]);
+            Assert.True(metadata.ContainsKey("hostFromEnv"));
             Assert.Equal("myQueue", metadata["queueName"]);
+            Assert.Equal("RabbitMQConnection", metadata["hostFromEnv"]);
         }
     }
 }
