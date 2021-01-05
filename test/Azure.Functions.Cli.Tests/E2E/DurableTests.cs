@@ -225,18 +225,19 @@ namespace Azure.Functions.Cli.Tests.E2E
             File.WriteAllText(filename, JsonConvert.SerializeObject(testObject));
 
             string instanceId = $"{Guid.NewGuid():N}";
+            string eventName = "parse";
 
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
                     $"durable start-new --function-name JsonInput --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data @raiseEvent.json --task-hub-name {taskHubName}",
+                    $"durable raise-event --id {instanceId} --event-name {eventName} --event-data @raiseEvent.json --task-hub-name {taskHubName}",
                     $"durable get-runtime-status --id {instanceId}"
                 },
                 OutputContains = new string[]
                 {
-                    $"Raised event 'operation' to instance '{instanceId}'",
+                    $"Raised event '{eventName}' to instance '{instanceId}'",
                     "\"OrchestrationStatus\": 0",
                 }
             },
