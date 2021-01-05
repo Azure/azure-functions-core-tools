@@ -2,18 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Kubernetes;
-using Azure.Functions.Cli.Kubernetes.FuncKeys;
+using Azure.Functions.Cli.Kubernetes.KEDA;
 using Azure.Functions.Cli.Kubernetes.Models;
-using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Fclp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -43,6 +40,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public bool IgnoreErrors { get; private set; } = false;
         public int? MaxReplicaCount { get; private set; }
         public int? MinReplicaCount { get; private set; }
+        public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -57,6 +55,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 Name = n;
             }, isRequired: true);
             SetFlag<string>("image-name", "Image to use for the pod deployment and to read functions from", n => ImageName = n);
+            SetFlag<KedaVersion>("keda-version", $"Defines the version of KEDA to use. Default: {Kubernetes.KEDA.KedaVersion.v2}. Options are: {Kubernetes.KEDA.KedaVersion.v1} or {Kubernetes.KEDA.KedaVersion.v2}", n => KedaVersion = n);
             SetFlag<string>("registry", "When set, a docker build is run and the image is pushed to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: default", ns => Namespace = ns);
             SetFlag<string>("pull-secret", "The secret holding a private registry credentials", s => PullSecret = s);
@@ -126,7 +125,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 MinReplicaCount,
                 MaxReplicaCount,
                 KeysSecretCollectionName,
-                MountFuncKeysAsContainerVolume);
+                MountFuncKeysAsContainerVolume,
+                KedaVersion);
 
             if (DryRun)
             {

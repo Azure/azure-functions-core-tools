@@ -80,7 +80,8 @@ namespace Azure.Functions.Cli
         public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
 
 
-        public static Task<string> KedaTemplate => GetValue("keda.yaml");
+        public static Task<string> KedaV1Template => GetValue("keda-v1.yaml");
+        public static Task<string> KedaV2Template => GetValue("keda-v2.yaml");
 
         public static Task<string> ZipToSquashfsScript => GetValue("ziptofs.sh");
     }
