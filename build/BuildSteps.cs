@@ -128,6 +128,7 @@ namespace Build
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release ");
         }
+
         public static void DotnetPublish()
         {
             foreach (var runtime in Settings.TargetRuntimes)
@@ -136,11 +137,15 @@ namespace Build
                 var rid = GetRuntimeId(runtime);
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                    (runtime.StartsWith(Settings.MinifiedVersionPrefix) ? "/p:NoWorkers=\"true\" ": string.Empty) +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                     $"-o {outputPath} -c Release " +
                                     (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
+
+                if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
+                {
+                    RemoveLanguageWorkers(outputPath);
+                }
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
@@ -582,6 +587,18 @@ namespace Build
             var packageList = JsonConvert.DeserializeObject<List<string>>(content);
 
             return packageList;
+        }
+
+        private static void RemoveLanguageWorkers(string outputPath)
+        {
+            foreach (var languageWorker in Settings.LanguageWorkers)
+            {
+                var path = Path.Combine(outputPath, "workers", languageWorker);
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: true);
+                }
+            }
         }
     }
 }
