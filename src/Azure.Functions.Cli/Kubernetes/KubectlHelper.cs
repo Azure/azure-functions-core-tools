@@ -33,6 +33,11 @@ namespace Azure.Functions.Cli.Kubernetes
             return JsonConvert.DeserializeObject<T>(output);
         }
 
+        public static async Task KubectlDelete(string content, bool showOutput, bool ignoreError = false, string @namespace = null)
+        {
+            await RunKubectl($"delete {(@namespace == null ? string.Empty : $"--namespace {@namespace}")} -f -", showOutput: showOutput, ignoreError: ignoreError, stdIn: content);
+        }
+
         public static async Task<(string output, string error, int exitCode)> RunKubectl(string cmd, bool ignoreError = false, bool showOutput = false, string stdIn = null)
         {
             var docker = new Executable("kubectl", cmd);

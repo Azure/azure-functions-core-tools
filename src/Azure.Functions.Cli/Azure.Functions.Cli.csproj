@@ -117,8 +117,11 @@
     <EmbeddedResource Include="StaticResources\print-functions.sh">
       <LogicalName>$(AssemblyName).print-functions.sh</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\keda.yaml">
-      <LogicalName>$(AssemblyName).keda.yaml</LogicalName>
+    <EmbeddedResource Include="StaticResources\keda-v1.yaml">
+      <LogicalName>$(AssemblyName).keda-v1.yaml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\keda-v2.yaml">
+      <LogicalName>$(AssemblyName).keda-v2.yaml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ziptofs.sh">
         <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>

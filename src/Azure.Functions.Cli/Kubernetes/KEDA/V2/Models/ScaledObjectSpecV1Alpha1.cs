@@ -1,13 +1,10 @@
-
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Azure.Functions.Cli.Kubernetes.KEDA.Models;
+using Azure.Functions.Cli.Kubernetes.Models;
 using Newtonsoft.Json;
 
-namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
+namespace Azure.Functions.Cli.Kubernetes.KEDA.V2.Models
 {
-    public class ScaledObjectV1Alpha1 : BaseKubernetesResource<ScaledObjectSpecV1Alpha1>
-    {
-    }
-
     public class ScaledObjectSpecV1Alpha1 : IKubernetesSpec
     {
         [JsonProperty("scaleTargetRef")]
@@ -27,23 +24,5 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 
         [JsonProperty("triggers")]
         public IEnumerable<ScaledObjectTriggerV1Alpha1> Triggers { get; internal set; }
-    }
-
-    public class ScaledObjectScaleTargetRefV1Alpha1
-    {
-        [JsonProperty("deploymentName")]
-        public string DeploymentName { get; set; }
-    }
-
-    public class ScaledObjectTriggerV1Alpha1
-    {
-        [JsonProperty("type")]
-        public string Type { get; set; }
-
-        [JsonProperty("name")]
-        public string Name { get; set; }
-
-        [JsonProperty("metadata")]
-        public IDictionary<string, string> Metadata { get; set; }
     }
 }

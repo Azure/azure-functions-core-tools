@@ -31,7 +31,6 @@ namespace Build
                 "https://www.myget.org/F/fusemandistfeed/api/v2",
                 "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/",
                 "https://www.myget.org/F/xunit/api/v3/index.json",
-                "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/index.json",
                 "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json",
                 "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json"
             }
@@ -128,6 +127,7 @@ namespace Build
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release ");
         }
+
         public static void DotnetPublish()
         {
             foreach (var runtime in Settings.TargetRuntimes)
@@ -136,11 +136,15 @@ namespace Build
                 var rid = GetRuntimeId(runtime);
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                    (runtime.StartsWith(Settings.MinifiedVersionPrefix) ? "/p:NoWorkers=\"true\"": string.Empty) +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                     $"-o {outputPath} -c Release " +
                                     (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
+
+                if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
+                {
+                    RemoveLanguageWorkers(outputPath);
+                }
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
@@ -582,6 +586,18 @@ namespace Build
             var packageList = JsonConvert.DeserializeObject<List<string>>(content);
 
             return packageList;
+        }
+
+        private static void RemoveLanguageWorkers(string outputPath)
+        {
+            foreach (var languageWorker in Settings.LanguageWorkers)
+            {
+                var path = Path.Combine(outputPath, "workers", languageWorker);
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: true);
+                }
+            }
         }
     }
 }
