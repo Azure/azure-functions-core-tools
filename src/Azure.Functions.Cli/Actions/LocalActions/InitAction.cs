@@ -244,25 +244,30 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
 
-                    string majorVersion = null;
-
+                    bool majorVersionRetrievedSuccessfully = false;
                     string guidance = null;
+
                     try
                     {
-                        majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
-
-                        requirementsContent = Regex.Replace(requirementsContent, @"#(\s?)'Az'", "'Az'");
+                        var majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
                         requirementsContent = Regex.Replace(requirementsContent, "MAJOR_VERSION", majorVersion);
+
+                        majorVersionRetrievedSuccessfully = true;
                     }
                     catch
                     {
-                        guidance = "Uncomment the next line and replace the MAJOR_VERSION, e.g., 'Az' = '2.*'";
+                        guidance = "Uncomment the next line and replace the MAJOR_VERSION, e.g., 'Az' = '5.*'";
 
                         var warningMsg = "Failed to get Az module version. Edit the requirements.psd1 file when the powershellgallery.com is accessible.";
                         ColoredConsole.WriteLine(WarningColor(warningMsg));
                     }
 
-                    requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance ?? string.Empty);
+                    if (majorVersionRetrievedSuccessfully)
+                    {
+                        guidance = Environment.NewLine + "    # To use the Az module in your function app, please uncomment the line below.";
+                    }
+
+                    requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance);
                     await WriteFiles("requirements.psd1", requirementsContent);
                 }
             }
