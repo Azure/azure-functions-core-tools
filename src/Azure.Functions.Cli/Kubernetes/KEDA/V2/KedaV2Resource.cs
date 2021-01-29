@@ -64,9 +64,15 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
             switch (triggerType)
             {
                 case TriggerTypes.AzureBlobStorage:
-                case TriggerTypes.AzureEventHubs:
-                case TriggerTypes.AzureServiceBus:
                 case TriggerTypes.AzureStorageQueue:
+                    metadata[ConnectionFromEnvField] = metadata[ConnectionField] ?? "AzureWebJobsStorage";
+                    metadata.Remove(ConnectionField);
+                    break;
+                case TriggerTypes.AzureServiceBus:
+                    metadata[ConnectionFromEnvField] = metadata[ConnectionField] ?? "AzureWebJobsServiceBus";
+                    metadata.Remove(ConnectionField);
+                    break;
+                case TriggerTypes.AzureEventHubs:
                     metadata[ConnectionFromEnvField] = metadata[ConnectionField];
                     metadata.Remove(ConnectionField);
                     break;
