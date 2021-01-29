@@ -15,217 +15,220 @@ trigger:
     - master
     - v3.x
     - release_3.0
-    
-pool:
-  vmImage: 'vs2017-win2016'
 
-variables:
-  devops_buildNumber: $[counter(format(''), 1500)]
-  APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
-  APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
-steps:
-- pwsh: |
-    $isIntegrationBuild = $false
-    if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
-    {
-        $isIntegrationBuild = $true
-    }
-    Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
-    Write-Host "IsIntegrationBuild: $isIntegrationBuild"
-  displayName: 'Set IsIntegrationBuild variable'
-- pwsh: |
-    Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
-  displayName: Set up environment variables
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-- task: UseDotNet@2
-  inputs:
-    packageType: 'sdk'
-    version: '3.1.x'
-    performMultiLevelLookup: true
-- task: NuGetToolInstaller@1
-  inputs:
-    versionSpec:
-  displayName: Install Nuget tool
-- task: AzureCLI@2
-  displayName: Login via Azure CLI to acquire access token
-  inputs:
-    azureSubscription: $(E2ETestServiceConnectionName)
-    scriptType: ps
-    scriptLocation: inlineScript
-    inlineScript: |
-      # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
-      $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
-      echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
-- pwsh: |
-    .\build.ps1
-  env:
-    AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
-    BuildArtifactsStorage: $(BuildArtifactsStorage)
-    DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
-    TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-    IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
-  displayName: 'Executing build script'
-- task: EsrpCodeSigning@1
-  displayName: 'Authenticode signing'
-  inputs:
-    ConnectedServiceName: 'ESRP Service'
-    FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Authenticode\'
-    Pattern: '*.dll, *.exe'
-    signConfigType: 'inlineSignParams'
-    inlineOperation: |
-      [    
-          {
-            "KeyCode": "CP-230012",
-            "OperationCode": "SigntoolSign",
-            "Parameters": {
-              "OpusName": "Microsoft",
-              "OpusInfo": "http://www.microsoft.com",
-              "FileDigest": "/fd \"SHA256\"",
-              "PageHash": "/NPH",
-              "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-            },
-            "ToolName": "sign",
-            "ToolVersion": "1.0"
-          },
-          {
-            "KeyCode": "CP-230012",
-            "OperationCode": "SigntoolVerify",
-            "Parameters": {},
-            "ToolName": "sign",
-            "ToolVersion": "1.0"
-          }
-      ]
-    SessionTimeout: '60'
-    MaxConcurrency: '50'
-    MaxRetryAttempts: '5'
-  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
-- task: EsrpCodeSigning@1
-  displayName: 'Third party signing'
-  inputs:
-    ConnectedServiceName: 'ESRP Service'
-    FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\ThirdParty\'
-    Pattern: '*.dll, *.exe'
-    signConfigType: 'inlineSignParams'
-    inlineOperation: |
-      [
-        {
-            "KeyCode": "CP-231522",
-            "OperationCode": "SigntoolSign",
-            "Parameters": {
+jobs:
+- job: Default
+  timeoutInMinutes: "90"
+  pool:
+    vmImage: 'vs2017-win2016'
+
+  variables:
+    devops_buildNumber: $[counter(format(''), 1500)]
+    APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+    APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
+  steps:
+  - pwsh: |
+      $isIntegrationBuild = $false
+      if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
+      {
+          $isIntegrationBuild = $true
+      }
+      Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
+      Write-Host "IsIntegrationBuild: $isIntegrationBuild"
+    displayName: 'Set IsIntegrationBuild variable'
+  - pwsh: |
+      Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+    displayName: Set up environment variables
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '10.x'
+  - task: UseDotNet@2
+    inputs:
+      packageType: 'sdk'
+      version: '3.1.x'
+      performMultiLevelLookup: true
+  - task: NuGetToolInstaller@1
+    inputs:
+      versionSpec:
+    displayName: Install Nuget tool
+  - task: AzureCLI@2
+    displayName: Login via Azure CLI to acquire access token
+    inputs:
+      azureSubscription: $(E2ETestServiceConnectionName)
+      scriptType: ps
+      scriptLocation: inlineScript
+      inlineScript: |
+        # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
+        $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
+        echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+  - pwsh: |
+      .\build.ps1
+    env:
+      AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+      BuildArtifactsStorage: $(BuildArtifactsStorage)
+      DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+      IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+    displayName: 'Executing build script'
+  - task: EsrpCodeSigning@1
+    displayName: 'Authenticode signing'
+    inputs:
+      ConnectedServiceName: 'ESRP Service'
+      FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Authenticode\'
+      Pattern: '*.dll, *.exe'
+      signConfigType: 'inlineSignParams'
+      inlineOperation: |
+        [    
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
                 "OpusName": "Microsoft",
                 "OpusInfo": "http://www.microsoft.com",
-                "Append": "/as",
                 "FileDigest": "/fd \"SHA256\"",
                 "PageHash": "/NPH",
                 "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
             },
-            "ToolName": "sign",
-            "ToolVersion": "1.0"
-        },
-        {
-            "KeyCode": "CP-231522",
-            "OperationCode": "SigntoolVerify",
-            "Parameters": {},
-            "ToolName": "sign",
-            "ToolVersion": "1.0"
-        }
-      ]
-    SessionTimeout: '60'
-    MaxConcurrency: '50'
-    MaxRetryAttempts: '5'
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
-- pwsh: |
-    .\repackageBinaries.ps1
-  displayName: Repackage signed binaries
-  env:
-    AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
-    BuildArtifactsStorage: $(BuildArtifactsStorage)
-    DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
-    TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
-- task: DotNetCoreCLI@2
-  inputs:
-    command: 'run'
-    workingDirectory: '.\build'
-    arguments: 'TestSignedArtifacts --signTest'
-  displayName: 'Verify signed binaries'
-  condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
-- pwsh: |
-    .\generateMsiFiles.ps1 -MsiGenBranches @("release_3.0") -CommitMessage '$(Build.SourceVersionMessage)'
-  env:
-    AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
-    BuildArtifactsStorage: $(BuildArtifactsStorage)
-    DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
-    TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-  displayName: 'Generate MSI files'
-- task: EsrpCodeSigning@1
-  displayName: 'MSI Code Signing'
-  inputs:
-    ConnectedServiceName: 'ESRP Service'
-    FolderPath: '$(Build.Repository.LocalPath)\artifacts'
-    Pattern: '*.msi'
-    signConfigType: 'inlineSignParams'
-    inlineOperation: |
-      [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+        ]
+      SessionTimeout: '60'
+      MaxConcurrency: '50'
+      MaxRetryAttempts: '5'
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  - task: EsrpCodeSigning@1
+    displayName: 'Third party signing'
+    inputs:
+      ConnectedServiceName: 'ESRP Service'
+      FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\ThirdParty\'
+      Pattern: '*.dll, *.exe'
+      signConfigType: 'inlineSignParams'
+      inlineOperation: |
+        [
           {
-            "KeyCode": "CP-230012",
-            "OperationCode": "SigntoolSign",
-            "Parameters": {
-              "OpusName": "Microsoft",
-              "OpusInfo": "http://www.microsoft.com",
-              "FileDigest": "/fd \"SHA256\"",
-              "PageHash": "/NPH",
-              "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-            },
-            "ToolName": "sign",
-            "ToolVersion": "1.0"
+              "KeyCode": "CP-231522",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                  "OpusName": "Microsoft",
+                  "OpusInfo": "http://www.microsoft.com",
+                  "Append": "/as",
+                  "FileDigest": "/fd \"SHA256\"",
+                  "PageHash": "/NPH",
+                  "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
           },
           {
-            "KeyCode": "CP-230012",
-            "OperationCode": "SigntoolVerify",
-            "Parameters": {},
-            "ToolName": "sign",
-            "ToolVersion": "1.0"
+              "KeyCode": "CP-231522",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
           }
-      ]
-    SessionTimeout: '60'
-    MaxConcurrency: '50'
-    MaxRetryAttempts: '5'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0'))
+        ]
+      SessionTimeout: '60'
+      MaxConcurrency: '50'
+      MaxRetryAttempts: '5'
+    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  - pwsh: |
+      .\repackageBinaries.ps1
+    displayName: Repackage signed binaries
+    env:
+      AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+      BuildArtifactsStorage: $(BuildArtifactsStorage)
+      DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'run'
+      workingDirectory: '.\build'
+      arguments: 'TestSignedArtifacts --signTest'
+    displayName: 'Verify signed binaries'
+    condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+  - pwsh: |
+      .\generateMsiFiles.ps1 -MsiGenBranches @("release_3.0") -CommitMessage '$(Build.SourceVersionMessage)'
+    env:
+      AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+      BuildArtifactsStorage: $(BuildArtifactsStorage)
+      DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+    displayName: 'Generate MSI files'
+  - task: EsrpCodeSigning@1
+    displayName: 'MSI Code Signing'
+    inputs:
+      ConnectedServiceName: 'ESRP Service'
+      FolderPath: '$(Build.Repository.LocalPath)\artifacts'
+      Pattern: '*.msi'
+      signConfigType: 'inlineSignParams'
+      inlineOperation: |
+        [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+        ]
+      SessionTimeout: '60'
+      MaxConcurrency: '50'
+      MaxRetryAttempts: '5'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0'))
 
-- pwsh: |
-    .\generateSha.ps1
-  displayName: 'Generate sha files'
+  - pwsh: |
+      .\generateSha.ps1
+    displayName: 'Generate sha files'
 
-- task: PublishTestResults@2
-  inputs:
-    testResultsFormat: 'VSTest'
-    testResultsFiles: '**/*.trx'
-    failTaskOnFailedTests: true
-  condition: succeededOrFailed()
-- pwsh: |
-    Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
-    Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
-    Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
-    if ($env:IntegrationBuildNumber -like "PreRelease*-*")
-    {
-        $sourcePath = Join-Path '$(Build.Repository.LocalPath)\artifacts' 'integrationTestsBuildManifest.json'
-        Move-Item -Path $sourcePath -Destination '$(Build.ArtifactStagingDirectory)'
-    }
-  env:
-    IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
-  displayName: 'Move artifacts'
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'drop'
-    publishLocation: 'Container'
-- pwsh: |
-    .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
-  env:
-    IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
-    IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
-  displayName: 'Upload Core Tools build to the storage account for Integration Tests'
-  condition: eq(variables.IsIntegrationBuild, true)
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true
+    condition: succeededOrFailed()
+  - pwsh: |
+      Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
+      Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
+      Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
+      if ($env:IntegrationBuildNumber -like "PreRelease*-*")
+      {
+          $sourcePath = Join-Path '$(Build.Repository.LocalPath)\artifacts' 'integrationTestsBuildManifest.json'
+          Move-Item -Path $sourcePath -Destination '$(Build.ArtifactStagingDirectory)'
+      }
+    env:
+      IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+    displayName: 'Move artifacts'
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
+  - pwsh: |
+      .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
+    env:
+      IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
+      IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
+    displayName: 'Upload Core Tools build to the storage account for Integration Tests'
+    condition: eq(variables.IsIntegrationBuild, true)
