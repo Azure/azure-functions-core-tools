@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -273,6 +274,12 @@ namespace Azure.Functions.Cli.Kubernetes
             return (scaledobject != null ? result.Append(scaledobject) : result, resultantFunctionKeys);
         }
 
+        internal static async Task WaitForDeploymentRolleout(DeploymentV1Apps deployment)
+        {
+            await KubectlHelper.RunKubectl($"rollout status deployment {deployment.Metadata.Name} --namespace {deployment.Metadata.Namespace}", showOutput: true, timeout: TimeSpan.FromSeconds(60));
+            await Task.Delay(TimeSpan.FromSeconds(2.5));
+        }
+
         internal static async Task RemoveKeda(string @namespace)
         {
             foreach (var name in _allResourceNames)
@@ -302,12 +309,9 @@ namespace Azure.Functions.Cli.Kubernetes
             return new Dictionary<string, string>();
         }
 
-        internal async static Task PrintFunctionsInfo(string serviceName, string @namespace, IDictionary<string, string> funcKeys, TriggersPayload triggers)
+        internal async static Task PrintFunctionsInfo(DeploymentV1Apps deployment, ServiceV1 service, IDictionary<string, string> funcKeys, TriggersPayload triggers, bool showServiceFqdn)
         {
-            if (string.IsNullOrWhiteSpace(serviceName)
-                || string.IsNullOrWhiteSpace(@namespace)
-                || funcKeys?.Any() == false
-                || triggers == null)
+            if (funcKeys?.Any() == false || triggers == null)
             {
                 return;
             }
@@ -316,29 +320,34 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true)
                 .Select(item => item.Key);
 
-            var loadBalancerIp = await GetLoadBalancerIp(serviceName, @namespace, 24);
-            if (string.IsNullOrEmpty(loadBalancerIp))
+            var localPort = NetworkHelpers.GetAvailablePort();
+            Process proxy = null;
+            try
             {
-                ColoredConsole.WriteLine(WarningColor($"The service: {serviceName} is not yet ready, please re-run the deployment to get the function keys."));
-                return;
-            }
-
-            var masterKey = funcKeys["host.master"];
-            if (httpFunctions?.Any() == true)
-            {
-                foreach (var functionName in httpFunctions)
+                proxy = await KubectlHelper.RunKubectlProxy(
+                    deployment,
+                    service.Spec.Ports.FirstOrDefault()?.Port ?? 80,
+                    localPort
+                );
+                string baseAddress;
+                if (showServiceFqdn)
                 {
-                    var getFunctionAdminUri = $"http://{loadBalancerIp}/admin/functions/{functionName}?code={masterKey}";
-                    var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri), 20);
+                    baseAddress = $"{service.Metadata.Name}.{service.Metadata.Namespace}.svc.cluster.local";
+                }
+                else
+                {
+                    baseAddress = await GetServiceIp(service);
+                }
 
-                    if (httpResponseMessage.StatusCode == System.Net.HttpStatusCode.NotFound)
+                var masterKey = funcKeys["host.master"];
+                if (httpFunctions?.Any() == true)
+                {
+                    foreach (var functionName in httpFunctions)
                     {
-                        ColoredConsole.WriteLine(WarningColor($"The service: {functionName} is not yet ready in the runtime yet, please re-run the deployment to get the function keys."));
-                        return;
-                    }
+                        var getFunctionAdminUri = $"http://127.0.0.1:{localPort}/admin/functions/{functionName}?code={masterKey}";
+                        var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri), 20);
+                        httpResponseMessage.EnsureSuccessStatusCode();
 
-                    if (httpResponseMessage.IsSuccessStatusCode)
-                    {
                         var responseContent = await httpResponseMessage.Content.ReadAsStringAsync();
                         var functionsInfo = JsonConvert.DeserializeObject<FunctionInfo>(responseContent);
 
@@ -363,13 +372,14 @@ namespace Azure.Functions.Cli.Kubernetes
                         ColoredConsole.WriteLine($"\t{functionName} - [{VerboseColor(trigger.ToString())}]");
                         if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate))
                         {
+                            var url = new Uri(new Uri($"http://{baseAddress}"), new Uri(functionsInfo.InvokeUrlTemplate).PathAndQuery).ToString();
                             if (showFunctionKey)
                             {
-                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor($"{functionsInfo.InvokeUrlTemplate}?code={funcKeys[$"functions.{functionName.ToLower()}.default"]}")}");
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor($"{url}?code={funcKeys[$"functions.{functionName.ToLower()}.default"]}")}");
                             }
                             else
                             {
-                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor(functionsInfo.InvokeUrlTemplate)}");
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor(url)}");
                             }
                         }
                         ColoredConsole.WriteLine();
@@ -377,9 +387,26 @@ namespace Azure.Functions.Cli.Kubernetes
                     }
                 }
             }
+            finally
+            {
+                if (proxy != null && !proxy.HasExited)
+                {
+                    proxy.Kill();
+                }
+            }
+
 
             //Print the master key as well for the user
             ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys[$"host.master"]}")}");
+        }
+
+        public async static Task<IEnumerable<PodTemplateV1>> GetPods(this DeploymentV1Apps deployment)
+        {
+            var selector = deployment.Spec.Selector.MatchLabels
+                .Aggregate(string.Empty, (a, kv) => $"{a}{kv.Key}={kv.Value},");
+
+            var pods = await KubectlHelper.KubectlGet<SearchResultV1<PodTemplateV1>>($"pods --selector {selector}");
+            return pods.Items;
         }
 
         private async static Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
@@ -393,18 +420,28 @@ namespace Azure.Functions.Cli.Kubernetes
             int currentRetry = 0;
             using (var httpClient = new HttpClient(new HttpClientHandler()))
             {
+                httpClient.Timeout = TimeSpan.FromSeconds(2);
                 while (currentRetry++ < retryCount)
                 {
-                    httpResponseMsg = await httpClient.SendAsync(httpRequestMessage.Clone());
-                    if (httpResponseMsg.IsSuccessStatusCode ||
-                        (httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
-                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
-                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout
-                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.NotFound))
+                    try
                     {
-                        return httpResponseMsg;
+                        httpResponseMsg = await httpClient.SendAsync(httpRequestMessage.Clone());
+                        if (httpResponseMsg.IsSuccessStatusCode ||
+                            (httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
+                            && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
+                            && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout
+                            && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.NotFound))
+                        {
+                            return httpResponseMsg;
+                        }
                     }
-
+                    catch (Exception e)
+                    {
+                        if (StaticSettings.IsDebug)
+                        {
+                            ColoredConsole.Error.WriteLine(e);
+                        }
+                    }
                     await Task.Delay(new Random().Next(500, 2000));
                 }
             }
@@ -412,30 +449,27 @@ namespace Azure.Functions.Cli.Kubernetes
             return httpResponseMsg;
         }
 
-        private async static Task<string> GetLoadBalancerIp(string serviceName, string @namespace, int retryCount = 12)
+        private async static Task<string> GetServiceIp(ServiceV1 service, int retryCount = 12)
         {
-            if (string.IsNullOrWhiteSpace(serviceName)
-                || string.IsNullOrWhiteSpace(@namespace))
-            {
-                return string.Empty;
-            }
-
-            ColoredConsole.WriteLine(AdditionalInfoColor($"Getting loadbalancer ip for the service: {serviceName}"));
             int currentRetry = 0;
             while (currentRetry++ < retryCount)
             {
-                (string output, bool serviceExists) = await ResourceExists("service", serviceName, @namespace, true);
+                (string output, bool serviceExists) = await ResourceExists("service", service.Metadata.Name, service.Metadata.Namespace, true);
                 if (serviceExists)
                 {
-                    var service = TryParse<ServiceV1>(output);
-                    if (service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                    service = TryParse<ServiceV1>(output);
+                    if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == true && service?.Status?.LoadBalancer?.Ingress?.Any() == true)
                     {
-                        return service?.Status?.LoadBalancer?.Ingress.First().Ip;
+                        return service.Status.LoadBalancer.Ingress.First().Ip;
+                    }
+                    else if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == false && !string.IsNullOrEmpty(service?.Spec?.ClusterIp))
+                    {
+                        return service.Spec.ClusterIp;
                     }
                 }
 
+                ColoredConsole.WriteLine(AdditionalInfoColor($"Waiting for the service to be ready: {service.Metadata.Name}"));
                 await Task.Delay(5000);
-                ColoredConsole.WriteLine(AdditionalInfoColor($"Waiting for the service to be ready: {serviceName}"));
             }
 
             return string.Empty;
@@ -539,7 +573,33 @@ namespace Azure.Functions.Cli.Kubernetes
                                         {
                                             ContainerPort = 80
                                         }
-                                    }
+                                    },
+                                ReadinessProbe = new Probe
+                                {
+                                    FailureThreshold = 3,
+                                    HttpGet = new HttpAction
+                                    {
+                                        Path = "/",
+                                        port = 80,
+                                        Scheme = "HTTP"
+                                    },
+                                    PeriodSeconds = 10,
+                                    SuccessThreshold = 1,
+                                    TimeoutSeconds = 240
+                                },
+                                StartupProbe = new Probe
+                                {
+                                    FailureThreshold = 3,
+                                    HttpGet = new HttpAction
+                                    {
+                                        Path = "/",
+                                        port = 80,
+                                        Scheme = "HTTP"
+                                    },
+                                    PeriodSeconds = 10,
+                                    SuccessThreshold = 1,
+                                    TimeoutSeconds = 240
+                                }
                               }
                             },
                             ImagePullSecrets = string.IsNullOrEmpty(pullSecret)
