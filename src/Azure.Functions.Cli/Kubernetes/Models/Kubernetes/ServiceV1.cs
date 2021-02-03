@@ -19,6 +19,9 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 
         [JsonProperty("type")]
         public string Type { get; set; }
+
+        [JsonProperty("clusterIP", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public string ClusterIp { get; set; }
     }
 
     public class ServicePortV1
