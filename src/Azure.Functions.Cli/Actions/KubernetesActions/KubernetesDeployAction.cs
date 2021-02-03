@@ -43,6 +43,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public bool IgnoreErrors { get; private set; } = false;
         public int? MaxReplicaCount { get; private set; }
         public int? MinReplicaCount { get; private set; }
+        public bool ShowServiceFqdn { get; set; } = false;
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -80,6 +81,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("use-config-map", "Use a ConfigMap/V1 instead of a Secret/V1 object for function app settings configurations", c => UseConfigMap = c);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
+            SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
             return base.ParseArgs(args);
         }
 
@@ -148,9 +150,18 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     await KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
                 }
+                var httpService = resources
+                    .Where(i => i is ServiceV1)
+                    .Cast<ServiceV1>()
+                    .FirstOrDefault(s => s.Metadata.Name.Contains("http"));
+                var httpDeployment = resources
+                    .Where(i => i is DeploymentV1Apps)
+                    .Cast<DeploymentV1Apps>()
+                    .FirstOrDefault(d => d.Metadata.Name.Contains("http"));
+                await KubernetesHelper.WaitForDeploymentRolleout(httpDeployment);
 
                 //Print the function keys message to the console
-                await KubernetesHelper.PrintFunctionsInfo($"{Name}-http", Namespace, funcKeys, triggers);
+                await KubernetesHelper.PrintFunctionsInfo(httpDeployment, httpService, funcKeys, triggers, ShowServiceFqdn);
             }
         }
 

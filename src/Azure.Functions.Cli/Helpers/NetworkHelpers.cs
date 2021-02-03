@@ -19,5 +19,19 @@ namespace Azure.Functions.Cli.Helpers
                 return false;
             }
         }
+
+        public static int GetAvailablePort()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            try
+            {
+                listener.Start();
+                return ((IPEndPoint)listener.LocalEndpoint).Port;
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
     }
 }
