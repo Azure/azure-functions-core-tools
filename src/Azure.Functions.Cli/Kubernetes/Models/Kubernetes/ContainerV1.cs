@@ -29,6 +29,12 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 
         [JsonProperty("volumeMounts")]
         public IEnumerable<ContainerVolumeMountV1> VolumeMounts { get; internal set; }
+
+        [JsonProperty("readinessProbe")]
+        public Probe ReadinessProbe { get; set;}
+
+        [JsonProperty("startupProbe")]
+        public Probe StartupProbe { get; set;}
     }
 
     public class ContainerVolumeMountV1
@@ -117,5 +123,35 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 
         [JsonProperty("readOnly")]
         public bool ReadOnly { get; set; }
+    }
+
+    public class Probe
+    {
+        [JsonProperty("failureThreshold")]
+        public int? FailureThreshold { get; set; }
+
+        [JsonProperty("periodSeconds")]
+        public int? PeriodSeconds { get; set; }
+
+        [JsonProperty("successThreshold")]
+        public int? SuccessThreshold { get; set; }
+
+        [JsonProperty("timeoutSeconds")]
+        public int? TimeoutSeconds { get; set; }
+
+        [JsonProperty("httpGet")]
+        public HttpAction HttpGet { get; set; }
+    }
+
+    public class HttpAction
+    {
+        [JsonProperty("path")]
+        public string Path { get; set; }
+
+        [JsonProperty("port")]
+        public int? port { get; set; }
+
+        [JsonProperty("scheme")]
+        public string Scheme { get; set; }
     }
 }
