@@ -150,6 +150,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     await KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
                 }
+
                 var httpService = resources
                     .Where(i => i is ServiceV1)
                     .Cast<ServiceV1>()
@@ -158,10 +159,13 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     .Where(i => i is DeploymentV1Apps)
                     .Cast<DeploymentV1Apps>()
                     .FirstOrDefault(d => d.Metadata.Name.Contains("http"));
-                await KubernetesHelper.WaitForDeploymentRolleout(httpDeployment);
 
-                //Print the function keys message to the console
-                await KubernetesHelper.PrintFunctionsInfo(httpDeployment, httpService, funcKeys, triggers, ShowServiceFqdn);
+                if (httpDeployment != null && httpDeployment != null)
+                {
+                    await KubernetesHelper.WaitForDeploymentRolleout(httpDeployment);
+                    //Print the function keys message to the console
+                    await KubernetesHelper.PrintFunctionsInfo(httpDeployment, httpService, funcKeys, triggers, ShowServiceFqdn);
+                }
             }
         }
 
