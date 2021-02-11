@@ -14,9 +14,9 @@ namespace Azure.Functions.Cli.Helpers
     {
         public static Task DockerPull(string image) => RunDockerCommand($"pull {image}");
 
-        public static Task DockerPush(string image) => RunDockerCommand($"push {image}");
+        public static Task DockerPush(string image, bool showProgress = true) => RunDockerCommand($"push {image}", showProgress: showProgress);
 
-        public static Task DockerBuild(string tag, string dir) => RunDockerCommand($"build -t {tag} {dir}");
+        public static Task DockerBuild(string tag, string dir, bool showProgress = true) => RunDockerCommand($"build -t {tag} {dir}", showProgress: showProgress);
 
         public static Task CopyToContainer(string containerId, string source, string target, bool showProgress = false) => RunDockerCommand($"cp \"{source}\" {containerId}:\"{target}\"", containerId, showProgress: showProgress);
 
@@ -62,6 +62,7 @@ namespace Azure.Functions.Cli.Helpers
             var containerId = string.Empty;
             try
             {
+                // TODO: This could be a single Docker run command
                 containerId = await DockerRun(imageName, entryPoint: "/bin/sh");
                 var scriptFilePath = Path.GetTempFileName();
                 FileSystemHelpers.WriteAllTextToFile(scriptFilePath, (await StaticResources.PrintFunctionJson).Replace("\r\n", "\n"));
