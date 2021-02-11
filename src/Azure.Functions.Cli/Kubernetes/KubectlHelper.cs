@@ -35,7 +35,16 @@ namespace Azure.Functions.Cli.Kubernetes
             (var output, var error, _) = await RunKubectl($"get {resource} --output json");
             return JsonConvert.DeserializeObject<T>(output);
         }
-
+        public static async Task KubectlDelete(object obj, bool showOutput, bool ignoreError = false, string @namespace = null)
+        {
+            var payload = JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.None,
+                new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                });
+            await KubectlDelete(payload, showOutput, ignoreError, @namespace);
+        }
+        
         public static async Task KubectlDelete(string content, bool showOutput, bool ignoreError = false, string @namespace = null)
         {
             await RunKubectl($"delete {(@namespace == null ? string.Empty : $"--namespace {@namespace}")} -f -", showOutput: showOutput, ignoreError: ignoreError, stdIn: content);
