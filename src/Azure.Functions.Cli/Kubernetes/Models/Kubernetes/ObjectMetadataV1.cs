@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
         [JsonProperty("name")]
         public string Name { get; set; }
 
-        [JsonProperty("namespace", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonProperty("namespace")]
         public string Namespace { get; set; }
 
         [JsonProperty("labels")]
