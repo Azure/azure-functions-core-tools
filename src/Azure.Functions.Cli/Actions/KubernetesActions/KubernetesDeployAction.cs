@@ -137,6 +137,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             }
             else
             {
+                List<Task> tasks = new List<Task>();
                 if (!await KubernetesHelper.NamespaceExists(Namespace))
                 {
                     await KubernetesHelper.CreateNamespace(Namespace);
@@ -144,13 +145,16 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
                 if (shouldBuild)
                 {
-                    await DockerHelpers.DockerPush(resolvedImageName);
+                    // TODO: Join this with the build above so that it can run in parallel to the Kubernetes object create
+                    tasks.Add(DockerHelpers.DockerPush(resolvedImageName, false));
                 }
-
+                // TODO: Convert these to YAML so that we can send them as a single file
                 foreach (var resource in resources)
                 {
-                    await KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
+                    tasks.Add(KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace));
                 }
+
+                Task.WaitAll(tasks.ToArray());
 
                 var httpService = resources
                     .Where(i => i is ServiceV1)
