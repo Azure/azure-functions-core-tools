@@ -42,13 +42,28 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static async Task<bool> NamespaceExists(string @namespace)
         {
+            if (string.IsNullOrWhiteSpace(@namespace))
+            {
+                // No namespace was specified so we rely on the default namespace in .kube/config
+                // Because of that, we assume that it exists because we don't know its name
+
+                return true;
+            }
+
             (_, _, var exitCode) = await KubectlHelper.RunKubectl($"get namespace {@namespace}", ignoreError: true, showOutput: false);
             return exitCode == 0;
         }
 
         internal static async Task<(string Output, bool ResourceExists)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
         {
-            var cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
+            var cmd = $"get {resourceTypeName} {resourceName}";
+
+            // If a namespace is specified, then we need to filter
+            if (string.IsNullOrWhiteSpace(@namespace) == false)
+            {
+                cmd += $" --namespace {@namespace}";
+            }
+
             if (returnJsonOutput)
             {
                 cmd = string.Concat(cmd, " -o json");
@@ -58,10 +73,20 @@ namespace Azure.Functions.Cli.Kubernetes
             return (output, exitCode == 0);
         }
 
-        internal static Task CreateNamespace(string @namespace)
-            => KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
+        internal static async Task CreateNamespace(string @namespace)
+        {
+            if (string.IsNullOrWhiteSpace(@namespace))
+            {
+                // No namespace was specified so we rely on the default namespace in .kube/config
+                // Because of that, we assume that already exists since we don't know its name
 
-        internal async static Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
+                return;
+            }
+
+            await KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
+        }
+
+        internal static async Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
             string name,
             string imageName,
             string @namespace,
@@ -236,11 +261,19 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static async Task WaitForDeploymentRolleout(DeploymentV1Apps deployment)
         {
-            await KubectlHelper.RunKubectl($"rollout status deployment {deployment.Metadata.Name} --namespace {deployment.Metadata.Namespace}", showOutput: true, timeout: TimeSpan.FromMinutes(4));
+            var statement = $"rollout status deployment {deployment.Metadata.Name}";
+            
+            // If a namespace is specified, we filter on it
+            if (string.IsNullOrWhiteSpace(deployment.Metadata.Namespace) == false)
+            {
+                statement += $" --namespace {deployment.Metadata.Namespace}";
+            }
+
+            await KubectlHelper.RunKubectl(statement, showOutput: true, timeout: TimeSpan.FromMinutes(4));
             await Task.Delay(TimeSpan.FromSeconds(2.5));
         }
 
-        private async static Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
+        private static async Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
         {
             if (string.IsNullOrWhiteSpace(keysSecretCollectionName)
                 || string.IsNullOrWhiteSpace(@namespace))
@@ -261,7 +294,7 @@ namespace Azure.Functions.Cli.Kubernetes
             return new Dictionary<string, string>();
         }
 
-        internal async static Task PrintFunctionsInfo(DeploymentV1Apps deployment, ServiceV1 service, IDictionary<string, string> funcKeys, TriggersPayload triggers, bool showServiceFqdn)
+        internal static async Task PrintFunctionsInfo(DeploymentV1Apps deployment, ServiceV1 service, IDictionary<string, string> funcKeys, TriggersPayload triggers, bool showServiceFqdn)
         {
             if (funcKeys?.Any() == false || triggers == null)
             {
@@ -347,21 +380,11 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-
             //Print the master key as well for the user
-            ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys[$"host.master"]}")}");
+            ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys["host.master"]}")}");
         }
 
-        public async static Task<IEnumerable<PodTemplateV1>> GetPods(this DeploymentV1Apps deployment)
-        {
-            var selector = deployment.Spec.Selector.MatchLabels
-                .Aggregate(string.Empty, (a, kv) => $"{a}{kv.Key}={kv.Value},");
-
-            var pods = await KubectlHelper.KubectlGet<SearchResultV1<PodTemplateV1>>($"pods --selector {selector}");
-            return pods.Items;
-        }
-
-        private async static Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
+        private static async Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
         {
             HttpResponseMessage httpResponseMsg = new HttpResponseMessage();
             if (httpRequestMessage == null)
@@ -401,7 +424,7 @@ namespace Azure.Functions.Cli.Kubernetes
             return httpResponseMsg;
         }
 
-        private async static Task<string> GetServiceIp(ServiceV1 service, int retryCount = 12)
+        private static async Task<string> GetServiceIp(ServiceV1 service, int retryCount = 12)
         {
             int currentRetry = 0;
             while (currentRetry++ < retryCount)
