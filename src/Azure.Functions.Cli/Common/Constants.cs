@@ -71,7 +71,16 @@ namespace Azure.Functions.Cli.Common
             { WorkerRuntime.powershell, new [] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } }
         };
 
-        public static readonly string[] TriggersWithoutStorage = new[] { "httptrigger", "kafkatrigger" };
+        public static readonly string[] TriggersWithoutStorage = new[]
+        {
+            "httptrigger",
+            "kafkatrigger",
+
+            // Durable Functions triggers can also support non-Azure Storage backends
+            "orchestrationTrigger",
+            "activityTrigger",
+            "entityTrigger",
+        };
 
         public static class Errors
         {

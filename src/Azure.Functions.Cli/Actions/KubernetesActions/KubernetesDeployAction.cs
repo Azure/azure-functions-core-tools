@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Kubernetes;
 using Azure.Functions.Cli.Kubernetes.KEDA;
 using Azure.Functions.Cli.Kubernetes.Models;
+using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
@@ -41,6 +42,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public int? MaxReplicaCount { get; private set; }
         public int? MinReplicaCount { get; private set; }
         public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
+        public bool ShowServiceFqdn { get; set; } = false;
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -79,6 +81,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("use-config-map", "Use a ConfigMap/V1 instead of a Secret/V1 object for function app settings configurations", c => UseConfigMap = c);
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
+            SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
             return base.ParseArgs(args);
         }
 
@@ -108,7 +111,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
-			
+
             (var resources, var funcKeys) = await KubernetesHelper.GetFunctionsDeploymentResources(
                 Name,
                 resolvedImageName,
@@ -149,8 +152,21 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     await KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
                 }
 
-                //Print the function keys message to the console
-                await KubernetesHelper.PrintFunctionsInfo($"{Name}-http", Namespace, funcKeys, triggers);
+                var httpService = resources
+                    .Where(i => i is ServiceV1)
+                    .Cast<ServiceV1>()
+                    .FirstOrDefault(s => s.Metadata.Name.Contains("http"));
+                var httpDeployment = resources
+                    .Where(i => i is DeploymentV1Apps)
+                    .Cast<DeploymentV1Apps>()
+                    .FirstOrDefault(d => d.Metadata.Name.Contains("http"));
+
+                if (httpDeployment != null && httpDeployment != null)
+                {
+                    await KubernetesHelper.WaitForDeploymentRolleout(httpDeployment);
+                    //Print the function keys message to the console
+                    await KubernetesHelper.PrintFunctionsInfo(httpDeployment, httpService, funcKeys, triggers, ShowServiceFqdn);
+                }
             }
         }
 
