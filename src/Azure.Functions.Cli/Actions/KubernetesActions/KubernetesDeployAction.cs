@@ -44,6 +44,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
         public bool ShowServiceFqdn { get; set; } = false;
 
+        public bool UseGitHashAsImageVersion { get; set; } = false;
+
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -82,12 +84,13 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
+            SetFlag<bool>("use-git-hash-version", "Use the githash as the version for the image", f => UseGitHashAsImageVersion = f);
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
-            (var resolvedImageName, var shouldBuild) = ResolveImageName();
+            (var resolvedImageName, var shouldBuild) = await ResolveImageName();
             TriggersPayload triggers = null;
 
             if (DryRun)
@@ -207,15 +210,23 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             };
         }
 
-        private (string, bool) ResolveImageName()
+        private async Task<(string, bool)> ResolveImageName()
         {
+            var version = "latest";
+            if (UseGitHashAsImageVersion) {
+                (var stdout, var err, var exit) = await GitHelpers.GitHash();
+                if (exit != 0) {
+                    throw new CliException("Git describe failed: " + err);
+                }
+                version = stdout;
+            }
             if (!string.IsNullOrEmpty(Registry))
             {
-                return ($"{Registry}/{Name}", true && !NoDocker);
+                return ($"{Registry}/{Name}:{version}", true && !NoDocker);
             }
             else if (!string.IsNullOrEmpty(ImageName))
             {
-                return (ImageName, false);
+                return ($"{ImageName}:{version}", false);
             }
             throw new CliArgumentsException("either --image-name or --registry is required.");
         }
