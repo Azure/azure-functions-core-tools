@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.2</TargetFramework>
@@ -16,7 +16,7 @@
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
-    <Copyright>© .NET Foundation.  All rights reserved.</Copyright>
+    <Copyright>� .NET Foundation.  All rights reserved.</Copyright>
     <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Azure/azure-functions-cli</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -122,7 +122,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="1.2.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker" Version="2.0.554" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="2.0.14786" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="2.1.1.9" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="2.1.1.11" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
