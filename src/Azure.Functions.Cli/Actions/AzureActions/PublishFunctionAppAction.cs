@@ -292,11 +292,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Check if remote LinuxFxVersion exists and is different from local version
                 if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
                 {
-                    string localImageVersion = await PythonHelpers.ChoosePythonBuildEnvImage();
-                    if (!string.Equals(localImageVersion, functionApp.LinuxFxVersion))
+                    string localVersion = (await PythonHelpers.GetEnvironmentPythonVersion()).Version;
+                    if (!string.IsNullOrEmpty(localVersion) && !functionApp.LinuxFxVersion.Contains(localVersion))
                     {
-                        string localVersion = (await PythonHelpers.GetEnvironmentPythonVersion()).Version;
-                        ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion}' is different from the published version that will be run in Azure on image '{functionApp.LinuxFxVersion}'."));
+                        ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion}' is different from the version expected for your deployed Function App. This may result in dependencies being built incorrectly. The image running your deployed Function App is '{functionApp.LinuxFxVersion}'."));
                     }
                 }
             }
