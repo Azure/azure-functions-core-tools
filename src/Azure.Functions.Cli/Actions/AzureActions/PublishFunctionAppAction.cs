@@ -295,7 +295,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     string localImageVersion = await PythonHelpers.ChoosePythonBuildEnvImage();
                     if (!string.Equals(localImageVersion, functionApp.LinuxFxVersion))
                     {
-                        string localVersion = (await GetEnvironmentPythonVersion()).Version;
+                        string localVersion = (await PythonHelpers.GetEnvironmentPythonVersion()).Version;
                         ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion}' is different from the published version that will be run in Azure on image '{functionApp.LinuxFxVersion}'."));
                     }
                 }
