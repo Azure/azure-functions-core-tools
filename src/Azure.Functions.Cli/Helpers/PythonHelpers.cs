@@ -444,7 +444,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<string> ChoosePythonBuildEnvImage()
+        public static async Task<string> ChoosePythonBuildEnvImage()
         {
             WorkerLanguageVersionInfo workerInfo = await GetEnvironmentPythonVersion();
             return GetBuildNativeDepsEnvironmentImage(workerInfo);

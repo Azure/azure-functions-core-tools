@@ -284,10 +284,21 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            // Check if azure-functions-worker exists in requirements.txt for Python function app
+            // Special checks for python dependencies
             if (workerRuntime == WorkerRuntime.python)
             {
+                // Check if azure-functions-worker exists in requirements.txt for Python function app
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
+                // Check if remote LinuxFxVersion exists and is different from local version
+                if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+                {
+                    string localImageVersion = await PythonHelpers.ChoosePythonBuildEnvImage();
+                    if (!string.Equals(localImageVersion, functionApp.LinuxFxVersion))
+                    {
+                        string localVersion = (await GetEnvironmentPythonVersion()).Version;
+                        ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion}' is different from the published version that will be run in Azure on image '{functionApp.LinuxFxVersion}'."));
+                    }
+                }
             }
 
             // Temporary: there's no tool support to create a .NET isolated worker runtime app,
