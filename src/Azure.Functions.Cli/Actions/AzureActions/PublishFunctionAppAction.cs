@@ -293,7 +293,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
                 {
                     string localVersion = (await PythonHelpers.GetEnvironmentPythonVersion()).Version;
-                    if (!string.IsNullOrEmpty(localVersion) && !functionApp.LinuxFxVersion.Contains(localVersion))
+                    if (!functionApp.LinuxFxVersion.Contains(localVersion))
                     {
                         ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion}' is different from the version expected for your deployed Function App. This may result in dependencies being built incorrectly. The image running your deployed Function App is '{functionApp.LinuxFxVersion}'."));
                     }
