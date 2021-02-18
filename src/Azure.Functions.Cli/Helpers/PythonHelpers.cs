@@ -519,11 +519,6 @@ namespace Azure.Functions.Cli.Helpers
             } else return false;
         }
 
-        // empty and 3.6 => true
-        // startswith python|
-          // has python|major.minor => true
-        // true
-
         public static bool IsLinuxFxVersionRuntimeVersionMatched(string linuxFxVersion, int? major, int? minor)
         {
             // No linux fx version will default to python 3.6
