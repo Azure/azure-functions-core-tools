@@ -290,13 +290,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Check if azure-functions-worker exists in requirements.txt for Python function app
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
                 // Check if remote LinuxFxVersion exists and is different from local version
-                if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+                var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
+                if (!PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor))
                 {
-                    string localVersion = (await PythonHelpers.GetEnvironmentPythonVersion()).Version;
-                    if (!functionApp.LinuxFxVersion.Contains(localVersion))
-                    {
-                        ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion}' is different from the version expected for your deployed Function App. This may result in dependencies being built incorrectly. The image running your deployed Function App is '{functionApp.LinuxFxVersion}'."));
-                    }
+                    ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App. This may result in dependencies being built incorrectly. The image running your deployed Function App is '{functionApp.LinuxFxVersion}'."));
                 }
             }
 

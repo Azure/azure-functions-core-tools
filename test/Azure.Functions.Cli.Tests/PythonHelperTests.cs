@@ -42,6 +42,25 @@ namespace Azure.Functions.Cli.Tests
         }
 
         [Theory]
+        [InlineData("DOCKER|mcr.microsoft.com/azure-functions/python", 3, 9, true)]
+        [InlineData("", 3, 7, false)]
+        [InlineData("", 3, 6, true)]
+        [InlineData("PYTHON|3.6", 3, 6, true)]
+        [InlineData("PYTHON|3.6", 3, 7, false)]
+        [InlineData("PYTHON|3.7", 3, 6, false)]
+        [InlineData("python|3.7", 3, 7, true)]
+        [InlineData("Python|3.8", 3, 8, true)]
+        [InlineData("PyThOn|3.9", 3, 9, true)]
+        public void ShouldHaveMatchingLinuxFxVersion(string linuxFxVersion, int major, int minor, bool expectedResult)
+        {
+            bool result = PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(linuxFxVersion, major, minor);
+            if (result != expectedResult)
+            {
+                throw new Exception("Local version compatibility check failed (IsLocalVersionCompatibleWithLinuxFxVersion).");
+            }
+        }
+
+        [Theory]
         [InlineData("2.7.10", true)]
         [InlineData("3.5.5", true)]
         [InlineData("3.6.8b", false)]

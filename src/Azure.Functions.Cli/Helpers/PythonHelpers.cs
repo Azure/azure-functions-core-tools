@@ -518,5 +518,27 @@ namespace Azure.Functions.Cli.Helpers
                 }
             } else return false;
         }
+
+        // empty and 3.6 => true
+        // startswith python|
+          // has python|major.minor => true
+        // true
+
+        public static bool IsLinuxFxVersionRuntimeVersionMatched(string linuxFxVersion, int? major, int? minor)
+        {
+            // No linux fx version will default to python 3.6
+            if (string.IsNullOrEmpty(linuxFxVersion))
+            {
+                // Match if version is 3.6
+                return major == 3 && minor == 6;
+            }
+            // Only validate on LinuxFxVersion that follows the pattern PYTHON|<version>
+            else if (!linuxFxVersion.StartsWith("PYTHON|", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            // Validate LinuxFxVersion that follows the pattern PYTHON|<major>.<minor>
+            return string.Equals(linuxFxVersion, $"PYTHON|{major}.{minor}", StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
