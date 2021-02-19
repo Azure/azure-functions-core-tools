@@ -259,7 +259,7 @@ namespace Azure.Functions.Cli.Kubernetes
             return (scaledObject != null ? result.Append(scaledObject) : result, resultantFunctionKeys);
         }
 
-        internal static async Task WaitForDeploymentRolleout(DeploymentV1Apps deployment)
+        internal static async Task WaitForDeploymentRollout(DeploymentV1Apps deployment)
         {
             var statement = $"rollout status deployment {deployment.Metadata.Name}";
             
@@ -270,7 +270,6 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             await KubectlHelper.RunKubectl(statement, showOutput: true, timeout: TimeSpan.FromMinutes(4));
-            await Task.Delay(TimeSpan.FromSeconds(2.5));
         }
 
         private static async Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)

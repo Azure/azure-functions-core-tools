@@ -89,7 +89,6 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         {
             (var resolvedImageName, var shouldBuild) = ResolveImageName();
             TriggersPayload triggers = null;
-
             if (DryRun)
             {
                 if (shouldBuild)
@@ -109,6 +108,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     await DockerHelpers.DockerBuild(resolvedImageName, Environment.CurrentDirectory);
                 }
+                // This needs to be fixed to run after the build.
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
 
@@ -137,25 +137,39 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             }
             else
             {
-                List<Task> tasks = new List<Task>();
+                Task kubernetesTask = null;
+                Task imageTask = null;
                 if (!await KubernetesHelper.NamespaceExists(Namespace))
                 {
-                    await KubernetesHelper.CreateNamespace(Namespace);
+                    kubernetesTask = KubernetesHelper.CreateNamespace(Namespace);
                 }
-
                 if (shouldBuild)
                 {
-                    // TODO: Join this with the build above so that it can run in parallel to the Kubernetes object create
-                    tasks.Add(DockerHelpers.DockerPush(resolvedImageName, false));
+                    imageTask = DockerHelpers.DockerPush(resolvedImageName, false);
                 }
-                // TODO: Convert these to YAML so that we can send them as a single file
-                foreach (var resource in resources)
+                Func<Task> resourceTaskFn = () => {
+                    var serialized = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
+                    return KubectlHelper.KubectlApply(serialized, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
+                };
+
+                if (kubernetesTask != null)
                 {
-                    tasks.Add(KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace));
+                    kubernetesTask = kubernetesTask.ContinueWith((result) => {
+                        return resourceTaskFn();
+                    });
                 }
-
-                Task.WaitAll(tasks.ToArray());
-
+                else
+                {
+                    kubernetesTask = resourceTaskFn();
+                }
+                if (imageTask != null)
+                {
+                    Task.WaitAll(new Task[] {imageTask, kubernetesTask});
+                }
+                else
+                {
+                    await kubernetesTask;
+                }
                 var httpService = resources
                     .Where(i => i is ServiceV1)
                     .Cast<ServiceV1>()
@@ -167,7 +181,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
                 if (httpDeployment != null && httpDeployment != null)
                 {
-                    await KubernetesHelper.WaitForDeploymentRolleout(httpDeployment);
+                    await KubernetesHelper.WaitForDeploymentRollout(httpDeployment);
                     //Print the function keys message to the console
                     await KubernetesHelper.PrintFunctionsInfo(httpDeployment, httpService, funcKeys, triggers, ShowServiceFqdn);
                 }
