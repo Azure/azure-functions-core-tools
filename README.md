@@ -306,7 +306,7 @@ Azure Functions running on Kubernetes can take advantage of true serverless cont
 Functions deployed to Kubernetes already contain all the tolerations needed to be schedulable to Virtual Kubelet nodes.
 All you need to do is to set up VKubelet on your Kubernetes cluster:
 
-* [Install VKubelet with ACI](https://github.com/virtual-kubelet/virtual-kubelet/tree/master/providers/azure)
+* [Install VKubelet with ACI](https://github.com/virtual-kubelet/azure-aci)
 
 * [Install VKubelet with ACI on AKS](https://docs.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-install-connector)
 
