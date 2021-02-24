@@ -205,6 +205,7 @@ namespace Build
                 "System.Diagnostics.PerformanceCounter.dll",
                 "System.IdentityModel.Tokens.Jwt.dll",
                 "System.Interactive.Async.dll",
+                "System.Memory.Data",
                 "System.Net.Http.Formatting.dll",
                 "System.Private.ServiceModel.dll",
                 "System.Reactive.*.dll",
