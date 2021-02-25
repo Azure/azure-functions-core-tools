@@ -164,9 +164,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
-            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
+            if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
-                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force);
+                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
             }
             else
             {
@@ -201,7 +201,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
-                workerRuntime = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.AvailableWorkersList);
+                IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
+                var workerRuntimedisplay = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
+                workerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimedisplay)).Key;
                 ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
                 language = LanguageSelectionIfRelevant(workerRuntime);
             }

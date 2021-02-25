@@ -243,7 +243,43 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
             }
 
-            if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+            if (workerRuntime == WorkerRuntime.dotnetIsolated && functionApp.IsLinux)
+            {
+                Dictionary<string, string> updatedSettings = null;
+                if (functionApp.IsDynamic)
+                {
+                    if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+                    {
+                        updatedSettings = new Dictionary<string, string>
+                        {
+                            [Constants.LinuxFxVersion] = ""
+                        };
+                    }
+                }
+                else
+                {
+                    if (!string.Equals(functionApp.LinuxFxVersion, "DOTNET-ISOLATED|5.0", StringComparison.OrdinalIgnoreCase))
+                    {
+                        updatedSettings = new Dictionary<string, string>
+                        {
+                            [Constants.LinuxFxVersion] = "DOTNET-ISOLATED|5.0"
+                        };
+                    }
+                }
+
+                if (updatedSettings != null)
+                {
+                    var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken, ManagementURL);
+
+                    if (!settingsResult.IsSuccessful)
+                    {
+                        ColoredConsole.Error
+                            .WriteLine(ErrorColor("Error updating linux image property:"))
+                            .WriteLine(ErrorColor(settingsResult.ErrorResult));
+                    }
+                }
+            }
+            else if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
                 // If linuxFxVersion does not match any of our images
                 if (PublishHelper.IsLinuxFxVersionUsingCustomImage(functionApp.LinuxFxVersion))
@@ -259,6 +295,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         {
                             [Constants.LinuxFxVersion] = $"DOCKER|{Constants.WorkerRuntimeImages.GetValueOrDefault(workerRuntime).FirstOrDefault()}"
                         };
+
                         var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken, ManagementURL);
 
                         if (!settingsResult.IsSuccessful)

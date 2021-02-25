@@ -266,11 +266,20 @@ namespace Build
 
             using (var client = new WebClient())
             {
+                var isolated = "https://ankikumapublic.blob.core.windows.net/templates/Microsoft.Azure.Functions.Worker.ItemTemplates.3.1.1709-preview1.nupkg";
+                var isolatedProject = "https://ankikumapublic.blob.core.windows.net/templates/Microsoft.Azure.Functions.Worker.ProjectTemplates.3.1.1709-preview1.nupkg";
+
+                client.DownloadFile(isolated,
+                    Path.Combine(templatesPath, $"isolated.itemTemplates.{Settings.ItemTemplatesVersion}.nupkg"));
+
+                client.DownloadFile(isolatedProject,
+                    Path.Combine(templatesPath, $"isolated.projectTemplates.{Settings.ProjectTemplatesVersion}.nupkg"));
+
                 client.DownloadFile(Settings.ItemTemplates,
-                    Path.Combine(templatesPath, $"itemTemplates.{Settings.ItemTemplatesVersion}.nupkg"));
+                    Path.Combine(templatesPath, $"webjobs.itemTemplates.{Settings.ItemTemplatesVersion}.nupkg"));
 
                 client.DownloadFile(Settings.ProjectTemplates,
-                    Path.Combine(templatesPath, $"projectTemplates.{Settings.ProjectTemplatesVersion}.nupkg"));
+                    Path.Combine(templatesPath, $"webjobs.projectTemplates.{Settings.ProjectTemplatesVersion}.nupkg"));
             }
 
             foreach (var runtime in Settings.TargetRuntimes)

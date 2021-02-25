@@ -41,6 +41,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, string> workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
         {
             { WorkerRuntime.dotnet, Constants.Languages.CSharp },
+            { WorkerRuntime.dotnetIsolated, Constants.Languages.CSharp },
             { WorkerRuntime.node, Constants.Languages.JavaScript },
             { WorkerRuntime.python, Constants.Languages.Python },
             { WorkerRuntime.powershell, Constants.Languages.Powershell },
@@ -72,12 +73,29 @@ namespace Azure.Functions.Cli.Helpers
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", availableWorkersRuntime.Keys
                 .Where(k => (k != WorkerRuntime.java))
-                .Where(k => (k != WorkerRuntime.dotnetIsolated))
                 .Select(s => s.ToString()));
 
+        public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
+        {
+            IDictionary<WorkerRuntime, string> workerToDisplayStrings = new Dictionary<WorkerRuntime, string>();
+            foreach (WorkerRuntime wr in availableWorkersRuntime.Keys)
+            {
+                switch (wr)
+                {
+                    case WorkerRuntime.dotnetIsolated:
+                        workerToDisplayStrings[wr] = "dotnet (isolated)";
+                        break;
+                    default:
+                        workerToDisplayStrings[wr] = wr.ToString();
+                        break;
+                }
+            }
+            return workerToDisplayStrings;
+        }
+
+
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
-            .Where(k => k != WorkerRuntime.java)
-            .Where(k => k != WorkerRuntime.dotnetIsolated);
+            .Where(k => k != WorkerRuntime.java);
 
         public static WorkerRuntime NormalizeWorkerRuntime(string workerRuntime)
         {

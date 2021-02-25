@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public async static Task DeployDotnetProject(string Name, bool force)
+        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime)
         {
             await TemplateOperation(async () =>
             {
@@ -36,10 +36,10 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException("Error creating project template");
                 }
-            });
+            }, workerRuntime);
         }
 
-        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, AuthorizationLevel? httpAuthorizationLevel = null)
+        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             await TemplateOperation(async () =>
             {
@@ -62,25 +62,41 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException("Error creating function");
                 }
-            });
+            }, workerRuntime);
         }
 
-        internal static IEnumerable<string> GetTemplates()
+        internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
         {
+            if (workerRuntime == WorkerRuntime.dotnet)
+            {
+                return new[]
+                {
+                    "QueueTrigger",
+                    "HttpTrigger",
+                    "BlobTrigger",
+                    "TimerTrigger",
+                    "DurableFunctionsOrchestration",
+                    "SendGrid",
+                    "EventHubTrigger",
+                    "ServiceBusQueueTrigger",
+                    "ServiceBusTopicTrigger",
+                    "EventGridTrigger",
+                    "CosmosDBTrigger",
+                    "IotHubTrigger"
+                };
+            }
+
             return new[]
             {
                 "QueueTrigger",
-                "HttpTrigger",
-                "BlobTrigger",
-                "TimerTrigger",
-                "DurableFunctionsOrchestration",
-                "SendGrid",
-                "EventHubTrigger",
-                "ServiceBusQueueTrigger",
-                "ServiceBusTopicTrigger",
-                "EventGridTrigger",
-                "CosmosDBTrigger",
-                "IotHubTrigger",
+                    "HttpTrigger",
+                    "BlobTrigger",
+                    "TimerTrigger",
+                    "EventHubTrigger",
+                    "ServiceBusQueueTrigger",
+                    "ServiceBusTopicTrigger",
+                    "EventGridTrigger",
+                    "CosmosDBTrigger"
             };
         }
 
@@ -155,12 +171,20 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task TemplateOperation(Func<Task> action)
+        private static async Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
             try
             {
-                await InstallDotnetTemplates();
+                await UninstallDotnetTemplates();
+                if (workerRuntime == WorkerRuntime.dotnet)
+                {
+                    await InstallDotnetTemplates("webjobs.*.nupkg");
+                }
+                else
+                {
+                    await InstallDotnetTemplates("isolated.*.nupkg");
+                }
                 await action();
             }
             finally
@@ -169,11 +193,21 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static Task InstallDotnetTemplates() => DotnetTemplatesAction("install");
+        private static Task InstallDotnetTemplates(string pattern) => DotnetTemplatesAction("install", pattern);
 
-        private static Task UninstallDotnetTemplates() => DotnetTemplatesAction("uninstall");
+        private static async Task UninstallDotnetTemplates()
+        {
+            var allPackages = new[] { "Microsoft.Azure.WebJobs.ProjectTemplates", "Microsoft.Azure.WebJobs.ItemTemplates",
+                "Microsoft.Azure.Functions.Worker.ProjectTemplates", "Microsoft.Azure.Functions.Worker.ItemTemplates" };
 
-        private static async Task DotnetTemplatesAction(string action)
+            foreach (var package in allPackages)
+            {
+                var exe = new Executable("dotnet", $"new -u \"{package}\"");
+                await exe.RunAsync();
+            }
+        }
+
+        private static async Task DotnetTemplatesAction(string action, string pattern)
         {
             var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "templates");
             if (!FileSystemHelpers.DirectoryExists(templatesLocation))
@@ -181,7 +215,7 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
             }
 
-            foreach (var nupkg in FileSystemHelpers.GetFiles(templatesLocation, null, null, "*.nupkg"))
+            foreach (var nupkg in FileSystemHelpers.GetFiles(templatesLocation, null, null, pattern))
             {
                 var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();

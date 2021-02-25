@@ -26,13 +26,13 @@ namespace Build
                 .Then(AddTemplatesNupkgs)
                 .Then(AddTemplatesJson)
                 .Then(AddGoZip)
-                .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
-                .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
-                .Then(Test, skip: args.Contains("--integrationTests"))
+                // .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
+                // .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
+                // .Then(Test, skip: args.Contains("--integrationTests"))
                 .Then(Zip)
-                .Then(DotnetPack)
-                .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
-                .Then(UploadToStorage, skip: !args.Contains("--ci"))
+                // .Then(DotnetPack)
+                // .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
+                // .Then(UploadToStorage, skip: !args.Contains("--ci"))
                 .Run();
         }
     }

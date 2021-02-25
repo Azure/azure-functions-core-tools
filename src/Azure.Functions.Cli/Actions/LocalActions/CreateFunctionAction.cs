@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
-                else if (workerRuntime != WorkerRuntime.dotnet || Csx)
+                else if (!WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
                     var displayList = _templates.Value
@@ -145,15 +145,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
 
-            if (workerRuntime == WorkerRuntime.dotnet && !Csx)
+            if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates());
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), AuthorizationLevel);
+                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), workerRuntime, AuthorizationLevel);
             }
             else
             {
