@@ -266,8 +266,8 @@ namespace Build
 
             using (var client = new WebClient())
             {
-                var isolated = "https://ankikumapublic.blob.core.windows.net/templates/Microsoft.Azure.Functions.Worker.ItemTemplates.3.1.1709-preview1.nupkg";
-                var isolatedProject = "https://ankikumapublic.blob.core.windows.net/templates/Microsoft.Azure.Functions.Worker.ProjectTemplates.3.1.1709-preview1.nupkg";
+                var isolated = "https://ankikumapublic.blob.core.windows.net/templates/Microsoft.Azure.Functions.Worker.ItemTemplates.3.1.1710-preview1.nupkg";
+                var isolatedProject = "https://ankikumapublic.blob.core.windows.net/templates/Microsoft.Azure.Functions.Worker.ProjectTemplates.3.1.1710-preview1.nupkg";
 
                 client.DownloadFile(isolated,
                     Path.Combine(templatesPath, $"isolated.itemTemplates.{Settings.ItemTemplatesVersion}.nupkg"));
