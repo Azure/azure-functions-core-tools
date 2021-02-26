@@ -46,6 +46,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public bool UseGitHashAsImageVersion { get; set; } = false;
 
+        public bool BuildImage { get; set; } = true;
+
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -85,6 +87,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
             SetFlag<bool>("use-git-hash-version", "Use the githash as the version for the image", f => UseGitHashAsImageVersion = f);
+            SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
             return base.ParseArgs(args);
         }
 
@@ -105,7 +108,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
                 }
             }
-            else
+            else if (BuildImage)
             {
                 if (shouldBuild)
                 {
@@ -113,6 +116,10 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 // This needs to be fixed to run after the build.
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+            }
+            else
+            {
+                triggers = await GetTriggersLocalFiles();
             }
 
             (var resources, var funcKeys) = await KubernetesHelper.GetFunctionsDeploymentResources(
@@ -146,7 +153,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     kubernetesTask = KubernetesHelper.CreateNamespace(Namespace);
                 }
-                if (shouldBuild)
+                if (BuildImage && shouldBuild)
                 {
                     imageTask = DockerHelpers.DockerPush(resolvedImageName, false);
                 }
