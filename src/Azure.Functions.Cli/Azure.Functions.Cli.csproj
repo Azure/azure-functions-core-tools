@@ -72,6 +72,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.node">
       <LogicalName>$(AssemblyName).Dockerfile.node</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
+      <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
     </EmbeddedResource>
