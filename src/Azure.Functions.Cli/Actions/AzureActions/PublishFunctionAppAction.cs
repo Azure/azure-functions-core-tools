@@ -293,7 +293,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
                 if (!PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor))
                 {
-                    ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App. This may result in dependencies being built incorrectly. The image running your deployed Function App is '{functionApp.LinuxFxVersion}'."));
+                    ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
+                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{functionApp.LinuxFxVersion}'."));
                 }
             }
 
