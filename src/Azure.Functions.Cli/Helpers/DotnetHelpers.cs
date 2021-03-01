@@ -15,6 +15,9 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class DotnetHelpers
     {
+        private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
+        private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
+
         public static void EnsureDotnet()
         {
             if (!CommandChecker.CommandExists("dotnet"))
@@ -171,41 +174,75 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
+        private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
+
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            {
+                return IsolatedTemplateOperation(action);
+            }
+            else
+            {
+                return WebJobsTemplateOpetation(action);
+            }
+        }
+
+        private static async Task IsolatedTemplateOperation(Func<Task> action)
+        {
             try
             {
-                await UninstallDotnetTemplates();
-                if (workerRuntime == WorkerRuntime.dotnet)
-                {
-                    await InstallDotnetTemplates("webjobs.*.nupkg");
-                }
-                else
-                {
-                    await InstallDotnetTemplates("isolated.*.nupkg");
-                }
+                await UninstallWebJobsTemplates();
+                await InstallIsolatedTemplates();
                 await action();
             }
             finally
             {
-                await UninstallDotnetTemplates();
+                await UninstallIsolatedTemplates();
             }
         }
 
-        private static Task InstallDotnetTemplates(string pattern) => DotnetTemplatesAction("install", pattern);
-
-        private static async Task UninstallDotnetTemplates()
+        private static async Task WebJobsTemplateOpetation(Func<Task> action)
         {
-            var allPackages = new[] { "Microsoft.Azure.WebJobs.ProjectTemplates", "Microsoft.Azure.WebJobs.ItemTemplates",
-                "Microsoft.Azure.Functions.Worker.ProjectTemplates", "Microsoft.Azure.Functions.Worker.ItemTemplates" };
-
-            foreach (var package in allPackages)
+            try
             {
-                var exe = new Executable("dotnet", $"new -u \"{package}\"");
-                await exe.RunAsync();
+                await UninstallIsolatedTemplates();
+                await InstallWebJobsTemplates();
+                await action();
+            }
+            finally
+            {
+                await UninstallWebJobsTemplates();
             }
         }
+
+        private static async Task UninstallIsolatedTemplates()
+        {
+            string projTemplates = $"{IsolatedTemplateBasePackId}.ProjectTemplates";
+            string itemTemplates = $"{IsolatedTemplateBasePackId}.ItemTemplates";
+
+            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
+            await exe.RunAsync();
+
+            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
+            await exe.RunAsync();
+        }
+
+        private static async Task UninstallWebJobsTemplates()
+        {
+            string projTemplates = $"{WebJobsTemplateBasePackId}.ProjectTemplates";
+            string itemTemplates = $"{WebJobsTemplateBasePackId}.ItemTemplates";
+
+            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
+            await exe.RunAsync();
+
+            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
+            await exe.RunAsync();
+        }
+
+        private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "webjobs.*.nupkg");
+
+        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", "isolated.*.nupkg");
 
         private static async Task DotnetTemplatesAction(string action, string pattern)
         {

@@ -245,39 +245,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (workerRuntime == WorkerRuntime.dotnetIsolated && functionApp.IsLinux)
             {
-                Dictionary<string, string> updatedSettings = null;
-                if (functionApp.IsDynamic)
-                {
-                    if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
-                    {
-                        updatedSettings = new Dictionary<string, string>
-                        {
-                            [Constants.LinuxFxVersion] = ""
-                        };
-                    }
-                }
-                else
-                {
-                    if (!string.Equals(functionApp.LinuxFxVersion, "DOTNET-ISOLATED|5.0", StringComparison.OrdinalIgnoreCase))
-                    {
-                        updatedSettings = new Dictionary<string, string>
-                        {
-                            [Constants.LinuxFxVersion] = "DOTNET-ISOLATED|5.0"
-                        };
-                    }
-                }
-
-                if (updatedSettings != null)
-                {
-                    var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken, ManagementURL);
-
-                    if (!settingsResult.IsSuccessful)
-                    {
-                        ColoredConsole.Error
-                            .WriteLine(ErrorColor("Error updating linux image property:"))
-                            .WriteLine(ErrorColor(settingsResult.ErrorResult));
-                    }
-                }
+                // For dotnet isolated, as function create options are limited, we update an exisiting App to .NET 5 isolated app,
+                // if the user is trying to deploy that. This is why we need to special case this scenario and set the proper
+                // LinuxFxVersion properties when missing.
+                await DotnetIsolatedLinuxValidation(functionApp);
             }
             else if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
@@ -341,6 +312,43 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             return result;
+        }
+
+        private async Task DotnetIsolatedLinuxValidation(Site functionApp)
+        {
+            Dictionary<string, string> updatedSettings = null;
+            if (functionApp.IsDynamic)
+            {
+                if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+                {
+                    updatedSettings = new Dictionary<string, string>
+                    {
+                        [Constants.LinuxFxVersion] = ""
+                    };
+                }
+            }
+            else
+            {
+                if (!string.Equals(functionApp.LinuxFxVersion, "DOTNET-ISOLATED|5.0", StringComparison.OrdinalIgnoreCase))
+                {
+                    updatedSettings = new Dictionary<string, string>
+                    {
+                        [Constants.LinuxFxVersion] = "DOTNET-ISOLATED|5.0"
+                    };
+                }
+            }
+
+            if (updatedSettings != null)
+            {
+                var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken, ManagementURL);
+
+                if (!settingsResult.IsSuccessful)
+                {
+                    ColoredConsole.Error
+                        .WriteLine(ErrorColor("Error updating linux image property:"))
+                        .WriteLine(ErrorColor(settingsResult.ErrorResult));
+                }
+            }
         }
 
         private async Task PublishFunctionApp(Site functionApp, GitIgnoreParser ignoreParser, IDictionary<string, string> additionalAppSettings)

@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.TypeScript, new [] { "ts" } },
             { Constants.Languages.Python, new [] { "py" } },
             { Constants.Languages.Powershell, new [] { "pwsh" } },
-            { Constants.Languages.CSharp, new [] { "csharp", "dotnet" } },
+            { Constants.Languages.CSharp, new [] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.Java, new string[] { } },
             { Constants.Languages.Custom, new string[] { } }
         };
@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli.Helpers
                 switch (wr)
                 {
                     case WorkerRuntime.dotnetIsolated:
-                        workerToDisplayStrings[wr] = "dotnet (isolated)";
+                        workerToDisplayStrings[wr] = "dotnet (isolated process)";
                         break;
                     default:
                         workerToDisplayStrings[wr] = wr.ToString();
@@ -92,7 +92,6 @@ namespace Azure.Functions.Cli.Helpers
             }
             return workerToDisplayStrings;
         }
-
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
             .Where(k => k != WorkerRuntime.java);
