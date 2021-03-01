@@ -70,28 +70,11 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
         {
-            if (workerRuntime == WorkerRuntime.dotnet)
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
                 return new[]
                 {
                     "QueueTrigger",
-                    "HttpTrigger",
-                    "BlobTrigger",
-                    "TimerTrigger",
-                    "DurableFunctionsOrchestration",
-                    "SendGrid",
-                    "EventHubTrigger",
-                    "ServiceBusQueueTrigger",
-                    "ServiceBusTopicTrigger",
-                    "EventGridTrigger",
-                    "CosmosDBTrigger",
-                    "IotHubTrigger"
-                };
-            }
-
-            return new[]
-            {
-                "QueueTrigger",
                     "HttpTrigger",
                     "BlobTrigger",
                     "TimerTrigger",
@@ -100,6 +83,23 @@ namespace Azure.Functions.Cli.Helpers
                     "ServiceBusTopicTrigger",
                     "EventGridTrigger",
                     "CosmosDBTrigger"
+                };
+            }
+
+            return new[]
+            {
+                "QueueTrigger",
+                "HttpTrigger",
+                "BlobTrigger",
+                "TimerTrigger",
+                "DurableFunctionsOrchestration",
+                "SendGrid",
+                "EventHubTrigger",
+                "ServiceBusQueueTrigger",
+                "ServiceBusTopicTrigger",
+                "EventGridTrigger",
+                "CosmosDBTrigger",
+                "IotHubTrigger"
             };
         }
 

@@ -20,7 +20,7 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedTemplatesVersion = "3.1.1711-preview1";
+        public const string DotnetIsolatedItemTemplatesVersion = "3.1.1711-preview1";
         public const string DotnetIsolatedProjectTemplatesVersion = "3.1.1711-preview1";
         public const string DotnetItemTemplatesVersion = "3.1.1648";
         public const string DotnetProjectTemplatesVersion = "3.1.1648";
