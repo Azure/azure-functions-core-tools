@@ -266,11 +266,17 @@ namespace Build
 
             using (var client = new WebClient())
             {
-                client.DownloadFile(Settings.ItemTemplates,
-                    Path.Combine(templatesPath, $"itemTemplates.{Settings.ItemTemplatesVersion}.nupkg"));
+                client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
+                    Path.Combine(templatesPath, $"isolated.itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
 
-                client.DownloadFile(Settings.ProjectTemplates,
-                    Path.Combine(templatesPath, $"projectTemplates.{Settings.ProjectTemplatesVersion}.nupkg"));
+                client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
+                    Path.Combine(templatesPath, $"isolated.projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
+
+                client.DownloadFile(Settings.DotnetItemTemplates,
+                    Path.Combine(templatesPath, $"webjobs.itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
+
+                client.DownloadFile(Settings.DotnetProjectTemplates,
+                    Path.Combine(templatesPath, $"webjobs.projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
             }
 
             foreach (var runtime in Settings.TargetRuntimes)

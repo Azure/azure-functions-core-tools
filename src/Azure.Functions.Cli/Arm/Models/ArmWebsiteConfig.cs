@@ -4,5 +4,6 @@
     {
         public string scmType { get; set; }
         public string linuxFxVersion { get; set; }
+        public string netFrameworkVersion { get; set; }
     }
 }
