@@ -20,8 +20,10 @@ namespace Build
                 : value;
         }
 
-        public const string ItemTemplatesVersion = "3.1.1648";
-        public const string ProjectTemplatesVersion = "3.1.1648";
+        public const string DotnetIsolatedItemTemplatesVersion = "3.1.1711-preview1";
+        public const string DotnetIsolatedProjectTemplatesVersion = "3.1.1711-preview1";
+        public const string DotnetItemTemplatesVersion = "3.1.1648";
+        public const string DotnetProjectTemplatesVersion = "3.1.1648";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
@@ -87,9 +89,13 @@ namespace Build
 
         public static readonly string SignTestDir = "SignTest";
 
-        public static readonly string ItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{ItemTemplatesVersion}";
+        public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
 
-        public static readonly string ProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{ProjectTemplatesVersion}";
+        public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
+
+        public static readonly string DotnetItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}";
+
+        public static readonly string DotnetProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
 
         public static readonly string TemplatesJsonZip = $"https://functionscdn.azureedge.net/public/TemplatesApi/{TemplateJsonVersion}.zip";
 
