@@ -266,7 +266,7 @@ namespace Build
                 client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
                     Path.Combine(templatesPath, $"isolated.itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
 
-                client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
+                client.DownloadFile(Settings.DotnetIsolatedProjectTemplates,
                     Path.Combine(templatesPath, $"isolated.projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
 
                 client.DownloadFile(Settings.DotnetItemTemplates,
