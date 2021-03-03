@@ -262,21 +262,26 @@ namespace Build
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
+            var isolatedTemplatesPath = Path.Combine(templatesPath, "net5-isolated");
+
             Directory.CreateDirectory(templatesPath);
+            Directory.CreateDirectory(isolatedTemplatesPath);
 
             using (var client = new WebClient())
             {
+                // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
+                // and we are sure it doesn't break them.
                 client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
-                    Path.Combine(templatesPath, $"isolated.itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
+                    Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
 
                 client.DownloadFile(Settings.DotnetIsolatedProjectTemplates,
-                    Path.Combine(templatesPath, $"isolated.projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
+                    Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
 
                 client.DownloadFile(Settings.DotnetItemTemplates,
-                    Path.Combine(templatesPath, $"webjobs.itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
+                    Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
 
                 client.DownloadFile(Settings.DotnetProjectTemplates,
-                    Path.Combine(templatesPath, $"webjobs.projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
+                    Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
             }
 
             foreach (var runtime in Settings.TargetRuntimes)
