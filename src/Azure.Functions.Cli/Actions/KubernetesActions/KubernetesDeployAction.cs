@@ -44,10 +44,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public int? MinReplicaCount { get; private set; }
         public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
         public bool ShowServiceFqdn { get; set; } = false;
-
         public bool UseGitHashAsImageVersion { get; set; } = false;
-
         public string HashFilesPattern { get; set; } = "";
+        public bool BuildImage { get; set; } = true;
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -89,6 +88,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
             SetFlag<bool>("use-git-hash-version", "Use the githash as the version for the image", f => UseGitHashAsImageVersion = f);
             SetFlag<string>("hash-files", "Files to hash to determine the image version", f => HashFilesPattern = f);
+            SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
+
             return base.ParseArgs(args);
         }
 
@@ -109,7 +110,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
                 }
             }
-            else
+            else if (BuildImage)
             {
                 if (shouldBuild)
                 {
@@ -117,6 +118,10 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 // This needs to be fixed to run after the build.
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+            }
+            else
+            {
+                triggers = await GetTriggersLocalFiles();
             }
 
             (var resources, var funcKeys) = await KubernetesHelper.GetFunctionsDeploymentResources(
@@ -150,7 +155,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     kubernetesTask = KubernetesHelper.CreateNamespace(Namespace);
                 }
-                if (shouldBuild)
+                if (BuildImage && shouldBuild)
                 {
                     imageTask = DockerHelpers.DockerPush(resolvedImageName, false);
                 }
