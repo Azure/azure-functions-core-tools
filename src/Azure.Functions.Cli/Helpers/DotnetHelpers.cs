@@ -240,19 +240,19 @@ namespace Azure.Functions.Cli.Helpers
             await exe.RunAsync();
         }
 
-        private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "webjobs.*.nupkg");
+        private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "templates");
 
-        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", "isolated.*.nupkg");
+        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", "net5-isolated"));
 
-        private static async Task DotnetTemplatesAction(string action, string pattern)
+        private static async Task DotnetTemplatesAction(string action, string templateDirectory)
         {
-            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "templates");
+            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), templateDirectory);
             if (!FileSystemHelpers.DirectoryExists(templatesLocation))
             {
                 throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
             }
 
-            foreach (var nupkg in FileSystemHelpers.GetFiles(templatesLocation, null, null, pattern))
+            foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
             {
                 var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();
