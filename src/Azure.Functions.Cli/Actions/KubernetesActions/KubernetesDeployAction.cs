@@ -48,6 +48,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
         public bool UseGitHashAsImageVersion { get; set; } = false;
 
+        public bool BuildImage { get; set; } = true;
+
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -89,6 +91,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("use-git-hash-version", "Use the githash as the version for the image", f => UseGitHashAsImageVersion = f);
             SetFlag<bool>("write-configs", "Output the kubernetes configurations as YAML files instead of deploying", f => WriteConfigs = f);
             SetFlag<string>("config-file", "if --write-configs is true, write configs to this file (default: 'functions.yaml')", f => ConfigFile = f);
+            SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
             return base.ParseArgs(args);
         }
 
@@ -109,7 +112,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
                 }
             }
-            else
+            else if (BuildImage)
             {
                 if (shouldBuild)
                 {
@@ -117,6 +120,10 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 // This needs to be fixed to run after the build.
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+            }
+            else
+            {
+                triggers = await GetTriggersLocalFiles();
             }
 
             (var resources, var funcKeys) = await KubernetesHelper.GetFunctionsDeploymentResources(
@@ -145,7 +152,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             else
             {
                 Task kubernetesTask = null;
-                Task imageTask = (shouldBuild ? DockerHelpers.DockerPush(resolvedImageName, false) : null);
+                Task imageTask = ((BuildImage && shouldBuild) ? DockerHelpers.DockerPush(resolvedImageName, false) : null);
 
                 if (WriteConfigs)
                 {
@@ -156,18 +163,14 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 else
                 {
-                    if (!await KubernetesHelper.NamespaceExists(Namespace))
-                    {
-                        kubernetesTask = KubernetesHelper.CreateNamespace(Namespace);
-                    }
                     Func<Task> resourceTaskFn = () => {
                         var serialized = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
                         return KubectlHelper.KubectlApply(serialized, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
                     };
 
-                    if (kubernetesTask != null)
+                    if (!await KubernetesHelper.NamespaceExists(Namespace))
                     {
-                        kubernetesTask = kubernetesTask.ContinueWith((result) => {
+                        kubernetesTask = KubernetesHelper.CreateNamespace(Namespace).ContinueWith((result) => {
                             return resourceTaskFn();
                         });
                     }

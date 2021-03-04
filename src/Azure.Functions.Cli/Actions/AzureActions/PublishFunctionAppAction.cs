@@ -284,10 +284,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            // Check if azure-functions-worker exists in requirements.txt for Python function app
+            // Special checks for python dependencies
             if (workerRuntime == WorkerRuntime.python)
             {
+                // Check if azure-functions-worker exists in requirements.txt for Python function app
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
+                // Check if remote LinuxFxVersion exists and is different from local version
+                var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
+                if (!PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor))
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
+                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{functionApp.LinuxFxVersion}'."));
+                }
             }
 
             // Temporary: there's no tool support to create a .NET isolated worker runtime app,
