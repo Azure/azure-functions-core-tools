@@ -135,16 +135,25 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
+            static string MaybeNamespace(string @namespace)
+            {
+                if (string.IsNullOrWhiteSpace(@namespace) == false)
+                {
+                    return $" --namespace {@namespace}";
+                }
+                return String.Empty;
+            }
+
             string GetResourceFullName(IKubernetesResource r)
             {
                 switch (r)
                 {
                     case DeploymentV1Apps deployment:
-                        return $"deployment/{deployment.Metadata.Name} --namespace {deployment.Metadata.Namespace}";
+                        return $"deployment/{deployment.Metadata.Name} {MaybeNamespace(deployment.Metadata.Namespace)}";
                     case ServiceV1 service:
-                        return $"service/{service.Metadata.Name} --namespace {service.Metadata.Namespace}";
+                        return $"service/{service.Metadata.Name} {MaybeNamespace(service.Metadata.Namespace)}";
                     case PodTemplateV1 pod:
-                        return $"pod/{pod.Metadata.Name} --namespace {pod.Metadata.Namespace}";
+                        return $"pod/{pod.Metadata.Name} {MaybeNamespace(pod.Metadata.Namespace)}";
                     default:
                         throw new ArgumentException($"type {r.GetType()} is not supported");
                 }
