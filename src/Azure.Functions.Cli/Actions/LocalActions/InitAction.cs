@@ -185,7 +185,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(ResolvedWorkerRuntime, Language, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, Csx);
             }
         }
 
