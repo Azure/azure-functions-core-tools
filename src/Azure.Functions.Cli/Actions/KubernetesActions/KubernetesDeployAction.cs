@@ -44,6 +44,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public int? MinReplicaCount { get; private set; }
         public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
         public bool ShowServiceFqdn { get; set; } = false;
+        public bool WriteConfigs { get; set; } = false;
+        public string ConfigFile { get; set; } = "functions.yaml";
         public bool UseGitHashAsImageVersion { get; set; } = false;
         public string HashFilesPattern { get; set; } = "";
         public bool BuildImage { get; set; } = true;
@@ -87,6 +89,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
             SetFlag<bool>("use-git-hash-version", "Use the githash as the version for the image", f => UseGitHashAsImageVersion = f);
+            SetFlag<bool>("write-configs", "Output the kubernetes configurations as YAML files instead of deploying", f => WriteConfigs = f);
+            SetFlag<string>("config-file", "if --write-configs is true, write configs to this file (default: 'functions.yaml')", f => ConfigFile = f);
             SetFlag<string>("hash-files", "Files to hash to determine the image version", f => HashFilesPattern = f);
             SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
 
@@ -150,38 +154,40 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             else
             {
                 Task kubernetesTask = null;
-                Task imageTask = null;
-                if (!await KubernetesHelper.NamespaceExists(Namespace))
-                {
-                    kubernetesTask = KubernetesHelper.CreateNamespace(Namespace);
-                }
-                if (BuildImage && shouldBuild)
-                {
-                    imageTask = DockerHelpers.DockerPush(resolvedImageName, false);
-                }
-                Func<Task> resourceTaskFn = () => {
-                    var serialized = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
-                    return KubectlHelper.KubectlApply(serialized, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
-                };
+                Task imageTask = ((BuildImage && shouldBuild) ? DockerHelpers.DockerPush(resolvedImageName, false) : null);
 
-                if (kubernetesTask != null)
+                if (WriteConfigs)
                 {
-                    kubernetesTask = kubernetesTask.ContinueWith((result) => {
-                        return resourceTaskFn();
-                    });
+                    var yaml = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
+                    kubernetesTask = File.WriteAllTextAsync(ConfigFile, yaml);
+                    Console.Write($"Configuration written to {ConfigFile}");
+                    return;
                 }
                 else
                 {
-                    kubernetesTask = resourceTaskFn();
+                    Func<Task> resourceTaskFn = () => {
+                        var serialized = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
+                        return KubectlHelper.KubectlApply(serialized, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
+                    };
+
+                    if (!await KubernetesHelper.NamespaceExists(Namespace))
+                    {
+                        kubernetesTask = KubernetesHelper.CreateNamespace(Namespace).ContinueWith((result) => {
+                            return resourceTaskFn();
+                        });
+                    }
+                    else
+                    {
+                        kubernetesTask = resourceTaskFn();
+                    }
                 }
+
                 if (imageTask != null)
                 {
-                    Task.WaitAll(new Task[] {imageTask, kubernetesTask});
+                    await imageTask;
                 }
-                else
-                {
-                    await kubernetesTask;
-                }
+                await kubernetesTask;
+
                 var httpService = resources
                     .Where(i => i is ServiceV1)
                     .Cast<ServiceV1>()
