@@ -12,6 +12,7 @@ using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Fclp;
+using Microsoft.Extensions.FileSystemGlobbing;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -43,9 +44,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public int? MinReplicaCount { get; private set; }
         public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
         public bool ShowServiceFqdn { get; set; } = false;
-
         public bool UseGitHashAsImageVersion { get; set; } = false;
-
+        public string HashFilesPattern { get; set; } = "";
         public bool BuildImage { get; set; } = true;
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
@@ -87,7 +87,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
             SetFlag<bool>("use-git-hash-version", "Use the githash as the version for the image", f => UseGitHashAsImageVersion = f);
+            SetFlag<string>("hash-files", "Files to hash to determine the image version", f => HashFilesPattern = f);
             SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
+
             return base.ParseArgs(args);
         }
 
@@ -235,11 +237,21 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         {
             var version = "latest";
             if (UseGitHashAsImageVersion) {
-                (var stdout, var err, var exit) = await GitHelpers.GitHash();
-                if (exit != 0) {
-                    throw new CliException("Git describe failed: " + err);
+                if (HashFilesPattern.Length > 0)
+                {
+                    var matcher = new Matcher();
+                    matcher.AddInclude(HashFilesPattern);
+                    var matches = MatcherExtensions.GetResultsInFullPath(matcher, "./");
+                    version = GitHelpers.ActionsHashFiles(matches);
                 }
-                version = stdout;
+                else
+                {
+                    (var stdout, var err, var exit) = await GitHelpers.GitHash();
+                    if (exit != 0) {
+                        throw new CliException("Git describe failed: " + err);
+                    }
+                    version = stdout;
+                }
             }
             if (!string.IsNullOrEmpty(Registry))
             {
