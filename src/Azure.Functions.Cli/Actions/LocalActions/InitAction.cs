@@ -322,6 +322,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
                 }
             }
+            else if (workerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+            }
             else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
                 if (language == Constants.Languages.TypeScript)
