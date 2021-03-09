@@ -66,6 +66,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string UserSecretsId { get; private set; }
 
+        public bool? DotNetIsolatedDebug { get; set; }
+
+        public bool? EnableJsonOutput { get; set; }
+
         public StartHostAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -141,6 +145,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .WithDescription("When false, hides system logs other than warnings and errors.")
                 .SetDefault(false)
                 .Callback(v => VerboseLogging = v);
+
+            Parser
+               .Setup<bool>("dotnet-isolated-debug")
+               .WithDescription("When specified, set to true, pauses the .NET Worker process until a debugger is attached.")
+               .SetDefault(false)
+               .Callback(netIsolated => DotNetIsolatedDebug = netIsolated);
+
+            Parser
+               .Setup<bool>("enable-json-output")
+               .WithDescription("Signals to Core Tools and other components that JSON line output console logs, when applicable, should be emitted.")
+               .SetDefault(false)
+               .Callback(enableJsonOutput => EnableJsonOutput = enableJsonOutput);
 
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
@@ -230,6 +246,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+
+
+            // Inject the .NET Worker startup hook if debugging the worker
+            if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
+            {
+                Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker");
+            }
+
+            // Flow JSON logs flag
+            if (EnableJsonOutput != null && EnableJsonOutput.Value)
+            {
+                Environment.SetEnvironmentVariable("FUNCTIONS_ENABLE_JSON_OUTPUT", bool.TrueString);
+            }
+
             return settings;
         }
 
