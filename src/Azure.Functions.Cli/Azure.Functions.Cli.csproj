@@ -54,6 +54,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.python36">
       <LogicalName>$(AssemblyName).Dockerfile.python36</LogicalName>
     </EmbeddedResource>
