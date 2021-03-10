@@ -251,7 +251,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
             {
-                Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker");
+                Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
             }
 
             // Flow JSON logs flag
