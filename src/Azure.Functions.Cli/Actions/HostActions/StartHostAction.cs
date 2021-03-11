@@ -196,7 +196,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return defaultBuilder
                 .ConfigureKestrel(o =>
                 {
-                    o.Limits.MaxRequestBodySize = 104857600;
+                    // Setting it to match the default RequestBodySize in host
+                    o.Limits.MaxRequestBodySize = Constants.DefaultMaxRequestBodySize;
                 })
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(listenAddress.ToString())
