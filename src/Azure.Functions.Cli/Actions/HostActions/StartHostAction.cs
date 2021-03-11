@@ -194,6 +194,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 });
             }
             return defaultBuilder
+                .ConfigureKestrel(o =>
+                {
+                    o.Limits.MaxRequestBodySize = 104857600;
+                })
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
