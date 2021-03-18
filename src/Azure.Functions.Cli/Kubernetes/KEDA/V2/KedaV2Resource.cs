@@ -41,20 +41,58 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
                         .Where(b => b?["type"] != null)
                         .Where(b => b["type"].ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                         .Where(b => b["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) == -1)
-                        .Select(t => new ScaledObjectTriggerV1Alpha1
-                        {
-                            Type = GetKedaTriggerType(t["type"]?.ToString()),
-                            Metadata = PopulateMetadataDictionary(t)
-                        })
+                        .GroupBy(b => IsDurable(b)) // Multiple durable triggers map to a single scaler
+                        .SelectMany(group => group.Key ? GetDurableScalar(triggers.HostJson) : group.Select(GetStandardScalar))
                 }
             };
         }
 
-        private const string ConnectionField = "connection";
-        private const string ConnectionFromEnvField = "connectionFromEnv";
+        private static bool IsDurable(JToken trigger) => 
+            trigger["type"].ToString().Equals("orchestrationTrigger", StringComparison.OrdinalIgnoreCase) ||
+            trigger["type"].ToString().Equals("activityTrigger", StringComparison.OrdinalIgnoreCase) ||
+            trigger["type"].ToString().Equals("entityTrigger", StringComparison.OrdinalIgnoreCase);
+
+        private static IEnumerable<ScaledObjectTriggerV1Alpha1> GetDurableScalar(JObject hostJson)
+        {
+            // Reference: https://docs.microsoft.com/azure/azure-functions/durable/durable-functions-bindings#durable-functions-2-0-host-json
+            JObject storageProviderConfig = hostJson.SelectToken("extensions.durableTask.storageProvider") as JObject;
+            string storageType = storageProviderConfig?["type"]?.ToString();
+
+            // Custom storage types are supported starting in Durable Functions v2.4.2
+            if (string.Equals(storageType, "MicrosoftSQL", StringComparison.OrdinalIgnoreCase))
+            {
+                yield return new ScaledObjectTriggerV1Alpha1
+                {
+                    // MSSQL scaler reference: https://keda.sh/docs/2.2/scalers/mssql/
+                    Type = "mssql",
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["query"] = "SELECT dt.GetScaleMetric()",
+                        ["targetValue"] = "1", // super-conservative default
+                        ["connectionStringFromEnv"] = storageProviderConfig?["connectionStringName"]?.ToString(),
+                    }
+                };
+            }
+            else
+            {
+                // TODO: Support for the Azure Storage and Netherite backends
+            }
+        }
+
+        private ScaledObjectTriggerV1Alpha1 GetStandardScalar(JToken binding)
+        {
+            return new ScaledObjectTriggerV1Alpha1
+            {
+                Type = GetKedaTriggerType(binding["type"]?.ToString()),
+                Metadata = PopulateMetadataDictionary(binding)
+            };
+        }
 
         public override IDictionary<string, string> PopulateMetadataDictionary(JToken t)
         {
+            const string ConnectionField = "connection";
+            const string ConnectionFromEnvField = "connectionFromEnv";
+
             IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
                 .Where(i => i.Value.Type == JTokenType.String)
                 .ToDictionary(k => k.Key, v => v.Value.ToString());
