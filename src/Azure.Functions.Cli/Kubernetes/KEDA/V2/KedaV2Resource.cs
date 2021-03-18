@@ -67,6 +67,8 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
                     Type = "mssql",
                     Metadata = new Dictionary<string, string>
                     {
+                        ["query"] = "SELECT dt.GetScaleMetric()",
+                        ["targetValue"] = "1", // super-conservative default
                         ["connectionStringFromEnv"] = storageProviderConfig?["connectionStringName"]?.ToString(),
                     }
                 };
