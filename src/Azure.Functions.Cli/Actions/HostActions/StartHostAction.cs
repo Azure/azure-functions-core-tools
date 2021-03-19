@@ -69,6 +69,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public bool? DotNetIsolatedDebug { get; set; }
 
         public bool? EnableJsonOutput { get; set; }
+        
+        public string JsonOutputFile { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager)
         {
@@ -158,6 +160,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                .SetDefault(false)
                .Callback(enableJsonOutput => EnableJsonOutput = enableJsonOutput);
 
+            Parser
+               .Setup<string>("json-output-file")
+               .WithDescription("If provided, a path to the file that will be used to write the output when using --enable-json-output.")
+               .Callback(jsonOutputFile => JsonOutputFile = jsonOutputFile);
+
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
             // Input args do not contain --verbose flag
@@ -214,12 +221,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>().Value;
                         // Set min level to SystemLogDefaultLogLevel.
                         filterOptions.MinLevel = loggingFilterHelper.SystemLogDefaultLogLevel;
-                        return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions);
+                        return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions, JsonOutputFile);
                     });
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile)))
                 .Build();
         }
 
