@@ -265,7 +265,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             }
             else if (!string.IsNullOrEmpty(ImageName))
             {
-                return ($"{ImageName}:{version}", false);
+                return ($"{ImageName}", false);
             }
             throw new CliArgumentsException("either --image-name or --registry is required.");
         }

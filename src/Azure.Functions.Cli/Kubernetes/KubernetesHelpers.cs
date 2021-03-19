@@ -17,9 +17,12 @@ using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Newtonsoft.Json;
+using YamlDotNet.Core;
 using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.EventEmitters;
 using YamlDotNet.Serialization.NamingConventions;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Constants = Azure.Functions.Cli.Common.Constants;
 
 namespace Azure.Functions.Cli.Kubernetes
 {
@@ -262,7 +265,7 @@ namespace Azure.Functions.Cli.Kubernetes
         internal static async Task WaitForDeploymentRollout(DeploymentV1Apps deployment)
         {
             var statement = $"rollout status deployment {deployment.Metadata.Name}";
-            
+
             // If a namespace is specified, we filter on it
             if (string.IsNullOrWhiteSpace(deployment.Metadata.Namespace) == false)
             {
@@ -468,6 +471,21 @@ namespace Azure.Functions.Cli.Kubernetes
             return funcKeys;
         }
 
+        public class QuoteNumbersEventEmitter : ChainedEventEmitter
+        {
+            public QuoteNumbersEventEmitter(IEventEmitter nextEmitter)
+                : base(nextEmitter)
+            { }
+
+            public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
+            {
+                if (eventInfo.Source.Type == typeof(string) && double.TryParse(eventInfo.Source.Value.ToString(), out _))
+                {
+                    eventInfo.Style = ScalarStyle.DoubleQuoted;
+                }
+                base.Emit(eventInfo, emitter);
+            }
+        }
         internal static string SerializeResources(IEnumerable<IKubernetesResource> resources, OutputSerializationOptions outputFormat)
         {
             var sb = new StringBuilder();
@@ -482,6 +500,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     var yaml = new SerializerBuilder()
                         .DisableAliases()
                         .WithNamingConvention(new CamelCaseNamingConvention())
+                        .WithEventEmitter(e => new QuoteNumbersEventEmitter(e))
                         .Build();
                     var writer = new StringWriter();
                     yaml.Serialize(writer, resource);
