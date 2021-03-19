@@ -62,7 +62,7 @@ namespace Azure.Functions.Cli.Helpers
             var containerId = string.Empty;
             try
             {
-                var script = await StaticResources.PrintFunctionJson;
+                var script = (await StaticResources.PrintFunctionJson).Replace("\r\n", "\n");
                 var args = $"run --rm -i {imageName} sh -";
                 (var functionsList, _, _) = await RunDockerCommand(args, showProgress: false, stdIn: script);
                 functionsList = functionsList.Trim();
