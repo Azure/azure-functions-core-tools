@@ -12,10 +12,12 @@ namespace Azure.Functions.Cli.Diagnostics
     internal class LoggingBuilder : IConfigureBuilder<ILoggingBuilder>
     {
         private LoggingFilterHelper _loggingFilterHelper;
+        private readonly string _jsonOutputFile;
 
-        public LoggingBuilder(LoggingFilterHelper loggingFilterHelper)
+        public LoggingBuilder(LoggingFilterHelper loggingFilterHelper, string jsonOutputFile)
         {
             _loggingFilterHelper = loggingFilterHelper;
+            _jsonOutputFile = jsonOutputFile;
         }
 
         public void Configure(ILoggingBuilder builder)
@@ -24,7 +26,7 @@ namespace Azure.Functions.Cli.Diagnostics
             {
                 //Cache LoggerFilterOptions to be used by the logger to filter logs based on content
                 var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>();
-                return new ColoredConsoleLoggerProvider(_loggingFilterHelper, filterOptions.Value);
+                return new ColoredConsoleLoggerProvider(_loggingFilterHelper, filterOptions.Value, _jsonOutputFile);
             });
 
             builder.AddFilter<ColoredConsoleLoggerProvider>((category, level) => true);
