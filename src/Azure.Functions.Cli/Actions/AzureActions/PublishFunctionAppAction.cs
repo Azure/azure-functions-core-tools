@@ -395,13 +395,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
                 // Elastic Premium Linux
-                shouldSyncTriggers = await HandleElasticPremiumLinuxPublish(functionApp, zipStreamFactory);
+                shouldSyncTriggers = true;
+                await HandleLinuxAppServicePublish(functionApp, zipStreamFactory);
             }
             else if (isFunctionAppDedicatedLinux)
             {
                 // Dedicated Linux
                 shouldSyncTriggers = false;
-                await HandleLinuxDedicatedPublish(functionApp, zipStreamFactory);
+                await HandleLinuxAppServicePublish(functionApp, zipStreamFactory);
             }
             else if (RunFromPackageDeploy)
             {
@@ -469,23 +470,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, retryCount: 5);
         }
 
-        private async Task<bool> HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
-        {
-            // Local build
-            if (PublishBuildOption != BuildOption.Remote)
-            {
-                string fileName = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
-                await EnsureNoKuduLiteBuildSettings(functionApp);
-                await PublishRunFromPackage(functionApp, await zipStreamFactory(), fileName);
-                return true;
-            }
-
-            // Remote build
-            await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
-            return false;
-        }
-
-        private async Task HandleLinuxDedicatedPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        private async Task HandleLinuxAppServicePublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
         {
             // Local build
             if (PublishBuildOption != BuildOption.Remote)
