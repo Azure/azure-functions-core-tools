@@ -251,16 +251,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
             {
-                Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
+                Environment.SetEnvironmentVariable("FUNCTIONS_ENABLE_DEBUGGER_WAIT", bool.TrueString);
+                EnableDotNetWorkerStartup();
             }
 
             // Flow JSON logs flag
             if (EnableJsonOutput != null && EnableJsonOutput.Value)
             {
                 Environment.SetEnvironmentVariable("FUNCTIONS_ENABLE_JSON_OUTPUT", bool.TrueString);
+                EnableDotNetWorkerStartup();
             }
 
             return settings;
+        }
+
+        private void EnableDotNetWorkerStartup()
+        {
+            Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
         }
 
         private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
