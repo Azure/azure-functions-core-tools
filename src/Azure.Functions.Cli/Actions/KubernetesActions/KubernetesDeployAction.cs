@@ -12,6 +12,7 @@ using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Fclp;
+using Microsoft.Extensions.FileSystemGlobbing;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -43,6 +44,11 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public int? MinReplicaCount { get; private set; }
         public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
         public bool ShowServiceFqdn { get; set; } = false;
+        public bool WriteConfigs { get; set; } = false;
+        public string ConfigFile { get; set; } = "functions.yaml";
+        public bool UseGitHashAsImageVersion { get; set; } = false;
+        public string HashFilesPattern { get; set; } = "";
+        public bool BuildImage { get; set; } = true;
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -82,14 +88,19 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("dry-run", "Show the deployment template", f => DryRun = f);
             SetFlag<bool>("ignore-errors", "Proceed with the deployment if a resource returns an error. Default: false", f => IgnoreErrors = f);
             SetFlag<bool>("show-service-fqdn", "display Http Trigger URL with kubernetes FQDN rather than IP. Default: false", f => ShowServiceFqdn = f);
+            SetFlag<bool>("use-git-hash-version", "Use the githash as the version for the image", f => UseGitHashAsImageVersion = f);
+            SetFlag<bool>("write-configs", "Output the kubernetes configurations as YAML files instead of deploying", f => WriteConfigs = f);
+            SetFlag<string>("config-file", "if --write-configs is true, write configs to this file (default: 'functions.yaml')", f => ConfigFile = f);
+            SetFlag<string>("hash-files", "Files to hash to determine the image version", f => HashFilesPattern = f);
+            SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
+
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
-            (var resolvedImageName, var shouldBuild) = ResolveImageName();
+            (var resolvedImageName, var shouldBuild) = await ResolveImageName();
             TriggersPayload triggers = null;
-
             if (DryRun)
             {
                 if (shouldBuild)
@@ -103,13 +114,18 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
                 }
             }
-            else
+            else if (BuildImage)
             {
                 if (shouldBuild)
                 {
                     await DockerHelpers.DockerBuild(resolvedImageName, Environment.CurrentDirectory);
                 }
+                // This needs to be fixed to run after the build.
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+            }
+            else
+            {
+                triggers = await GetTriggersLocalFiles();
             }
 
             (var resources, var funcKeys) = await KubernetesHelper.GetFunctionsDeploymentResources(
@@ -137,24 +153,40 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             }
             else
             {
-                List<Task> tasks = new List<Task>();
-                if (!await KubernetesHelper.NamespaceExists(Namespace))
+                Task kubernetesTask = null;
+                Task imageTask = ((BuildImage && shouldBuild) ? DockerHelpers.DockerPush(resolvedImageName, false) : null);
+
+                if (WriteConfigs)
                 {
-                    await KubernetesHelper.CreateNamespace(Namespace);
+                    var yaml = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
+                    kubernetesTask = File.WriteAllTextAsync(ConfigFile, yaml);
+                    Console.Write($"Configuration written to {ConfigFile}");
+                    return;
+                }
+                else
+                {
+                    Func<Task> resourceTaskFn = () => {
+                        var serialized = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
+                        return KubectlHelper.KubectlApply(serialized, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
+                    };
+
+                    if (!await KubernetesHelper.NamespaceExists(Namespace))
+                    {
+                        kubernetesTask = KubernetesHelper.CreateNamespace(Namespace).ContinueWith((result) => {
+                            return resourceTaskFn();
+                        });
+                    }
+                    else
+                    {
+                        kubernetesTask = resourceTaskFn();
+                    }
                 }
 
-                if (shouldBuild)
+                if (imageTask != null)
                 {
-                    // TODO: Join this with the build above so that it can run in parallel to the Kubernetes object create
-                    tasks.Add(DockerHelpers.DockerPush(resolvedImageName, false));
+                    await imageTask;
                 }
-                // TODO: Convert these to YAML so that we can send them as a single file
-                foreach (var resource in resources)
-                {
-                    tasks.Add(KubectlHelper.KubectlApply(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace));
-                }
-
-                Task.WaitAll(tasks.ToArray());
+                await kubernetesTask;
 
                 var httpService = resources
                     .Where(i => i is ServiceV1)
@@ -167,7 +199,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
 
                 if (httpDeployment != null && httpDeployment != null)
                 {
-                    await KubernetesHelper.WaitForDeploymentRolleout(httpDeployment);
+                    await KubernetesHelper.WaitForDeploymentRollout(httpDeployment);
                     //Print the function keys message to the console
                     await KubernetesHelper.PrintFunctionsInfo(httpDeployment, httpService, funcKeys, triggers, ShowServiceFqdn);
                 }
@@ -207,15 +239,33 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             };
         }
 
-        private (string, bool) ResolveImageName()
+        private async Task<(string, bool)> ResolveImageName()
         {
+            var version = "latest";
+            if (UseGitHashAsImageVersion) {
+                if (HashFilesPattern.Length > 0)
+                {
+                    var matcher = new Matcher();
+                    matcher.AddInclude(HashFilesPattern);
+                    var matches = MatcherExtensions.GetResultsInFullPath(matcher, "./");
+                    version = GitHelpers.ActionsHashFiles(matches);
+                }
+                else
+                {
+                    (var stdout, var err, var exit) = await GitHelpers.GitHash();
+                    if (exit != 0) {
+                        throw new CliException("Git describe failed: " + err);
+                    }
+                    version = stdout;
+                }
+            }
             if (!string.IsNullOrEmpty(Registry))
             {
-                return ($"{Registry}/{Name}", true && !NoDocker);
+                return ($"{Registry}/{Name}:{version}", true && !NoDocker);
             }
             else if (!string.IsNullOrEmpty(ImageName))
             {
-                return (ImageName, false);
+                return ($"{ImageName}", false);
             }
             throw new CliArgumentsException("either --image-name or --registry is required.");
         }

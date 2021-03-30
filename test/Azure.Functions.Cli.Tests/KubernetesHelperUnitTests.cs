@@ -1,4 +1,7 @@
 using Azure.Functions.Cli.Kubernetes;
+using Azure.Functions.Cli.Kubernetes.KEDA.Models;
+using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
+using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using Xunit;
@@ -27,6 +30,32 @@ namespace Azure.Functions.Cli.Tests
                     throw;
                 }
             }
+        }
+
+        [Fact]
+        public void ValidateYamlStringQuote()
+        {
+            var result = KubernetesHelper.SerializeResources(new []
+            {
+                new ScaledObjectKedaV2
+                {
+                    Spec = new ScaledObjectSpecV1Alpha1
+                    {
+                        Triggers = new []
+                        {
+                            new ScaledObjectTriggerV1Alpha1
+                            {
+                                Metadata = new Dictionary<string, string>
+                                {
+                                    ["targetValue"] = "1",
+                                }
+                            }
+                        }
+                    }
+                }
+            }, Kubernetes.Models.OutputSerializationOptions.Yaml);
+
+            result.Should().Contain("\"1\"");
         }
     }
 }

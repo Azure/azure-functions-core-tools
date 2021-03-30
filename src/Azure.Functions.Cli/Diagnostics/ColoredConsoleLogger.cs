@@ -8,25 +8,52 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 using System.Linq;
 using Colors.Net.StringColorExtensions;
 using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Collections.Concurrent;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
-    public class ColoredConsoleLogger : ILogger
+    public class ColoredConsoleLogger : ILogger, IDisposable
     {
         private readonly bool _verboseErrors;
+        private readonly Action<string> _logJsonOutput;
+        private readonly object _fileAccessLock;
         private readonly string _category;
         private readonly LoggingFilterHelper _loggingFilterHelper;
         private readonly LoggerFilterOptions _loggerFilterOptions;
         private readonly string[] allowedLogsPrefixes = new string[] { "Worker process started and initialized.", "Host lock lease acquired by instance ID" };
         private static readonly LoggerRuleSelector RuleSelector = new LoggerRuleSelector();
         private static readonly Type ProviderType = typeof(ColoredConsoleLoggerProvider);
+        private readonly FileStream _jsonOutputFileStream;
+        private bool _disposed;
+        private const string JsonLogPrefix = "azfuncjsonlog:";
+        private readonly static ConcurrentDictionary<string, object> _fileAccessLocks = new ConcurrentDictionary<string, object>();
 
-        public ColoredConsoleLogger(string category, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
+        public ColoredConsoleLogger(string category, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions, string jsonOutputFilePath = null)
         {
             _category = category;
             _loggerFilterOptions = loggerFilterOptions ?? throw new ArgumentNullException(nameof(loggerFilterOptions));
             _loggingFilterHelper = loggingFilterHelper ?? throw new ArgumentNullException(nameof(loggingFilterHelper));
             _verboseErrors = StaticSettings.IsDebug;
+            _logJsonOutput = message => LogToConsole(LogLevel.Information, null, message, false);
+
+
+            if (jsonOutputFilePath != null)
+            {
+                if (!File.Exists(jsonOutputFilePath))
+                {
+                    _jsonOutputFileStream = File.Create(jsonOutputFilePath);
+                }
+                else
+                {
+                    _jsonOutputFileStream = File.Open(jsonOutputFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                }
+
+                _logJsonOutput = LogJsonToFile;
+
+                _fileAccessLock = _fileAccessLocks.GetOrAdd(jsonOutputFilePath, s => new object());
+            }
         }
 
         internal LoggerFilterRule SelectRule(string categoryName, LoggerFilterOptions loggerFilterOptions)
@@ -74,6 +101,12 @@ namespace Azure.Functions.Cli.Diagnostics
                 return;
             }
 
+            if (formattedMessage.StartsWith(JsonLogPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                _logJsonOutput(formattedMessage.Remove(0, JsonLogPrefix.Length));
+                return;
+            }
+            
             if (DoesMessageStartsWithAllowedLogsPrefix(formattedMessage))
             {
                 LogToConsole(logLevel, exception, formattedMessage);
@@ -88,11 +121,24 @@ namespace Azure.Functions.Cli.Diagnostics
             LogToConsole(logLevel, exception, formattedMessage);
         }
 
-        private void LogToConsole(LogLevel logLevel, Exception exception, string formattedMessage)
+        private void LogToConsole(LogLevel logLevel, Exception exception, string formattedMessage, bool includeTimeStamp = true)
         {
             foreach (var line in GetMessageString(logLevel, formattedMessage, exception))
             {
-                ColoredConsole.WriteLine($"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".DarkGray() + line);
+                string prefix = includeTimeStamp
+                    ? $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".DarkGray().ToString()
+                    : string.Empty;
+
+                ColoredConsole.WriteLine(prefix + line);
+            }
+        }
+
+        private void LogJsonToFile(string message)
+        {
+            lock (_fileAccessLock)
+            {
+                _jsonOutputFileStream.Write(Encoding.UTF8.GetBytes(message + Environment.NewLine));
+                _jsonOutputFileStream.Flush();
             }
         }
 
@@ -102,6 +148,7 @@ namespace Azure.Functions.Cli.Diagnostics
             {
                 throw new ArgumentNullException(nameof(formattedMessage));
             }
+
             return allowedLogsPrefixes.Any(s => formattedMessage.StartsWith(s, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -139,6 +186,24 @@ namespace Azure.Functions.Cli.Diagnostics
         public IDisposable BeginScope<TState>(TState state)
         {
             return null;
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _jsonOutputFileStream?.Dispose();
+                }
+
+                _disposed = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
         }
     }
 }

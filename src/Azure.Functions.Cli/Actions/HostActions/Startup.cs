@@ -29,6 +29,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private readonly bool _enableAuth;
         private readonly string _userSecretsId;
         private readonly LoggingFilterHelper _loggingFilterHelper;
+        private readonly string _jsonOutputFile;
 
         public Startup(
             WebHostBuilderContext builderContext,
@@ -37,14 +38,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
             bool corsCredentials,
             bool enableAuth,
             string userSecretsId,
-            LoggingFilterHelper loggingFilterHelper)
+            LoggingFilterHelper loggingFilterHelper,
+            string jsonOutputFile)
         {
             _builderContext = builderContext;
             _hostOptions = hostOptions;
             _enableAuth = enableAuth;
             _userSecretsId = userSecretsId;
             _loggingFilterHelper = loggingFilterHelper;
-
+            _jsonOutputFile = jsonOutputFile;
             if (!string.IsNullOrEmpty(corsOrigins))
             {
                 _corsOrigins = corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries);
@@ -91,7 +93,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
-            services.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(_ => new LoggingBuilder(_loggingFilterHelper));
+            services.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(_ => new LoggingBuilder(_loggingFilterHelper, _jsonOutputFile));
             if (!string.IsNullOrEmpty(_userSecretsId))
             {
                 services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>((provider) => new UserSecretsConfigurationBuilder(_userSecretsId, _loggingFilterHelper, provider.GetService<IOptions<LoggerFilterOptions>>().Value));

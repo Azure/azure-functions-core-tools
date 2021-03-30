@@ -320,7 +320,7 @@ namespace Azure.Functions.Cli.Helpers
                 if (buildOption != BuildOption.Remote && await ArePackagesInSync(reqTxtFile, packagesLocation))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
-                    return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
+                    return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot, Enumerable.Empty<string>());
                 }
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
                 FileSystemHelpers.DeleteDirectorySafe(packagesLocation);
@@ -357,7 +357,7 @@ namespace Azure.Functions.Cli.Helpers
                 await FileSystemHelpers.WriteAllTextToFileAsync(md5FilePath, SecurityHelpers.CalculateMd5(reqTxtFile));
             }
 
-            return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot);
+            return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot, Enumerable.Empty<string>());
         }
 
         private static async Task RestorePythonRequirementsPackapp(string functionAppRoot, string packagesLocation)
@@ -511,12 +511,29 @@ namespace Azure.Functions.Cli.Helpers
                 switch (info?.Minor)
                 {
                     case 9:
-                    case 8:	
-                    case 7:	
-                    case 6:  return true;	
+                    case 8:
+                    case 7:
+                    case 6:  return true;
                     default: return false;
                 }
             } else return false;
+        }
+
+        public static bool IsLinuxFxVersionRuntimeVersionMatched(string linuxFxVersion, int? major, int? minor)
+        {
+            // No linux fx version will default to python 3.6
+            if (string.IsNullOrEmpty(linuxFxVersion))
+            {
+                // Match if version is 3.6
+                return major == 3 && minor == 6;
+            }
+            // Only validate on LinuxFxVersion that follows the pattern PYTHON|<version>
+            else if (!linuxFxVersion.StartsWith("PYTHON|", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            // Validate LinuxFxVersion that follows the pattern PYTHON|<major>.<minor>
+            return string.Equals(linuxFxVersion, $"PYTHON|{major}.{minor}", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

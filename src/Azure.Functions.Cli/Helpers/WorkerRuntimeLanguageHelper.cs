@@ -41,6 +41,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, string> workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
         {
             { WorkerRuntime.dotnet, Constants.Languages.CSharp },
+            { WorkerRuntime.dotnetIsolated, Constants.Languages.CSharp },
             { WorkerRuntime.node, Constants.Languages.JavaScript },
             { WorkerRuntime.python, Constants.Languages.Python },
             { WorkerRuntime.powershell, Constants.Languages.Powershell },
@@ -54,7 +55,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.TypeScript, new [] { "ts" } },
             { Constants.Languages.Python, new [] { "py" } },
             { Constants.Languages.Powershell, new [] { "pwsh" } },
-            { Constants.Languages.CSharp, new [] { "csharp", "dotnet" } },
+            { Constants.Languages.CSharp, new [] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.Java, new string[] { } },
             { Constants.Languages.Custom, new string[] { } }
         };
@@ -72,12 +73,28 @@ namespace Azure.Functions.Cli.Helpers
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", availableWorkersRuntime.Keys
                 .Where(k => (k != WorkerRuntime.java))
-                .Where(k => (k != WorkerRuntime.dotnetIsolated))
                 .Select(s => s.ToString()));
 
+        public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
+        {
+            IDictionary<WorkerRuntime, string> workerToDisplayStrings = new Dictionary<WorkerRuntime, string>();
+            foreach (WorkerRuntime wr in availableWorkersRuntime.Keys)
+            {
+                switch (wr)
+                {
+                    case WorkerRuntime.dotnetIsolated:
+                        workerToDisplayStrings[wr] = "dotnet (isolated process)";
+                        break;
+                    default:
+                        workerToDisplayStrings[wr] = wr.ToString();
+                        break;
+                }
+            }
+            return workerToDisplayStrings;
+        }
+
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
-            .Where(k => k != WorkerRuntime.java)
-            .Where(k => k != WorkerRuntime.dotnetIsolated);
+            .Where(k => k != WorkerRuntime.java);
 
         public static WorkerRuntime NormalizeWorkerRuntime(string workerRuntime)
         {

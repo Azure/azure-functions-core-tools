@@ -148,7 +148,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Csx);
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, Csx);
         }
 
         private async Task InitFunctionAppProject()
@@ -164,9 +164,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
-            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
+            if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
-                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force);
+                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
             }
             else
             {
@@ -185,7 +185,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(ResolvedWorkerRuntime, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, Csx);
             }
         }
 
@@ -201,7 +201,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
-                workerRuntime = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.AvailableWorkersList);
+
+                IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
+                string workerRuntimedisplay = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
+                workerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimedisplay)).Key;
+
                 ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
                 language = LanguageSelectionIfRelevant(workerRuntime);
             }
@@ -305,7 +309,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
-        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, bool csx)
+        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, bool csx)
         {
             if (workerRuntime == Helpers.WorkerRuntime.dotnet)
             {
@@ -318,9 +322,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
                 }
             }
+            else if (workerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+            }
             else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
+                if (language == Constants.Languages.TypeScript)
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileTypescript);
+                }
+                else
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
+                }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
             {

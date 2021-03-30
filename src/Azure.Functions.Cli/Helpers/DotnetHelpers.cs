@@ -15,6 +15,9 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class DotnetHelpers
     {
+        private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
+        private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
+
         public static void EnsureDotnet()
         {
             if (!CommandChecker.CommandExists("dotnet"))
@@ -23,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public async static Task DeployDotnetProject(string Name, bool force)
+        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime)
         {
             await TemplateOperation(async () =>
             {
@@ -36,10 +39,10 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException("Error creating project template");
                 }
-            });
+            }, workerRuntime);
         }
 
-        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, AuthorizationLevel? httpAuthorizationLevel = null)
+        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             await TemplateOperation(async () =>
             {
@@ -62,11 +65,27 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException("Error creating function");
                 }
-            });
+            }, workerRuntime);
         }
 
-        internal static IEnumerable<string> GetTemplates()
+        internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
         {
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            {
+                return new[]
+                {
+                    "QueueTrigger",
+                    "HttpTrigger",
+                    "BlobTrigger",
+                    "TimerTrigger",
+                    "EventHubTrigger",
+                    "ServiceBusQueueTrigger",
+                    "ServiceBusTopicTrigger",
+                    "EventGridTrigger",
+                    "CosmosDBTrigger"
+                };
+            }
+
             return new[]
             {
                 "QueueTrigger",
@@ -80,7 +99,7 @@ namespace Azure.Functions.Cli.Helpers
                 "ServiceBusTopicTrigger",
                 "EventGridTrigger",
                 "CosmosDBTrigger",
-                "IotHubTrigger",
+                "IotHubTrigger"
             };
         }
 
@@ -155,33 +174,85 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task TemplateOperation(Func<Task> action)
+        private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
+
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            {
+                return IsolatedTemplateOperation(action);
+            }
+            else
+            {
+                return WebJobsTemplateOpetation(action);
+            }
+        }
+
+        private static async Task IsolatedTemplateOperation(Func<Task> action)
+        {
             try
             {
-                await InstallDotnetTemplates();
+                await UninstallWebJobsTemplates();
+                await InstallIsolatedTemplates();
                 await action();
             }
             finally
             {
-                await UninstallDotnetTemplates();
+                await UninstallIsolatedTemplates();
             }
         }
 
-        private static Task InstallDotnetTemplates() => DotnetTemplatesAction("install");
-
-        private static Task UninstallDotnetTemplates() => DotnetTemplatesAction("uninstall");
-
-        private static async Task DotnetTemplatesAction(string action)
+        private static async Task WebJobsTemplateOpetation(Func<Task> action)
         {
-            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "templates");
+            try
+            {
+                await UninstallIsolatedTemplates();
+                await InstallWebJobsTemplates();
+                await action();
+            }
+            finally
+            {
+                await UninstallWebJobsTemplates();
+            }
+        }
+
+        private static async Task UninstallIsolatedTemplates()
+        {
+            string projTemplates = $"{IsolatedTemplateBasePackId}.ProjectTemplates";
+            string itemTemplates = $"{IsolatedTemplateBasePackId}.ItemTemplates";
+
+            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
+            await exe.RunAsync();
+
+            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
+            await exe.RunAsync();
+        }
+
+        private static async Task UninstallWebJobsTemplates()
+        {
+            string projTemplates = $"{WebJobsTemplateBasePackId}.ProjectTemplates";
+            string itemTemplates = $"{WebJobsTemplateBasePackId}.ItemTemplates";
+
+            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
+            await exe.RunAsync();
+
+            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
+            await exe.RunAsync();
+        }
+
+        private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "templates");
+
+        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", "net5-isolated"));
+
+        private static async Task DotnetTemplatesAction(string action, string templateDirectory)
+        {
+            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), templateDirectory);
             if (!FileSystemHelpers.DirectoryExists(templatesLocation))
             {
                 throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
             }
 
-            foreach (var nupkg in FileSystemHelpers.GetFiles(templatesLocation, null, null, "*.nupkg"))
+            foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
             {
                 var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();

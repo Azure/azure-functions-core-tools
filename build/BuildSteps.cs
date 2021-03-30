@@ -262,15 +262,26 @@ namespace Build
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
+            var isolatedTemplatesPath = Path.Combine(templatesPath, "net5-isolated");
+
             Directory.CreateDirectory(templatesPath);
+            Directory.CreateDirectory(isolatedTemplatesPath);
 
             using (var client = new WebClient())
             {
-                client.DownloadFile(Settings.ItemTemplates,
-                    Path.Combine(templatesPath, $"itemTemplates.{Settings.ItemTemplatesVersion}.nupkg"));
+                // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
+                // and we are sure it doesn't break them.
+                client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
+                    Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
 
-                client.DownloadFile(Settings.ProjectTemplates,
-                    Path.Combine(templatesPath, $"projectTemplates.{Settings.ProjectTemplatesVersion}.nupkg"));
+                client.DownloadFile(Settings.DotnetIsolatedProjectTemplates,
+                    Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
+
+                client.DownloadFile(Settings.DotnetItemTemplates,
+                    Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
+
+                client.DownloadFile(Settings.DotnetProjectTemplates,
+                    Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
             }
 
             foreach (var runtime in Settings.TargetRuntimes)

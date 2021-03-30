@@ -331,7 +331,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Test = async (workingDir, p) =>
                     {
                         var filePath = Path.Combine(workingDir, "host.json");
-                        string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[1.*, 2.0.0)\" }}";
+                        string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                     },
                 },

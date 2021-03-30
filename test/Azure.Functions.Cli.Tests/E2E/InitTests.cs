@@ -161,6 +161,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_dotnetIsolated_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet-isolated --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:3.0-dotnet-isolated5.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_Dockerfile_for_csx()
         {
             return CliTester.Run(new RunConfiguration
@@ -221,12 +239,14 @@ namespace Azure.Functions.Cli.Tests.E2E
             });
         }
 
-        [Fact]
-        public Task init_ts_app_using_lang()
+        [Theory]
+        [InlineData("--worker-runtime node --language typescript")]
+        [InlineData("--typescript")]
+        public Task init_ts_app_using_lang(string initCommand)
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init . --worker-runtime node --language typescript" },
+                Commands = new[] { $"init . {initCommand} --docker" },
                 CheckFiles = new FileResult[]
                 {
                     new FileResult
@@ -236,6 +256,15 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
                             "FUNCTIONS_WORKER_RUNTIME",
                             "node"
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new []
+                        {
+                            "mcr.microsoft.com/azure-functions/node:3.0",
+                            "npm run build"
                         }
                     }
                 },
@@ -248,6 +277,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    "Writing Dockerfile",
+                    "Writing .dockerignore"
                 }
             }, _output);
         }

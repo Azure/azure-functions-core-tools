@@ -66,6 +66,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string UserSecretsId { get; private set; }
 
+        public bool? DotNetIsolatedDebug { get; set; }
+
+        public bool? EnableJsonOutput { get; set; }
+        
+        public string JsonOutputFile { get; set; }
+
         public StartHostAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -142,6 +148,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .SetDefault(false)
                 .Callback(v => VerboseLogging = v);
 
+            Parser
+               .Setup<bool>("dotnet-isolated-debug")
+               .WithDescription("When specified, set to true, pauses the .NET Worker process until a debugger is attached.")
+               .SetDefault(false)
+               .Callback(netIsolated => DotNetIsolatedDebug = netIsolated);
+
+            Parser
+               .Setup<bool>("enable-json-output")
+               .WithDescription("Signals to Core Tools and other components that JSON line output console logs, when applicable, should be emitted.")
+               .SetDefault(false)
+               .Callback(enableJsonOutput => EnableJsonOutput = enableJsonOutput);
+
+            Parser
+               .Setup<string>("json-output-file")
+               .WithDescription("If provided, a path to the file that will be used to write the output when using --enable-json-output.")
+               .Callback(jsonOutputFile => JsonOutputFile = jsonOutputFile);
+
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
             // Input args do not contain --verbose flag
@@ -178,6 +201,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 });
             }
             return defaultBuilder
+                .ConfigureKestrel(o =>
+                {
+                    // Setting it to match the default RequestBodySize in host
+                    o.Limits.MaxRequestBodySize = Constants.DefaultMaxRequestBodySize;
+                })
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
@@ -193,12 +221,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>().Value;
                         // Set min level to SystemLogDefaultLogLevel.
                         filterOptions.MinLevel = loggingFilterHelper.SystemLogDefaultLogLevel;
-                        return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions);
+                        return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions, JsonOutputFile);
                     });
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile)))
                 .Build();
         }
 
@@ -230,7 +258,28 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+
+
+            // Inject the .NET Worker startup hook if debugging the worker
+            if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
+            {
+                Environment.SetEnvironmentVariable("FUNCTIONS_ENABLE_DEBUGGER_WAIT", bool.TrueString);
+                EnableDotNetWorkerStartup();
+            }
+
+            // Flow JSON logs flag
+            if (EnableJsonOutput != null && EnableJsonOutput.Value)
+            {
+                Environment.SetEnvironmentVariable("FUNCTIONS_ENABLE_JSON_OUTPUT", bool.TrueString);
+                EnableDotNetWorkerStartup();
+            }
+
             return settings;
+        }
+
+        private void EnableDotNetWorkerStartup()
+        {
+            Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
         }
 
         private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
