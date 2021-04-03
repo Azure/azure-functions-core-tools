@@ -75,6 +75,7 @@ namespace Azure.Functions.Cli.Common
         {
             "httptrigger",
             "kafkatrigger",
+            "rabbitmqtrigger",
 
             // Durable Functions triggers can also support non-Azure Storage backends
             "orchestrationTrigger",
