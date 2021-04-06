@@ -438,7 +438,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // So, we only show the info, if Function App is not Linux Elastic Premium
             // or a Linux Dedicated Function App with remote build
             if (!(functionApp.IsLinux && functionApp.IsElasticPremium)
-                && !functionApp.IsKubeApp
                 && !(isFunctionAppDedicatedLinux && PublishBuildOption == BuildOption.Remote))
             {
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
