@@ -396,7 +396,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 // Elastic Premium Linux
                 shouldSyncTriggers = true;
-                await HandleLinuxAppServicePublish(functionApp, zipStreamFactory);
+                await HandleElasticPremiumLinuxPublish(functionApp, zipStreamFactory);
             }
             else if (isFunctionAppDedicatedLinux)
             {
@@ -468,6 +468,34 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException(errorMessage);
                 }
             }, retryCount: 5);
+        }
+
+        private async Task HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        {
+            // If Azure Files settings are present, we deploy similar to Linux App Service
+            if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteContentAzureFileConnectionString)
+                && functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteContentShared))
+            {
+                await HandleLinuxAppServicePublish(functionApp, zipStreamFactory);
+                return;
+            }
+
+            ColoredConsole.WriteLine(WarningColor($"Your Linux Premium function app does not have Azure Files App Settings" +
+                $" ('{Constants.WebsiteContentAzureFileConnectionString}', '{Constants.WebsiteContentShared}') configured. Azure Files setup is required to enable" +
+                $"persistent storage in Linux Premium function apps." +
+                $" For more info, see https://docs.microsoft.com/en-us/azure/azure-functions/functions-recover-storage-account#required-application-settings"));
+
+            // If Azure Files settings are not present, we need to do Run From Package = URL deployment
+            // Local build
+            if (PublishBuildOption != BuildOption.Remote)
+            {
+                string fileName = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
+                await EnsureNoKuduLiteBuildSettings(functionApp);
+                await PublishRunFromPackage(functionApp, await zipStreamFactory(), fileName);
+            }
+
+            // Remote build
+            await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
         }
 
         private async Task HandleLinuxAppServicePublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
