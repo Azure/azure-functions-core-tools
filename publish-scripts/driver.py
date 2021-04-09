@@ -7,7 +7,10 @@ from shared import constants
 
 def main(*args):
     # assume follow semantic versioning 2.0.0
-    constants.VERSION = args[1]
+    ver = args[1]
+    if not ver.startswith('2'):
+        raise Exception(f"This script only builds packages for major version '2'. Instead received '{ver}'")
+    constants.VERSION = ver
     constants.DRIVERROOTDIR = os.path.dirname(os.path.abspath(__file__))
     platformSystem = platform.system()
     if platformSystem == "Linux":
