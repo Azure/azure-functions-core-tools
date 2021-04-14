@@ -59,7 +59,8 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
             string storageType = storageProviderConfig?["type"]?.ToString();
 
             // Custom storage types are supported starting in Durable Functions v2.4.2
-            if (string.Equals(storageType, "MicrosoftSQL", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(storageType, "MicrosoftSQL", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(storageType, "mssql", StringComparison.OrdinalIgnoreCase))
             {
                 yield return new ScaledObjectTriggerV1Alpha1
                 {
@@ -67,8 +68,9 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
                     Type = "mssql",
                     Metadata = new Dictionary<string, string>
                     {
-                        ["query"] = "SELECT dt.GetScaleMetric()",
-                        ["targetValue"] = "1", // super-conservative default
+                        // Durable SQL scaling: https://microsoft.github.io/durabletask-mssql/#/scaling?id=worker-auto-scale
+                        ["query"] = "SELECT dt.GetScaleRecommendation(10, 1)", // max 10 orchestrations and 1 activity per replica
+                        ["targetValue"] = "1",
                         ["connectionStringFromEnv"] = storageProviderConfig?["connectionStringName"]?.ToString(),
                     }
                 };
