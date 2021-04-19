@@ -24,7 +24,7 @@ namespace Build
         public const string DotnetIsolatedProjectTemplatesVersion = "3.1.1733";
         public const string DotnetItemTemplatesVersion = "3.1.1788";
         public const string DotnetProjectTemplatesVersion = "3.1.1788";
-        public const string TemplateJsonVersion = "3.1.1788";
+        public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
