@@ -515,7 +515,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
         }
 
-        private async Task HandleLimaAppPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        private async Task HandleKuberenetesEnvironmentAppPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
         {
             await PublishZipDeploy(functionApp, zipStreamFactory);
         }
