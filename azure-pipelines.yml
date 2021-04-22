@@ -78,7 +78,7 @@ jobs:
       Pattern: '*.dll, *.exe'
       signConfigType: 'inlineSignParams'
       inlineOperation: |
-        [    
+        [
             {
               "KeyCode": "CP-230012",
               "OperationCode": "SigntoolSign",
@@ -220,11 +220,11 @@ jobs:
     env:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
-  - task: PublishBuildArtifacts@1
+  - task: PublishPipelineArtifact@1
     inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      ArtifactName: 'drop'
-      publishLocation: 'Container'
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifactName: 'drop'
+      artifactType: 'pipeline'
   - pwsh: |
       .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
     env:
