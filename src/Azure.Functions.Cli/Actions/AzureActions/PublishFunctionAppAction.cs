@@ -367,7 +367,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // For dedicated linux apps, we do not support run from package right now
             var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium &&!functionApp.IsKubeApp;
 
-            // For Lima app, we do not support run from package right now
+            // For Kubernetes Environment app, we do not support run from package right now
             var isKubeApp = functionApp.IsLinux && functionApp.IsKubeApp;
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
@@ -408,7 +408,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else if (isKubeApp)
             {
-                // Lima App
+                // Kubernetes Environment
                 shouldSyncTriggers = false;
 
             }
