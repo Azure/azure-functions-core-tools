@@ -365,7 +365,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
             // For dedicated linux apps, we do not support run from package right now
-            var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium &&!functionApp.IsKubeApp;
+
+            // For Lima app, we do not support run from package right now
+            var isKubeApp = functionApp.IsLinux && functionApp.IsKubeApp;
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
             {
@@ -402,6 +405,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Dedicated Linux
                 shouldSyncTriggers = false;
                 await HandleLinuxDedicatedPublish(functionApp, zipStreamFactory);
+            }
+            else if (isKubeApp)
+            {
+                // Lima App
+                shouldSyncTriggers = false;
+
             }
             else if (RunFromPackageDeploy)
             {
@@ -504,6 +513,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Remote build
             await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
+        }
+
+        private async Task HandleLimaAppPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        {
+            await PublishZipDeploy(functionApp, zipStreamFactory);
         }
 
         private async Task PerformAppServiceRemoteBuild(Func<Task<Stream>> zipStreamFactory, Site functionApp)
