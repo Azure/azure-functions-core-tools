@@ -515,11 +515,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
         }
 
-        private async Task HandleKuberenetesEnvironmentAppPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
-        {
-            await PublishZipDeploy(functionApp, zipStreamFactory);
-        }
-
         private async Task PerformAppServiceRemoteBuild(Func<Task<Stream>> zipStreamFactory, Site functionApp)
         {
             // Sync the correct Application Settings required for remote build
