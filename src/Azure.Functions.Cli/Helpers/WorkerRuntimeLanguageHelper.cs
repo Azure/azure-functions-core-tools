@@ -78,7 +78,7 @@ namespace Azure.Functions.Cli.Helpers
         public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
         {
             IDictionary<WorkerRuntime, string> workerToDisplayStrings = new Dictionary<WorkerRuntime, string>();
-            foreach (WorkerRuntime wr in availableWorkersRuntime.Keys)
+            foreach (WorkerRuntime wr in AvailableWorkersList)
             {
                 switch (wr)
                 {
