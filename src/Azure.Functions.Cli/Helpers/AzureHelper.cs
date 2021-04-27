@@ -359,7 +359,13 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
         {
-            var functions = await GetFunctions(functionApp, accessToken, managementURL);
+            ArmArrayWrapper<FunctionInfo> functions = null;
+            await RetryHelper.Retry(async () =>
+            {
+                functions = await GetFunctions(functionApp, accessToken, managementURL);
+                if (!functions.value.Any()) throw new Exception($"GetFunctions is not ready for {functionApp}");
+            }, 3, TimeSpan.FromSeconds(5));
+
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
             foreach (var function in functions.value.Select(v => v.properties))
             {
