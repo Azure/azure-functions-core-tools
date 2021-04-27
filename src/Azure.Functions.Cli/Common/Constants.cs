@@ -53,6 +53,8 @@ namespace Azure.Functions.Cli.Common
         public const string PowerShellWorkerDefaultVersion = "~6";
         public const string AuthLevelErrorMessage = "Unable to configure Authorization level. The selected template does not use Http Trigger";
         public const string HttpTriggerTemplateName = "HttpTrigger";
+        public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
+        public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

@@ -1,10 +1,7 @@
 ﻿using System;
 using Autofac;
-using Colors.Net;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
-using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli
 {

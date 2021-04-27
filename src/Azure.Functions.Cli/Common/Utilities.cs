@@ -13,11 +13,10 @@ using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
+using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli
 {
@@ -47,8 +46,14 @@ namespace Azure.Functions.Cli
         internal static void PrintVersion()
         {
             ColoredConsole
-                .WriteLine($"Azure Functions Core Tools ({Constants.CliDetailedVersion})")
-                .WriteLine($"Function Runtime Version: {ScriptHost.Version}");
+                .WriteLine($"\nAzure Functions Core Tools")
+                .WriteLine($"Core Tools Version:       {Constants.CliDetailedVersion}".DarkGray())
+                .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
+        }
+
+        internal static void PrintUpgradeWarning()
+        {
+            ColoredConsole.WriteLine(OutputTheme.ErrorColor("You are using an outdated version of the Azure Functions Core Tools. For more information, please see: https://aka.ms/func-v2-upgrade"));
         }
 
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)
@@ -183,34 +188,20 @@ namespace Azure.Functions.Cli
             return localPath;
         }
 
-        internal static LogLevel GetHostJsonDefaultLogLevel(IConfigurationRoot hostJsonConfig)
-        {
-            string defaultLogLevelKey = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, LogLevelSection, LogLevelDefaultSection);
-            try
-            {
-                if (Enum.TryParse(typeof(LogLevel), hostJsonConfig[defaultLogLevelKey].ToString(), true, out object outLevel))
-                {
-                    return (LogLevel)outLevel;
-                }
-            }
-            catch
-            {
-            }
-            // Default log level
-            return LogLevel.Information;
-        }
-
-        internal static bool LogLevelExists(IConfigurationRoot hostJsonConfig, string category)
+        internal static bool LogLevelExists(IConfigurationRoot hostJsonConfig, string category, out LogLevel outLogLevel)
         {
             string categoryKey = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, LogLevelSection, category);
             try
             {
-                if (Enum.TryParse(typeof(LogLevel), hostJsonConfig[categoryKey].ToString(), true, out object outLevel))
+                if (Enum.TryParse(hostJsonConfig[categoryKey], true, out outLogLevel))
                 {
                     return true;
                 }
             }
-            catch { }
+            catch 
+            { 
+            }
+            outLogLevel = LogLevel.Information;
             return false;
         }
 
@@ -239,25 +230,24 @@ namespace Azure.Functions.Cli
         /// <returns></returns>
         internal static bool DefaultLoggingFilter(string category, LogLevel actualLevel, LogLevel userLogMinLevel, LogLevel systemLogMinLevel)
         {
-            if (LogCategories.IsFunctionUserCategory(category))
+            if (LogCategories.IsFunctionUserCategory(category)
+                || LogCategories.IsFunctionCategory(category)
+                || category.Equals(WorkerConstants.FunctionConsoleLogCategoryName, StringComparison.OrdinalIgnoreCase))
             {
                 return actualLevel >= userLogMinLevel;
             }
-            return actualLevel >= systemLogMinLevel;
+            if (IsSystemLogCategory(category))
+            {
+                // System logs
+                return actualLevel >= systemLogMinLevel;
+            }
+            // consider any other category as user log
+            return actualLevel >= userLogMinLevel;
         }
 
-        /// <summary>
-        /// Returns true for user logs >= Trace level. Returns false, if log level is explicitly set to None.
-        /// </summary>
-        /// <param name="actualLevel"></param>
-        /// <returns></returns>
-        internal static bool UserLoggingFilter(LogLevel actualLevel)
+        internal static bool IsSystemLogCategory(string category)
         {
-            if (actualLevel == LogLevel.None)
-            {
-                return false;
-            }
-            return actualLevel >= LogLevel.Trace;
+            return ScriptConstants.SystemLogCategoryPrefixes.Where(p => category.StartsWith(p)).Any();
         }
 
         internal static IConfigurationRoot BuildHostJsonConfigutation(ScriptApplicationHostOptions hostOptions)
