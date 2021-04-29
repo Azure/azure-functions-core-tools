@@ -9,6 +9,8 @@ using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Colors.Net;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.Http.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -154,6 +156,36 @@ namespace Azure.Functions.Cli.Helpers
             }
             return key;
         }
+
+        internal static async Task<string> GetMasterKeyAsync(string appId, string accessToken, string managementURL) {
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                return null;
+            }
+
+            var uri = $"{managementURL}{appId}/host/default/listKeys?api-version={ArmUriTemplates.WebsitesApiVersion}";
+            var key = string.Empty;
+            try
+            {
+                var keysJson = await ArmHttpAsync<JToken>(HttpMethod.Post, new Uri(uri), accessToken);
+                key = keysJson["masterKey"]?.ToString();
+                if (StaticSettings.IsDebug && string.IsNullOrEmpty(key))
+                {
+                    ColoredConsole.WriteLine($"Can not find masterKey for {appId}. URI: {uri}");
+                    return null;
+                }
+            }
+            catch (Exception e)
+            {
+                if (StaticSettings.IsDebug)
+                {
+                    ColoredConsole.WriteLine($"Can not get masterKey for {appId}. URI: {uri} : {e.Message} : {e.StackTrace}");
+                }
+                return null;
+            }
+            return key;
+        }
+        
 
         private static async Task<Site> LoadFunctionApp(Site site, string accessToken, string managementURL)
         {
@@ -357,13 +389,74 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
+        private static HttpClient functionAppReadyClient = null;
+
+        internal static async Task WaitUntilFunctionAppReadyAsync(Site functionApp, string accessToken, string managementURL,
+            bool showKeys, HttpMessageHandler messageHandler = null)
         {
+            var masterKey = await GetMasterKeyAsync(functionApp.SiteId, accessToken, managementURL);
+
+            if (functionAppReadyClient == null)
+            {
+                HttpMessageHandler handler = messageHandler ?? new HttpClientHandler();
+                if (StaticSettings.IsDebug)
+                {
+                    handler = new LoggingHandler(handler);
+                }
+
+                functionAppReadyClient = new HttpClient(handler);
+                const string jsonContentType = "application/json";
+                functionAppReadyClient.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+                functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
+            }
+
+            functionAppReadyClient.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
+            var uri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
+            var request = new HttpRequestMessage()
+            {
+                RequestUri = uri,
+                Method = HttpMethod.Get
+            };
+
+            await RetryHelper.Retry(async () =>
+                  {
+                      var response = await functionAppReadyClient.SendAsync(request);
+
+                      if (!response.IsSuccessStatusCode)
+                      {
+                          var json = await response.Content.ReadAsAsync<JToken>();
+                          var processUpTime = json["processUptime"]?.ToObject<int>() ?? 0;
+
+                          // Wait 60sec for the readiness of the worker process rebooting by deployment.
+                          if (processUpTime >= Constants.DefaultWorkerProcessUptimeReadiness)  
+                          {
+                              return;
+                          }
+                          else
+                          {
+                              throw new Exception($"GetFunctions is not ready. Hostname: {functionApp.HostName}");
+                          }
+                      }
+                      else
+                      {
+                          throw new Exception($"Status check returns unsuccessful status. Hostname: {functionApp.HostName}");
+                      }
+                  }, 6, TimeSpan.FromSeconds(10)
+            );
+        }
+
+
+
+    public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
+        {
+
+            await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL, showKeys);
+
             ArmArrayWrapper<FunctionInfo> functions = null;
             await RetryHelper.Retry(async () =>
             {
                 functions = await GetFunctions(functionApp, accessToken, managementURL);
-                if (!functions.value.Any()) throw new Exception($"GetFunctions is not ready for {functionApp}");
+                if (!functions.value.Any()) throw new Exception($"Cannot get functions information: {functionApp.HostName}");
             }, 3, TimeSpan.FromSeconds(5));
 
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
