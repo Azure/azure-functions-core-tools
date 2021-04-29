@@ -157,7 +157,8 @@ namespace Azure.Functions.Cli.Helpers
             return key;
         }
 
-        internal static async Task<string> GetMasterKeyAsync(string appId, string accessToken, string managementURL) {
+        internal static async Task<string> GetMasterKeyAsync(string appId, string accessToken, string managementURL)
+        {
             if (string.IsNullOrEmpty(accessToken))
             {
                 return null;
