@@ -421,6 +421,7 @@ namespace Azure.Functions.Cli.Helpers
                       };
 
                       var response = await functionAppReadyClient.SendAsync(request);
+                      ColoredConsole.Write(".");
 
                       if (response.IsSuccessStatusCode)
                       {
@@ -430,6 +431,7 @@ namespace Azure.Functions.Cli.Helpers
                           // Wait 60sec for the readiness of the worker process rebooting by deployment.
                           if (processUpTime >= Constants.DefaultWorkerProcessUptimeReadiness)  
                           {
+                              ColoredConsole.WriteLine(" done");
                               return;
                           }
                           else
@@ -448,8 +450,8 @@ namespace Azure.Functions.Cli.Helpers
 
 
     public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
-        {
-
+    {
+            ColoredConsole.Write("Waiting for the functions host up and running ");
             await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL, showKeys);
 
             ArmArrayWrapper<FunctionInfo> functions = null;
