@@ -410,19 +410,19 @@ namespace Azure.Functions.Cli.Helpers
                 functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
             }
 
-            functionAppReadyClient.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
-            var uri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
-            var request = new HttpRequestMessage()
-            {
-                RequestUri = uri,
-                Method = HttpMethod.Get
-            };
-
             await RetryHelper.Retry(async () =>
                   {
+                      functionAppReadyClient.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
+                      var uri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
+                      var request = new HttpRequestMessage()
+                      {
+                          RequestUri = uri,
+                          Method = HttpMethod.Get
+                      };
+
                       var response = await functionAppReadyClient.SendAsync(request);
 
-                      if (!response.IsSuccessStatusCode)
+                      if (response.IsSuccessStatusCode)
                       {
                           var json = await response.Content.ReadAsAsync<JToken>();
                           var processUpTime = json["processUptime"]?.ToObject<int>() ?? 0;
@@ -453,11 +453,8 @@ namespace Azure.Functions.Cli.Helpers
             await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL, showKeys);
 
             ArmArrayWrapper<FunctionInfo> functions = null;
-            await RetryHelper.Retry(async () =>
-            {
-                functions = await GetFunctions(functionApp, accessToken, managementURL);
-                if (!functions.value.Any()) throw new Exception($"Cannot get functions information: {functionApp.HostName}");
-            }, 3, TimeSpan.FromSeconds(5));
+
+            functions = await GetFunctions(functionApp, accessToken, managementURL);
 
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
             foreach (var function in functions.value.Select(v => v.properties))
