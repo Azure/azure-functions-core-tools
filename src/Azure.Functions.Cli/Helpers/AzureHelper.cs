@@ -390,26 +390,27 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static HttpClient functionAppReadyClient = null;
-
         internal static async Task WaitUntilFunctionAppReadyAsync(Site functionApp, string accessToken, string managementURL,
             bool showKeys, HttpMessageHandler messageHandler = null)
         {
             var masterKey = await GetMasterKeyAsync(functionApp.SiteId, accessToken, managementURL);
 
-            if (functionAppReadyClient == null)
+            if (masterKey is null)
             {
-                HttpMessageHandler handler = messageHandler ?? new HttpClientHandler();
-                if (StaticSettings.IsDebug)
-                {
-                    handler = new LoggingHandler(handler);
-                }
-
-                functionAppReadyClient = new HttpClient(handler);
-                const string jsonContentType = "application/json";
-                functionAppReadyClient.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
-                functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
+                throw new CliException($"The masterKey is null. hostname: {functionApp.HostName}.");
             }
+
+            HttpMessageHandler handler = messageHandler ?? new HttpClientHandler();
+            if (StaticSettings.IsDebug)
+            {
+                handler = new LoggingHandler(handler);
+            }
+
+            var functionAppReadyClient = new HttpClient(handler);
+            const string jsonContentType = "application/json";
+            functionAppReadyClient.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+            functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
+            
 
             await RetryHelper.Retry(async () =>
                   {
@@ -452,8 +453,11 @@ namespace Azure.Functions.Cli.Helpers
 
     public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
     {
-            ColoredConsole.Write("Waiting for the functions host up and running ");
-            await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL, showKeys);
+            if (functionApp.IsKubeApp)
+            {
+                ColoredConsole.Write("Waiting for the functions host up and running ");
+                await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL, showKeys);
+            }
 
             ArmArrayWrapper<FunctionInfo> functions = null;
 
