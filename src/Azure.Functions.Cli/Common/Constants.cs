@@ -57,6 +57,8 @@ namespace Azure.Functions.Cli.Common
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
         public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
         public const long DefaultMaxRequestBodySize = 104857600;
+        public const int DefaultWorkerProcessUptimeReadiness = 60000;
+
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
         public static string CliDetailedVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
