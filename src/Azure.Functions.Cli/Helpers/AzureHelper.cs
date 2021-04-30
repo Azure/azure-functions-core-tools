@@ -459,7 +459,7 @@ namespace Azure.Functions.Cli.Helpers
                 await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL, showKeys);
             }
 
-            ArmArrayWrapper<FunctionInfo> functions = null;
+            ArmArrayWrapper<FunctionInfo> functions = await GetFunctions(functionApp, accessToken, managementURL);
 
             functions = await GetFunctions(functionApp, accessToken, managementURL);
 
