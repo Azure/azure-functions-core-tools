@@ -11,7 +11,6 @@ def main(*args):
     if not ver.startswith('3'):
         raise Exception(f"This script only builds packages for major version '3'. Instead received '{ver}'")
     constants.VERSION = ver
-    constants.VERSION = args[1]
     constants.DRIVERROOTDIR = os.path.dirname(os.path.abspath(__file__))
     platformSystem = platform.system()
     if platformSystem == "Linux":
