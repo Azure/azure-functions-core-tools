@@ -382,10 +382,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
+            bool shouldDeferPublishZipDeploy = false;
             if (functionApp.IsKubeApp)
             {
                 shouldSyncTriggers = false;
-                await PublishZipDeploy(functionApp, zipStreamFactory);
+                shouldDeferPublishZipDeploy = true;
             }
             else if (functionApp.IsLinux && functionApp.IsDynamic)
             {
@@ -425,6 +426,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else if (additionalAppSettings.Any())
             {
                 await PublishAppSettings(functionApp, new Dictionary<string, string>(), additionalAppSettings);
+            }
+
+            if (shouldDeferPublishZipDeploy)
+            { 
+                await PublishZipDeploy(functionApp, zipStreamFactory);
             }
 
             if (shouldSyncTriggers)
