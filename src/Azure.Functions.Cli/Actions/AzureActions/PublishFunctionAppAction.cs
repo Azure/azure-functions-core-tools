@@ -466,7 +466,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (PublishBuildOption == BuildOption.Remote)
             {
                 await EnsureRemoteBuildIsSupported(functionApp);
-                await RemoveFunctionAppAppSetting(functionApp, Constants.WebsiteRunFromPackage, Constants.WebsiteContentAzureFileConnectionString, Constants.WebsiteContentShared);
+                await RemoveFunctionAppAppSetting(functionApp, Constants.WebsiteRunFromPackage);
                 Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
                 var deployStatus = await PerformServerSideBuild(functionApp, zipFileFactory, pollConsumptionBuild);
                 return deployStatus == DeployStatus.Success;
