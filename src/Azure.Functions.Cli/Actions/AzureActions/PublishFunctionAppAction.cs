@@ -254,8 +254,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await UpdateDotNetIsolatedFrameworkVersion(functionApp, DotnetFrameworkVersion,
                     (settings) => AzureHelper.UpdateWebSettings(functionApp, settings, AccessToken, ManagementURL));
             }
-
-            if (workerRuntime != WorkerRuntime.dotnetIsolated && functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+            else if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
                 // If linuxFxVersion does not match any of our images
                 if (PublishHelper.IsLinuxFxVersionUsingCustomImage(functionApp.LinuxFxVersion))
