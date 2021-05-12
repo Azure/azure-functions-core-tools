@@ -382,10 +382,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
+            bool shouldDeferPublishZipDeploy = false;
             if (functionApp.IsKubeApp)
             {
                 shouldSyncTriggers = false;
-                await PublishZipDeploy(functionApp, zipStreamFactory);
+                shouldDeferPublishZipDeploy = true;
             }
             else if (functionApp.IsLinux && functionApp.IsDynamic)
             {
@@ -428,6 +429,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishAppSettings(functionApp, new Dictionary<string, string>(), additionalAppSettings);
             }
 
+            if (shouldDeferPublishZipDeploy)
+            { 
+                await PublishZipDeploy(functionApp, zipStreamFactory);
+            }
+
             if (shouldSyncTriggers)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
@@ -439,7 +445,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // So, we only show the info, if Function App is not Linux Elastic Premium
             // or a Linux Dedicated Function App with remote build
             if (!(functionApp.IsLinux && functionApp.IsElasticPremium)
-                && !functionApp.IsKubeApp
                 && !(isFunctionAppDedicatedLinux && PublishBuildOption == BuildOption.Remote))
             {
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
