@@ -485,10 +485,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
-            ColoredConsole.WriteLine(WarningColor($"Your Linux Premium function app does not have Azure Files App Settings" +
+            ColoredConsole.WriteLine(WarningColor($"Your Linux Premium function app does not have Azure Files Application Settings" +
                 $" ('{Constants.WebsiteContentAzureFileConnectionString}', '{Constants.WebsiteContentShared}') configured. Azure Files setup is required to enable" +
                 $"persistent storage in Linux Premium function apps." +
-                $" For more info, see https://docs.microsoft.com/en-us/azure/azure-functions/functions-recover-storage-account#required-application-settings"));
+                $" For more info, see https://aka.ms/linux-ep-storage"));
 
             // If Azure Files settings are not present, we need to do Run From Package = URL deployment
             // Local build
