@@ -31,8 +31,8 @@
     <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
-    <PublishReadyToRun>true</PublishReadyToRun>
-    <PublishReadyToRunShowWarnings>true</PublishReadyToRunShowWarnings>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
 
   <ItemGroup>
