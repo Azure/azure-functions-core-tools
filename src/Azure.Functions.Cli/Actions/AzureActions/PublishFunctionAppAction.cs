@@ -25,10 +25,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "publish", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Publish the current directory contents to an Azure Function App. Locally deleted files are not removed from destination.")]
     internal class PublishFunctionAppAction : BaseFunctionAppAction
     {
-        private const string _hostVersion = "3";
+        private const string _hostVersion = "4";
 
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
+        private const string _requiredNetFrameworkVersion = "6.0";
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
@@ -188,7 +189,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsExtensionVersion, out string version))
                 {
-                    // v3 can be either "~3" or an exact match like "3.0.11961"
+                    // v4 can be either "~4" or an exact match like "4.0.11961"
                     if (!version.Equals($"~{_hostVersion}") &&
                         !version.StartsWith($"{_hostVersion}."))
                     {
@@ -198,10 +199,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         }
                         else
                         {
-                            throw new CliException($"You're trying to use v3 tooling to publish to a non-v3 function app ({Constants.FunctionsExtensionVersion} is set to {version}).\n" +
-                            "You can pass --force to force update the app to v3, or downgrade to v1 or v2 tooling for publishing.");
+                            throw new CliException($"You're trying to use v4 tooling to publish to a non-v4 function app ({Constants.FunctionsExtensionVersion} is set to {version}).\n" +
+                            "You can pass --force to force update the app to v4, or downgrade tooling for publishing.");
                         }
                     }
+                }
+
+                if (string.Compare(functionApp.NetFrameworkVersion, _requiredNetFrameworkVersion, StringComparison.OrdinalIgnoreCase) != 0)
+                {
+                    await DotnetIsolatedWindowsValidation(functionApp, _requiredNetFrameworkVersion,
+                        (settings) => AzureHelper.UpdateWebSettings(functionApp, settings, AccessToken, ManagementURL));
                 }
             }
 

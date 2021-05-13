@@ -1,13 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>func</AssemblyName>
 
     <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>
 
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>3.0</MajorMinorProductVersion>
+    <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
     <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
     <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
     <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
@@ -146,7 +146,7 @@
     <PackageReference Include="DotNetZip" Version="1.13.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.0.15733" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.0.0-preview.1.15799" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
