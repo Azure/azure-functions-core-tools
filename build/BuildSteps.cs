@@ -339,6 +339,9 @@ namespace Build
             string authentiCodeDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToAuthenticodeSign);
             string thirdPartyDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToThirdPartySign);
 
+            Directory.CreateDirectory(authentiCodeDirectory);
+            Directory.CreateDirectory(thirdPartyDirectory);
+
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
                 var sourceDir = Path.Combine(Settings.OutputDir, supportedRuntime);
