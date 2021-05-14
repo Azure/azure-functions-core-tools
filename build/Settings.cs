@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -38,7 +37,13 @@ namespace Build
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
-        public static readonly string[] TargetRuntimes = new[] { "min.win-x86", "min.win-x64", "linux-x64", "osx-x64", "win-x86", "win-x64" };
+        public static readonly string[] TargetRuntimes = new[] { 
+            // "min.win-x86", skipping temporarily
+            // "min.win-x64", 
+            "linux-x64",
+            "osx-x64",
+            "win-x86",
+            "win-x64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
@@ -234,7 +239,7 @@ namespace Build
                 "Microsoft.OData.Core.dll",
                 "Microsoft.OData.Edm.dll",
                 "Microsoft.Spatial.dll",
-				"Mono.Posix.NETStandard.dll",
+                "Mono.Posix.NETStandard.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
             };
         }
