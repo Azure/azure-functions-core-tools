@@ -130,7 +130,7 @@ namespace Build
             public static readonly string ToAuthenticodeSign = "Authenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string ToThirdPartySign = "ThirdParty";
-            public static readonly string[] RuntimesToSign = new[] { "min.win-x86", "min.win-x64" };
+            public static readonly string[] RuntimesToSign = new string[] { /* temporarily skipped "min.win-x86", "min.win-x64" */ };
             public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
