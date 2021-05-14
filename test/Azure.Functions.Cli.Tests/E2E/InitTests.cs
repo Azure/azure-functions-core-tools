@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:3.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:4.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -361,7 +361,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:3.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:4.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
