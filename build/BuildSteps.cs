@@ -6,6 +6,11 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using Colors.Net;
+using Colors.Net.StringColorExtensions;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
+using Newtonsoft.Json;
 
 namespace Build
 {
