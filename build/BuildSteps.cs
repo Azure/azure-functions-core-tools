@@ -6,11 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using Colors.Net;
-using Colors.Net.StringColorExtensions;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Newtonsoft.Json;
 
 namespace Build
 {
@@ -41,7 +36,7 @@ namespace Build
             }
             .Aggregate(string.Empty, (a, b) => $"{a} --source {b}");
 
-            Shell.Run("dotnet", $"restore {Settings.ProjectFile} {feeds}");
+            Shell.Run("dotnet", $"restore {Settings.ProjectFile} -v d {feeds}");
         }
 
         public static void UpdatePackageVersionForIntegrationTests()
