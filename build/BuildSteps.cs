@@ -41,7 +41,7 @@ namespace Build
             }
             .Aggregate(string.Empty, (a, b) => $"{a} --source {b}");
 
-            Shell.Run("dotnet", $"restore {Settings.ProjectFile} -v d {feeds}");
+            Shell.Run("dotnet", $"restore {Settings.ProjectFile} {feeds}");
         }
 
         public static void UpdatePackageVersionForIntegrationTests()
