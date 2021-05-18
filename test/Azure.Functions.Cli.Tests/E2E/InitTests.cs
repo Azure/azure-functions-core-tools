@@ -119,10 +119,10 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet")]
-        [InlineData("node")]
-        [InlineData("powershell")]
-        public Task init_with_Dockerfile(string workerRuntime)
+        [InlineData("dotnet", "4.0")]
+        [InlineData("node", "3.0")]
+        [InlineData("powershell", "3.0")]
+        public Task init_with_Dockerfile(string workerRuntime, string version)
         {
             return CliTester.Run(new RunConfiguration
             {
@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:3.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -344,10 +344,10 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet")]
-        [InlineData("node")]
-        [InlineData("powershell")]
-        public Task init_docker_only_for_existing_project(string workerRuntime)
+        [InlineData("dotnet", "4.0")]
+        [InlineData("node", "3.0")]
+        [InlineData("powershell", "3.0")]
+        public Task init_docker_only_for_existing_project(string workerRuntime, string version)
         {
             return CliTester.Run(new RunConfiguration
             {
@@ -361,7 +361,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:3.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }

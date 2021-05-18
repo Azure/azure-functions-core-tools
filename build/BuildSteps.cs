@@ -1,4 +1,3 @@
-using Colors.Net;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,10 +6,11 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
+using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using Newtonsoft.Json;
 
 namespace Build
 {
@@ -28,14 +28,16 @@ namespace Build
         {
             var feeds = new[]
             {
-                "https://www.nuget.org/api/v2/",
-                "https://www.myget.org/F/azure-appservice/api/v2",
-                "https://www.myget.org/F/azure-appservice-staging/api/v2",
-                "https://www.myget.org/F/fusemandistfeed/api/v2",
-                "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/",
-                "https://www.myget.org/F/xunit/api/v3/index.json",
+                "https://api.nuget.org/v3/index.json",
+                "https://www.myget.org/F/azure-appservice/api/v3/index.json",
+                "https://www.myget.org/F/azure-appservice-staging/api/v3/index.json",
+                //"https://www.myget.org/F/fusemandistfeed/api/v2",
+                //"https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/",
+                //"https://www.myget.org/F/xunit/api/v3/index.json",
                 "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json",
-                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json"
+                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json",
+                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctions/nuget/v3/index.json",
+                "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet6/nuget/v3/index.json"
             }
             .Aggregate(string.Empty, (a, b) => $"{a} --source {b}");
 
@@ -336,6 +338,9 @@ namespace Build
             string toSignDirPath = Path.Combine(Settings.OutputDir, Settings.SignInfo.ToSignDir);
             string authentiCodeDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToAuthenticodeSign);
             string thirdPartyDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToThirdPartySign);
+
+            Directory.CreateDirectory(authentiCodeDirectory);
+            Directory.CreateDirectory(thirdPartyDirectory);
 
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {

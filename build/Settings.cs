@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -23,7 +22,7 @@ namespace Build
         public const string DotnetIsolatedItemTemplatesVersion = "3.1.1733";
         public const string DotnetIsolatedProjectTemplatesVersion = "3.1.1733";
         public const string DotnetItemTemplatesVersion = "3.1.1648";
-        public const string DotnetProjectTemplatesVersion = "3.1.1648";
+        public const string DotnetProjectTemplatesVersion = "4.0.1793";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
@@ -38,7 +37,13 @@ namespace Build
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
-        public static readonly string[] TargetRuntimes = new[] { "min.win-x86", "min.win-x64", "linux-x64", "osx-x64", "win-x86", "win-x64" };
+        public static readonly string[] TargetRuntimes = new[] { 
+            // "min.win-x86", skipping temporarily
+            // "min.win-x64", 
+            "linux-x64",
+            "osx-x64",
+            "win-x86",
+            "win-x64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
@@ -95,7 +100,7 @@ namespace Build
 
         public static readonly string DotnetItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}";
 
-        public static readonly string DotnetProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
+        public static readonly string DotnetProjectTemplates = $"https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
 
         public static readonly string TemplatesJsonZip = $"https://functionscdn.azureedge.net/public/TemplatesApi/{TemplateJsonVersion}.zip";
 
@@ -125,7 +130,7 @@ namespace Build
             public static readonly string ToAuthenticodeSign = "Authenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string ToThirdPartySign = "ThirdParty";
-            public static readonly string[] RuntimesToSign = new[] { "min.win-x86", "min.win-x64" };
+            public static readonly string[] RuntimesToSign = new string[] { /* temporarily skipped "min.win-x86", "min.win-x64" */ };
             public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
@@ -234,7 +239,7 @@ namespace Build
                 "Microsoft.OData.Core.dll",
                 "Microsoft.OData.Edm.dll",
                 "Microsoft.Spatial.dll",
-				"Mono.Posix.NETStandard.dll",
+                "Mono.Posix.NETStandard.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
             };
         }
