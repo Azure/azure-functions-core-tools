@@ -44,7 +44,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool NoBuild { get; set; }
         public string DotnetCliParameters { get; set; }
         public string DotnetFrameworkVersion { get; set; }
-        public bool DeployOnly { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -117,10 +116,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<string>("dotnet-framework-version")
                 .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET Framework version for the function app. For example, set to '5.0' when publishing a .NET 5 app.")
                 .Callback(s => DotnetFrameworkVersion = s);
-            Parser
-                .Setup<bool>("deploy-only")
-                .WithDescription("Skip showing function trigger info after the deployment.")
-                .Callback(f => DeployOnly = f);
             return base.ParseArgs(args);
         }
 
@@ -492,8 +487,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // So, we only show the info, if Function App is not Linux Elastic Premium
             // or a Linux Dedicated Function App with remote build
             if (!(functionApp.IsLinux && functionApp.IsElasticPremium)
-                && !(isFunctionAppDedicatedLinux && PublishBuildOption == BuildOption.Remote)
-                && !DeployOnly)
+                && !(isFunctionAppDedicatedLinux && PublishBuildOption == BuildOption.Remote))
             {
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
             }
