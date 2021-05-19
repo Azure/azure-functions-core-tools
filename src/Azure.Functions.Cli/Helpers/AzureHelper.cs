@@ -468,7 +468,7 @@ namespace Azure.Functions.Cli.Helpers
             if (functionApp.IsKubeApp && !functions.value.Any())
             {
                 ColoredConsole.WriteLine(WarningColor(
-                    $"The deployment success. Wait for {Constants.DefaultRestartedWorkerProcessUptimeWithin / 1000} sec to fetch the trigger info after the function app provisioning has been finished."));
+                    $"The deployment succeeded. Waiting for {Constants.DefaultRestartedWorkerProcessUptimeWithin / 1000} sec to fetch the list of functions deployed in the function app."));
             }
             foreach (var function in functions.value.Select(v => v.properties))
             {
