@@ -110,7 +110,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<string>("dotnet-cli-params")
                 .WithDescription("When publishing dotnet functions, the core tools calls 'dotnet build --output bin/publish'. Any parameters passed to this will be appended to the command line.")
                 .Callback(s => DotnetCliParameters = s);
-
             return base.ParseArgs(args);
         }
 

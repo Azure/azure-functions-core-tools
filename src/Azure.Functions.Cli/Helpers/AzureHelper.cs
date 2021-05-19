@@ -429,9 +429,10 @@ namespace Azure.Functions.Cli.Helpers
                       {
                           var json = await response.Content.ReadAsAsync<JToken>();
                           var processUpTime = json["processUptime"]?.ToObject<int>() ?? 0;
-
-                          // Wait 60sec for the readiness of the worker process rebooting by deployment.
-                          if (processUpTime >= Constants.DefaultWorkerProcessUptimeReadiness)  
+                          // Wait for 30 sec after Restart is happening.
+                          // We assume that we need to wait until the restart happens if the ProcessUpTime is greater than 45sec.
+                          if (processUpTime >= Constants.DefaultGetFunctionReadinessTime &&
+                              processUpTime < Constants.DefaultRestartedWorkerProcessUptimeWithin)
                           {
                               ColoredConsole.WriteLine(" done");
                               return;
@@ -445,7 +446,7 @@ namespace Azure.Functions.Cli.Helpers
                       {
                           throw new Exception($"Status check returns unsuccessful status. Hostname: {functionApp.HostName}");
                       }
-                  }, 6, TimeSpan.FromSeconds(10)
+                  }, 18, TimeSpan.FromSeconds(3)
             );
         }
 
@@ -464,6 +465,11 @@ namespace Azure.Functions.Cli.Helpers
             functions = await GetFunctions(functionApp, accessToken, managementURL);
 
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
+            if (functionApp.IsKubeApp && !functions.value.Any())
+            {
+                ColoredConsole.WriteLine(WarningColor(
+                    $"The deployment succeeded. Waiting for {Constants.DefaultRestartedWorkerProcessUptimeWithin / 1000} sec to fetch the list of functions deployed in the function app."));
+            }
             foreach (var function in functions.value.Select(v => v.properties))
             {
                 var trigger = function
