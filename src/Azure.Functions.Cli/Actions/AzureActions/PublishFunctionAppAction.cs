@@ -116,7 +116,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<string>("dotnet-framework-version")
                 .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET Framework version for the function app. For example, set to '5.0' when publishing a .NET 5 app.")
                 .Callback(s => DotnetFrameworkVersion = s);
-
             return base.ParseArgs(args);
         }
 
