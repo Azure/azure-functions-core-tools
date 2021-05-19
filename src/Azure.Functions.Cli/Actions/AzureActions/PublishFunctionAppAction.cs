@@ -113,8 +113,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("When publishing dotnet functions, the core tools calls 'dotnet build --output bin/publish'. Any parameters passed to this will be appended to the command line.")
                 .Callback(s => DotnetCliParameters = s);
             Parser
-                .Setup<string>("dotnet-framework-version")
-                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET Framework version for the function app. For example, set to '5.0' when publishing a .NET 5 app.")
+                .Setup<string>("dotnet-version")
+                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET version for the function app. For example, set to '5.0' when publishing a .NET 5.0 app.")
                 .Callback(s => DotnetFrameworkVersion = s);
             return base.ParseArgs(args);
         }
@@ -1075,12 +1075,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // remove any leading "v" and try again
                 if (!Version.TryParse(version.ToLower().TrimStart('v'), out parsedVersion))
                 {
-                    throw new CliException($"The dotnet-framework-version value of '{version}' is invalid. Specify a value like '5.0'.");
+                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '5.0'.");
                 }
             }
 
             string normalizedVersion = $"{parsedVersion.Major}.{parsedVersion.Minor}";
-            ColoredConsole.WriteLine($"Using dotnet-framework-version value of '{normalizedVersion}'.");
+            ColoredConsole.WriteLine($"Using dotnet-version value of '{normalizedVersion}'.");
             return normalizedVersion;
         }
     }
