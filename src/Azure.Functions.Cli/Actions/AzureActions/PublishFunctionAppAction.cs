@@ -114,10 +114,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .WithDescription("When publishing dotnet functions, the core tools calls 'dotnet build --output bin/publish'. Any parameters passed to this will be appended to the command line.")
                 .Callback(s => DotnetCliParameters = s);
             Parser
-                .Setup<string>("dotnet-framework-version")
-                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET Framework version for the function app. For example, set to '5.0' when publishing a .NET 5 app.")
+                .Setup<string>("dotnet-version")
+                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET version for the function app. For example, set to '5.0' when publishing a .NET 5.0 app.")
                 .Callback(s => DotnetFrameworkVersion = s);
-
             return base.ParseArgs(args);
         }
 
@@ -315,33 +314,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         internal static async Task UpdateDotNetIsolatedFrameworkVersion(Site functionApp, string dotnetFrameworkVersion,
             Func<Dictionary<string, string>, Task<HttpResult<string, string>>> updateWebSettings)
         {
-            string normalizedVersion;
-            if (dotnetFrameworkVersion == null)
-            {
-                // Legacy behavior.
-                normalizedVersion = "5.0";
-            }
-            else if (!TryNormalizeDotnetFrameworkVersion(dotnetFrameworkVersion, out normalizedVersion))
-            {
-                throw new CliException($"The dotnet-framework-version value of '{dotnetFrameworkVersion}' is invalid. Specify a value like '5.0'.");
-            }
-
             if (functionApp.IsLinux)
             {
                 // For dotnet isolated, as function create options are limited, we update an exisiting App to .NET 5 isolated app,
                 // if the user is trying to deploy that. This is why we need to special case this scenario and set the proper
                 // LinuxFxVersion properties when missing.
-                await DotnetIsolatedLinuxValidation(functionApp, normalizedVersion, updateWebSettings);
+                await DotnetIsolatedLinuxValidation(functionApp, dotnetFrameworkVersion, updateWebSettings);
             }
             else
             {
-                await DotnetIsolatedWindowsValidation(functionApp, normalizedVersion, updateWebSettings);
+                await UpdateNetFrameworkVersionWindows(functionApp, dotnetFrameworkVersion, updateWebSettings);
             }
         }
 
-        private static async Task DotnetIsolatedWindowsValidation(Site functionApp, string normalizedVersion,
+        private static async Task UpdateNetFrameworkVersionWindows(Site functionApp, string dotnetFramworkVersion,
             Func<Dictionary<string, string>, Task<HttpResult<string, string>>> updateWebSettings)
         {
+            string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
+
             // Websites ensure it begins with 'v'.
             string version = $"v{normalizedVersion}";
             if (!string.Equals(functionApp.NetFrameworkVersion, version, StringComparison.OrdinalIgnoreCase))
@@ -363,9 +353,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private static async Task DotnetIsolatedLinuxValidation(Site functionApp, string normalizedVersion,
+        private static async Task DotnetIsolatedLinuxValidation(Site functionApp, string dotnetFramworkVersion,
             Func<Dictionary<string, string>, Task<HttpResult<string, string>>> updateWebSettings)
         {
+            string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
+
             string linuxFxVersion;
 
             if (functionApp.IsDynamic)
@@ -1076,21 +1068,27 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return client;
         }
 
-        private static bool TryNormalizeDotnetFrameworkVersion(string version, out string normalizedVersion)
+        private static string NormalizeDotnetFrameworkVersion(string version)
         {
-            if (!Version.TryParse(version, out Version parsedVersion))
+            Version parsedVersion;
+
+            if (version == null)
+            {
+                // Legacy behavior.
+                parsedVersion = new Version("5.0");
+            }
+            else if (!Version.TryParse(version, out parsedVersion))
             {
                 // remove any leading "v" and try again
                 if (!Version.TryParse(version.ToLower().TrimStart('v'), out parsedVersion))
                 {
-                    normalizedVersion = null;
-                    return false;
+                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '5.0'.");
                 }
             }
 
-            normalizedVersion = $"{parsedVersion.Major}.{parsedVersion.Minor}";
-            ColoredConsole.WriteLine($"Using dotnet-framework-version value of '{normalizedVersion}'.");
-            return true;
+            string normalizedVersion = $"{parsedVersion.Major}.{parsedVersion.Minor}";
+            ColoredConsole.WriteLine($"Using dotnet-version value of '{normalizedVersion}'.");
+            return normalizedVersion;
         }
     }
 }
