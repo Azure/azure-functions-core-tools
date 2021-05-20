@@ -118,7 +118,7 @@ namespace Azure.Functions.Cli.Tests
             var exception = await Assert.ThrowsAsync<CliException>(() =>
                 PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, specifiedVersion, UpdateWebSettings));
 
-            Assert.StartsWith($"The dotnet-framework-version value of '{specifiedVersion}' is invalid.", exception.Message);
+            Assert.StartsWith($"The dotnet-version value of '{specifiedVersion}' is invalid.", exception.Message);
         }
 
         private Task<HttpResult<string, string>> UpdateWebSettings(Dictionary<string, string> settings)
