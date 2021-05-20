@@ -206,7 +206,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 if (string.Compare(functionApp.NetFrameworkVersion, _requiredNetFrameworkVersion, StringComparison.OrdinalIgnoreCase) != 0)
                 {
-                    await DotnetIsolatedWindowsValidation(functionApp, _requiredNetFrameworkVersion,
+                    await UpdateNetFrameworkVersionWindows(functionApp, _requiredNetFrameworkVersion,
                         (settings) => AzureHelper.UpdateWebSettings(functionApp, settings, AccessToken, ManagementURL));
                 }
             }
