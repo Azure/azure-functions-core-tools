@@ -41,7 +41,7 @@ jobs:
       versionSpec: '10.x'
   - task: PowerShell@2
     displayName: 'Install .NET 6.0'
-    condition: ne('${{ variables.DOTNET_URL }}', '')
+    condition: ne('${{ MAPPED_DOTNET_URL }}', '')
     inputs:
       targetType: 'inline'
       script: |
@@ -54,10 +54,26 @@ jobs:
     inputs:
       targetType: 'inline'
       script: |
-        Invoke-WebRequest 'https://dot.net/v1/dotnet-install.ps1' -OutFile 'dotnet-install.ps1'
-        # Official release versions can be found at: https://dotnet.microsoft.com/download/dotnet/6.0
-        # Newer versions can be found at: https://github.com/dotnet/installer#installers-and-binaries
-        ./dotnet-install.ps1 -InstallDir 'C:\Program Files\dotnet' -Verbose -Version 6.0.100-preview.4.21255.9
+        $DOTNET_URLS = $env:MAPPED_DOTNET_URLS
+        if ($DOTNET_URLS)
+        {
+          $urls = $DOTNET_URLS -split ";"
+          foreach ($url in $urls)
+          {
+            Invoke-WebRequest $url -OutFile 'temp.zip'
+            Expand-Archive -Path 'temp.zip' -DestinationPath 'C:\Program Files\dotnet' -Force
+            Remove-Item 'temp.zip'
+          }
+        }
+        else
+        {
+            Invoke-WebRequest 'https://dot.net/v1/dotnet-install.ps1' -OutFile 'dotnet-install.ps1'
+            # Official release versions can be found at: https://dotnet.microsoft.com/download/dotnet/6.0
+            # Newer versions can be found at: https://github.com/dotnet/installer#installers-and-binaries
+            ./dotnet-install.ps1 -InstallDir 'C:\Program Files\dotnet' -Verbose -Version "6.0.100-preview.4.21255.9"
+        }
+    env: 
+      MAPPED_DOTNET_URLS: $(DOTNET_URLS)
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
