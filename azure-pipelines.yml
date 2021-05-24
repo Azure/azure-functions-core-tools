@@ -49,7 +49,14 @@ jobs:
           $urls = $DOTNET_URLS -split ";"
           foreach ($url in $urls)
           {
-            Invoke-WebRequest $url -OutFile 'temp.zip' | Out-Null
+            try 
+            {
+                Invoke-WebRequest $url -OutFile 'temp.zip' | Out-Null
+            }
+            catch
+            {
+                Throw "Error downloading zip file."
+            }
             Expand-Archive -Path 'temp.zip' -DestinationPath 'C:\Program Files\dotnet' -Force
             Remove-Item 'temp.zip'
           }
