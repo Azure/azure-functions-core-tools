@@ -51,13 +51,22 @@ jobs:
           {
             try 
             {
+                Write-Host "Downloading zip..."        
                 Invoke-WebRequest $url -OutFile 'temp.zip' | Out-Null
+                Write-Host "Done."
             }
             catch
             {
                 Throw "Error downloading zip file."
             }
-            Expand-Archive -Path 'temp.zip' -DestinationPath 'C:\Program Files\dotnet' -Force
+        
+            $destPath = "C:\Program Files\dotnet"            
+            if ($url.Contains("dotnet-runtime"))
+            {
+                # adjust path for runtime
+                $destPath = "C:\Program Files\dotnet\shared"
+            }
+            Expand-Archive -Path 'temp.zip' -DestinationPath $destPath -Force
             Remove-Item 'temp.zip'
           }
         }
