@@ -22,7 +22,6 @@ jobs:
     devops_buildNumber: $[counter(format(''), 1500)]
     APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
-    DOTNET_URL: $(DOTNET_URL)
   steps:
   - pwsh: |
       $isIntegrationBuild = $false
