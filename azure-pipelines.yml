@@ -44,6 +44,7 @@ jobs:
       targetType: 'inline'
       script: |
         $DOTNET_URLS = $env:MAPPED_DOTNET_URLS
+        $DOTNET_SOURCE = $env:MAPPED_DOTNET_SOURCE
         if ($DOTNET_URLS)
         {
           $urls = $DOTNET_URLS -split ";"
@@ -51,7 +52,7 @@ jobs:
           {
             try 
             {
-                Write-Host "Downloading zip..."        
+                Write-Host "Downloading zip..." -NoNewline
                 Invoke-WebRequest $url -OutFile 'temp.zip' | Out-Null
                 Write-Host "Done."
             }
@@ -60,14 +61,22 @@ jobs:
                 Throw "Error downloading zip file."
             }
         
-            $destPath = "C:\Program Files\dotnet"            
+            $destPath = "C:\Program Files\dotnet"
             if ($url.Contains("dotnet-runtime"))
             {
                 # adjust path for runtime
                 $destPath = "C:\Program Files\dotnet\shared"
             }
+            Write-Host "Extracting zip to $destPath..." -NoNewline
             Expand-Archive -Path 'temp.zip' -DestinationPath $destPath -Force
             Remove-Item 'temp.zip'
+            Write-Host "Done."
+          }
+          if($DOTNET_SOURCE)
+          {                
+            & dotnet nuget remove source dotnet6 | Out-Null
+            & dotnet nuget add source $DOTNET_SOURCE | Out-Null
+            Write-Host "Nuget source updated."
           }
         }
         else
@@ -77,8 +86,10 @@ jobs:
             # Newer versions can be found at: https://github.com/dotnet/installer#installers-and-binaries
             ./dotnet-install.ps1 -InstallDir 'C:\Program Files\dotnet' -Verbose -Version "6.0.100-preview.4.21255.9"
         }
+        & dotnet --info
     env: 
       MAPPED_DOTNET_URLS: $(DOTNET_URLS)
+      MAPPED_DOTNET_SOURCE: $(DOTNET_SOURCE)
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
