@@ -42,7 +42,10 @@ jobs:
   - task: PowerShell@2
     displayName: 'Install .NET 6.0'
     condition: ne('${{ variables.DOTNET_URL }}', '')
-      Write-Host "Mapped - $env:MAPPED_DOTNET_URL"
+    inputs:
+      targetType: 'inline'
+      script: |
+        Write-Host "Mapped: $env:MAPPED_DOTNET_URL"
     env: 
       MAPPED_DOTNET_URL: $(DOTNET_URL)
   - task: PowerShell@2
