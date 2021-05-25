@@ -37,9 +37,9 @@ namespace Build
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
-        public static readonly string[] TargetRuntimes = new[] { 
+        public static readonly string[] TargetRuntimes = new[] {
             "min.win-x86",
-            "min.win-x64", 
+            "min.win-x64",
             "linux-x64",
             "osx-x64",
             "win-x86",
@@ -130,7 +130,7 @@ namespace Build
             public static readonly string ToAuthenticodeSign = "Authenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string ToThirdPartySign = "ThirdParty";
-            public static readonly string[] RuntimesToSign = new string[] { /* temporarily skipped "min.win-x86", "min.win-x64" */ };
+            public static readonly string[] RuntimesToSign = new string[] { "min.win-x86", "min.win-x64" };
             public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
