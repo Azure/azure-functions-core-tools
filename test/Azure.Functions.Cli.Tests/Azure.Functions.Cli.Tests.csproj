@@ -39,7 +39,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\.nuget\NuGet.Config" Link="NuGet.Config">
+    <None Include="..\..\NuGet.Config" Link="NuGet.Config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
