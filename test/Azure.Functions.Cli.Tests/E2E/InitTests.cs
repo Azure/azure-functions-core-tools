@@ -1,14 +1,12 @@
 ﻿using System;
-using System.IO;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.IO;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
 using Xunit.Abstractions;
-using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -119,7 +117,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet", "4.0")]
+        [InlineData("dotnet", "4")]
         [InlineData("node", "3.0")]
         [InlineData("powershell", "3.0")]
         public Task init_with_Dockerfile(string workerRuntime, string version)
@@ -344,7 +342,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet", "4.0")]
+        [InlineData("dotnet", "4")]
         [InlineData("node", "3.0")]
         [InlineData("powershell", "3.0")]
         public Task init_docker_only_for_existing_project(string workerRuntime, string version)
