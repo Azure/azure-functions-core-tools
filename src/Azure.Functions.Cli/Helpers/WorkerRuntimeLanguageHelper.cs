@@ -75,6 +75,31 @@ namespace Azure.Functions.Cli.Helpers
                 .Where(k => (k != WorkerRuntime.java))
                 .Select(s => s.ToString()));
 
+        public static string GetRuntimeMoniker(WorkerRuntime workerRuntime) 
+        {
+            switch(workerRuntime)
+            {
+                case WorkerRuntime.None:
+                    return "None";
+                case WorkerRuntime.dotnet:
+                    return "dotnet";
+                case WorkerRuntime.dotnetIsolated:
+                    return "dotnet-isolated";
+                case WorkerRuntime.node:
+                    return "node";
+                case WorkerRuntime.python:
+                    return "python";
+                case WorkerRuntime.java:
+                    return "java";
+                case WorkerRuntime.powershell:
+                    return "powershell";
+                case WorkerRuntime.custom:
+                    return "custom";
+                default:
+                    return "None";
+            }
+        }
+
         public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
         {
             IDictionary<WorkerRuntime, string> workerToDisplayStrings = new Dictionary<WorkerRuntime, string>();
