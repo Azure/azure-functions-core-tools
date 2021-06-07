@@ -37,6 +37,26 @@ function WriteLog
     Write-Host $Message
 }
 
+function GetContentType
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [System.String]
+        $FilePath
+    )
+
+    $fileExtension =  [System.IO.Path]::GetExtension($FilePath)
+
+    switch ($fileExtension)
+    {
+        ".txt" { "text/plain" }
+        ".json" { "application/json" }
+        default { "application/octet-stream"}
+    }
+}
+
 WriteLog -Message "Script started."
 
 $CONTAINER_NAME = "builds"
@@ -48,8 +68,8 @@ if (-not (Test-Path $SourcePath))
 }
 
 WriteLog "Validating source path '$SourcePath'."
-$filesToUploaded = @(Get-ChildItem -Path "$SourcePath/*.zip" | ForEach-Object {$_.FullName})
-if ($filesToUploaded.Count -eq 0)
+$filesToUpload = @(Get-ChildItem -Path "$SourcePath/*.zip" | ForEach-Object {$_.FullName})
+if ($filesToUpload.Count -eq 0)
 {
     WriteLog -Message "'$SourcePath' does not contain any zip files to upload." -Throw
 }
@@ -86,7 +106,7 @@ try
 {
     WriteLog -Message "Reading $manifestFileName."
     $manifest = Get-Content $manifestFilePath -Raw | ConvertFrom-Json -ErrorAction Stop
-    $filesToUploaded += $manifestFilePath
+    $filesToUpload += $manifestFilePath
 }
 catch
 {
@@ -98,7 +118,7 @@ WriteLog -Message "Creating version.txt file..."
 $version = $manifest.CoreToolsVersion
 $versionFilePath = Join-Path $SourcePath "version.txt"
 $version | Set-Content -Path $versionFilePath
-$filesToUploaded += $versionFilePath
+$filesToUpload += $versionFilePath
 
 # These are the destination paths in the storage account
 # "https://<storageAccountName>.blob.core.windows.net/builds/$FUNC_RUNTIME_VERSION/latest/Azure.Functions.Cli.$os-$arch.zip"
@@ -118,10 +138,12 @@ if ($filesToDelete.Count -gt 0)
 
 foreach ($path in @($latestDestinationPath, $versionDestinationPath))
 {
-    foreach ($file in $filesToUploaded)
+    foreach ($file in $filesToUpload)
     {
         $fileName = Split-Path $file -Leaf
         $destinationPath = Join-Path $path $fileName
+
+        $contentType = GetContentType -FilePath $file
 
         if ($destinationPath -like "*latest*")
         {
@@ -139,6 +161,7 @@ foreach ($path in @($latestDestinationPath, $versionDestinationPath))
                                      -Context $context `
                                      -StandardBlobTier Hot `
                                      -ErrorAction Stop `
+                                     -Properties  @{"ContentType" = $contentType} `
                                      -Force | Out-Null
         }
         catch
