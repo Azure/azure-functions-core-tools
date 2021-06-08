@@ -248,44 +248,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
             }
 
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
-            {
-                await UpdateDotNetIsolatedFrameworkVersion(functionApp, DotnetFrameworkVersion,
-                    (settings) => AzureHelper.UpdateWebSettings(functionApp, settings, AccessToken, ManagementURL));
-            }
-            else if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
-            {
-                // If linuxFxVersion does not match any of our images
-                if (PublishHelper.IsLinuxFxVersionUsingCustomImage(functionApp.LinuxFxVersion))
-                {
-                    ColoredConsole.WriteLine($"Your functionapp is using a custom image {functionApp.LinuxFxVersion}.\nAssuming that the image contains the correct framework.\n");
-                }
-                // If there the functionapp is our image but does not match the worker runtime image, we either fail or force update
-                else if (!PublishHelper.IsLinuxFxVersionRuntimeMatched(functionApp.LinuxFxVersion, workerRuntime))
-                {
-                    if (Force)
-                    {
-                        var updatedSettings = new Dictionary<string, string>
-                        {
-                            [Constants.LinuxFxVersion] = $"DOCKER|{Constants.WorkerRuntimeImages.GetValueOrDefault(workerRuntime).FirstOrDefault()}"
-                        };
-
-                        var settingsResult = await AzureHelper.UpdateWebSettings(functionApp, updatedSettings, AccessToken, ManagementURL);
-
-                        if (!settingsResult.IsSuccessful)
-                        {
-                            ColoredConsole.Error
-                                .WriteLine(ErrorColor("Error updating linux image version:"))
-                                .WriteLine(ErrorColor(settingsResult.ErrorResult));
-                        }
-                    }
-                    else
-                    {
-                        throw new CliException($"Your Linux dedicated app has the container image version (LinuxFxVersion) set to {functionApp.LinuxFxVersion} which is not expected for the worker runtime {workerRuntime}. " +
-                        $"To force publish use --force. This will update your app to the expected image for worker runtime {workerRuntime}\n");
-                    }
-                }
-            }
+            await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, new AzureHelperService(AccessToken, ManagementURL));
 
             // Special checks for python dependencies
             if (workerRuntime == WorkerRuntime.python)
@@ -304,24 +267,64 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return result;
         }
 
-        internal static async Task UpdateDotNetIsolatedFrameworkVersion(Site functionApp, string dotnetFrameworkVersion,
-            Func<Dictionary<string, string>, Task<HttpResult<string, string>>> updateWebSettings)
+        internal static async Task UpdateFrameworkVersions(Site functionApp, WorkerRuntime workerRuntime, string requestedDotNetVersion, bool force, AzureHelperService helperService)
+        {
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            {
+                await UpdateDotNetIsolatedFrameworkVersion(functionApp, requestedDotNetVersion, helperService);
+            }
+            else if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+            {
+                // If linuxFxVersion does not match any of our images
+                if (PublishHelper.IsLinuxFxVersionUsingCustomImage(functionApp.LinuxFxVersion))
+                {
+                    ColoredConsole.WriteLine($"Your functionapp is using a custom image {functionApp.LinuxFxVersion}.\nAssuming that the image contains the correct framework.\n");
+                }
+                // If there the functionapp is our image but does not match the worker runtime image, we either fail or force update
+                else if (!PublishHelper.IsLinuxFxVersionRuntimeMatched(functionApp.LinuxFxVersion, workerRuntime))
+                {
+                    if (force)
+                    {
+                        var updatedSettings = new Dictionary<string, string>
+                        {
+                            [Constants.LinuxFxVersion] = $"DOCKER|{Constants.WorkerRuntimeImages.GetValueOrDefault(workerRuntime).FirstOrDefault()}"
+                        };
+
+                        var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
+
+                        if (!settingsResult.IsSuccessful)
+                        {
+                            ColoredConsole.Error
+                                .WriteLine(ErrorColor("Error updating linux image version:"))
+                                .WriteLine(ErrorColor(settingsResult.ErrorResult));
+                        }
+                    }
+                    else
+                    {
+                        throw new CliException($"Your Linux dedicated app has the container image version (LinuxFxVersion) set to {functionApp.LinuxFxVersion} which is not expected for the worker runtime {workerRuntime}. " +
+                        $"To force publish use --force. This will update your app to the expected image for worker runtime {workerRuntime}\n");
+                    }
+                }
+            }
+
+        }
+
+        private static async Task UpdateDotNetIsolatedFrameworkVersion(Site functionApp, string dotnetFrameworkVersion, AzureHelperService helperService)
         {
             if (functionApp.IsLinux)
             {
                 // For dotnet isolated, as function create options are limited, we update an exisiting App to .NET 5 isolated app,
                 // if the user is trying to deploy that. This is why we need to special case this scenario and set the proper
                 // LinuxFxVersion properties when missing.
-                await DotnetIsolatedLinuxValidation(functionApp, dotnetFrameworkVersion, updateWebSettings);
+                await DotnetIsolatedLinuxValidation(functionApp, dotnetFrameworkVersion, helperService);
             }
             else
             {
-                await UpdateNetFrameworkVersionWindows(functionApp, dotnetFrameworkVersion, updateWebSettings);
+                await UpdateNetFrameworkVersionWindows(functionApp, dotnetFrameworkVersion, helperService);
             }
         }
 
-        private static async Task UpdateNetFrameworkVersionWindows(Site functionApp, string dotnetFramworkVersion,
-            Func<Dictionary<string, string>, Task<HttpResult<string, string>>> updateWebSettings)
+        private static async Task UpdateNetFrameworkVersionWindows(Site functionApp, string dotnetFramworkVersion, AzureHelperService helperService)
         {
             string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
 
@@ -335,7 +338,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     [Constants.DotnetFrameworkVersion] = $"{version}"
                 };
-                var settingsResult = await updateWebSettings(dotnetSiteConfig);
+                var settingsResult = await helperService.UpdateWebSettings(functionApp, dotnetSiteConfig);
 
                 if (!settingsResult.IsSuccessful)
                 {
@@ -346,8 +349,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private static async Task DotnetIsolatedLinuxValidation(Site functionApp, string dotnetFramworkVersion,
-            Func<Dictionary<string, string>, Task<HttpResult<string, string>>> updateWebSettings)
+        private static async Task DotnetIsolatedLinuxValidation(Site functionApp, string dotnetFramworkVersion, AzureHelperService helperService)
         {
             string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
 
@@ -384,7 +386,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     [Constants.LinuxFxVersion] = linuxFxVersion
                 };
 
-                var settingsResult = await updateWebSettings(updatedSettings);
+                var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
 
                 if (!settingsResult.IsSuccessful)
                 {
@@ -1082,6 +1084,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             string normalizedVersion = $"{parsedVersion.Major}.{parsedVersion.Minor}";
             ColoredConsole.WriteLine($"Using dotnet-version value of '{normalizedVersion}'.");
             return normalizedVersion;
+        }
+
+        // For testing
+        internal class AzureHelperService
+        {
+            private readonly string _accessToken;
+            private readonly string _managementUrl;
+
+            public AzureHelperService(string accessToken, string managementUrl)
+            {
+                _accessToken = accessToken;
+                _managementUrl = managementUrl;
+            }
+
+            public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
+                 AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
         }
     }
 }
