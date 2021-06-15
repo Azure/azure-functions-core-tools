@@ -84,7 +84,7 @@ namespace Azure.Functions.Cli
 
                 if (args.Any(a => a.Equals("--pause-on-error", StringComparison.OrdinalIgnoreCase)))
                 {
-                    ColoredConsole.Write("Press any to continue....");
+                    ColoredConsole.Write("Press any key to continue....");
                     Console.ReadKey(true);
                 }
 
