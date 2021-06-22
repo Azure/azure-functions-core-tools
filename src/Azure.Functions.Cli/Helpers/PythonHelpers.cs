@@ -26,6 +26,7 @@ namespace Azure.Functions.Cli.Helpers
 
             await CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
+            await CreateGettingStartedMarkdown();
         }
 
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
@@ -73,6 +74,20 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     // Safe execution, we aren't harmed by failures here
                 }
+            }
+        }
+
+        private async static Task CreateGettingStartedMarkdown()
+        {
+            if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+            {
+                ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
+                string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
+                await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
+            }
+            else
+            {
+                ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
             }
         }
 
