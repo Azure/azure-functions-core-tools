@@ -19,14 +19,18 @@ namespace Azure.Functions.Cli.Helpers
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
         private static WorkerLanguageVersionInfo _pythonVersionCache = null;
 
-        public static async Task SetupPythonProject()
+        public static async Task SetupPythonProject(bool generatePythonDocumentation = true)
         {
             var pyVersion = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pyVersion, errorIfNoVersion: false);
 
             await CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
-            await CreateGettingStartedMarkdown();
+
+            if (generatePythonDocumentation)
+            {
+                await CreateGettingStartedMarkdown();
+            }
         }
 
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
