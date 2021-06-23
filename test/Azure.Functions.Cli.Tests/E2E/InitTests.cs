@@ -532,6 +532,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing .gitignore",
                     "Writing host.json",
                     "Writing local.settings.json",
+                    $"Writing {Constants.PythonGettingStarted}",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                     "requirements.txt already exists. Skipped!",
                     ".gitignore already exists. Skipped!",
@@ -564,6 +565,33 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
                             "# Do not include azure-functions-worker as it may conflict with the Azure Functions platform",
                             "azure-functions"
+                        }
+                    }
+                },
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_python_app_generates_getting_started_md()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime python"
+                },
+                OutputContains = new[]
+                {
+                    "Writing getting_started.md"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "getting_started.md",
+                        ContentContains = new []
+                        {
+                            "## Getting Started with Azure Function"
                         }
                     }
                 },
