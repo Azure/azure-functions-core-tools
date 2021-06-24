@@ -183,6 +183,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             var result = new Dictionary<string, string>();
 
+            var azureHelperService = new AzureHelperService(AccessToken, ManagementURL);
+
             // Check version
             if (!functionApp.IsLinux)
             {
@@ -206,8 +208,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 if (string.Compare(functionApp.NetFrameworkVersion, _requiredNetFrameworkVersion, StringComparison.OrdinalIgnoreCase) != 0)
                 {
-                    await UpdateNetFrameworkVersionWindows(functionApp, _requiredNetFrameworkVersion,
-                        (settings) => AzureHelper.UpdateWebSettings(functionApp, settings, AccessToken, ManagementURL));
+                    await UpdateNetFrameworkVersionWindows(functionApp, _requiredNetFrameworkVersion, azureHelperService);
                 }
             }
 
@@ -255,7 +256,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
             }
 
-            await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, new AzureHelperService(AccessToken, ManagementURL));
+            await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
 
             // Special checks for python dependencies
             if (workerRuntime == WorkerRuntime.python)
