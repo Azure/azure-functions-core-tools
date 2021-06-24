@@ -4,13 +4,15 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
 using Xunit;
+using static Azure.Functions.Cli.Actions.AzureActions.PublishFunctionAppAction;
 
 namespace Azure.Functions.Cli.Tests
 {
     public class PublishActionTests
     {
-        private Dictionary<string, string> _settings;
+        TestAzureHelperService _helperService = new TestAzureHelperService();
 
         [Fact]
         public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_AlreadyEmpty()
@@ -22,10 +24,10 @@ namespace Azure.Functions.Cli.Tests
                 LinuxFxVersion = null
             };
 
-            await PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, "6.0", UpdateWebSettings);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, "6.0", false, _helperService);
 
             // no-op if already null or empty
-            Assert.Null(_settings);
+            Assert.Null(_helperService.UpdatedSettings);
         }
 
         [Fact]
@@ -38,10 +40,10 @@ namespace Azure.Functions.Cli.Tests
                 LinuxFxVersion = "something"
             };
 
-            await PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, "6.0", UpdateWebSettings);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, "6.0", false, _helperService);
 
             // update it to empty
-            var setting = _settings.Single();
+            var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
             Assert.Equal(string.Empty, setting.Value);
         }
@@ -57,9 +59,9 @@ namespace Azure.Functions.Cli.Tests
                 Kind = "linux"
             };
 
-            await PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, specifiedVersion, UpdateWebSettings);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, specifiedVersion, false, _helperService);
 
-            var setting = _settings.Single();
+            var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
             Assert.Equal("DOTNET-ISOLATED|6.0", setting.Value);
         }
@@ -72,9 +74,9 @@ namespace Azure.Functions.Cli.Tests
         {
             var site = new Site("test");
 
-            await PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, specifiedVersion, UpdateWebSettings);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, specifiedVersion, false, _helperService);
 
-            var setting = _settings.Single();
+            var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
             Assert.Equal("v6.0", setting.Value);
         }
@@ -88,9 +90,9 @@ namespace Azure.Functions.Cli.Tests
                 Kind = "linux"
             };
 
-            await PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, null, UpdateWebSettings);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, null, false, _helperService);
 
-            var setting = _settings.Single();
+            var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
             Assert.Equal("DOTNET-ISOLATED|5.0", setting.Value);
         }
@@ -101,9 +103,9 @@ namespace Azure.Functions.Cli.Tests
             // If not specified, assume 5.0
             var site = new Site("test");
 
-            await PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, null, UpdateWebSettings);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, null, false, _helperService);
 
-            var setting = _settings.Single();
+            var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
             Assert.Equal("v5.0", setting.Value);
         }
@@ -116,15 +118,25 @@ namespace Azure.Functions.Cli.Tests
             var site = new Site("test");
 
             var exception = await Assert.ThrowsAsync<CliException>(() =>
-                PublishFunctionAppAction.UpdateDotNetIsolatedFrameworkVersion(site, specifiedVersion, UpdateWebSettings));
+                PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, specifiedVersion, false, _helperService));
 
             Assert.StartsWith($"The dotnet-version value of '{specifiedVersion}' is invalid.", exception.Message);
         }
 
-        private Task<HttpResult<string, string>> UpdateWebSettings(Dictionary<string, string> settings)
+        private class TestAzureHelperService : AzureHelperService
         {
-            _settings = settings;
-            return Task.FromResult(new HttpResult<string, string>(string.Empty));
+            public Dictionary<string, string> UpdatedSettings { get; private set; }
+
+            public TestAzureHelperService()
+                : base(null, null)
+            {
+            }
+
+            public override Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings)
+            {
+                UpdatedSettings = updatedSettings;
+                return Task.FromResult(new HttpResult<string, string>(string.Empty));
+            }
         }
     }
 }
