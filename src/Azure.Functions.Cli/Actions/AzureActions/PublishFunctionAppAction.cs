@@ -215,7 +215,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         if (Force)
                         {
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
-                            result[Constants.FunctionsWorkerRuntime] = workerRuntime.ToString();
+                            result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                         }
                         else if (workerRuntime == WorkerRuntime.dotnetIsolated)
                         {
@@ -223,7 +223,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             // This way we temporarily update worker runtime in Azure if locally they are using dotnet-isolated.
                             // TODO: Revisit this before GA
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to 'dotnet-isolated'"));
-                            result[Constants.FunctionsWorkerRuntime] = "dotnet-isolated";
+                            result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                         }
                         else
                         {
@@ -234,7 +234,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
                 catch (ArgumentException) when (Force)
                 {
-                    result[Constants.FunctionsWorkerRuntime] = workerRuntime.ToString();
+                    result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                 }
                 catch (ArgumentException) when (!Force)
                 {
