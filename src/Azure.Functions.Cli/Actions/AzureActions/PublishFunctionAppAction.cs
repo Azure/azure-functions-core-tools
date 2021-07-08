@@ -205,11 +205,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         }
                     }
                 }
-
-                if (string.Compare(functionApp.NetFrameworkVersion, _requiredNetFrameworkVersion, StringComparison.OrdinalIgnoreCase) != 0)
-                {
-                    await UpdateNetFrameworkVersionWindows(functionApp, _requiredNetFrameworkVersion, azureHelperService);
-                }
             }
 
             if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out string workerRuntimeStr))
@@ -281,7 +276,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await UpdateDotNetIsolatedFrameworkVersion(functionApp, requestedDotNetVersion, helperService);
             }
-            else if (functionApp.IsLinux && !functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
+            else if (!functionApp.IsLinux)
+            {
+                await UpdateNetFrameworkVersionWindows(functionApp, requestedDotNetVersion, helperService);
+
+            }
+            else if (!functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
                 // If linuxFxVersion does not match any of our images
                 if (PublishHelper.IsLinuxFxVersionUsingCustomImage(functionApp.LinuxFxVersion))
@@ -1077,21 +1077,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (version == null)
             {
-                // Legacy behavior.
-                parsedVersion = new Version("5.0");
+                parsedVersion = new Version(_requiredNetFrameworkVersion);
             }
             else if (!Version.TryParse(version, out parsedVersion))
             {
                 // remove any leading "v" and try again
                 if (!Version.TryParse(version.ToLower().TrimStart('v'), out parsedVersion))
                 {
-                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '5.0'.");
+                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '{_requiredNetFrameworkVersion}'.");
                 }
             }
 
-            string normalizedVersion = $"{parsedVersion.Major}.{parsedVersion.Minor}";
-            ColoredConsole.WriteLine($"Using dotnet-version value of '{normalizedVersion}'.");
-            return normalizedVersion;
+            return $"{parsedVersion.Major}.{parsedVersion.Minor}";
         }
 
         // For testing
