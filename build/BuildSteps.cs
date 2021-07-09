@@ -360,6 +360,10 @@ namespace Build
             // binaries we know are unsigned via sigcheck.exe
             var unSignedBinaries = GetUnsignedBinaries(toSignDirPath);
 
+            // These assemblies are currently signed, but with an invalid root cert.
+            // Until that is resolved, we are explicity signing the AppService.Middleware packages
+            unSignedBinaries = unSignedBinaries.Concat(allFiles.Where(f => f.Contains("Microsoft.Azure.AppService.Middleware"))).ToList();
+
             // binaries to be signed via signed tool
             var allFiles = Directory.GetFiles(toSignDirPath, "*.*", new EnumerationOptions() { RecurseSubdirectories = true }).ToList();
 
