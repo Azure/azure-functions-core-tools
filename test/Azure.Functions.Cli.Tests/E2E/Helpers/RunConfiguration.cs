@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         public string[] ErrorDoesntContain { get; set; } = Array.Empty<string>();
         public Action<string> PreTest { get; set; }
         public Func<string, Process, Task> Test { get; set; }
-        public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(20);
+        public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(40);
         public string CommandsStr => $"{string.Join(", ", Commands)}";
     }
 }

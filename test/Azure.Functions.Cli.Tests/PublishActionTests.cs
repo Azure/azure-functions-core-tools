@@ -94,20 +94,50 @@ namespace Azure.Functions.Cli.Tests
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
-            Assert.Equal("DOTNET-ISOLATED|5.0", setting.Value);
+            Assert.Equal("DOTNET-ISOLATED|6.0", setting.Value);
         }
 
         [Fact]
         public async Task NetFrameworkVersion_DotnetIsolated_Windows_Null()
         {
-            // If not specified, assume 5.0
+            // If not specified, assume 6.0
             var site = new Site("test");
 
             await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, null, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
-            Assert.Equal("v5.0", setting.Value);
+            Assert.Equal("v6.0", setting.Value);
+        }
+
+        [Fact]
+        public async Task NetFrameworkVersion_Dotnet_Windows_Null()
+        {
+            var site = new Site("test")
+            {
+                NetFrameworkVersion = "v4.0"
+            };
+
+            // If not specified, assume 6.0
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnet, null, false, _helperService);
+
+            var setting = _helperService.UpdatedSettings.Single();
+            Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
+            Assert.Equal("v6.0", setting.Value);
+        }
+
+        [Fact]
+        public async Task NetFrameworkVersion_Dotnet_Windows_NoOp()
+        {
+            var site = new Site("test")
+            {
+                NetFrameworkVersion = "v6.0"
+            };
+
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnet, null, false, _helperService);
+
+            // Should be a no-op as site is already v6.0
+            Assert.Null(_helperService.UpdatedSettings);
         }
 
         [Theory]
