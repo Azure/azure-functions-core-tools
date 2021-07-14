@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         public async Task CheckNonOptionalSettingsPrintsWarningForMissingSettings()
         {
             Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
-                reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failling");
+                reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
 
             var fileSystem = GetFakeFileSystem(new[]
             {
