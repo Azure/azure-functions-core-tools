@@ -434,13 +434,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
                 // Elastic Premium Linux
-                shouldSyncTriggers = await HandleElasticPremiumLinuxPublish(functionApp, zipStreamFactory);
+                shouldSyncTriggers = true;
+                await HandleElasticPremiumLinuxPublish(functionApp, zipStreamFactory);
             }
             else if (isFunctionAppDedicatedLinux)
             {
                 // Dedicated Linux
                 shouldSyncTriggers = false;
-                await HandleLinuxDedicatedPublish(functionApp, zipStreamFactory);
+                await HandleLinuxAppServicePublish(functionApp, zipStreamFactory);
             }
             else if (RunFromPackageDeploy)
             {
@@ -512,23 +513,35 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }, retryCount: 5);
         }
 
-        private async Task<bool> HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        private async Task HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
         {
+            // If Azure Files settings are present, we deploy similar to Linux App Service
+            if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteContentAzureFileConnectionString)
+                && functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteContentShared))
+            {
+                await HandleLinuxAppServicePublish(functionApp, zipStreamFactory);
+                return;
+            }
+
+            ColoredConsole.WriteLine(WarningColor($"Your Linux Premium function app does not have Azure Files Application Settings" +
+                $" ('{Constants.WebsiteContentAzureFileConnectionString}', '{Constants.WebsiteContentShared}') configured. Azure Files setup is required to enable" +
+                $"persistent storage in Linux Premium function apps." +
+                $" For more info, see https://aka.ms/linux-ep-storage"));
+
+            // If Azure Files settings are not present, we need to do Run From Package = URL deployment
             // Local build
             if (PublishBuildOption != BuildOption.Remote)
             {
                 string fileName = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
                 await EnsureNoKuduLiteBuildSettings(functionApp);
                 await PublishRunFromPackage(functionApp, await zipStreamFactory(), fileName);
-                return true;
             }
 
             // Remote build
             await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
-            return false;
         }
 
-        private async Task HandleLinuxDedicatedPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        private async Task HandleLinuxAppServicePublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
         {
             // Local build
             if (PublishBuildOption != BuildOption.Remote)
