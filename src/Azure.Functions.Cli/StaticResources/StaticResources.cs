@@ -81,6 +81,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PythonRequirementsTxt => GetValue("requirements.txt");
 
+        public static Task<string> PythonGettingStartedMarkdown => GetValue("getting_started_python_function.md");
+
         public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
 
 
