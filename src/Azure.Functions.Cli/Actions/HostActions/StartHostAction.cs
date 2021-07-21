@@ -406,7 +406,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
-                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
+                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>', specify a connection string in {SecretsManager.AppSettingsFileName}, or use managed identity to authenticate.");
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
