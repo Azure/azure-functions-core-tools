@@ -377,10 +377,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                        
         internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool skipAzureWebJobsStorageCheck = false)
         {
+            string storageConnectionKey = "AzureWebJobsStorage";
             try
             {
                 // FirstOrDefault returns a KeyValuePair<string, string> which is a struct so it can't be null.
-                var azureWebJobsStorage = secrets.FirstOrDefault(pair => pair.Key.Equals("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)).Value;
+                var azureWebJobsStorage = secrets.FirstOrDefault(pair => pair.Key.Equals(storageConnectionKey, StringComparison.OrdinalIgnoreCase)).Value;
                 var functionJsonFiles = await FileSystemHelpers
                     .GetDirectories(scriptPath)
                     .Select(d => Path.Combine(d, "function.json"))
@@ -400,11 +401,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
+                if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && 
+                    !StorageConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers) 
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
-                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
+                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>', specify a connection string in {SecretsManager.AppSettingsFileName}, or use managed identity to authenticate.");
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
@@ -439,6 +441,28 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(e);
                 }
             }
+        }
+
+        internal static bool StorageConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
+        {
+            // convert secrets into IConfiguration object, check for storage connection in config section
+            var convertedEnv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in secrets)
+            {
+                var convertedKey = kvp.Key.Replace("__", ":");
+                if (!convertedEnv.ContainsKey(convertedKey))
+                {
+                    convertedEnv.Add(convertedKey, kvp.Value);
+                }
+            }
+
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(convertedEnv).Build();
+            var connectionStringSection = configuration?.GetSection("ConnectionStrings").GetSection(connectionStringKey);
+            if (!connectionStringSection.Exists())
+            {
+                connectionStringSection = configuration?.GetSection(connectionStringKey);
+            }
+            return connectionStringSection.Exists();
         }
 
         private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert)> Setup()
