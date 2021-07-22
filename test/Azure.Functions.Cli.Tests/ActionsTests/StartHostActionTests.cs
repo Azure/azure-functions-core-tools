@@ -79,8 +79,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             exception.Should().BeNull();
         }
 
-
-
         [Fact]
         public async Task CheckNonOptionalSettingsDoesntThrowOnMissingAzureWebJobsStorage()
         {
