@@ -441,15 +441,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) &&
-                    !StorageConnectionExists(secrets, storageConnectionKey) &&
-                    !allNonStorageTriggers)
+                if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && 
+                    !StorageConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers) 
                 {
-                    string errorMessage = userSecretsEnabled ? Constants.Errors.WebJobsStorageNotFoundWithUserSecrets : Constants.Errors.WebJobsStorageNotFound;
-                    throw new CliException(string.Format(errorMessage,
-                                                         SecretsManager.AppSettingsFileName,
-                                                         string.Join(", ", Constants.TriggersWithoutStorage),
-                                                         SecretsManager.AppSettingsFileName));
+                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
+                        $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
+                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>', specify a connection string in {SecretsManager.AppSettingsFileName}, or use managed identity to authenticate.");
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
@@ -488,6 +485,27 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole.WriteLine(e);
                 }
+            }
+        }
+
+        internal static bool StorageConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
+        {
+            // convert secrets into IConfiguration object, check for storage connection in config section
+            var convertedEnv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in secrets)
+            {
+                var convertedKey = kvp.Key.Replace("__", ":");
+                if (!convertedEnv.ContainsKey(convertedKey))
+                {
+                    convertedEnv.Add(convertedKey, kvp.Value);
+                }
+            }
+
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(convertedEnv).Build();
+            var connectionStringSection = configuration?.GetSection("ConnectionStrings").GetSection(connectionStringKey);
+            if (!connectionStringSection.Exists())
+            {
+                connectionStringSection = configuration?.GetSection(connectionStringKey);
             }
         }
 

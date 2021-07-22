@@ -69,6 +69,37 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             Exception exception = null;
             try
             {
+                await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\");
+            }
+            catch (Exception e)
+            {
+                exception = e;
+            }
+            exception.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task CheckNonOptionalSettingsDoesntThrowOnMissingAzureWebJobsStorage()
+        {
+            Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
+                reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
+            var fileSystem = GetFakeFileSystem(new[]
+                {
+                ("x:\\folder1", "{'bindings': [{'type': 'blobTrigger'}]}"),
+                ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
+            });
+
+            var secrets = new Dictionary<string, string>()
+            {
+                { "AzureWebJobsStorage:blobServiceUri", "myuri" },
+                { "AzureWebJobsStorage__queueServiceUri", "queueuri" }
+            };
+
+            FileSystemHelpers.Instance = fileSystem;
+
+            Exception exception = null;
+            try
+            {
                 await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\", false);
             }
             catch (Exception e)
