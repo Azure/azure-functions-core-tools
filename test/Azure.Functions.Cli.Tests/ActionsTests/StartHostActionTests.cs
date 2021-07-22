@@ -51,7 +51,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [Fact]
         public async Task CheckNonOptionalSettingsDoesntThrowMissingStorageUsingManagedIdentity()
         {
-
             Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
                 reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
             var fileSystem = GetFakeFileSystem(new[]
@@ -63,7 +62,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             var secrets = new Dictionary<string, string>()
             {
                 { "AzureWebJobsStorage:blobServiceUri", "myuri" },
-                { "AzureWebJobsStorage:queueServiceUri", "queueuri" }
+                { "AzureWebJobsStorage__queueServiceUri", "queueuri" }
             };
 
             FileSystemHelpers.Instance = fileSystem;
@@ -77,7 +76,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             {
                 exception = e;
             }
-
             exception.Should().BeNull();
         }
 
