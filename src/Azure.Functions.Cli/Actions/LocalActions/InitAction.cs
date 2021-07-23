@@ -213,13 +213,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 string workerRuntimedisplay = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
                 workerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimedisplay)).Key;
 
-                ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
+                ColoredConsole.WriteLine(TitleColor(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)));
                 language = LanguageSelectionIfRelevant(workerRuntime);
             }
             else
             {
                 workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
-                language = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntime.ToString());
+                language = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
             }
 
             return (workerRuntime, language);
@@ -299,7 +299,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime)
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntime.ToString());
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
 
             var storageConnectionStringValue = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Constants.StorageEmulatorConnectionString
