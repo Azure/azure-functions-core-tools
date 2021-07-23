@@ -532,11 +532,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing .gitignore",
                     "Writing host.json",
                     "Writing local.settings.json",
+                    "Writing getting_started.md",
                     $"Writing {Constants.PythonGettingStarted}",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                     "requirements.txt already exists. Skipped!",
                     ".gitignore already exists. Skipped!",
                     "host.json already exists. Skipped!",
+                    "getting_started.md already exists. Skipped!",
                     "local.settings.json already exists. Skipped!",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
                 }
