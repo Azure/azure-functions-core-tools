@@ -133,7 +133,7 @@
         <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\getting_started_python_function.md">
-        <LogicalName>$(AssemblyName).zgetting_started_python_function.md</LogicalName>
+        <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
