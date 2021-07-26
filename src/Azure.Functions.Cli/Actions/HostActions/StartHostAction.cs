@@ -27,7 +27,6 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -69,7 +68,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public bool? DotNetIsolatedDebug { get; set; }
 
         public bool? EnableJsonOutput { get; set; }
-        
+
         public string JsonOutputFile { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager)
@@ -188,7 +187,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             UpdateEnvironmentVariables(settings);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
-            
+
             if (UseHttps)
             {
                 defaultBuilder
@@ -329,7 +328,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
-           
+
             ValidateAndBuildHostJsonConfigurationIfFileExists(hostOptions);
 
             (var listenUri, var baseUri, var certificate) = await Setup();
@@ -415,13 +414,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             return isPrecompiled;
         }
-                       
+
         internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool userSecretsEnabled)
         {
+            string storageConnectionKey = "AzureWebJobsStorage";
             try
             {
                 // FirstOrDefault returns a KeyValuePair<string, string> which is a struct so it can't be null.
-                var azureWebJobsStorage = secrets.FirstOrDefault(pair => pair.Key.Equals("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)).Value;
+                var azureWebJobsStorage = secrets.FirstOrDefault(pair => pair.Key.Equals(storageConnectionKey, StringComparison.OrdinalIgnoreCase)).Value;
                 var functionJsonFiles = await FileSystemHelpers
                     .GetDirectories(scriptPath)
                     .Select(d => Path.Combine(d, "function.json"))
@@ -441,7 +441,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
+                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) &&
+                    !StorageConnectionExists(secrets, storageConnectionKey) &&
+                    !allNonStorageTriggers)
                 {
                     string errorMessage = userSecretsEnabled ? Constants.Errors.WebJobsStorageNotFoundWithUserSecrets : Constants.Errors.WebJobsStorageNotFound;
                     throw new CliException(string.Format(errorMessage,
@@ -487,6 +489,28 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(e);
                 }
             }
+        }
+
+        internal static bool StorageConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
+        {
+            // convert secrets into IConfiguration object, check for storage connection in config section
+            var convertedEnv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in secrets)
+            {
+                var convertedKey = kvp.Key.Replace("__", ":");
+                if (!convertedEnv.ContainsKey(convertedKey))
+                {
+                    convertedEnv.Add(convertedKey, kvp.Value);
+                }
+            }
+
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(convertedEnv).Build();
+            var connectionStringSection = configuration?.GetSection("ConnectionStrings").GetSection(connectionStringKey);
+            if (!connectionStringSection.Exists())
+            {
+                connectionStringSection = configuration?.GetSection(connectionStringKey);
+            }
+            return connectionStringSection.Exists();
         }
 
         private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert)> Setup()
