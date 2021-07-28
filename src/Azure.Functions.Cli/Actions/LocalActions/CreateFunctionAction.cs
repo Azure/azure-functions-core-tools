@@ -153,7 +153,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), workerRuntime, AuthorizationLevel);
+                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel);
             }
             else
             {
@@ -223,13 +223,28 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private bool InferAndUpdateLanguage(WorkerRuntime workerRuntime)
         {
-            // If there is a tsconfig.json present, we assume that the language is typescript
-            if (workerRuntime == WorkerRuntime.node)
+            switch (workerRuntime)
             {
-                Language = FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "tsconfig.json")) ? Constants.Languages.TypeScript : Constants.Languages.JavaScript;
-                return true;
+                case WorkerRuntime.dotnet:
+                    // use fsproj as an indication that we have a F# project
+                    Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharp : Constants.Languages.CSharp;
+                    return true;
+                case WorkerRuntime.dotnetIsolated:
+                    // use fsproj as an indication that we have a F# project
+                    Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharpIsolated : Constants.Languages.CSharpIsolated;
+                    return true;
+                case WorkerRuntime.node:
+                    // use tsconfig.json as an indicator that we have a TypeScript project
+                    Language = FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "tsconfig.json")) ? Constants.Languages.TypeScript : Constants.Languages.JavaScript;
+                    return true;
+                case WorkerRuntime.None:
+                case WorkerRuntime.python:
+                case WorkerRuntime.java:
+                case WorkerRuntime.powershell:
+                case WorkerRuntime.custom:
+                default:
+                    return false;
             }
-            return false;
         }
 
         private void PerformPostDeployTasks(string functionName, string language)

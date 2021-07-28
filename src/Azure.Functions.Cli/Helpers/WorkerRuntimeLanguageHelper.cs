@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> availableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
             { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
-            { WorkerRuntime.dotnetIsolated, new [] { "dotnet-isolated" } },
+            { WorkerRuntime.dotnetIsolated, new [] { "dotnet-isolated", "c#-isolated", "csharp-isolated", "f#-isolated", "fsharp-isolated" } },
             { WorkerRuntime.node, new [] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.python, new []  { "py" } },
             { WorkerRuntime.java, new string[] { } },
@@ -41,7 +41,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, string> workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
         {
             { WorkerRuntime.dotnet, Constants.Languages.CSharp },
-            { WorkerRuntime.dotnetIsolated, Constants.Languages.CSharp },
+            { WorkerRuntime.dotnetIsolated, Constants.Languages.CSharpIsolated },
             { WorkerRuntime.node, Constants.Languages.JavaScript },
             { WorkerRuntime.python, Constants.Languages.Python },
             { WorkerRuntime.powershell, Constants.Languages.Powershell },
@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.TypeScript, new [] { "ts" } },
             { Constants.Languages.Python, new [] { "py" } },
             { Constants.Languages.Powershell, new [] { "pwsh" } },
-            { Constants.Languages.CSharp, new [] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
+            { Constants.Languages.CSharpIsolated, new [] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.Java, new string[] { } },
             { Constants.Languages.Custom, new string[] { } }
         };
@@ -67,7 +67,9 @@ namespace Azure.Functions.Cli.Helpers
 
         public static readonly IDictionary<WorkerRuntime, IEnumerable<string>> WorkerToSupportedLanguages = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
-            { WorkerRuntime.node, new [] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } }
+            { WorkerRuntime.node, new [] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
+            { WorkerRuntime.dotnet, new [] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
+            { WorkerRuntime.dotnetIsolated, new [] { Constants.Languages.CSharpIsolated, Constants.Languages.FSharpIsolated } }
         };
 
         public static string AvailableWorkersRuntimeString =>

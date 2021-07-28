@@ -42,11 +42,11 @@ namespace Azure.Functions.Cli.Helpers
             }, workerRuntime);
         }
 
-        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
+        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             await TemplateOperation(async () =>
             {
-                string exeCommandArguments = $"new {templateName} --name {functionName} --namespace {namespaceStr}";
+                string exeCommandArguments = $"new {templateName} --name {functionName} --namespace {namespaceStr} --language {language}";
                 if (httpAuthorizationLevel != null)
                 {
                     if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
