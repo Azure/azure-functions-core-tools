@@ -22,7 +22,7 @@ namespace Build
         public const string DotnetIsolatedItemTemplatesVersion = "3.1.1733";
         public const string DotnetIsolatedProjectTemplatesVersion = "3.1.1733";
         public const string DotnetItemTemplatesVersion = "3.1.1648";
-        public const string DotnetProjectTemplatesVersion = "4.0.1793";
+        public const string DotnetProjectTemplatesVersion = "4.0.1844-preview1";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
@@ -100,7 +100,7 @@ namespace Build
 
         public static readonly string DotnetItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}";
 
-        public static readonly string DotnetProjectTemplates = $"https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
+        public static readonly string DotnetProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
 
         public static readonly string TemplatesJsonZip = $"https://functionscdn.azureedge.net/public/TemplatesApi/{TemplateJsonVersion}.zip";
 
