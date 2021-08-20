@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Autofac;
 using Colors.Net;
 using Azure.Functions.Cli.Arm;
@@ -16,6 +17,7 @@ namespace Azure.Functions.Cli
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVaraibles();
+            SetDebugEnvironmentVariable(args);
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
         }
 
@@ -43,10 +45,14 @@ namespace Azure.Functions.Cli
             }
         }
 
-        private static void SetCoreToolsEnvironmentVaraibles()
+        private static void SetCoreToolsEnvironmentVaraibles(string[] args)
         {
             EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.FunctionsCoreToolsEnvironment);
             EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.SequentialJobHostRestart);
+            if (args.Contains("--debug", StringComparer.OrdinalIgnoreCase))
+            {
+                Environment.SetEnvironmentVariable(Constants.CliDebug, "1");
+            }
         }
 
         internal static IContainer InitializeAutofacContainer()
