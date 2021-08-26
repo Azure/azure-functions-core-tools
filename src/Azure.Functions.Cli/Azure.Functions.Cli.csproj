@@ -149,7 +149,7 @@
     <PackageReference Include="DotNetZip" Version="1.13.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.1.3" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.1.4" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
@@ -158,7 +158,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="2.1.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS6" Version="3.0.630" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.833" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.2.4" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.2.5" />
   </ItemGroup>
 
   <Target Name="ExcludeWorkersFromReadyToRun">
