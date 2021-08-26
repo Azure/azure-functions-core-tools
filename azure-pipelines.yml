@@ -1,4 +1,4 @@
-name: $(Build.SourceBranchName)_$(Build.Reason)_$(devops_buildNumber)
+name: $(Build.SourceBranchName)_$(Build.Reason)
 
 pr:
   branches:
