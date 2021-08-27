@@ -134,6 +134,9 @@
     <EmbeddedResource Include="StaticResources\ziptofs.sh">
         <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\getting_started_python_function.md">
+        <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\tools\python\packapp\__main__.py">

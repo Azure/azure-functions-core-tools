@@ -38,6 +38,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool ExtensionBundle { get; set; } = true;
 
+        public bool GeneratePythonDocumentation { get; set; } = true;
+
         public string Language { get; set; }
 
         public bool? ManagedDependencies { get; set; }
@@ -114,6 +116,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("no-bundle")
                 .Callback(e => ExtensionBundle = !e);
 
+            Parser
+                .Setup<bool>("no-docs")
+                .WithDescription("Do not create getting started documentation file. Currently supported when --worker-runtime set to python.")
+                .Callback(d => GeneratePythonDocumentation = !d);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -171,7 +178,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, managedDependenciesOption);
+                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, managedDependenciesOption, GeneratePythonDocumentation);
                 await WriteFiles();
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
                 await WriteLocalSettingsJson(ResolvedWorkerRuntime);
@@ -234,59 +241,58 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return string.Empty;
         }
 
-        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language, bool managedDependenciesOption)
+        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language, bool managedDependenciesOption, bool generatePythonDocumentation=true)
         {
-            if (workerRuntime == Helpers.WorkerRuntime.python)
-            {
-                await PythonHelpers.SetupPythonProject();
-            }
-            else if (workerRuntime == Helpers.WorkerRuntime.powershell)
-            {
-                await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
+            switch (workerRuntime) {
+                case Helpers.WorkerRuntime.python:
+                    await PythonHelpers.SetupPythonProject(generatePythonDocumentation);
+                    break;
+                case Helpers.WorkerRuntime.powershell:
+                    await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
 
-                if (managedDependenciesOption)
-                {
-                    var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
-
-                    bool majorVersionRetrievedSuccessfully = false;
-                    string guidance = null;
-
-                    try
+                    if (managedDependenciesOption)
                     {
-                        var majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
-                        requirementsContent = Regex.Replace(requirementsContent, "MAJOR_VERSION", majorVersion);
+                        var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
 
-                        majorVersionRetrievedSuccessfully = true;
+                        bool majorVersionRetrievedSuccessfully = false;
+                        string guidance = null;
+
+                        try
+                        {
+                            var majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
+                            requirementsContent = Regex.Replace(requirementsContent, "MAJOR_VERSION", majorVersion);
+
+                            majorVersionRetrievedSuccessfully = true;
+                        }
+                        catch
+                        {
+                            guidance = "Uncomment the next line and replace the MAJOR_VERSION, e.g., 'Az' = '5.*'";
+
+                            var warningMsg = "Failed to get Az module version. Edit the requirements.psd1 file when the powershellgallery.com is accessible.";
+                            ColoredConsole.WriteLine(WarningColor(warningMsg));
+                        }
+
+                        if (majorVersionRetrievedSuccessfully)
+                        {
+                            guidance = Environment.NewLine + "    # To use the Az module in your function app, please uncomment the line below.";
+                        }
+
+                        requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance);
+                        await WriteFiles("requirements.psd1", requirementsContent);
                     }
-                    catch
+                    break;
+                case Helpers.WorkerRuntime.node:
+                    if (language == Constants.Languages.TypeScript)
                     {
-                        guidance = "Uncomment the next line and replace the MAJOR_VERSION, e.g., 'Az' = '5.*'";
-
-                        var warningMsg = "Failed to get Az module version. Edit the requirements.psd1 file when the powershellgallery.com is accessible.";
-                        ColoredConsole.WriteLine(WarningColor(warningMsg));
+                        await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
+                        await WriteFiles("package.json", await StaticResources.PackageJson);
+                        await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
                     }
-
-                    if (majorVersionRetrievedSuccessfully)
+                    else
                     {
-                        guidance = Environment.NewLine + "    # To use the Az module in your function app, please uncomment the line below.";
+                        await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
                     }
-
-                    requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance);
-                    await WriteFiles("requirements.psd1", requirementsContent);
-                }
-            }
-            else if (workerRuntime == Helpers.WorkerRuntime.node)
-            {
-                if (language == Constants.Languages.TypeScript)
-                {
-                    await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
-                    await WriteFiles("package.json", await StaticResources.PackageJson);
-                    await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
-                }
-                else
-                {
-                    await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
-                }
+                    break;
             }
         }
 
