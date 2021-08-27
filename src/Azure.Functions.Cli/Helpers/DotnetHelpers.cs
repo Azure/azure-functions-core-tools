@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -46,7 +45,9 @@ namespace Azure.Functions.Cli.Helpers
         {
             await TemplateOperation(async () =>
             {
-                string exeCommandArguments = $"new {templateName} --name {functionName} --namespace {namespaceStr}";
+                // In .NET 6.0, the 'dotnet new' command requires the short name.
+                string templateShortName = GetTemplateShortName(templateName);
+                string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr}";
                 if (httpAuthorizationLevel != null)
                 {
                     if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
@@ -67,6 +68,23 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }, workerRuntime);
         }
+
+        private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
+        {
+            "blobtrigger" => "blob",
+            "cosmosdbtrigger" => "cosmos",
+            "durablefunctionsorchestration" => "durable",
+            "eventgridtrigger" => "eventgrid",
+            "eventhubtrigger" => "eventhub",
+            "httptrigger" => "http",
+            "iothubtrigger" => "iothub",
+            "queuetrigger" => "queue",
+            "sendgrid" => "sendgrid",
+            "servicebusqueuetrigger" => "squeue",
+            "servicebustopictrigger" => "stopic",
+            "timertrigger" => "timer",
+            _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
+        };
 
         internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
         {
