@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli
         {
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
-            SetCoreToolsEnvironmentVaraibles(args);
+            SetCoreToolsEnvironmentVariables(args);
             ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
         }
 
@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli
             }
         }
 
-        private static void SetCoreToolsEnvironmentVaraibles(string[] args)
+        private static void SetCoreToolsEnvironmentVariables(string[] args)
         {
             EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.FunctionsCoreToolsEnvironment);
             EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.SequentialJobHostRestart);
