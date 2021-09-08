@@ -9,6 +9,7 @@ using Colors.Net;
 using Ionic.Zip;
 using static Colors.Net.StringStaticMethods;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using System.Text;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -44,20 +45,25 @@ namespace Azure.Functions.Cli.Helpers
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && buildOption == BuildOption.Remote)
             {
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
-                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot);
-            } else
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Enumerable.Empty<string>());
+            }
+            else
             {
-                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot);
+                var customHandler = await HostHelpers.GetCustomHandlerExecutable();
+                IEnumerable<string> executables = !string.IsNullOrEmpty(customHandler)
+                    ? new [] {customHandler}
+                    : Enumerable.Empty<string>();
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables);
             }
         }
 
-        public static async Task<Stream> CreateZip(IEnumerable<string> files, string rootPath)
+        public static async Task<Stream> CreateZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables)
         {
             var zipFilePath = Path.GetTempFileName();
 
             if (GoZipExists(out string goZipLocation))
             {
-                return await CreateGoZip(files, rootPath, zipFilePath, goZipLocation);
+                return await CreateGoZip(files, rootPath, zipFilePath, goZipLocation, executables);
             }
 
             ColoredConsole.WriteLine(Yellow("Could not find gozip for packaging. Using DotNetZip to package. " +
@@ -98,12 +104,17 @@ namespace Azure.Functions.Cli.Helpers
             return fileStream;
         }
 
-        public static async Task<Stream> CreateGoZip(IEnumerable<string> files, string rootPath, string zipFilePath, string goZipLocation)
+        public static async Task<Stream> CreateGoZip(IEnumerable<string> files, string rootPath, string zipFilePath, string goZipLocation, IEnumerable<string> executables)
         {
             var contentsFile = Path.GetTempFileName();
             await File.WriteAllLinesAsync(contentsFile, files);
+            var args = new StringBuilder($"-base-dir \"{rootPath}\" -input-file \"{contentsFile}\" -output \"{zipFilePath}\"");
+            foreach (var executable in executables)
+            {
+                args.Append($" --set-executable \"{executable}\"");
+            }
 
-            var goZipExe = new Executable(goZipLocation, $"-base-dir \"{rootPath}\" -input-file \"{contentsFile}\" -output \"{zipFilePath}\"");
+            var goZipExe = new Executable(goZipLocation, args.ToString());
             await goZipExe.RunAsync();
             return new FileStream(zipFilePath, FileMode.Open, FileAccess.Read);
         }

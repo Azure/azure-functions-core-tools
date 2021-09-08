@@ -26,3 +26,6 @@ nCrunchTemp*
 artifacts/
 /src/Azure.Functions.Cli/Properties/launchSettings.json
 launchSettings.json
+
+# MacOS related
+.DS_Store

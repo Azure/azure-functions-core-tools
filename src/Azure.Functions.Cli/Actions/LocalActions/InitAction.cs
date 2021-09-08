@@ -38,6 +38,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool ExtensionBundle { get; set; } = true;
 
+        public bool GeneratePythonDocumentation { get; set; } = true;
+
         public string Language { get; set; }
 
         public bool? ManagedDependencies { get; set; }
@@ -114,6 +116,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("no-bundle")
                 .Callback(e => ExtensionBundle = !e);
 
+            Parser
+                .Setup<bool>("no-docs")
+                .WithDescription("Do not create getting started documentation file. Currently supported when --worker-runtime set to python.")
+                .Callback(d => GeneratePythonDocumentation = !d);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FolderName = args.First();
@@ -148,7 +155,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Csx);
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, Csx);
         }
 
         private async Task InitFunctionAppProject()
@@ -164,14 +171,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
 
-            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet && !Csx)
+            if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
-                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force);
+                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
             }
             else
             {
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, managedDependenciesOption);
+                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, managedDependenciesOption, GeneratePythonDocumentation);
                 await WriteFiles();
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
                 await WriteLocalSettingsJson(ResolvedWorkerRuntime);
@@ -185,7 +192,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(ResolvedWorkerRuntime, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, Csx);
             }
         }
 
@@ -201,14 +208,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == Helpers.WorkerRuntime.None)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
-                workerRuntime = SelectionMenuHelper.DisplaySelectionWizard(WorkerRuntimeLanguageHelper.AvailableWorkersList);
-                ColoredConsole.WriteLine(TitleColor(workerRuntime.ToString()));
+
+                IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
+                string workerRuntimedisplay = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
+                workerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimedisplay)).Key;
+
+                ColoredConsole.WriteLine(TitleColor(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)));
                 language = LanguageSelectionIfRelevant(workerRuntime);
             }
             else
             {
                 workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
-                language = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(workerRuntime.ToString());
+                language = GlobalCoreToolsSettings.CurrentLanguageOrNull ?? languageString ?? WorkerRuntimeLanguageHelper.NormalizeLanguage(WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
             }
 
             return (workerRuntime, language);
@@ -230,61 +241,65 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return string.Empty;
         }
 
-        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language, bool managedDependenciesOption)
+        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language, bool managedDependenciesOption, bool generatePythonDocumentation=true)
         {
-            if (workerRuntime == Helpers.WorkerRuntime.python)
-            {
-                await PythonHelpers.SetupPythonProject();
-            }
-            else if (workerRuntime == Helpers.WorkerRuntime.powershell)
-            {
-                await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
+            switch (workerRuntime) {
+                case Helpers.WorkerRuntime.python:
+                    await PythonHelpers.SetupPythonProject(generatePythonDocumentation);
+                    break;
+                case Helpers.WorkerRuntime.powershell:
+                    await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
 
-                if (managedDependenciesOption)
-                {
-                    var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
-
-                    string majorVersion = null;
-
-                    string guidance = null;
-                    try
+                    if (managedDependenciesOption)
                     {
-                        majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
+                        var requirementsContent = await StaticResources.PowerShellRequirementsPsd1;
 
-                        requirementsContent = Regex.Replace(requirementsContent, @"#(\s?)'Az'", "'Az'");
-                        requirementsContent = Regex.Replace(requirementsContent, "MAJOR_VERSION", majorVersion);
+                        bool majorVersionRetrievedSuccessfully = false;
+                        string guidance = null;
+
+                        try
+                        {
+                            var majorVersion = await PowerShellHelper.GetLatestAzModuleMajorVersion();
+                            requirementsContent = Regex.Replace(requirementsContent, "MAJOR_VERSION", majorVersion);
+
+                            majorVersionRetrievedSuccessfully = true;
+                        }
+                        catch
+                        {
+                            guidance = "Uncomment the next line and replace the MAJOR_VERSION, e.g., 'Az' = '5.*'";
+
+                            var warningMsg = "Failed to get Az module version. Edit the requirements.psd1 file when the powershellgallery.com is accessible.";
+                            ColoredConsole.WriteLine(WarningColor(warningMsg));
+                        }
+
+                        if (majorVersionRetrievedSuccessfully)
+                        {
+                            guidance = Environment.NewLine + "    # To use the Az module in your function app, please uncomment the line below.";
+                        }
+
+                        requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance);
+                        await WriteFiles("requirements.psd1", requirementsContent);
                     }
-                    catch
+                    break;
+                case Helpers.WorkerRuntime.node:
+                    if (language == Constants.Languages.TypeScript)
                     {
-                        guidance = "Uncomment the next line and replace the MAJOR_VERSION, e.g., 'Az' = '2.*'";
-
-                        var warningMsg = "Failed to get Az module version. Edit the requirements.psd1 file when the powershellgallery.com is accessible.";
-                        ColoredConsole.WriteLine(WarningColor(warningMsg));
+                        await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
+                        await WriteFiles("package.json", await StaticResources.PackageJson);
+                        await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
                     }
-
-                    requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance ?? string.Empty);
-                    await WriteFiles("requirements.psd1", requirementsContent);
-                }
-            }
-            else if (workerRuntime == Helpers.WorkerRuntime.node)
-            {
-                if (language == Constants.Languages.TypeScript)
-                {
-                    await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
-                    await WriteFiles("package.json", await StaticResources.PackageJson);
-                    await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
-                }
-                else
-                {
-                    await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
-                }
+                    else
+                    {
+                        await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
+                    }
+                    break;
             }
         }
 
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime)
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntime.ToString());
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
 
             var storageConnectionStringValue = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Constants.StorageEmulatorConnectionString
@@ -300,7 +315,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteFiles("local.settings.json", localSettingsJsonContent);
         }
 
-        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, bool csx)
+        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, bool csx)
         {
             if (workerRuntime == Helpers.WorkerRuntime.dotnet)
             {
@@ -313,9 +328,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
                 }
             }
+            else if (workerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            {
+                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+            }
             else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
+                if (language == Constants.Languages.TypeScript)
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileTypescript);
+                }
+                else
+                {
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
+                }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
             {

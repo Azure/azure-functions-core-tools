@@ -16,6 +16,7 @@ namespace Build
                 .Then(TestSignedArtifacts, skip: !args.Contains("--signTest"))
                 .Then(Clean)
                 .Then(LogIntoAzure, skip: !args.Contains("--ci"))
+                .Then(UpdatePackageVersionForIntegrationTests, skip: !args.Contains("--integrationTests"))
                 .Then(RestorePackages)
                 .Then(ReplaceTelemetryInstrumentationKey, skip: !args.Contains("--ci"))
                 .Then(DotnetPublish)
@@ -29,8 +30,11 @@ namespace Build
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
                 .Then(Test)
                 .Then(Zip)
+                .Then(DotnetPack)
+                .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
                 .Then(UploadToStorage, skip: !args.Contains("--ci"))
                 .Run();
         }
     }
 }
+

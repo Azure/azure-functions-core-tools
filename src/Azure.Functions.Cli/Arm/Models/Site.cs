@@ -28,6 +28,8 @@ namespace Azure.Functions.Cli.Arm.Models
 
         public string LinuxFxVersion { get; set; }
 
+        public string NetFrameworkVersion { get; set; }
+
         public IDictionary<string, string> AzureAppSettings { get; set; }
 
         public IDictionary<string, AppServiceConnectionString> ConnectionStrings { get; set; }
@@ -40,6 +42,9 @@ namespace Azure.Functions.Cli.Arm.Models
 
         public bool IsElasticPremium
             => Sku?.Equals("elasticpremium", StringComparison.OrdinalIgnoreCase) == true;
+
+        public bool IsKubeApp
+            => Kind?.IndexOf("kubernetes", StringComparison.OrdinalIgnoreCase) >= 0;
 
         public Site(string siteId)
         {

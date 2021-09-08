@@ -9,47 +9,24 @@ namespace Azure.Functions.Cli.Diagnostics
 {
     internal class UserSecretsConfigurationBuilder : IConfigureBuilder<IConfigurationBuilder>
     {
-        private readonly string _scriptPath;
+        private readonly string _userSecretsId;
         private readonly LoggingFilterHelper _loggingFilterHelper;
         private readonly LoggerFilterOptions _loggerFilterOptions;
 
-        public UserSecretsConfigurationBuilder(string scriptPath, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
+        public UserSecretsConfigurationBuilder(string userSecretsId, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
         {
             _loggingFilterHelper = loggingFilterHelper;
             _loggerFilterOptions = loggerFilterOptions;
-            if (string.IsNullOrEmpty(scriptPath))
-            {
-                _scriptPath = Environment.CurrentDirectory;
-            }
-            else
-            {
-                _scriptPath = scriptPath;
-            }
+            _userSecretsId = userSecretsId;
         }
 
         public void Configure(IConfigurationBuilder builder)
         {
-            string userSecretsId = GetUserSecretsId();
-            if (userSecretsId == null)
+            if (_userSecretsId == null)
             {
                 return;
             }
-            builder.AddUserSecrets(userSecretsId);
-        }
-
-        private string GetUserSecretsId()
-        {
-            if (string.IsNullOrEmpty(_scriptPath))
-            {
-                return null;
-            }
-            string projectFilePath = ProjectHelpers.FindProjectFile(_scriptPath, _loggingFilterHelper, _loggerFilterOptions);
-            if (projectFilePath == null) return null;
-
-            var projectRoot = ProjectHelpers.GetProject(projectFilePath);
-            var userSecretsId = ProjectHelpers.GetPropertyValue(projectRoot, Constants.UserSecretsIdElementName);
-
-            return userSecretsId;
+            builder.AddUserSecrets(_userSecretsId);
         }
     }
 }

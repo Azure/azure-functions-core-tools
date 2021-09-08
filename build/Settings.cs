@@ -20,9 +20,11 @@ namespace Build
                 : value;
         }
 
-        public const string ItemTemplatesVersion = "3.1.1582";
-        public const string ProjectTemplatesVersion = "3.1.1582";
-        public const string TemplateJsonVersion = "3.1.1582";
+        public const string DotnetIsolatedItemTemplatesVersion = "3.1.1733";
+        public const string DotnetIsolatedProjectTemplatesVersion = "3.1.1733";
+        public const string DotnetItemTemplatesVersion = "3.1.1648";
+        public const string DotnetProjectTemplatesVersion = "3.1.1648";
+        public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
@@ -36,7 +38,7 @@ namespace Build
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
-        public static readonly string[] TargetRuntimes = new[] {"min.win-x86", "min.win-x64", "linux-x64", "osx-x64", "no-runtime", "win-x86", "win-x64" };
+        public static readonly string[] TargetRuntimes = new[] { "min.win-x86", "min.win-x64", "linux-x64", "osx-x64", "win-x86", "win-x64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
@@ -44,7 +46,6 @@ namespace Build
             { "win-x64", "WINDOWS" },
             { "linux-x64", "LINUX" },
             { "osx-x64", "OSX" },
-            { "no-runtime", "LINUX" },
             { "min.win-x86", "WINDOWS" },
             { "min.win-x64", "WINDOWS" },
         };
@@ -59,13 +60,7 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "unix" } },
-                    { "no-runtime", new [] {
-                        "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86",
-                        "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64", "linux",
-                        "linux-x64", "unix", "linux-musl-x64",
-                        "osx", "win-arm64", "win-arm", "linux-arm", "linux-arm64"
-                    } }
+                    { "osx-x64", new [] { "osx", "unix" } }
                 }
             },
             {
@@ -75,14 +70,7 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
-                    { "no-runtime", new [] {
-                        "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86",
-                        "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64", "linux",
-                        "linux-x64", "unix", "linux-musl-x64",
-                        "osx", "win-arm64", "win-arm", "linux-arm", "linux-arm64",
-                        "freebsd"
-                    } }
+                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } }
                 }
             }
         };
@@ -101,15 +89,21 @@ namespace Build
 
         public static readonly string SignTestDir = "SignTest";
 
-        public static readonly string ItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{ItemTemplatesVersion}";
+        public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
 
-        public static readonly string ProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{ProjectTemplatesVersion}";
+        public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
+
+        public static readonly string DotnetItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}";
+
+        public static readonly string DotnetProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
 
         public static readonly string TemplatesJsonZip = $"https://functionscdn.azureedge.net/public/TemplatesApi/{TemplateJsonVersion}.zip";
 
         public static readonly string TelemetryKeyToReplace = "00000000-0000-0000-0000-000000000000";
 
         public static string BuildNumber => config(null, "devops_buildNumber") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
+
+        public static string IntegrationBuildNumber => config(null, "integrationBuildNumber") ?? string.Empty;
 
         public static string CommitId => config(null, "Build.SourceVersion") ?? config("N/A", "APPVEYOR_REPO_COMMIT");
 
@@ -151,6 +145,13 @@ namespace Build
                 "Microsoft.Azure.AppService.*",
                 "Microsoft.Azure.WebJobs.*",
                 "Microsoft.Azure.WebSites.DataProtection.dll",
+                "Azure.Core.dll",
+                "Azure.Identity.dll",
+                "Azure.Storage.Blobs.dll",
+                "Azure.Storage.Common.dll",
+                "Microsoft.Extensions.Azure.dll",
+                "Microsoft.Identity.Client.dll",
+                "Microsoft.Identity.Client.Extensions.Msal.dll",
                 Path.Combine("templates", "itemTemplates.2.0.10328.nupkg"),
                 Path.Combine("templates", "projectTemplates.2.0.10328.nupkg"),
                 Path.Combine("tools", "python", "packapp", "__main__.py"),
@@ -166,6 +167,7 @@ namespace Build
                 "Dynamitey.dll",
                 "Google.Protobuf.dll",
                 "Grpc.Core.dll",
+                "Grpc.Core.Api.dll",
                 "grpc_csharp_ext.x64.dll",
                 "grpc_csharp_ext.x86.dll",
                 "HTTPlease.Core.dll",
@@ -187,6 +189,8 @@ namespace Build
                 "Microsoft.AI.*.dll",
                 "Microsoft.Build.Framework.dll",
                 "Microsoft.Build.dll",
+                "Microsoft.CodeAnalysis.dll",
+                "Microsoft.CodeAnalysis.CSharp.dll",
                 "Microsoft.CodeAnalysis.CSharp.Scripting.dll",
                 "Microsoft.CodeAnalysis.CSharp.Workspaces.dll",
                 "Microsoft.CodeAnalysis.Razor.dll",
@@ -209,10 +213,16 @@ namespace Build
                 "NuGet.*.dll",
                 "protobuf-net.Core.dll",
                 "System.Composition.*",
+                "System.Configuration.ConfigurationManager.dll",
+                "System.Data.SqlClient.dll",
+                "System.Diagnostics.PerformanceCounter.dll",
                 "System.IdentityModel.Tokens.Jwt.dll",
                 "System.Interactive.Async.dll",
+                "System.Memory.Data.dll",
                 "System.Net.Http.Formatting.dll",
+                "System.Private.ServiceModel.dll",
                 "System.Reactive.*.dll",
+                "System.Security.Cryptography.ProtectedData.dll",
                 "YamlDotNet.dll",
                 "Marklio.Metadata.dll",
                 "Microsoft.Azure.Cosmos.Table.dll",

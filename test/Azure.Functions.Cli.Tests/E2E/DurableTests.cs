@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         public DurableTests(ITestOutputHelper output) : base(output) { }
 
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableDeleteTaskHubTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableGetHistoryTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "ExecutionStarted",
                     "OrchestratorCompleted"
                 },
-                CommandTimeout = TimeSpan.FromSeconds(45)
+                CommandTimeout = TimeSpan.FromMinutes(2)
             },
             _output,
             workingDir: WorkingDirPath,
@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableGetInstancesTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -117,7 +117,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableGetRuntimeStatusTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -146,7 +146,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurablePurgeHistoryTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -175,7 +175,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableRaiseEventTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -205,7 +205,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableRaiseEventTest_FileInput()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -225,18 +225,19 @@ namespace Azure.Functions.Cli.Tests.E2E
             File.WriteAllText(filename, JsonConvert.SerializeObject(testObject));
 
             string instanceId = $"{Guid.NewGuid():N}";
+            string eventName = "parse";
 
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
                     $"durable start-new --function-name JsonInput --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data @raiseEvent.json --task-hub-name {taskHubName}",
+                    $"durable raise-event --id {instanceId} --event-name {eventName} --event-data @raiseEvent.json --task-hub-name {taskHubName}",
                     $"durable get-runtime-status --id {instanceId}"
                 },
                 OutputContains = new string[]
                 {
-                    $"Raised event 'operation' to instance '{instanceId}'",
+                    $"Raised event '{eventName}' to instance '{instanceId}'",
                     "\"OrchestrationStatus\": 0",
                 }
             },
@@ -249,7 +250,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             File.Delete(filename);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableRewindTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -282,7 +283,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableStartNewTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),
@@ -310,7 +311,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableStartNewTest_FileInput()
         {
             Skip.If(true, reason: "This test fails intermittently, needs to be fixed");
@@ -354,7 +355,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             File.Delete(filename);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test as it is currently unstable: https://github.com/Azure/azure-functions-core-tools/issues/2512")]
         public async Task DurableTerminateTest()
         {
             Skip.If(string.IsNullOrEmpty(StorageConnectionString),

@@ -27,7 +27,6 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.HostActions
 {
@@ -65,6 +64,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public List<string> EnabledFunctions { get; private set; }
 
+        public string UserSecretsId { get; private set; }
+
+        public bool? DotNetIsolatedDebug { get; set; }
+
+        public bool? EnableJsonOutput { get; set; }
+
+        public string JsonOutputFile { get; set; }
+
         public StartHostAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -94,7 +101,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<int>('t', "timeout")
-                .WithDescription($"Timeout for on the functions host to start in seconds. Default: {DefaultTimeout} seconds.")
+                .WithDescription($"Timeout for the functions host to start in seconds. Default: {DefaultTimeout} seconds.")
                 .SetDefault(DefaultTimeout)
                 .Callback(t => Timeout = t);
 
@@ -142,6 +149,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .SetDefault(false)
                 .Callback(v => VerboseLogging = v);
 
+            Parser
+               .Setup<bool>("dotnet-isolated-debug")
+               .WithDescription("When specified, set to true, pauses the .NET Worker process until a debugger is attached.")
+               .SetDefault(false)
+               .Callback(netIsolated => DotNetIsolatedDebug = netIsolated);
+
+            Parser
+               .Setup<bool>("enable-json-output")
+               .WithDescription("Signals to Core Tools and other components that JSON line output console logs, when applicable, should be emitted.")
+               .SetDefault(false)
+               .Callback(enableJsonOutput => EnableJsonOutput = enableJsonOutput);
+
+            Parser
+               .Setup<string>("json-output-file")
+               .WithDescription("If provided, a path to the file that will be used to write the output when using --enable-json-output.")
+               .Callback(jsonOutputFile => JsonOutputFile = jsonOutputFile);
+
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
             // Input args do not contain --verbose flag
@@ -154,16 +178,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+            {
+                UserSecretsId = ProjectHelpers.GetUserSecretsId(hostOptions.ScriptPath, loggingFilterHelper, new LoggerFilterOptions());
+            }
+
             IDictionary<string, string> settings = await GetConfigurationSettings(hostOptions.ScriptPath, baseAddress);
-           
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             _keyVaultReferencesManager.ResolveKeyVaultReferences(settings);
             UpdateEnvironmentVariables(settings);
 
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
-
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
-            
+
             if (UseHttps)
             {
                 defaultBuilder
@@ -176,6 +203,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 });
             }
             return defaultBuilder
+                .ConfigureKestrel(o =>
+                {
+                    // Setting it to match the default RequestBodySize in host
+                    o.Limits.MaxRequestBodySize = Constants.DefaultMaxRequestBodySize;
+                })
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(Startup).Assembly.GetName().Name)
                 .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
@@ -191,12 +223,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                         var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>().Value;
                         // Set min level to SystemLogDefaultLogLevel.
                         filterOptions.MinLevel = loggingFilterHelper.SystemLogDefaultLogLevel;
-                        return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions);
+                        return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions, JsonOutputFile);
                     });
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, loggingFilterHelper)))
+                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile)))
                 .Build();
         }
 
@@ -214,12 +246,42 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .GetEnvironmentVariables()
                     .Cast<DictionaryEntry>()
                     .ToDictionary(k => k.Key.ToString(), v => v.Value.ToString());
-            await CheckNonOptionalSettings(settings.Union(environment), scriptPath);
+
+            // Build user secrets in order to read secrets.json file
+            IEnumerable<KeyValuePair<string, string>> userSecrets = new Dictionary<string, string>();
+            bool userSecretsEnabled = !string.IsNullOrEmpty(UserSecretsId);
+            if (userSecretsEnabled)
+            {
+                userSecrets = Utilities.BuildUserSecrets(UserSecretsId, _hostJsonConfig, VerboseLogging);
+            }
+
+            await CheckNonOptionalSettings(settings.Union(environment).Union(userSecrets), scriptPath, userSecretsEnabled);
 
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
+
+
+            // Inject the .NET Worker startup hook if debugging the worker
+            if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
+            {
+                Environment.SetEnvironmentVariable("FUNCTIONS_ENABLE_DEBUGGER_WAIT", bool.TrueString);
+                EnableDotNetWorkerStartup();
+            }
+
+            // Flow JSON logs flag
+            if (EnableJsonOutput != null && EnableJsonOutput.Value)
+            {
+                Environment.SetEnvironmentVariable("FUNCTIONS_ENABLE_JSON_OUTPUT", bool.TrueString);
+                EnableDotNetWorkerStartup();
+            }
+
             return settings;
+        }
+
+        private void EnableDotNetWorkerStartup()
+        {
+            Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
         }
 
         private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
@@ -269,7 +331,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
-           
+
             ValidateAndBuildHostJsonConfigurationIfFileExists(hostOptions);
 
             (var listenUri, var baseUri, var certificate) = await Setup();
@@ -320,18 +382,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 PythonHelpers.SetWorkerPath(pythonVersion?.ExecutablePath, overwrite: false);
                 PythonHelpers.SetWorkerRuntimeVersionPython(pythonVersion);
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && !NoBuild)
+            else if (WorkerRuntimeLanguageHelper.IsDotnet(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !NoBuild)
             {
-                if (DotnetHelpers.CanDotnetBuild())
-                {
-                    var outputPath = Path.Combine("bin", "output");
-                    await DotnetHelpers.BuildDotnetProject(outputPath, string.Empty);
-                    Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, outputPath);
-                }
-                else if (StaticSettings.IsDebug)
-                {
-                    ColoredConsole.WriteLine("Could not find a valid .csproj file. Skipping the build.");
-                }
+                await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
             {
@@ -343,7 +396,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 throw new CliException($"Port {Port} is unavailable. Close the process using that port, or specify another port using --port [-p].");
             }
         }
-       
+
         private bool IsPreCompiledFunctionApp()
         {
             bool isPrecompiled = false;
@@ -364,13 +417,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             return isPrecompiled;
         }
-                       
-        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath)
+
+        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool userSecretsEnabled)
         {
+            string storageConnectionKey = "AzureWebJobsStorage";
             try
             {
                 // FirstOrDefault returns a KeyValuePair<string, string> which is a struct so it can't be null.
-                var azureWebJobsStorage = secrets.FirstOrDefault(pair => pair.Key.Equals("AzureWebJobsStorage", StringComparison.OrdinalIgnoreCase)).Value;
+                var azureWebJobsStorage = secrets.FirstOrDefault(pair => pair.Key.Equals(storageConnectionKey, StringComparison.OrdinalIgnoreCase)).Value;
                 var functionJsonFiles = await FileSystemHelpers
                     .GetDirectories(scriptPath)
                     .Select(d => Path.Combine(d, "function.json"))
@@ -390,11 +444,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) && !allNonStorageTriggers)
+                if (string.IsNullOrWhiteSpace(azureWebJobsStorage) &&
+                    !StorageConnectionExists(secrets, storageConnectionKey) &&
+                    !allNonStorageTriggers)
                 {
-                    throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
-                        $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
-                        + $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}.");
+                    string errorMessage = userSecretsEnabled ? Constants.Errors.WebJobsStorageNotFoundWithUserSecrets : Constants.Errors.WebJobsStorageNotFound;
+                    throw new CliException(string.Format(errorMessage,
+                                                         SecretsManager.AppSettingsFileName,
+                                                         string.Join(", ", Constants.TriggersWithoutStorage),
+                                                         SecretsManager.AppSettingsFileName));
                 }
 
                 foreach ((var filePath, var functionJson) in functionsJsons)
@@ -412,9 +470,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                                 }
                                 else if (!secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
                                 {
-                                    ColoredConsole
-                                        .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
-                                            $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}."));
+                                    string warningMessage = userSecretsEnabled ? Constants.Errors.AppSettingNotFoundWithUserSecrets : Constants.Errors.AppSettingNotFound;
+                                    ColoredConsole.WriteLine(WarningColor(string.Format(warningMessage,
+                                                                                        appSettingName,
+                                                                                        SecretsManager.AppSettingsFileName,
+                                                                                        token.Key,
+                                                                                        binding["type"]?.ToString(),
+                                                                                        filePath,
+                                                                                        SecretsManager.AppSettingsFileName)));
                                 }
                             }
                         }
@@ -429,6 +492,28 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ColoredConsole.WriteLine(e);
                 }
             }
+        }
+
+        internal static bool StorageConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
+        {
+            // convert secrets into IConfiguration object, check for storage connection in config section
+            var convertedEnv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in secrets)
+            {
+                var convertedKey = kvp.Key.Replace("__", ":");
+                if (!convertedEnv.ContainsKey(convertedKey))
+                {
+                    convertedEnv.Add(convertedKey, kvp.Value);
+                }
+            }
+
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(convertedEnv).Build();
+            var connectionStringSection = configuration?.GetSection("ConnectionStrings").GetSection(connectionStringKey);
+            if (!connectionStringSection.Exists())
+            {
+                connectionStringSection = configuration?.GetSection(connectionStringKey);
+            }
+            return connectionStringSection.Exists();
         }
 
         private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert)> Setup()

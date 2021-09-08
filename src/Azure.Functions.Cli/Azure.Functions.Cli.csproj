@@ -12,17 +12,23 @@
     <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
     <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
-    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash)</InformationalVersion>
+    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
+    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
 
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
-    <Copyright>© .NET Foundation.  All rights reserved.</Copyright>
+    <Copyright>� .NET Foundation.  All rights reserved.</Copyright>
     <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Azure/azure-functions-cli</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+
+    <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>func</ToolCommandName>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
     <PublishReadyToRun>true</PublishReadyToRun>
@@ -48,6 +54,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.python36">
       <LogicalName>$(AssemblyName).Dockerfile.python36</LogicalName>
     </EmbeddedResource>
@@ -57,11 +66,17 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python38">
       <LogicalName>$(AssemblyName).Dockerfile.python38</LogicalName>
     </EmbeddedResource>
+      <EmbeddedResource Include="StaticResources\Dockerfile.python39">
+      <LogicalName>$(AssemblyName).Dockerfile.python39</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
       <LogicalName>$(AssemblyName).Dockerfile.powershell</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.node">
       <LogicalName>$(AssemblyName).Dockerfile.node</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
+      <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
@@ -108,11 +123,17 @@
     <EmbeddedResource Include="StaticResources\print-functions.sh">
       <LogicalName>$(AssemblyName).print-functions.sh</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\keda.yaml">
-      <LogicalName>$(AssemblyName).keda.yaml</LogicalName>
+    <EmbeddedResource Include="StaticResources\keda-v1.yaml">
+      <LogicalName>$(AssemblyName).keda-v1.yaml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\keda-v2.yaml">
+      <LogicalName>$(AssemblyName).keda-v2.yaml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ziptofs.sh">
         <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\getting_started_python_function.md">
+        <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -130,14 +151,16 @@
     <PackageReference Include="DotNetZip" Version="1.13.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.8.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="2.0.6" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS6" Version="3.0.552" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.549" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.0.14785" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.0.14492" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.1.4" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(NoWorkers)' != 'true'">
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.8.2-SNAPSHOT" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="2.1.2" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS6" Version="3.0.630" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.833" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.2.5" />
   </ItemGroup>
 
   <Target Name="ExcludeWorkersFromReadyToRun">

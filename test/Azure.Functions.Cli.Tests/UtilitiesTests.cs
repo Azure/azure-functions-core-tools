@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.Tests
             if (expected)
             {
                 settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "extensionBundle", "id"), "Microsoft.Azure.Functions.ExtensionBundle");
-                settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "extensionBundle", "version"), "[1.*, 2.0.0)");
+                settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "extensionBundle", "version"), "[2.*, 3.0.0)");
             }
             
             var testConfiguration = TestUtils.CreateSetupWithConfiguration(settings);

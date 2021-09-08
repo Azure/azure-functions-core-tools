@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -11,52 +12,22 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Kubernetes.FuncKeys;
+using Azure.Functions.Cli.Kubernetes.KEDA;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using YamlDotNet.Core;
 using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.EventEmitters;
 using YamlDotNet.Serialization.NamingConventions;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Constants = Azure.Functions.Cli.Common.Constants;
 
 namespace Azure.Functions.Cli.Kubernetes
 {
     public static class KubernetesHelper
     {
-        private static readonly IEnumerable<string> _allResourceNames = new[]
-        {
-            "customresourcedefinition.apiextensions.k8s.io/scaledobjects.keda.k8s.io",
-            "customresourcedefinition.apiextensions.k8s.io/triggerauthentications.keda.k8s.io",
-            "serviceaccount/keda",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda-hpa-role-binding",
-            "clusterrole.rbac.authorization.k8s.io/keda-external-metrics-reader",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda:system:auth-delegator",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda-hpa-controller-external-metrics",
-            "clusterrolebinding.rbac.authorization.k8s.io/keda",
-            "rolebinding.rbac.authorization.k8s.io/keda-auth-reader",
-            "service/keda",
-            "deployment.apps/keda",
-            "apiservice.apiregistration.k8s.io/v1beta1.custom.metrics.k8s.io",
-            "apiservice.apiregistration.k8s.io/v1beta1.external.metrics.k8s.io",
-            "secret/osiris-osiris-edge-endpoints-hijacker-cert",
-            "secret/osiris-osiris-edge",
-            "secret/osiris-osiris-edge-proxy-injector-cert",
-            "serviceaccount/osiris-osiris-edge",
-            "clusterrole.rbac.authorization.k8s.io/osiris-osiris-edge",
-            "clusterrolebinding.rbac.authorization.k8s.io/osiris-osiris-edge",
-            "service/osiris-osiris-edge-endpoints-hijacker",
-            "service/osiris-osiris-edge-proxy-injector",
-            "deployment.apps/osiris-osiris-edge-activator",
-            "deployment.apps/osiris-osiris-edge-endpoints-controller",
-            "deployment.apps/osiris-osiris-edge-endpoints-hijacker",
-            "deployment.apps/osiris-osiris-edge-proxy-injector",
-            "deployment.apps/osiris-osiris-edge-zeroscaler",
-            "mutatingwebhookconfiguration.admissionregistration.k8s.io/osiris-osiris-edge-endpoints-hijacker",
-            "mutatingwebhookconfiguration.admissionregistration.k8s.io/osiris-osiris-edge-proxy-injector"
-        };
-
         public static void ValidateKubernetesName(string name)
         {
             var regExValue = "^[a-z0-9\\-\\.]*$";
@@ -74,13 +45,28 @@ namespace Azure.Functions.Cli.Kubernetes
 
         internal static async Task<bool> NamespaceExists(string @namespace)
         {
+            if (string.IsNullOrWhiteSpace(@namespace))
+            {
+                // No namespace was specified so we rely on the default namespace in .kube/config
+                // Because of that, we assume that it exists because we don't know its name
+
+                return true;
+            }
+
             (_, _, var exitCode) = await KubectlHelper.RunKubectl($"get namespace {@namespace}", ignoreError: true, showOutput: false);
             return exitCode == 0;
         }
 
-        internal static async Task<(string, bool)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
+        internal static async Task<(string Output, bool ResourceExists)> ResourceExists(string resourceTypeName, string resourceName, string @namespace, bool returnJsonOutput = false)
         {
-            var cmd = $"get {resourceTypeName} {resourceName} --namespace {@namespace}";
+            var cmd = $"get {resourceTypeName} {resourceName}";
+
+            // If a namespace is specified, then we need to filter
+            if (string.IsNullOrWhiteSpace(@namespace) == false)
+            {
+                cmd += $" --namespace {@namespace}";
+            }
+
             if (returnJsonOutput)
             {
                 cmd = string.Concat(cmd, " -o json");
@@ -90,18 +76,20 @@ namespace Azure.Functions.Cli.Kubernetes
             return (output, exitCode == 0);
         }
 
-        internal static Task CreateNamespace(string @namespace)
-            => KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
-
-        internal static string GetKedaResources(string @namespace)
+        internal static async Task CreateNamespace(string @namespace)
         {
-            return StaticResources
-                .KedaTemplate
-                .Result
-                .Replace("KEDA_NAMESPACE", @namespace);
+            if (string.IsNullOrWhiteSpace(@namespace))
+            {
+                // No namespace was specified so we rely on the default namespace in .kube/config
+                // Because of that, we assume that already exists since we don't know its name
+
+                return;
+            }
+
+            await KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
         }
 
-        internal async static Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
+        internal static async Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
             string name,
             string imageName,
             string @namespace,
@@ -117,9 +105,10 @@ namespace Azure.Functions.Cli.Kubernetes
             int? minReplicas = null,
             int? maxReplicas = null,
             string keysSecretCollectionName = null,
-            bool mountKeysAsContainerVolume = false)
+            bool mountKeysAsContainerVolume = false,
+            KedaVersion? kedaVersion = null)
         {
-            ScaledObjectV1Alpha1 scaledobject = null;
+            IKubernetesResource scaledObject = null;
             var result = new List<IKubernetesResource>();
             var deployments = new List<DeploymentV1Apps>();
             var httpFunctions = triggers.FunctionsJson
@@ -147,7 +136,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 var enabledFunctions = nonHttpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
                 var deployment = GetDeployment(name, @namespace, imageName, pullSecret, minReplicas ?? 0, enabledFunctions);
                 deployments.Add(deployment);
-                scaledobject = GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas);
+                scaledObject = await KedaHelper.GetScaledObject(name, @namespace, triggers, deployment, pollingInterval, cooldownPeriod, minReplicas, maxReplicas, kedaVersion);
             }
 
             // Set worker runtime if needed.
@@ -270,18 +259,23 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             result = result.Concat(deployments).ToList();
-            return (scaledobject != null ? result.Append(scaledobject) : result, resultantFunctionKeys);
+            return (scaledObject != null ? result.Append(scaledObject) : result, resultantFunctionKeys);
         }
 
-        internal static async Task RemoveKeda(string @namespace)
+        internal static async Task WaitForDeploymentRollout(DeploymentV1Apps deployment)
         {
-            foreach (var name in _allResourceNames)
+            var statement = $"rollout status deployment {deployment.Metadata.Name}";
+
+            // If a namespace is specified, we filter on it
+            if (string.IsNullOrWhiteSpace(deployment.Metadata.Namespace) == false)
             {
-                await KubectlHelper.RunKubectl($"delete {name} --namespace {@namespace}", ignoreError: true, showOutput: true);
+                statement += $" --namespace {deployment.Metadata.Namespace}";
             }
+
+            await KubectlHelper.RunKubectl(statement, showOutput: true, timeout: TimeSpan.FromMinutes(4));
         }
 
-        private async static Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
+        private static async Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
         {
             if (string.IsNullOrWhiteSpace(keysSecretCollectionName)
                 || string.IsNullOrWhiteSpace(@namespace))
@@ -302,12 +296,9 @@ namespace Azure.Functions.Cli.Kubernetes
             return new Dictionary<string, string>();
         }
 
-        internal async static Task PrintFunctionsInfo(string serviceName, string @namespace, IDictionary<string, string> funcKeys, TriggersPayload triggers)
+        internal static async Task PrintFunctionsInfo(DeploymentV1Apps deployment, ServiceV1 service, IDictionary<string, string> funcKeys, TriggersPayload triggers, bool showServiceFqdn)
         {
-            if (string.IsNullOrWhiteSpace(serviceName)
-                || string.IsNullOrWhiteSpace(@namespace)
-                || funcKeys?.Any() == false
-                || triggers == null)
+            if (funcKeys?.Any() == false || triggers == null)
             {
                 return;
             }
@@ -316,29 +307,34 @@ namespace Azure.Functions.Cli.Kubernetes
                 .Where(b => b.Value["bindings"]?.Any(e => e?["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) != -1) == true)
                 .Select(item => item.Key);
 
-            var loadBalancerIp = await GetLoadBalancerIp(serviceName, @namespace, 24);
-            if (string.IsNullOrEmpty(loadBalancerIp))
+            var localPort = NetworkHelpers.GetAvailablePort();
+            Process proxy = null;
+            try
             {
-                ColoredConsole.WriteLine(WarningColor($"The service: {serviceName} is not yet ready, please re-run the deployment to get the function keys."));
-                return;
-            }
-
-            var masterKey = funcKeys["host.master"];
-            if (httpFunctions?.Any() == true)
-            {
-                foreach (var functionName in httpFunctions)
+                proxy = await KubectlHelper.RunKubectlProxy(
+                    deployment,
+                    service.Spec.Ports.FirstOrDefault()?.Port ?? 80,
+                    localPort
+                );
+                string baseAddress;
+                if (showServiceFqdn)
                 {
-                    var getFunctionAdminUri = $"http://{loadBalancerIp}/admin/functions/{functionName}?code={masterKey}";
-                    var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri), 20);
+                    baseAddress = $"{service.Metadata.Name}.{service.Metadata.Namespace}.svc.cluster.local";
+                }
+                else
+                {
+                    baseAddress = await GetServiceIp(service);
+                }
 
-                    if (httpResponseMessage.StatusCode == System.Net.HttpStatusCode.NotFound)
+                var masterKey = funcKeys["host.master"];
+                if (httpFunctions?.Any() == true)
+                {
+                    foreach (var functionName in httpFunctions)
                     {
-                        ColoredConsole.WriteLine(WarningColor($"The service: {functionName} is not yet ready in the runtime yet, please re-run the deployment to get the function keys."));
-                        return;
-                    }
+                        var getFunctionAdminUri = $"http://127.0.0.1:{localPort}/admin/functions/{functionName}?code={masterKey}";
+                        var httpResponseMessage = await GetHttpResponse(new HttpRequestMessage(HttpMethod.Get, getFunctionAdminUri), 20);
+                        httpResponseMessage.EnsureSuccessStatusCode();
 
-                    if (httpResponseMessage.IsSuccessStatusCode)
-                    {
                         var responseContent = await httpResponseMessage.Content.ReadAsStringAsync();
                         var functionsInfo = JsonConvert.DeserializeObject<FunctionInfo>(responseContent);
 
@@ -363,13 +359,14 @@ namespace Azure.Functions.Cli.Kubernetes
                         ColoredConsole.WriteLine($"\t{functionName} - [{VerboseColor(trigger.ToString())}]");
                         if (!string.IsNullOrEmpty(functionsInfo.InvokeUrlTemplate))
                         {
+                            var url = new Uri(new Uri($"http://{baseAddress}"), new Uri(functionsInfo.InvokeUrlTemplate).PathAndQuery).ToString();
                             if (showFunctionKey)
                             {
-                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor($"{functionsInfo.InvokeUrlTemplate}?code={funcKeys[$"functions.{functionName.ToLower()}.default"]}")}");
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor($"{url}?code={funcKeys[$"functions.{functionName.ToLower()}.default"]}")}");
                             }
                             else
                             {
-                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor(functionsInfo.InvokeUrlTemplate)}");
+                                ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor(url)}");
                             }
                         }
                         ColoredConsole.WriteLine();
@@ -377,12 +374,19 @@ namespace Azure.Functions.Cli.Kubernetes
                     }
                 }
             }
+            finally
+            {
+                if (proxy != null && !proxy.HasExited)
+                {
+                    proxy.Kill();
+                }
+            }
 
             //Print the master key as well for the user
-            ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys[$"host.master"]}")}");
+            ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys["host.master"]}")}");
         }
 
-        private async static Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
+        private static async Task<HttpResponseMessage> GetHttpResponse(HttpRequestMessage httpRequestMessage, int retryCount = 5)
         {
             HttpResponseMessage httpResponseMsg = new HttpResponseMessage();
             if (httpRequestMessage == null)
@@ -393,18 +397,28 @@ namespace Azure.Functions.Cli.Kubernetes
             int currentRetry = 0;
             using (var httpClient = new HttpClient(new HttpClientHandler()))
             {
+                httpClient.Timeout = TimeSpan.FromSeconds(2);
                 while (currentRetry++ < retryCount)
                 {
-                    httpResponseMsg = await httpClient.SendAsync(httpRequestMessage.Clone());
-                    if (httpResponseMsg.IsSuccessStatusCode ||
-                        (httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
-                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
-                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout
-                        && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.NotFound))
+                    try
                     {
-                        return httpResponseMsg;
+                        httpResponseMsg = await httpClient.SendAsync(httpRequestMessage.Clone());
+                        if (httpResponseMsg.IsSuccessStatusCode ||
+                            (httpResponseMsg.StatusCode != System.Net.HttpStatusCode.BadGateway
+                            && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.RequestTimeout
+                            && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.GatewayTimeout
+                            && httpResponseMsg.StatusCode != System.Net.HttpStatusCode.NotFound))
+                        {
+                            return httpResponseMsg;
+                        }
                     }
-
+                    catch (Exception e)
+                    {
+                        if (StaticSettings.IsDebug)
+                        {
+                            ColoredConsole.Error.WriteLine(e);
+                        }
+                    }
                     await Task.Delay(new Random().Next(500, 2000));
                 }
             }
@@ -412,30 +426,27 @@ namespace Azure.Functions.Cli.Kubernetes
             return httpResponseMsg;
         }
 
-        private async static Task<string> GetLoadBalancerIp(string serviceName, string @namespace, int retryCount = 12)
+        private static async Task<string> GetServiceIp(ServiceV1 service, int retryCount = 12)
         {
-            if (string.IsNullOrWhiteSpace(serviceName)
-                || string.IsNullOrWhiteSpace(@namespace))
-            {
-                return string.Empty;
-            }
-
-            ColoredConsole.WriteLine(AdditionalInfoColor($"Getting loadbalancer ip for the service: {serviceName}"));
             int currentRetry = 0;
             while (currentRetry++ < retryCount)
             {
-                (string output, bool serviceExists) = await ResourceExists("service", serviceName, @namespace, true);
+                (string output, bool serviceExists) = await ResourceExists("service", service.Metadata.Name, service.Metadata.Namespace, true);
                 if (serviceExists)
                 {
-                    var service = TryParse<ServiceV1>(output);
-                    if (service?.Status?.LoadBalancer?.Ingress?.Any() == true)
+                    service = TryParse<ServiceV1>(output);
+                    if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == true && service?.Status?.LoadBalancer?.Ingress?.Any() == true)
                     {
-                        return service?.Status?.LoadBalancer?.Ingress.First().Ip;
+                        return service.Status.LoadBalancer.Ingress.First().Ip;
+                    }
+                    else if (service?.Spec?.Type?.Equals("LoadBalancer", StringComparison.OrdinalIgnoreCase) == false && !string.IsNullOrEmpty(service?.Spec?.ClusterIp))
+                    {
+                        return service.Spec.ClusterIp;
                     }
                 }
 
+                ColoredConsole.WriteLine(AdditionalInfoColor($"Waiting for the service to be ready: {service.Metadata.Name}"));
                 await Task.Delay(5000);
-                ColoredConsole.WriteLine(AdditionalInfoColor($"Waiting for the service to be ready: {serviceName}"));
             }
 
             return string.Empty;
@@ -460,6 +471,21 @@ namespace Azure.Functions.Cli.Kubernetes
             return funcKeys;
         }
 
+        public class QuoteNumbersEventEmitter : ChainedEventEmitter
+        {
+            public QuoteNumbersEventEmitter(IEventEmitter nextEmitter)
+                : base(nextEmitter)
+            { }
+
+            public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
+            {
+                if (eventInfo.Source.Type == typeof(string) && double.TryParse(eventInfo.Source.Value.ToString(), out _))
+                {
+                    eventInfo.Style = ScalarStyle.DoubleQuoted;
+                }
+                base.Emit(eventInfo, emitter);
+            }
+        }
         internal static string SerializeResources(IEnumerable<IKubernetesResource> resources, OutputSerializationOptions outputFormat)
         {
             var sb = new StringBuilder();
@@ -474,6 +500,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     var yaml = new SerializerBuilder()
                         .DisableAliases()
                         .WithNamingConvention(new CamelCaseNamingConvention())
+                        .WithEventEmitter(e => new QuoteNumbersEventEmitter(e))
                         .Build();
                     var writer = new StringWriter();
                     yaml.Serialize(writer, resource);
@@ -539,7 +566,33 @@ namespace Azure.Functions.Cli.Kubernetes
                                         {
                                             ContainerPort = 80
                                         }
-                                    }
+                                    },
+                                ReadinessProbe = new Probe
+                                {
+                                    FailureThreshold = 3,
+                                    HttpGet = new HttpAction
+                                    {
+                                        Path = "/",
+                                        port = 80,
+                                        Scheme = "HTTP"
+                                    },
+                                    PeriodSeconds = 10,
+                                    SuccessThreshold = 1,
+                                    TimeoutSeconds = 240
+                                },
+                                StartupProbe = new Probe
+                                {
+                                    FailureThreshold = 3,
+                                    HttpGet = new HttpAction
+                                    {
+                                        Path = "/",
+                                        port = 80,
+                                        Scheme = "HTTP"
+                                    },
+                                    PeriodSeconds = 10,
+                                    SuccessThreshold = 1,
+                                    TimeoutSeconds = 240
+                                }
                               }
                             },
                             ImagePullSecrets = string.IsNullOrEmpty(pullSecret)
@@ -587,112 +640,6 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             };
         }
-
-        private static ScaledObjectV1Alpha1 GetScaledObject(string name, string @namespace, TriggersPayload triggers, DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
-        {
-            return new ScaledObjectV1Alpha1
-            {
-                ApiVersion = "keda.k8s.io/v1alpha1",
-                Kind = "ScaledObject",
-                Metadata = new ObjectMetadataV1
-                {
-                    Name = name,
-                    Namespace = @namespace,
-                    Labels = new Dictionary<string, string>
-                    {
-                        { "deploymentName" , deployment.Metadata.Name }
-                    }
-                },
-                Spec = new ScaledObjectSpecV1Alpha1
-                {
-                    ScaleTargetRef = new ScaledObjectScaleTargetRefV1Alpha1
-                    {
-                        DeploymentName = deployment.Metadata.Name
-                    },
-                    PollingInterval = pollingInterval,
-                    CooldownPeriod = cooldownPeriod,
-                    MinReplicaCount = minReplicas,
-                    MaxReplicaCount = maxReplicas,
-                    Triggers = triggers
-                        .FunctionsJson
-                        .Select(kv => kv.Value)
-                        .Where(v => v["bindings"] != null)
-                        .Select(b => b["bindings"])
-                        .SelectMany(i => i)
-                        .Where(b => b?["type"] != null)
-                        .Where(b => b["type"].ToString().IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
-                        .Where(b => b["type"].ToString().IndexOf("httpTrigger", StringComparison.OrdinalIgnoreCase) == -1)
-                        .Select(t => new ScaledObjectTriggerV1Alpha1
-                        {
-                            Type = GetKedaTrigger(t["type"]?.ToString()),
-                            Metadata = PopulateMetadataDictionary(t)
-                        })
-                }
-            };
-        }
-
-        internal static IDictionary<string, string> PopulateMetadataDictionary(JToken t)
-        {
-            IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
-                                    .Where(i => i.Value.Type == JTokenType.String)
-                                    .ToDictionary(k => k.Key, v => v.Value.ToString());
-
-            if (t["type"].ToString().Equals("rabbitMQTrigger", StringComparison.InvariantCultureIgnoreCase))
-            {
-                metadata["host"] = metadata["connectionStringSetting"];
-                metadata.Remove("connectionStringSetting");
-            }
-
-            return metadata;
-        }
-
-        private static string GetKedaTrigger(string triggerType)
-        {
-            if (string.IsNullOrEmpty(triggerType))
-            {
-                throw new ArgumentNullException(nameof(triggerType));
-            }
-
-            triggerType = triggerType.ToLower();
-
-            switch (triggerType)
-            {
-                case "queuetrigger":
-                    return "azure-queue";
-
-                case "kafkatrigger":
-                    return "kafka";
-
-                case "blobtrigger":
-                    return "azure-blob";
-
-                case "servicebustrigger":
-                    return "azure-servicebus";
-
-                case "eventhubtrigger":
-                    return "azure-eventhub";
-
-                case "rabbitmqtrigger":
-                    return "rabbitmq";
-
-                default:
-                    return triggerType;
-            }
-        }
-
-        private static async Task<bool> HasKeda()
-        {
-            var kedaEdgeResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda-edge --all-namespaces");
-            var kedaResult = await KubectlHelper.KubectlGet<SearchResultV1<DeploymentV1Apps>>("deployments --selector=app=keda --all-namespaces");
-            return kedaResult.Items.Any() || kedaEdgeResult.Items.Any();
-        }
-
-        private static async Task<bool> HasScaledObjectCrd()
-        {
-            var crdResult = await KubectlHelper.KubectlGet<SearchResultV1<CustomResourceDefinitionV1Beta1>>("crd");
-            return crdResult.Items.Any(i => i.Metadata.Name == "scaledobjects.keda.k8s.io");
-        }
-
 
         private static SecretsV1 GetSecret(string name, string @namespace, IDictionary<string, string> secrets)
         {

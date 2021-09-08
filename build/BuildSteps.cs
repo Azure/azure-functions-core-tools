@@ -1,25 +1,23 @@
 using Colors.Net;
-using Colors.Net.StringColorExtensions;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.Queue;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
+using Colors.Net.StringColorExtensions;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace Build
 {
     public static class BuildSteps
     {
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
+        private static IntegrationTestBuildManifest _manifest;
 
         public static void Clean()
         {
@@ -36,12 +34,62 @@ namespace Build
                 "https://www.myget.org/F/fusemandistfeed/api/v2",
                 "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/",
                 "https://www.myget.org/F/xunit/api/v3/index.json",
-                "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/index.json",
-                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json"
+                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json",
+                "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json"
             }
             .Aggregate(string.Empty, (a, b) => $"{a} --source {b}");
 
             Shell.Run("dotnet", $"restore {Settings.ProjectFile} {feeds}");
+        }
+
+        public static void UpdatePackageVersionForIntegrationTests()
+        {
+            if (string.IsNullOrEmpty(Settings.IntegrationBuildNumber))
+            {
+                throw new Exception($"Environment variable 'integrationBuildNumber' cannot be null or empty for an integration build.");
+            }
+
+            const string AzureFunctionsPreReleaseFeedName = "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json";
+            var packagesToUpdate = GetV3PackageList();
+            string currentDirectory = null;
+
+            Dictionary<string, string> buildPackages = new Dictionary<string, string>();
+
+            _manifest = new IntegrationTestBuildManifest();
+
+            try
+            {
+                currentDirectory = Directory.GetCurrentDirectory();
+                var projectFolder = Path.GetFullPath(Settings.SrcProjectPath);
+                Directory.SetCurrentDirectory(projectFolder);
+
+                foreach (var package in packagesToUpdate)
+                {
+                    string packageInfo = Shell.GetOutput("NuGet", $"list {package} -Source {AzureFunctionsPreReleaseFeedName} -prerelease").Split(Environment.NewLine)[0];
+
+                    if (string.IsNullOrEmpty(packageInfo))
+                    {
+                        throw new Exception($"Failed to get {package} package information from {AzureFunctionsPreReleaseFeedName}.");
+                    }
+
+                    var parts = packageInfo.Split(" ");
+                    var packageName = parts[0];
+                    var packageVersion = parts[1];
+
+                    Shell.Run("dotnet", $"add package {packageName} -v {packageVersion} -s {AzureFunctionsPreReleaseFeedName} --no-restore");
+
+                    buildPackages.Add(packageName, packageVersion);
+                }
+            }
+            finally
+            {
+                if (buildPackages.Count > 0)
+                {
+                    _manifest.Packages = buildPackages;
+                }
+
+                Directory.SetCurrentDirectory(currentDirectory);
+            }
         }
 
         public static void ReplaceTelemetryInstrumentationKey()
@@ -67,11 +115,20 @@ namespace Build
                 case "min.win-x86":
                 case "min.win-x64":
                     return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
-                case "no-runtime":
-                    return string.Empty;
                 default:
                     return runtime;
             }
+        }
+
+        public static void DotnetPack()
+        {
+            var outputPath = Path.Combine(Settings.OutputDir);
+            Shell.Run("dotnet", $"pack {Settings.ProjectFile} " +
+                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
+                                $"/p:NoWorkers=\"true\" " +
+                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
+                                $"-o {outputPath} -c Release ");
         }
 
         public static void DotnetPublish()
@@ -83,6 +140,7 @@ namespace Build
                 Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                    (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                     $"-o {outputPath} -c Release " +
                                     (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
 
@@ -90,6 +148,11 @@ namespace Build
                 {
                     RemoveLanguageWorkers(outputPath);
                 }
+            }
+
+            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
+            {
+                _manifest.CommitId = Settings.CommitId;
             }
         }
 
@@ -105,19 +168,18 @@ namespace Build
                     var powerShellVersion = Path.GetFileName(powershellWorkerPath);
                     var powershellRuntimePath = Path.Combine(powershellWorkerPath, "runtimes");
 
-                    var allKnownPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion].Values.SelectMany(x => x).Distinct().ToList();
                     var allFoundPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
+                    var powershellRuntimesForCurrentToolsRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
 
-                    // Check to make sure any new runtime is categorizied properly and all the expected runtimes are available
-                    if (allFoundPowershellRuntimes.Count != allKnownPowershellRuntimes.Count || !allKnownPowershellRuntimes.All(allFoundPowershellRuntimes.Contains))
+                    // Check to make sure all the expected runtimes are available
+                    if (allFoundPowershellRuntimes.All(powershellRuntimesForCurrentToolsRuntime.Contains))
                     {
-                        throw new Exception($"Mismatch between classified Powershell runtimes and Powershell runtimes found for Powershell v{powerShellVersion}. Classified runtimes are ${string.Join(", ", allKnownPowershellRuntimes)}." +
-                            $"{Environment.NewLine}Found runtimes are ${string.Join(", ", allFoundPowershellRuntimes)}");
+                        throw new Exception($"Expected PowerShell runtimes not found for Powershell v{powerShellVersion}. Expected runtimes are {string.Join(", ", powershellRuntimesForCurrentToolsRuntime)}." +
+                            $"{Environment.NewLine}Found runtimes are {string.Join(", ", allFoundPowershellRuntimes)}");
                     }
 
                     // Delete all the runtimes that should not belong to the current runtime
-                    var powershellForCurrentRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
-                    allFoundPowershellRuntimes.Except(powershellForCurrentRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
+                    allFoundPowershellRuntimes.Except(powershellRuntimesForCurrentToolsRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
                 }
             }
 
@@ -175,18 +237,6 @@ namespace Build
             }
         }
 
-        private static void RemoveLanguageWorkers(string outputPath)
-        {
-            foreach (var languageWorker in Settings.LanguageWorkers)
-            {
-                var path = Path.Combine(outputPath, "workers", languageWorker);
-                if (Directory.Exists(path))
-                {
-                    Directory.Delete(path, recursive: true);
-                }
-            }
-        }
-
         public static void AddDistLib()
         {
             var distLibDir = Path.Combine(Settings.OutputDir, "distlib");
@@ -212,15 +262,26 @@ namespace Build
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
+            var isolatedTemplatesPath = Path.Combine(templatesPath, "net5-isolated");
+
             Directory.CreateDirectory(templatesPath);
+            Directory.CreateDirectory(isolatedTemplatesPath);
 
             using (var client = new WebClient())
             {
-                client.DownloadFile(Settings.ItemTemplates,
-                    Path.Combine(templatesPath, $"itemTemplates.{Settings.ItemTemplatesVersion}.nupkg"));
+                // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
+                // and we are sure it doesn't break them.
+                client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
+                    Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
 
-                client.DownloadFile(Settings.ProjectTemplates,
-                    Path.Combine(templatesPath, $"projectTemplates.{Settings.ProjectTemplatesVersion}.nupkg"));
+                client.DownloadFile(Settings.DotnetIsolatedProjectTemplates,
+                    Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
+
+                client.DownloadFile(Settings.DotnetItemTemplates,
+                    Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
+
+                client.DownloadFile(Settings.DotnetProjectTemplates,
+                    Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
             }
 
             foreach (var runtime in Settings.TargetRuntimes)
@@ -301,6 +362,10 @@ namespace Build
 
             // binaries to be signed via signed tool
             var allFiles = Directory.GetFiles(toSignDirPath, "*.*", new EnumerationOptions() { RecurseSubdirectories = true }).ToList();
+
+            // These assemblies are currently signed, but with an invalid root cert.
+            // Until that is resolved, we are explicity signing the AppService.Middleware packages
+            unSignedBinaries = unSignedBinaries.Concat(allFiles.Where(f => f.Contains("Microsoft.Azure.AppService.Middleware"))).ToList();
 
             // remove all entries for binaries that are actually unsigned (checked via sigcheck.exe)
             unSignedBinaries.ForEach(f => allFiles.RemoveAll(n => n.Equals(f, StringComparison.OrdinalIgnoreCase)));
@@ -416,6 +481,7 @@ namespace Build
         public static void Zip()
         {
             var version = CurrentVersion;
+
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var path = Path.Combine(Settings.OutputDir, runtime);
@@ -541,6 +607,52 @@ namespace Build
                 {
                     Environment.SetEnvironmentVariable("GOOS", "darwin");
                     Shell.Run("go", $"build -o {outputPath} {goFile}");
+                }
+            }
+        }
+
+        public static void CreateIntegrationTestsBuildManifest()
+        {
+            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
+            {
+                _manifest.CoreToolsVersion = _version;
+                _manifest.Build = Settings.IntegrationBuildNumber;
+
+                var json = JsonConvert.SerializeObject(_manifest, Formatting.Indented);
+                var manifestFilePath = Path.Combine(Settings.OutputDir, "integrationTestsBuildManifest.json");
+                File.WriteAllText(manifestFilePath, json);
+            }
+        }
+
+        private static List<string> GetV3PackageList()
+        {
+            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/dev/integrationTestsBuild/V3/CoreToolsBuild.json";
+            Uri address = new Uri(CoreToolsBuildPackageList);
+
+            string content = null;
+            using (var client = new WebClient())
+            {
+                content = client.DownloadString(address);
+            }
+
+            if (string.IsNullOrEmpty(content))
+            {
+                throw new Exception($"Failed to download package list from {CoreToolsBuildPackageList}");
+            }
+
+            var packageList = JsonConvert.DeserializeObject<List<string>>(content);
+
+            return packageList;
+        }
+
+        private static void RemoveLanguageWorkers(string outputPath)
+        {
+            foreach (var languageWorker in Settings.LanguageWorkers)
+            {
+                var path = Path.Combine(outputPath, "workers", languageWorker);
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: true);
                 }
             }
         }

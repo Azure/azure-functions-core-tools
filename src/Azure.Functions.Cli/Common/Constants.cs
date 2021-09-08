@@ -20,6 +20,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
+        public const string PythonGettingStarted = "getting_started.md";
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
         public const string ExtenstionsCsProjFile = "extensions.csproj";
@@ -30,6 +31,7 @@ namespace Azure.Functions.Cli.Common
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
+        public const string DotnetFrameworkVersion = "netFrameworkVersion";
         public const string PythonDockerImageVersionSetting = "FUNCTIONS_PYTHON_DOCKER_IMAGE";
         public const string PythonDockerImageSkipPull = "FUNCTIONS_PYTHON_DOCKER_SKIP_PULL";
         public const string PythonDockerRunCommand = "FUNCTIONS_PYTHON_DOCKER_RUN_COMMAND";
@@ -54,6 +56,10 @@ namespace Azure.Functions.Cli.Common
         public const string UserSecretsIdElementName = "UserSecretsId";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
+        public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
+        public const long DefaultMaxRequestBodySize = 104857600;
+        public const int DefaultGetFunctionReadinessTime = 30000;
+        public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -69,7 +75,17 @@ namespace Azure.Functions.Cli.Common
             { WorkerRuntime.powershell, new [] { "mcr.microsoft.com/azure-functions/powershell", "microsoft/azure-functions-powershell" } }
         };
 
-        public static readonly string[] TriggersWithoutStorage = new[] { "httptrigger", "kafkatrigger" };
+        public static readonly string[] TriggersWithoutStorage = new[]
+        {
+            "httptrigger",
+            "kafkatrigger",
+            "rabbitmqtrigger",
+
+            // Durable Functions triggers can also support non-Azure Storage backends
+            "orchestrationTrigger",
+            "activityTrigger",
+            "entityTrigger",
+        };
 
         public static class Errors
         {
@@ -78,6 +94,10 @@ namespace Azure.Functions.Cli.Common
             public const string EitherPidOrAllMustBeSpecified = "Must specify either -a/--all or -p/--processId <Pid>";
             public const string ExtensionsNeedDotnet = "Extensions command requires dotnet on your path. Please make sure to install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download";
             public const string UnableToUpdateAppSettings = "Error updating Application Settings for the Function App for deployment.";
+            public const string WebJobsStorageNotFound = "Missing value for AzureWebJobsStorage in {0}. This is required for all triggers other than {1}. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {2}.";
+            public const string WebJobsStorageNotFoundWithUserSecrets = "Missing value for AzureWebJobsStorage in {0} and User Secrets. This is required for all triggers other than {1}. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {2} or User Secrets.";
+            public const string AppSettingNotFound = "Warning: Cannot find value named '{0}' in {1} that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5}.";
+            public const string AppSettingNotFoundWithUserSecrets = "Warning: Cannot find value named '{0}' in {1} or User Secrets that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5} or User Secrets.";
         }
 
         public static class Languages
@@ -115,9 +135,10 @@ namespace Azure.Functions.Cli.Common
 
         public static class DockerImages
         {
-            public const string LinuxPython36ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12493-python3.6-buildenv";
-            public const string LinuxPython37ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.12763-python3.7-buildenv";
-            public const string LinuxPython38ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.13106-python3.8-buildenv";
+            public const string LinuxPython36ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.14786-python3.6-buildenv";
+            public const string LinuxPython37ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.14786-python3.7-buildenv";
+            public const string LinuxPython38ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.8-buildenv";
+            public const string LinuxPython39ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.9-buildenv";
         }
 
         public static class StaticResourcesNames

@@ -42,11 +42,34 @@ namespace Azure.Functions.Cli.Tests
         }
 
         [Theory]
+        [InlineData("DOCKER|mcr.microsoft.com/azure-functions/python", 3, 9, true)]
+        [InlineData("", 3, 7, false)]
+        [InlineData("", 3, 6, true)]
+        [InlineData("PYTHON|3.6", 3, 6, true)]
+        [InlineData("PYTHON|3.6", 3, 7, false)]
+        [InlineData("PYTHON|3.7", 3, 6, false)]
+        [InlineData("python|3.7", 3, 7, true)]
+        [InlineData("Python|3.8", 3, 8, true)]
+        [InlineData("PyThOn|3.9", 3, 9, true)]
+        [InlineData("PYTHON|3.9", null, 9, false)]
+        [InlineData("PYTHON|3.9", 3, null, false)]
+        [InlineData("PYTHON|3.9", null, null, false)]
+        public void ShouldHaveMatchingLinuxFxVersion(string linuxFxVersion, int major, int minor, bool expectedResult)
+        {
+            bool result = PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(linuxFxVersion, major, minor);
+            if (result != expectedResult)
+            {
+                throw new Exception("Local version compatibility check failed (IsLocalVersionCompatibleWithLinuxFxVersion).");
+            }
+        }
+
+        [Theory]
         [InlineData("2.7.10", true)]
         [InlineData("3.5.5", true)]
         [InlineData("3.6.8b", false)]
         [InlineData("3.7.2", false)]
         [InlineData("3.8.0", false)]
+        [InlineData("3.9.0", false)]
         public void AssertPythonVersion(string pythonVersion, bool expectException)
         {
             WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.python, pythonVersion, "python");
@@ -68,11 +91,11 @@ namespace Azure.Functions.Cli.Tests
             string[] pythons;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                pythons = new string[] { "python.exe", "python3.exe", "python36.exe", "python37.exe", "python38.exe", "py.exe" };
+                pythons = new string[] { "python.exe", "python3.exe", "python36.exe", "python37.exe", "python38.exe", "python39.exe", "py.exe" };
             }
             else
             {
-                pythons = new string[] { "python", "python3", "python36", "python37", "python38" };
+                pythons = new string[] { "python", "python3", "python36", "python37", "python38", "python39" };
             }
 
             string pythonExe = pythons.FirstOrDefault(p => CheckIfPythonExist(p));

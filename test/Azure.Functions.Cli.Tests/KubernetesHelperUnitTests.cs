@@ -1,4 +1,7 @@
 using Azure.Functions.Cli.Kubernetes;
+using Azure.Functions.Cli.Kubernetes.KEDA.Models;
+using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
+using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using Xunit;
@@ -30,29 +33,29 @@ namespace Azure.Functions.Cli.Tests
         }
 
         [Fact]
-        public void PopulateMetadataDictionary_CorrectlyPopulatesRabbitMQMetadata()
+        public void ValidateYamlStringQuote()
         {
-            string jsonText = @"
+            var result = KubernetesHelper.SerializeResources(new []
             {
-                ""type"": ""rabbitMQTrigger"",
-                ""connectionStringSetting"": ""RabbitMQConnection"",
-                ""queueName"": ""myQueue"",
-                ""name"": ""message""
-            }";
+                new ScaledObjectKedaV2
+                {
+                    Spec = new ScaledObjectSpecV1Alpha1
+                    {
+                        Triggers = new []
+                        {
+                            new ScaledObjectTriggerV1Alpha1
+                            {
+                                Metadata = new Dictionary<string, string>
+                                {
+                                    ["targetValue"] = "1",
+                                }
+                            }
+                        }
+                    }
+                }
+            }, Kubernetes.Models.OutputSerializationOptions.Yaml);
 
-            JToken jsonObj = JToken.Parse(jsonText);
-
-            IDictionary<string, string> metadata = KubernetesHelper.PopulateMetadataDictionary(jsonObj);
-
-            Assert.Equal(4, metadata.Count);
-            Assert.True(metadata.ContainsKey("type"));
-            Assert.True(metadata.ContainsKey("host"));
-            Assert.True(metadata.ContainsKey("name"));
-            Assert.True(metadata.ContainsKey("queueName"));
-            Assert.Equal("rabbitMQTrigger", metadata["type"]);
-            Assert.Equal("RabbitMQConnection", metadata["host"]);
-            Assert.Equal("message", metadata["name"]);
-            Assert.Equal("myQueue", metadata["queueName"]);
+            result.Should().Contain("\"1\"");
         }
     }
 }

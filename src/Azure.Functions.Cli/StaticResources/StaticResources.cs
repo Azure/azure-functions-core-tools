@@ -35,15 +35,21 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileCsxDotNet => GetValue("Dockerfile.csx.dotnet");
 
+        public static Task<string> DockerfileDotnetIsolated => GetValue("Dockerfile.dotnetIsolated");
+
         public static Task<string> DockerfilePython36 => GetValue("Dockerfile.python36");
 
         public static Task<string> DockerfilePython37 => GetValue("Dockerfile.python37");
 
         public static Task<string> DockerfilePython38 => GetValue("Dockerfile.python38");
 
+        public static Task<string> DockerfilePython39 => GetValue("Dockerfile.python39");
+
         public static Task<string> DockerfilePowershell => GetValue("Dockerfile.powershell");
 
         public static Task<string> DockerfileNode => GetValue("Dockerfile.node");
+
+        public static Task<string> DockerfileTypescript => GetValue("Dockerfile.typescript");
 
         public static Task<string> DockerIgnoreFile => GetValue("dockerignore");
 
@@ -75,10 +81,13 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PythonRequirementsTxt => GetValue("requirements.txt");
 
+        public static Task<string> PythonGettingStartedMarkdown => GetValue("getting_started_python_function.md");
+
         public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
 
 
-        public static Task<string> KedaTemplate => GetValue("keda.yaml");
+        public static Task<string> KedaV1Template => GetValue("keda-v1.yaml");
+        public static Task<string> KedaV2Template => GetValue("keda-v2.yaml");
 
         public static Task<string> ZipToSquashfsScript => GetValue("ziptofs.sh");
     }

@@ -12,6 +12,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         None,
         dotnet,
+        dotnetIsolated,
         node,
         python,
         java,
@@ -24,6 +25,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> availableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
             { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
+            { WorkerRuntime.dotnetIsolated, new [] { "dotnet-isolated" } },
             { WorkerRuntime.node, new [] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.python, new []  { "py" } },
             { WorkerRuntime.java, new string[] { } },
@@ -39,6 +41,7 @@ namespace Azure.Functions.Cli.Helpers
         private static readonly IDictionary<WorkerRuntime, string> workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
         {
             { WorkerRuntime.dotnet, Constants.Languages.CSharp },
+            { WorkerRuntime.dotnetIsolated, Constants.Languages.CSharp },
             { WorkerRuntime.node, Constants.Languages.JavaScript },
             { WorkerRuntime.python, Constants.Languages.Python },
             { WorkerRuntime.powershell, Constants.Languages.Powershell },
@@ -52,7 +55,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.TypeScript, new [] { "ts" } },
             { Constants.Languages.Python, new [] { "py" } },
             { Constants.Languages.Powershell, new [] { "pwsh" } },
-            { Constants.Languages.CSharp, new [] { "csharp", "dotnet" } },
+            { Constants.Languages.CSharp, new [] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.Java, new string[] { } },
             { Constants.Languages.Custom, new string[] { } }
         };
@@ -71,6 +74,49 @@ namespace Azure.Functions.Cli.Helpers
             string.Join(", ", availableWorkersRuntime.Keys
                 .Where(k => (k != WorkerRuntime.java))
                 .Select(s => s.ToString()));
+
+        public static string GetRuntimeMoniker(WorkerRuntime workerRuntime) 
+        {
+            switch(workerRuntime)
+            {
+                case WorkerRuntime.None:
+                    return "None";
+                case WorkerRuntime.dotnet:
+                    return "dotnet";
+                case WorkerRuntime.dotnetIsolated:
+                    return "dotnet-isolated";
+                case WorkerRuntime.node:
+                    return "node";
+                case WorkerRuntime.python:
+                    return "python";
+                case WorkerRuntime.java:
+                    return "java";
+                case WorkerRuntime.powershell:
+                    return "powershell";
+                case WorkerRuntime.custom:
+                    return "custom";
+                default:
+                    return "None";
+            }
+        }
+
+        public static IDictionary<WorkerRuntime, string> GetWorkerToDisplayStrings()
+        {
+            IDictionary<WorkerRuntime, string> workerToDisplayStrings = new Dictionary<WorkerRuntime, string>();
+            foreach (WorkerRuntime wr in AvailableWorkersList)
+            {
+                switch (wr)
+                {
+                    case WorkerRuntime.dotnetIsolated:
+                        workerToDisplayStrings[wr] = "dotnet (isolated process)";
+                        break;
+                    default:
+                        workerToDisplayStrings[wr] = wr.ToString();
+                        break;
+                }
+            }
+            return workerToDisplayStrings;
+        }
 
         public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
             .Where(k => k != WorkerRuntime.java);
@@ -144,6 +190,11 @@ namespace Azure.Functions.Cli.Helpers
                 throw new ArgumentException($"Worker runtime '{worker}' is not a valid worker for a template.");
             }
             return workerToDefaultLanguageMap[worker];
+        }
+
+        public static bool IsDotnet(WorkerRuntime worker)
+        {
+            return worker == WorkerRuntime.dotnet || worker ==  WorkerRuntime.dotnetIsolated;
         }
     }
 }

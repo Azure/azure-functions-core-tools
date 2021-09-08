@@ -161,6 +161,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_dotnetIsolated_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet-isolated --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:3.0-dotnet-isolated5.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_Dockerfile_for_csx()
         {
             return CliTester.Run(new RunConfiguration
@@ -221,12 +239,14 @@ namespace Azure.Functions.Cli.Tests.E2E
             });
         }
 
-        [Fact]
-        public Task init_ts_app_using_lang()
+        [Theory]
+        [InlineData("--worker-runtime node --language typescript")]
+        [InlineData("--typescript")]
+        public Task init_ts_app_using_lang(string initCommand)
         {
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { "init . --worker-runtime node --language typescript" },
+                Commands = new[] { $"init . {initCommand} --docker" },
                 CheckFiles = new FileResult[]
                 {
                     new FileResult
@@ -236,6 +256,15 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
                             "FUNCTIONS_WORKER_RUNTIME",
                             "node"
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new []
+                        {
+                            "mcr.microsoft.com/azure-functions/node:3.0",
+                            "npm run build"
                         }
                     }
                 },
@@ -248,6 +277,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    "Writing Dockerfile",
+                    "Writing .dockerignore"
                 }
             }, _output);
         }
@@ -403,6 +434,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = "requirements.psd1",
                         ContentContains = new []
                         {
+                            "For latest supported version, go to 'https://www.powershellgallery.com/packages/Az'.",
+                            "To use the Az module in your function app, please uncomment the line below.",
                             "Az",
                         }
                     },
@@ -499,10 +532,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing .gitignore",
                     "Writing host.json",
                     "Writing local.settings.json",
+                    "Writing getting_started.md",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                     "requirements.txt already exists. Skipped!",
                     ".gitignore already exists. Skipped!",
                     "host.json already exists. Skipped!",
+                    "getting_started.md already exists. Skipped!",
                     "local.settings.json already exists. Skipped!",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
                 }
@@ -531,6 +566,33 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
                             "# Do not include azure-functions-worker as it may conflict with the Azure Functions platform",
                             "azure-functions"
+                        }
+                    }
+                },
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_python_app_generates_getting_started_md()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime python"
+                },
+                OutputContains = new[]
+                {
+                    "Writing getting_started.md"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = "getting_started.md",
+                        ContentContains = new []
+                        {
+                            "## Getting Started with Azure Function"
                         }
                     }
                 },

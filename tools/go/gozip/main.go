@@ -13,12 +13,25 @@ import (
 	"strings"
 )
 
+type executableList []string
+
+func (l *executableList) Set(value string) error {
+	*l = append(*l, value)
+	return nil
+}
+
+func (l *executableList) String() string {
+	return strings.Join(*l, ", ")
+}
+
 var (
-	fbaseDir   string
-	fdir       string
-	finputFile string
-	foutput    string
-	fquiet     bool
+	fbaseDir       string
+	fdir           string
+	finputFile     string
+	foutput        string
+	fquiet         bool
+	executables    executableList
+	executablesMap map[string]struct{}
 )
 
 const pathSeparator = string(os.PathSeparator)
@@ -29,6 +42,7 @@ func init() {
 	flag.StringVar(&finputFile, "input-file", "", "a file containing a list of files to archive")
 	flag.StringVar(&foutput, "output", "", "Output file name")
 	flag.BoolVar(&fquiet, "quiet", false, "no output")
+	flag.Var(&executables, "set-executable", "Set these files as executabled in the zip file")
 }
 
 func validateFlags() {
@@ -58,6 +72,11 @@ func validateFlags() {
 
 	if !strings.HasSuffix(fbaseDir, pathSeparator) {
 		fbaseDir = fbaseDir + pathSeparator
+	}
+
+	executablesMap = make(map[string]struct{}, len(executables))
+	for _, v := range executables {
+		executablesMap[v] = struct{}{}
 	}
 }
 
@@ -121,6 +140,11 @@ func addFileToZip(zipWriter *zip.Writer, filePath, baseInZip string) error {
 	header.Name = filePath[baseLength:]
 	if runtime.GOOS == "windows" {
 		header.Name = strings.ReplaceAll(header.Name, "\\", "/")
+	}
+
+	if _, ok := executablesMap[header.Name]; ok {
+		mod := header.Mode() | 0111
+		header.SetMode(mod)
 	}
 
 	header.Method = zip.Deflate
