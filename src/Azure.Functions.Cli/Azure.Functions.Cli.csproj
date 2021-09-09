@@ -29,6 +29,8 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
+
+    <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
   </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
     <PublishReadyToRun>false</PublishReadyToRun>
@@ -132,6 +134,9 @@
     <EmbeddedResource Include="StaticResources\ziptofs.sh">
         <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\getting_started_python_function.md">
+        <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\tools\python\packapp\__main__.py">
@@ -146,7 +151,7 @@
     <PackageReference Include="DotNetZip" Version="1.13.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.0.0-preview.2.16091" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.0.0-preview.3.16281" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
@@ -155,7 +160,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="2.1.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS6" Version="3.0.630" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.833" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.2.4" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.2.5" />
   </ItemGroup>
 
   <Target Name="ExcludeWorkersFromReadyToRun">

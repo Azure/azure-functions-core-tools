@@ -19,13 +19,18 @@ namespace Azure.Functions.Cli.Helpers
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
         private static WorkerLanguageVersionInfo _pythonVersionCache = null;
 
-        public static async Task SetupPythonProject()
+        public static async Task SetupPythonProject(bool generatePythonDocumentation = true)
         {
             var pyVersion = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pyVersion, errorIfNoVersion: false);
 
             await CreateRequirements();
             await EnsureVirtualEnvrionmentIgnored();
+
+            if (generatePythonDocumentation)
+            {
+                await CreateGettingStartedMarkdown();
+            }
         }
 
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
@@ -73,6 +78,20 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     // Safe execution, we aren't harmed by failures here
                 }
+            }
+        }
+
+        private async static Task CreateGettingStartedMarkdown()
+        {
+            if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+            {
+                ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
+                string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
+                await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
+            }
+            else
+            {
+                ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
             }
         }
 
