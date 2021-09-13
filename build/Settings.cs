@@ -59,17 +59,17 @@ namespace Build
         public static readonly Dictionary<string, Dictionary<string, string[]>> ToolsRuntimeToPowershellRuntimes = new Dictionary<string, Dictionary<string, string[]>>
         {
             {
-                "6",
+                "7",
                 new Dictionary<string, string[]>
                 {
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "unix" } }
+                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } }
                 }
             },
             {
-                "7",
+                "7.2",
                 new Dictionary<string, string[]>
                 {
                     { "win-x86", _winPowershellRuntimes },
