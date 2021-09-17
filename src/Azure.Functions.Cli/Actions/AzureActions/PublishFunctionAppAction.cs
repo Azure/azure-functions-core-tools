@@ -42,7 +42,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public BuildOption PublishBuildOption { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
-        public string DotnetCliParameters { get; set; }
+
+        // For .net function apps, build using "release" configuration by default. User can override using "--dotnet-cli-params" as needed.
+        public string DotnetCliParameters { get; set; } = "-c release";
         public string DotnetFrameworkVersion { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
