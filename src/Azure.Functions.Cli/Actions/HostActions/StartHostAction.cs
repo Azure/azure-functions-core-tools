@@ -415,7 +415,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return isPrecompiled;
         }
 
-        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool userSecretsEnabled)
+        internal static async Task CheckNonOptionalSettings(IEnumerable<KeyValuePair<string, string>> secrets, string scriptPath, bool skipAzureWebJobsStorageCheck = false)
         {
             string storageConnectionKey = "AzureWebJobsStorage";
             try
@@ -464,14 +464,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                                 }
                                 else if (!secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
                                 {
-                                    string warningMessage = userSecretsEnabled ? Constants.Errors.AppSettingNotFoundWithUserSecrets : Constants.Errors.AppSettingNotFound;
-                                    ColoredConsole.WriteLine(WarningColor(string.Format(warningMessage,
-                                                                                        appSettingName,
-                                                                                        SecretsManager.AppSettingsFileName,
-                                                                                        token.Key,
-                                                                                        binding["type"]?.ToString(),
-                                                                                        filePath,
-                                                                                        SecretsManager.AppSettingsFileName)));
+                                    ColoredConsole
+                                        .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
+                                            $"You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {SecretsManager.AppSettingsFileName}."));
                                 }
                             }
                         }
@@ -485,27 +480,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole.WriteLine(e);
                 }
-            }
-        }
-
-        internal static bool StorageConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
-        {
-            // convert secrets into IConfiguration object, check for storage connection in config section
-            var convertedEnv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kvp in secrets)
-            {
-                var convertedKey = kvp.Key.Replace("__", ":");
-                if (!convertedEnv.ContainsKey(convertedKey))
-                {
-                    convertedEnv.Add(convertedKey, kvp.Value);
-                }
-            }
-
-            var configuration = new ConfigurationBuilder().AddInMemoryCollection(convertedEnv).Build();
-            var connectionStringSection = configuration?.GetSection("ConnectionStrings").GetSection(connectionStringKey);
-            if (!connectionStringSection.Exists())
-            {
-                connectionStringSection = configuration?.GetSection(connectionStringKey);
             }
         }
 
