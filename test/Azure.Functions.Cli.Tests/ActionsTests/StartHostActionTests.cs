@@ -109,30 +109,6 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             exception.Should().BeNull();
         }
 
-        [Fact]
-        public async Task CheckNonOptionalSettingsDoesntThrowOnMissingAzureWebJobsStorage()
-        {
-            var fileSystem = GetFakeFileSystem(new[]
-            {
-                ("x:\\folder1", "{'bindings': [{'type': 'httpTrigger'}]}"),
-                ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
-            });
-
-            FileSystemHelpers.Instance = fileSystem;
-
-            Exception exception = null;
-            try
-            {
-                await StartHostAction.CheckNonOptionalSettings(new Dictionary<string, string>(), "x:\\", false);
-            }
-            catch (Exception e)
-            {
-                exception = e;
-            }
-
-            exception.Should().BeNull();
-        }
-
         [SkippableFact]
         public async Task CheckNonOptionalSettingsPrintsWarningForMissingSettings()
         {
