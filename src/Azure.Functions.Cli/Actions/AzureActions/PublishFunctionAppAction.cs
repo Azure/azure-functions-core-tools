@@ -42,7 +42,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public BuildOption PublishBuildOption { get; set; }
         public string AdditionalPackages { get; set; } = string.Empty;
         public bool NoBuild { get; set; }
-        public string DotnetCliParameters { get; set; }
+
+        // For .net function apps, build using "release" configuration by default. User can override using "--dotnet-cli-params" as needed.
+        public string DotnetCliParameters { get; set; } = "--configuration release";
         public string DotnetFrameworkVersion { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
@@ -107,10 +109,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Parser
                 .Setup<bool>("no-build")
                 .WithDescription("Skip building and fetching dependencies for the function project.")
-                .Callback(f => NoBuild = f);
+                .Callback(f => NoBuild = f); 
+            // Note about usage:
+            // The value of 'dotnet-cli-params' option should either use a leading space character or escape the double quotes explicitly.
+            // Ex 1: --dotnet-cli-params " --configuration debug"
+            // Ex 2: --dotnet-cli-params "\"--configuration debug"\"
+            // If you don't do this, the value with leading - or -- will be read as a key (rather than the value of 'dotnet-cli-params'). 
+            // See https://github.com/fclp/fluent-command-line-parser/issues/99 for reference.
             Parser
                 .Setup<string>("dotnet-cli-params")
-                .WithDescription("When publishing dotnet functions, the core tools calls 'dotnet build --output bin/publish'. Any parameters passed to this will be appended to the command line.")
+                .WithDescription("When publishing dotnet functions, the core tools calls 'dotnet build --output bin/publish --configuration release'. Any parameters passed to this will be appended to the command line.")
                 .Callback(s => DotnetCliParameters = s);
             Parser
                 .Setup<string>("dotnet-version")
