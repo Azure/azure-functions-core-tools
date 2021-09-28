@@ -37,7 +37,7 @@ jobs:
     displayName: Set up environment variables
   - task: NodeTool@0
     inputs:
-      versionSpec: '10.x'
+      versionSpec: '14.x'
   - task: PowerShell@2
     displayName: 'Install .NET 6'
     inputs:
