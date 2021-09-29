@@ -65,7 +65,7 @@ namespace Build
 
                 foreach (var package in packagesToUpdate)
                 {
-                    string packageInfo = Shell.GetOutput("NuGet", $"list {package} -Source {AzureFunctionsPreReleaseFeedName} -prerelease").Split(Environment.NewLine)[0];
+                    var packageInfo = GetLatestPackageInfo(name: package.Name, majorVersion: package.MajorVersion, source: AzureFunctionsPreReleaseFeedName);
 
                     if (string.IsNullOrEmpty(packageInfo))
                     {
@@ -624,9 +624,9 @@ namespace Build
             }
         }
 
-        private static List<string> GetV3PackageList()
+        private static List<Package> GetV3PackageList()
         {
-            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/dev/integrationTestsBuild/V3/CoreToolsBuild.json";
+            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/dev/integrationTestsBuild/V3/CoreToolsBuild2.json";
             Uri address = new Uri(CoreToolsBuildPackageList);
 
             string content = null;
@@ -640,7 +640,7 @@ namespace Build
                 throw new Exception($"Failed to download package list from {CoreToolsBuildPackageList}");
             }
 
-            var packageList = JsonConvert.DeserializeObject<List<string>>(content);
+            var packageList = JsonConvert.DeserializeObject<List<Package>>(content);
 
             return packageList;
         }
@@ -655,6 +655,31 @@ namespace Build
                     Directory.Delete(path, recursive: true);
                 }
             }
+        }
+
+        private static string GetLatestPackageInfo(string name, string majorVersion, string source)
+        {
+            string includeAllVersion = !string.IsNullOrWhiteSpace(majorVersion) ? "-AllVersions" : string.Empty;
+            string packageInfo = Shell.GetOutput("NuGet", $"list {name} -Source {source} -prerelease {includeAllVersion}");
+
+            if (string.IsNullOrEmpty(packageInfo))
+            {
+                throw new Exception($"Failed to get {name} package information from {source}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(majorVersion))
+            {
+                foreach (var package in packageInfo.Split(Environment.NewLine))
+                {
+                    var version = package.Split(" ")[1];
+                    if (version.StartsWith(majorVersion))
+                    {
+                        return package;
+                    }
+                }
+            }
+
+            return packageInfo;
         }
     }
 }
