@@ -677,6 +677,8 @@ namespace Build
                         return package;
                     }
                 }
+
+                throw new Exception($"Failed to find {name} package for major version {majorVersion}.");
             }
 
             return packageInfo;
