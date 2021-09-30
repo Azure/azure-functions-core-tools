@@ -13,21 +13,21 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
+            Parser
+                .Setup<string>("slot")
+                .WithDescription("The deployment slot in the function app to use (if configured)")
+                .SetDefault(null)
+                .Callback(t => Slot = t);
+
             if (args.Any() && !args.First().StartsWith("-"))
             {
                 FunctionAppName = args.First();
             }
             else
             {
-                throw new CliArgumentsException("Must specify functionApp name.", Parser.Parse(args),
+                throw new CliArgumentsException("Must specify functionApp name.", base.ParseArgs(args),
                     new CliArgument { Name = nameof(FunctionAppName), Description = "Function App name" });
             }
-
-            Parser
-                .Setup<string>("slot")
-                .WithDescription("The deployment slot in the function app to use (if configured)")
-                .SetDefault(null)
-                .Callback(t => Slot = t);
 
             return base.ParseArgs(args);
         }
