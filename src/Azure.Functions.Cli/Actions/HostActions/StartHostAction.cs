@@ -325,6 +325,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // Suppress AspNetCoreSupressStatusMessages
             EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.AspNetCoreSupressStatusMessages);
 
+            // Suppress startup logs coming from grpc server startup
+            Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.Hosting.Lifetime", "None");
+
             Utilities.PrintVersion();
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);

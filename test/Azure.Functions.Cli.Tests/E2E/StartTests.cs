@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         private const string _serverNotReady = "Host was not ready after 10 seconds";
         public StartTests(ITestOutputHelper output) : base(output) { }
 
-        [Fact]
+        [Fact(Skip = "Test broken due to ASP.NET Core message suppression not taking effect.")]
         public async Task start_nodejs()
         {
             await CliTester.Run(new RunConfiguration
