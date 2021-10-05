@@ -65,20 +65,10 @@ namespace Build
 
                 foreach (var package in packagesToUpdate)
                 {
-                    string packageInfo = Shell.GetOutput("NuGet", $"list {package} -Source {AzureFunctionsPreReleaseFeedName} -prerelease").Split(Environment.NewLine)[0];
+                    var packageInfo = GetLatestPackageInfo(name: package.Name, majorVersion: package.MajorVersion, source: AzureFunctionsPreReleaseFeedName);
+                    Shell.Run("dotnet", $"add package {packageInfo.Name} -v {packageInfo.Version} -s {AzureFunctionsPreReleaseFeedName} --no-restore");
 
-                    if (string.IsNullOrEmpty(packageInfo))
-                    {
-                        throw new Exception($"Failed to get {package} package information from {AzureFunctionsPreReleaseFeedName}.");
-                    }
-
-                    var parts = packageInfo.Split(" ");
-                    var packageName = parts[0];
-                    var packageVersion = parts[1];
-
-                    Shell.Run("dotnet", $"add package {packageName} -v {packageVersion} -s {AzureFunctionsPreReleaseFeedName} --no-restore");
-
-                    buildPackages.Add(packageName, packageVersion);
+                    buildPackages.Add(packageInfo.Name, packageInfo.Version);
                 }
             }
             finally
@@ -624,9 +614,9 @@ namespace Build
             }
         }
 
-        private static List<string> GetV3PackageList()
+        private static List<Package> GetV3PackageList()
         {
-            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/dev/integrationTestsBuild/V3/CoreToolsBuild.json";
+            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/dev/integrationTestsBuild/V3/CoreToolsBuild2.json";
             Uri address = new Uri(CoreToolsBuildPackageList);
 
             string content = null;
@@ -640,7 +630,7 @@ namespace Build
                 throw new Exception($"Failed to download package list from {CoreToolsBuildPackageList}");
             }
 
-            var packageList = JsonConvert.DeserializeObject<List<string>>(content);
+            var packageList = JsonConvert.DeserializeObject<List<Package>>(content);
 
             return packageList;
         }
@@ -655,6 +645,44 @@ namespace Build
                     Directory.Delete(path, recursive: true);
                 }
             }
+        }
+
+        private static PackageInfo GetLatestPackageInfo(string name, string majorVersion, string source)
+        {
+            string includeAllVersion = !string.IsNullOrWhiteSpace(majorVersion) ? "-AllVersions" : string.Empty;
+            string packageInfo = Shell.GetOutput("NuGet", $"list {name} -Source {source} -prerelease {includeAllVersion}");
+
+            if (packageInfo.Contains("No packages found", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception($"Package name {name} not found in {source}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(majorVersion))
+            {
+                foreach (var package in packageInfo.Split(Environment.NewLine))
+                {
+                    var thisPackage = NewPackageInfo(package);
+                    if (thisPackage.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && thisPackage.Version.StartsWith(majorVersion))
+                    {
+                        return thisPackage;
+                    }
+                }
+
+                throw new Exception($"Failed to find {name} package for major version {majorVersion}.");
+            }
+
+            return NewPackageInfo(packageInfo);
+        }
+
+        private static PackageInfo NewPackageInfo(string packageInfo)
+        {
+            var parts = packageInfo.Split(" ");
+            if (parts.Length > 2)
+            {
+                throw new Exception($"Invalid package format. The string should only contain 'name<space>version'. Current value: '{packageInfo}'");
+            }
+
+            return new PackageInfo(Name: parts[0], Version: parts[1]);
         }
     }
 }
