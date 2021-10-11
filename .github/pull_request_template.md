@@ -2,14 +2,12 @@
 
 ### Issue describing the changes in this PR
 
-Resolves #issue_for_this_pr
+resolves #issue_for_this_pr
 
 ### Pull request checklist
 
-* [ ] My changes **do not** require external documentation changes
+* [ ] My changes **do not** require documentation changes
   * [ ] Otherwise: Documentation issue linked to PR
-* [ ] My changes **do not** require internal documentation changes
-  * [ ] Otherwise: Engineering hub documentation pull request or updated docs linked to PR
 * [ ] My changes **should not** be added to the release notes for the next release
   * [ ] Otherwise: I've added my notes to `release_notes.md`
 * [ ] My changes **do not** need to be backported to a previous version
