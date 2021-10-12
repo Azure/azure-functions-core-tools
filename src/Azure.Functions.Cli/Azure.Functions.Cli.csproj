@@ -152,7 +152,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.18.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.0.0-preview.4.16394" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.0.0-preview.5.16714" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
