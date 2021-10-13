@@ -225,7 +225,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile)))
+                .ConfigureServices((context, services) =>
+                {
+                    services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile));
+
+                    if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
+                    {
+                        services.AddSingleton<IConfigureBuilder<IServiceCollection>>(_ => new DotNetIsolatedDebugConfigureBuilder());
+                    }
+                })
                 .Build();
         }
 
@@ -324,6 +332,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // Suppress AspNetCoreSupressStatusMessages
             EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.AspNetCoreSupressStatusMessages);
+
+            // Suppress startup logs coming from grpc server startup
+            Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.Hosting.Lifetime", "None");
 
             Utilities.PrintVersion();
 

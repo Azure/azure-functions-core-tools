@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
@@ -18,7 +18,7 @@
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
-    <Copyright>� .NET Foundation.  All rights reserved.</Copyright>
+    <Copyright>? .NET Foundation.  All rights reserved.</Copyright>
     <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Azure/azure-functions-cli</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
