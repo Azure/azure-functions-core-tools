@@ -162,6 +162,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.1049" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.1128" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.2.6" />
+    <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
   </ItemGroup>
 
   <Target Name="ExcludeWorkersFromReadyToRun">
