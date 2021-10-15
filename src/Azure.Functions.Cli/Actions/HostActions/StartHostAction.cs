@@ -453,7 +453,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
                 if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && 
-                    !StorageConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers) 
+                    !ConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers) 
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
@@ -473,7 +473,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                                 {
                                     ColoredConsole.WriteLine(WarningColor($"Warning: '{token.Key}' property in '{filePath}' is empty."));
                                 }
-                                else if (!secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
+                                else if (token.Key == "connection" && !ConnectionExists(secrets, appSettingName) ||
+                                        token.Key != "connection" && !secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     ColoredConsole
                                         .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
@@ -494,7 +495,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        internal static bool StorageConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
+        internal static bool ConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
         {
             // convert secrets into IConfiguration object, check for storage connection in config section
             var convertedEnv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
