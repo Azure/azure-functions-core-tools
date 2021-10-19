@@ -1,0 +1,6 @@
+{
+  "configProperties": {
+    // Fix for https://github.com/dotnet/runtime/issues/56052
+    "System.Diagnostics.Tracing.EventSource.AllowDuplicateSourceNames": "true"
+  }
+}
