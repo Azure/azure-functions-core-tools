@@ -79,7 +79,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
                         // Durable SQL scaling: https://microsoft.github.io/durabletask-mssql/#/scaling?id=worker-auto-scale
                         ["query"] = query,
                         ["targetValue"] = "1",
-                        ["connectionStringFromEnv"] = durableTaskConfig.StorageProvider?["connectionStringName"]?.ToString(),
+                        ["connectionStringFromEnv"] = durableTaskConfig.StorageProvider["connectionStringName"]?.ToString(),
                     }
                 };
             }
