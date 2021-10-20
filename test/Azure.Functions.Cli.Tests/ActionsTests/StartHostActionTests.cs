@@ -48,6 +48,40 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         }
 
         [Fact]
+        public async Task CheckNonOptionalSettingsDoesntThrowMissingConnectionUsingManagedIdentity()
+        {
+            var fileSystem = GetFakeFileSystem(new[]
+                {
+                ("x:\\folder1", "{'bindings': [{'type': 'serviceBusTrigger', 'connection': 'myServiceBusConnection'}]}"),
+                ("x:\\folder2", "{'bindings': [{'type': 'eventHubTrigger', 'connection': 'myEventHubConnection'}]}"),
+                ("x:\\folder3", "{'bindings': [{'type': 'blobTrigger', 'connection': 'myBlobStorage'}]}"),
+                ("x:\\folder4", "{'bindings': [{'type': 'queueTrigger', 'connection': 'myQueueStorage'}]}")
+            });
+
+            var secrets = new Dictionary<string, string>()
+            {
+                { "AzureWebJobsStorage", "myuri" },
+                { "myServiceBusConnection", "myuri" },
+                { "myEventHubConnection__fullyQualifiedNamespace", "myEHNamespace.servicebus.windows.net" },
+                { "myBlobStorage__blobServiceUri", "myuri" },
+                { "myQueueStorage__accountName", "myAccountName" }
+            };
+
+            FileSystemHelpers.Instance = fileSystem;
+
+            Exception exception = null;
+            try
+            {
+                await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\");
+            }
+            catch (Exception e)
+            {
+                exception = e;
+            }
+            exception.Should().BeNull();
+        }
+
+        [Fact]
         public async Task CheckNonOptionalSettingsDoesntThrowMissingStorageUsingManagedIdentity()
         {
             Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
