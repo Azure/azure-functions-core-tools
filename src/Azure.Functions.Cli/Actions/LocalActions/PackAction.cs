@@ -14,7 +14,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
-    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to run.", ShowInHelp = false)]
+    [Action(Name = "pack", HelpText = "Pack function app into a zip that's ready to run.", ShowInHelp = true)]
     internal class PackAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<bool>("build-native-deps")
                 .SetDefault(false)
-                .WithDescription("Skips generating .wheels folder when publishing python function apps.")
+                .WithDescription("Build python packages in a container image")
                 .Callback(f => BuildNativeDeps = f);
             Parser
                 .Setup<bool>("no-bundler")
