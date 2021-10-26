@@ -95,9 +95,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 CheckFiles = files.ToArray(),
                 OutputContains = new[]
                 {
-                    "Writing .gitignore",
-                    "Writing host.json",
-                    "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
                 OutputDoesntContain = new[] { "Initialized empty Git repository" }
