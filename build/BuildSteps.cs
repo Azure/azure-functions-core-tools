@@ -607,7 +607,7 @@ namespace Build
 
         private static List<Package> GetV3PackageList()
         {
-            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/dev/integrationTestsBuild/V3/CoreToolsBuild2.json";
+            const string CoreToolsBuildPackageList = "https://raw.githubusercontent.com/Azure/azure-functions-integration-tests/main/integrationTestsBuild/V4/CoreToolsBuild.json";
             Uri address = new Uri(CoreToolsBuildPackageList);
 
             string content = null;
