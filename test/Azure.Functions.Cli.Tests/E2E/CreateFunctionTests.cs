@@ -117,7 +117,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[]
                         {
                             "namespace _12n.e__w_file_",
-                            "public class _12_n_other_file_"
+                            "public static class _12_n_other_file_"
                         }
                     }
                 }
