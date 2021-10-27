@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
         private static IEnumerable<ScaledObjectTriggerV1Alpha1> GetDurableScalar(JObject hostJson)
         {
             // Reference: https://docs.microsoft.com/azure/azure-functions/durable/durable-functions-bindings#durable-functions-2-0-host-json
-            DurableTaskConfig durableTaskConfig = hostJson.SelectToken("extensions.durableTask").ToObject<DurableTaskConfig>();
+            DurableTaskConfig durableTaskConfig = hostJson.SelectToken("extensions.durableTask")?.ToObject<DurableTaskConfig>();
             string storageType = durableTaskConfig?.StorageProvider?["type"]?.ToString();
 
             // Custom storage types are supported starting in Durable Functions v2.4.2
