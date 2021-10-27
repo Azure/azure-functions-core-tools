@@ -36,6 +36,30 @@ namespace Azure.Functions.Cli.Tests
         }
 
         [Theory]
+        [InlineData("{ }")]
+        [InlineData("{ \"extensions\": null }")]
+        [InlineData("{ \"extensions\": { } }")]
+        [InlineData("{ \"extensions\": { \"durableTask\": null } }")]
+        public void GetDurableScalarNoExtension(string hostSnippet)
+        {
+            JObject hostConfig = JObject.Parse(hostSnippet);
+
+            KedaV2Resource resource = new KedaV2Resource();
+            ScaledObjectKedaV2 scaledObject = resource.GetKubernetesResource(
+                "HelloWorld",
+                "default",
+                new TriggersPayload { HostJson = hostConfig, FunctionsJson = _functions },
+                new DeploymentV1Apps { Metadata = new ObjectMetadataV1 { Name = "HelloDeployment" } },
+                30,
+                300,
+                1,
+                8) as ScaledObjectKedaV2;
+
+            Assert.NotNull(scaledObject);
+            Assert.Empty(scaledObject.Spec.Triggers);
+        }
+
+        [Theory]
         [InlineData(null)]
         [InlineData("{ }")]
         [InlineData("{ \"type\": \"vnext\" }")]
