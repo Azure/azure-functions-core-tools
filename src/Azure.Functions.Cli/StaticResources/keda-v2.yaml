@@ -6,7 +6,7 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: clustertriggerauthentications.keda.sh
 spec:
   group: keda.sh
@@ -29,6 +29,9 @@ spec:
       type: string
     - jsonPath: .spec.env[*].name
       name: Env
+      type: string
+    - jsonPath: .spec.hashiCorpVault.address
+      name: VaultAddress
       type: string
     name: v1alpha1
     schema:
@@ -161,7 +164,7 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: scaledjobs.keda.sh
 spec:
   group: keda.sh
@@ -175,9 +178,6 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.minReplicaCount
-      name: Min
-      type: integer
     - jsonPath: .spec.maxReplicaCount
       name: Max
       type: integer
@@ -317,6 +317,7 @@ spec:
                       metadata:
                         description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
                         type: object
+                        x-kubernetes-preserve-unknown-fields: true
                       spec:
                         description: 'Specification of the desired behavior of the
                           pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
@@ -6898,6 +6899,10 @@ spec:
                     type: integer
                   customScalingRunningJobPercentage:
                     type: string
+                  pendingPodConditions:
+                    items:
+                      type: string
+                    type: array
                   strategy:
                     type: string
                 type: object
@@ -6922,6 +6927,9 @@ spec:
                       required:
                       - name
                       type: object
+                    fallback:
+                      format: int32
+                      type: integer
                     metadata:
                       additionalProperties:
                         type: string
@@ -6990,7 +6998,7 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: scaledobjects.keda.sh
 spec:
   group: keda.sh
@@ -7027,6 +7035,9 @@ spec:
       type: string
     - jsonPath: .status.conditions[?(@.type=="Active")].status
       name: Active
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Fallback")].status
+      name: Fallback
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -7185,6 +7196,22 @@ spec:
               cooldownPeriod:
                 format: int32
                 type: integer
+              fallback:
+                description: Fallback is the spec for fallback options
+                properties:
+                  failureThreshold:
+                    format: int32
+                    type: integer
+                  replicas:
+                    format: int32
+                    type: integer
+                required:
+                - failureThreshold
+                - replicas
+                type: object
+              idleReplicaCount:
+                format: int32
+                type: integer
               maxReplicaCount:
                 format: int32
                 type: integer
@@ -7227,6 +7254,9 @@ spec:
                       required:
                       - name
                       type: object
+                    fallback:
+                      format: int32
+                      type: integer
                     metadata:
                       additionalProperties:
                         type: string
@@ -7275,6 +7305,19 @@ spec:
                 items:
                   type: string
                 type: array
+              health:
+                additionalProperties:
+                  description: HealthStatus is the status for a ScaledObject's health
+                  properties:
+                    numberOfFailures:
+                      format: int32
+                      type: integer
+                    status:
+                      description: HealthStatusType is an indication of whether the
+                        health status is happy or failing
+                      type: string
+                  type: object
+                type: object
               lastActiveTime:
                 format: date-time
                 type: string
@@ -7328,7 +7371,7 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: triggerauthentications.keda.sh
 spec:
   group: keda.sh
@@ -7351,6 +7394,9 @@ spec:
       type: string
     - jsonPath: .spec.env[*].name
       name: Env
+      type: string
+    - jsonPath: .spec.hashiCorpVault.address
+      name: VaultAddress
       type: string
     name: v1alpha1
     schema:
@@ -7480,7 +7526,7 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-operator
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-operator
   namespace: keda
 ---
@@ -7490,7 +7536,7 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-external-metrics-reader
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-external-metrics-reader
 rules:
 - apiGroups:
@@ -7507,7 +7553,7 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-operator
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-operator
 rules:
 - apiGroups:
@@ -7564,6 +7610,13 @@ rules:
 - apiGroups:
   - keda.sh
   resources:
+  - clustertriggerauthentications
+  - clustertriggerauthentications/status
+  verbs:
+  - '*'
+- apiGroups:
+  - keda.sh
+  resources:
   - scaledjobs
   - scaledjobs/finalizers
   - scaledjobs/status
@@ -7591,9 +7644,9 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-auth-reader
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-auth-reader
-  namespace: keda
+  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -7609,7 +7662,7 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-hpa-controller-external-metrics
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-hpa-controller-external-metrics
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -7626,7 +7679,7 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-operator
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -7643,8 +7696,8 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-system-auth-delegator
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
-  name: keda:system:auth-delegator
+    app.kubernetes.io/version: 2.4.0
+  name: keda-system-auth-delegator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -7660,7 +7713,7 @@ metadata:
   labels:
     app.kubernetes.io/name: keda-metrics-apiserver
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-metrics-apiserver
   namespace: keda
 spec:
@@ -7673,8 +7726,6 @@ spec:
     targetPort: 8080
   selector:
     app: keda-metrics-apiserver
-    app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -7683,7 +7734,7 @@ metadata:
     app: keda-metrics-apiserver
     app.kubernetes.io/name: keda-metrics-apiserver
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-metrics-apiserver
   namespace: keda
 spec:
@@ -7691,14 +7742,10 @@ spec:
   selector:
     matchLabels:
       app: keda-metrics-apiserver
-      app.kubernetes.io/part-of: keda-operator
-      app.kubernetes.io/version: 2.1.0
   template:
     metadata:
       labels:
         app: keda-metrics-apiserver
-        app.kubernetes.io/part-of: keda-operator
-        app.kubernetes.io/version: 2.1.0
       name: keda-metrics-apiserver
     spec:
       containers:
@@ -7710,7 +7757,7 @@ spec:
         env:
         - name: WATCH_NAMESPACE
           value: ""
-        image: docker.io/kedacore/keda-metrics-apiserver:2.1.0
+        image: ghcr.io/kedacore/keda-metrics-apiserver:2.4.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -7755,7 +7802,7 @@ metadata:
     app.kubernetes.io/component: operator
     app.kubernetes.io/name: keda-operator
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: keda-operator
   namespace: keda
 spec:
@@ -7763,14 +7810,10 @@ spec:
   selector:
     matchLabels:
       app: keda-operator
-      app.kubernetes.io/part-of: keda-operator
-      app.kubernetes.io/version: 2.1.0
   template:
     metadata:
       labels:
         app: keda-operator
-        app.kubernetes.io/part-of: keda-operator
-        app.kubernetes.io/version: 2.1.0
         name: keda-operator
       name: keda-operator
     spec:
@@ -7784,7 +7827,7 @@ spec:
         env:
         - name: WATCH_NAMESPACE
           value: ""
-        image: docker.io/kedacore/keda:2.1.0
+        image: ghcr.io/kedacore/keda:2.4.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -7792,6 +7835,10 @@ spec:
             port: 8081
           initialDelaySeconds: 25
         name: keda-operator
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
@@ -7815,7 +7862,7 @@ metadata:
   labels:
     app.kubernetes.io/name: v1beta1.external.metrics.k8s.io
     app.kubernetes.io/part-of: keda-operator
-    app.kubernetes.io/version: 2.1.0
+    app.kubernetes.io/version: 2.4.0
   name: v1beta1.external.metrics.k8s.io
 spec:
   group: external.metrics.k8s.io
