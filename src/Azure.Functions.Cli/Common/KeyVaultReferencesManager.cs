@@ -86,4 +86,4 @@ namespace Azure.Functions.Cli.Common
             public string Version { get; set; }
         }
     }
-} 
+}
