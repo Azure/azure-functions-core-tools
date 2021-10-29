@@ -11,6 +11,7 @@ namespace Azure.Functions.Cli.Common
 {
     class KeyVaultReferencesManager
     {
+        private const string vaultUriSuffix = "vault.azure.net";
         private static readonly Regex PrimaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(SecretUri=(?<VaultUri>[\S^/]+)/(?<Secrets>[\S^/]+)/(?<SecretName>[\S^/]+)/(?<Version>[\S^/]+)\)$", RegexOptions.Compiled);
         private static readonly Regex SecondaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(VaultName=(?<VaultName>[\S^;]+);SecretName=(?<SecretName>[\S^;]+)\)$", RegexOptions.Compiled); 
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
@@ -61,9 +62,8 @@ namespace Azure.Functions.Cli.Common
                 {
                     return new ParseSecretResult
                     {
-                        Uri = new Uri(altMatch.Groups["VaultUri"].Value),
-                        Name = altMatch.Groups["SecretName"].Value,
-                        Version = altMatch.Groups["Version"].Value
+                        Uri = new Uri($"https://{altMatch.Groups["VaultName"]}.{vaultUriSuffix}"),
+                        Name = altMatch.Groups["SecretName"].Value
                     };
                 }
             }
