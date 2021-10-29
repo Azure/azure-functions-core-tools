@@ -224,6 +224,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     });
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
+
+                    // temporarily suppress shared memory warnings
+                    loggingBuilder.AddFilter((category, logLevel) => {
+                        var isSharedMemoryWarning = logLevel == LogLevel.Warning
+                            && string.Equals(category, "Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor");
+                        return !isSharedMemoryWarning;
+                    });
                 })
                 .ConfigureServices((context, services) =>
                 {
