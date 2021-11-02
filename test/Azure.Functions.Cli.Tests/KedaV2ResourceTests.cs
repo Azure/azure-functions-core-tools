@@ -36,6 +36,20 @@ namespace Azure.Functions.Cli.Tests
         }
 
         [Theory]
+        [InlineData("{ }")]
+        [InlineData("{ \"extensions\": null }")]
+        [InlineData("{ \"extensions\": { } }")]
+        [InlineData("{ \"extensions\": { \"durableTask\": null } }")]
+        public void GetDurableScalarNoExtension(string hostSnippet)
+        {
+            JObject hostConfig = JObject.Parse(hostSnippet);
+            ScaledObjectKedaV2 scaledObject = GetKubernetesResource(hostConfig);
+
+            Assert.NotNull(scaledObject);
+            Assert.Empty(scaledObject.Spec.Triggers);
+        }
+
+        [Theory]
         [InlineData(null)]
         [InlineData("{ }")]
         [InlineData("{ \"type\": \"vnext\" }")]
@@ -58,16 +72,7 @@ namespace Azure.Functions.Cli.Tests
             if (providerJson != null)
                 durableTaskConfig.Add("storageProvider", JObject.Parse(providerJson));
 
-            KedaV2Resource resource = new KedaV2Resource();
-            ScaledObjectKedaV2 scaledObject = resource.GetKubernetesResource(
-                "HelloWorld",
-                "default",
-                new TriggersPayload { HostJson = hostConfig, FunctionsJson = _functions },
-                new DeploymentV1Apps { Metadata = new ObjectMetadataV1 { Name = "HelloDeployment" } },
-                30,
-                300,
-                1,
-                8) as ScaledObjectKedaV2;
+            ScaledObjectKedaV2 scaledObject = GetKubernetesResource(hostConfig);
 
             Assert.NotNull(scaledObject);
             Assert.Empty(scaledObject.Spec.Triggers);
@@ -106,19 +111,24 @@ namespace Azure.Functions.Cli.Tests
             if (configuredMaxActivities.HasValue)
                 durableTaskConfig.Add("maxConcurrentActivityFunctions", configuredMaxActivities);
 
+            ScaledObjectKedaV2 scaledObject = GetKubernetesResource(hostConfig);
+
+            Assert.NotNull(scaledObject);
+            AssertMsSqlDurableScalar(scaledObject.Spec.Triggers.Single(), expectedMaxOrchestrations, expectedMaxActivities, "MySqlConnection");
+        }
+
+        private ScaledObjectKedaV2 GetKubernetesResource(JObject hostJson)
+        {
             KedaV2Resource resource = new KedaV2Resource();
-            ScaledObjectKedaV2 scaledObject = resource.GetKubernetesResource(
+            return resource.GetKubernetesResource(
                 "HelloWorld",
                 "default",
-                new TriggersPayload { HostJson = hostConfig, FunctionsJson = _functions },
+                new TriggersPayload { HostJson = hostJson, FunctionsJson = _functions },
                 new DeploymentV1Apps { Metadata = new ObjectMetadataV1 { Name = "HelloDeployment" } },
                 30,
                 300,
                 1,
                 8) as ScaledObjectKedaV2;
-
-            Assert.NotNull(scaledObject);
-            AssertMsSqlDurableScalar(scaledObject.Spec.Triggers.Single(), expectedMaxOrchestrations, expectedMaxActivities, "MySqlConnection");
         }
 
         private static void AssertMsSqlDurableScalar(ScaledObjectTriggerV1Alpha1 actual, int maxOrchestrations, int maxActivities, string connectionString)
