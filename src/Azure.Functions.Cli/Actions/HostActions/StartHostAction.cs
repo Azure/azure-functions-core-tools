@@ -224,8 +224,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     });
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
+
+                    // temporarily suppress shared memory warnings
+                    loggingBuilder.AddFilter((category, logLevel) => {
+                        var isSharedMemoryWarning = logLevel == LogLevel.Warning
+                            && string.Equals(category, "Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor");
+                        return !isSharedMemoryWarning;
+                    });
                 })
-                .ConfigureServices((context, services) => services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile)))
+                .ConfigureServices((context, services) =>
+                {
+                    services.AddSingleton<IStartup>(new Startup(context, hostOptions, CorsOrigins, CorsCredentials, EnableAuth, UserSecretsId, loggingFilterHelper, JsonOutputFile));
+
+                    if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
+                    {
+                        services.AddSingleton<IConfigureBuilder<IServiceCollection>>(_ => new DotNetIsolatedDebugConfigureBuilder());
+                    }
+                })
                 .Build();
         }
 
@@ -324,6 +339,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // Suppress AspNetCoreSupressStatusMessages
             EnvironmentHelper.SetEnvironmentVariableAsBoolIfNotExists(Constants.AspNetCoreSupressStatusMessages);
+
+            // Suppress startup logs coming from grpc server startup
+            Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.Hosting.Lifetime", "None");
 
             Utilities.PrintVersion();
 
@@ -442,7 +460,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
                 if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && 
-                    !StorageConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers) 
+                    !ConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers) 
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
@@ -462,7 +480,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                                 {
                                     ColoredConsole.WriteLine(WarningColor($"Warning: '{token.Key}' property in '{filePath}' is empty."));
                                 }
-                                else if (!secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
+                                else if (token.Key == "connection" && !ConnectionExists(secrets, appSettingName) ||
+                                        token.Key != "connection" && !secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     ColoredConsole
                                         .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
@@ -483,7 +502,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        internal static bool StorageConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
+        internal static bool ConnectionExists(IEnumerable<KeyValuePair<string, string>> secrets, string connectionStringKey)
         {
             // convert secrets into IConfiguration object, check for storage connection in config section
             var convertedEnv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
