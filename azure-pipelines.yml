@@ -5,6 +5,7 @@ pr:
     include:    
     - v4.x
     - release_4.0
+    - release_4.0-hotfix-1
 
 trigger:
   branches:
@@ -103,7 +104,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0-hotfix-1')))
   - task: EsrpCodeSigning@1
     displayName: 'Third party signing'
     inputs:
@@ -138,7 +139,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0-hotfix-1')))
   - pwsh: |
       .\repackageBinaries.ps1
     displayName: Repackage signed binaries
@@ -147,16 +148,16 @@ jobs:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0-hotfix-1')))
   - task: DotNetCoreCLI@2
     inputs:
       command: 'run'
       workingDirectory: '.\build'
       arguments: 'TestSignedArtifacts --signTest'
     displayName: 'Verify signed binaries'
-    condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0-hotfix-1')))
   - pwsh: |
-      .\generateMsiFiles.ps1 -MsiGenBranches @("release_4.0") -CommitMessage '$(Build.SourceVersionMessage)'
+      .\generateMsiFiles.ps1 -MsiGenBranches @("release_4.0-hotfix-1") -CommitMessage '$(Build.SourceVersionMessage)'
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -196,7 +197,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0-hotfix-1'))
 
   - pwsh: |
       .\generateSha.ps1
