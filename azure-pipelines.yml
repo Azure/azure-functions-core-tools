@@ -5,6 +5,7 @@ pr:
     include:    
     - v4.x
     - release_4.0
+    - release_4.0-hotfix-1
 
 trigger:
   branches:
