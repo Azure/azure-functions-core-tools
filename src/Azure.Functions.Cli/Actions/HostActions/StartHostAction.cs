@@ -225,20 +225,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
 
-                    // temporarily suppress shared memory warnings
                     loggingBuilder.AddFilter((category, logLevel) =>
                     {
+                        // temporarily suppress shared memory warnings
                         var isSharedMemoryWarning = logLevel == LogLevel.Warning
                             && string.Equals(category, "Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor");
-                        return !isSharedMemoryWarning;
-                    });
 
-                    // temporarily suppress AppInsights extension warnings
-                    loggingBuilder.AddFilter((category, logLevel) =>
-                    {
+                        // temporarily suppress AppInsights extension warnings
                         var isAppInsightsExtensionWarning = logLevel == LogLevel.Warning
                             && string.Equals(category, "Microsoft.Azure.WebJobs.Script.DependencyInjection.ScriptStartupTypeLocator");
-                        return !isAppInsightsExtensionWarning;
+
+                        return !isSharedMemoryWarning && !isAppInsightsExtensionWarning;
                     });
                 })
                 .ConfigureServices((context, services) =>
