@@ -225,11 +225,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
 
-                    // temporarily suppress shared memory warnings
-                    loggingBuilder.AddFilter((category, logLevel) => {
+                    loggingBuilder.AddFilter((category, logLevel) =>
+                    {
+                        // temporarily suppress shared memory warnings
                         var isSharedMemoryWarning = logLevel == LogLevel.Warning
                             && string.Equals(category, "Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor");
-                        return !isSharedMemoryWarning;
+
+                        // temporarily suppress AppInsights extension warnings
+                        var isAppInsightsExtensionWarning = logLevel == LogLevel.Warning
+                            && string.Equals(category, "Microsoft.Azure.WebJobs.Script.DependencyInjection.ScriptStartupTypeLocator");
+
+                        return !isSharedMemoryWarning && !isAppInsightsExtensionWarning;
                     });
                 })
                 .ConfigureServices((context, services) =>
@@ -459,8 +465,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .Where(b => b.IndexOf("Trigger", StringComparison.OrdinalIgnoreCase) != -1)
                     .All(t => Constants.TriggersWithoutStorage.Any(tws => tws.Equals(t, StringComparison.OrdinalIgnoreCase)));
 
-                if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) && 
-                    !ConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers) 
+                if (!skipAzureWebJobsStorageCheck && string.IsNullOrWhiteSpace(azureWebJobsStorage) &&
+                    !ConnectionExists(secrets, storageConnectionKey) && !allNonStorageTriggers)
                 {
                     throw new CliException($"Missing value for AzureWebJobsStorage in {SecretsManager.AppSettingsFileName}. " +
                         $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}. "
