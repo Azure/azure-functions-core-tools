@@ -16,9 +16,9 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 **v2** (master branch): Self-contained cross-platform package
 
-**v3**: (v3.x branch): Self-contained cross-platform package **(recommended)**
+**v3**: (v3.x branch): Self-contained cross-platform package
 
-**v4**: (v4.x branch): Self-contained cross-platform package (preview)
+**v4**: (v4.x branch): Self-contained cross-platform package **(recommended)**
 
 ## Installing
 
@@ -26,7 +26,7 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 #### To download and install with MSI:
 
-##### v4 (preview)
+##### v4
 
 - [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2174087) (VS Code debugging requires 64-bit)
 - [Windows 32-bit](https://go.microsoft.com/fwlink/?linkid=2174159)
@@ -38,7 +38,7 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 #### To install with npm:
 
-##### v4 (preview)
+##### v4
 ```bash
 npm i -g azure-functions-core-tools@4 --unsafe-perm true
 ```
@@ -55,7 +55,7 @@ npm i -g azure-functions-core-tools@2 --unsafe-perm true
 
 #### To install with chocolatey:
 
-##### v4 (preview)
+##### v4
 ```bash
 choco install azure-functions-core-tools-4
 ```
@@ -79,7 +79,7 @@ choco install azure-functions-core-tools-2
 
 #### Homebrew:
 
-#### v4 (preview)
+#### v4
     
 ```bash
 brew tap azure/functions
@@ -159,7 +159,7 @@ sudo chown root:root /etc/apt/sources.list.d/microsoft-prod.list
 
 #### 2. Install
 
-##### v4 (preview)
+##### v4
 ```bash
 sudo apt-get update
 sudo apt-get install azure-functions-core-tools-4
