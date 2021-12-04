@@ -12,19 +12,21 @@ namespace Azure.Functions.Cli.Tests.E2E
     {
         public CreateFunctionTests(ITestOutputHelper output) : base(output) { }
 
-        [Fact]
-        public async Task create_template_function_success_message()
+        [Theory]
+        [InlineData("dotnet", "HttpTrigger")]
+        [InlineData("dotnet", "KafkaTrigger")]
+        public async Task create_template_function_success_message(string workerRuntime, string template)
         {
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime dotnet",
-                    "new --template HttpTrigger --name testfunc"
+                    $"init . --worker-runtime {workerRuntime}",
+                    $"new --template {template} --name testfunc"
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                    $"The function \"testfunc\" was created successfully from the \"{template}\" template."
                 }
             }, _output);
         }
