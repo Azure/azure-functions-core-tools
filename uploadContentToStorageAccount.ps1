@@ -60,7 +60,7 @@ function GetContentType
 WriteLog -Message "Script started."
 
 $CONTAINER_NAME = "builds"
-$FUNC_RUNTIME_VERSION = '3'
+$FUNC_RUNTIME_VERSION = '4'
 
 if (-not (Test-Path $SourcePath))
 {

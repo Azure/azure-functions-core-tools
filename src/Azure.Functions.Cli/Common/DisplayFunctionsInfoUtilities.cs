@@ -1,13 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Azure.Functions.Cli.Extensions;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
-using static Colors.Net.StringStaticMethods;
-using static Azure.Functions.Cli.Common.OutputTheme;
 using Microsoft.Azure.WebJobs.Script.Description;
-using System.Collections.Generic;
+using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli
 {
@@ -15,17 +15,17 @@ namespace Azure.Functions.Cli
     {
         internal static void DisplayFunctionsInfo(ICollection<FunctionDescriptor> functions, HttpOptions httpOptions, Uri baseUri)
         {
-                var allValidFunctions = functions.Where(f => !f.Metadata.IsDisabled());
-                if (allValidFunctions.Any())
-                {
-                    ColoredConsole
-                        .WriteLine()
-                        .WriteLine(DarkYellow("Functions:"))
-                        .WriteLine();
-                }
-                DisplayHttpFunctions(functions, httpOptions, baseUri);
-                DisplayNonHttpFunctionsInfo(functions);
-                DisplayDisabledFunctions(functions);
+            var allValidFunctions = functions.Where(f => !f.Metadata.IsDisabled());
+            if (allValidFunctions.Any())
+            {
+                ColoredConsole
+                    .WriteLine()
+                    .WriteLine(DarkYellow("Functions:"))
+                    .WriteLine();
+            }
+            DisplayHttpFunctions(functions, httpOptions, baseUri);
+            DisplayNonHttpFunctionsInfo(functions);
+            DisplayDisabledFunctions(functions);
         }
 
         private static void DisplayHttpFunctions(ICollection<FunctionDescriptor> functions, HttpOptions httpOptions, Uri baseUri)
@@ -44,14 +44,10 @@ namespace Azure.Functions.Cli
                     methods = methodsRaw.Split(',');
                 }
 
-                string hostRoutePrefix = "";
-                if (!function.Metadata.IsProxy())
-                {
-                    hostRoutePrefix = httpOptions.RoutePrefix ?? "api/";
-                    hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
-                        ? hostRoutePrefix
-                        : $"{hostRoutePrefix}/";
-                }
+                string hostRoutePrefix = httpOptions.RoutePrefix ?? "api/";
+                hostRoutePrefix = string.IsNullOrEmpty(hostRoutePrefix) || hostRoutePrefix.EndsWith("/")
+                    ? hostRoutePrefix
+                    : $"{hostRoutePrefix}/";
 
                 var functionMethods = methods != null ? $"{CleanAndFormatHttpMethods(string.Join(",", methods))}" : null;
                 var url = $"{baseUri.ToString().Replace("0.0.0.0", "localhost")}{hostRoutePrefix}{httpRoute}";
@@ -69,22 +65,22 @@ namespace Azure.Functions.Cli
 
         private static void DisplayNonHttpFunctionsInfo(ICollection<FunctionDescriptor> functions)
         {
-                var nonHttpFunctions = functions.Where(f => !f.Metadata.IsHttpFunction() && !f.Metadata.IsDisabled());
-                foreach (var function in nonHttpFunctions)
-                {
-                    var trigger = function.Metadata.Bindings.FirstOrDefault(b => b.Type != null && b.Type.EndsWith("Trigger", ignoreCase: true, null));
-                    ColoredConsole
-                        .WriteLine($"\t{Yellow($"{function.Name}:")} {trigger?.Type}")
-                        .WriteLine();
-                }
+            var nonHttpFunctions = functions.Where(f => !f.Metadata.IsHttpFunction() && !f.Metadata.IsDisabled());
+            foreach (var function in nonHttpFunctions)
+            {
+                var trigger = function.Metadata.Bindings.FirstOrDefault(b => b.Type != null && b.Type.EndsWith("Trigger", ignoreCase: true, null));
+                ColoredConsole
+                    .WriteLine($"\t{Yellow($"{function.Name}:")} {trigger?.Type}")
+                    .WriteLine();
+            }
         }
 
         private static void DisplayDisabledFunctions(ICollection<FunctionDescriptor> functions)
         {
-                foreach (var function in functions.Where(f => f.Metadata.IsDisabled()))
-                {
-                    ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
-                }
+            foreach (var function in functions.Where(f => f.Metadata.IsDisabled()))
+            {
+                ColoredConsole.WriteLine(WarningColor($"Function {function.Name} is disabled."));
+            }
         }
     }
 }

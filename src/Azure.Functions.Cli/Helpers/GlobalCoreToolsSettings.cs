@@ -44,6 +44,10 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     _currentWorkerRuntime = WorkerRuntime.dotnet;
                 }
+                else if (args.Contains("--dotnet-isolated"))
+                {
+                    _currentWorkerRuntime = WorkerRuntime.dotnetIsolated;
+                }
                 else if (args.Contains("--javascript"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.node;
