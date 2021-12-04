@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (args.Length == 0)
             {
-                throw new CliArgumentsException("Must specify setting name.", Parser.Parse(args),
+                throw new CliArgumentsException("Must specify setting name.", base.ParseArgs(args),
                     new CliArgument { Name = nameof(Name), Description = "App setting name" },
                     new CliArgument { Name = nameof(Value), Description = "(Optional) App setting value. Omit for secure values."});
             }

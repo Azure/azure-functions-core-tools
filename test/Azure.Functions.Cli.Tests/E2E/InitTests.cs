@@ -60,6 +60,47 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
+        [Theory]
+        [InlineData("dotnet")]
+        [InlineData("dotnet-isolated")]
+        [InlineData("powershell")]
+        public Task init_with_only_runtime_option(string workerRuntime)
+        {
+            var files = new List<FileResult>
+            {
+                new FileResult
+                {
+                    Name = "local.settings.json",
+                    ContentContains = new []
+                    {
+                        "FUNCTIONS_WORKER_RUNTIME",
+                        workerRuntime
+                    }
+                },
+
+            };
+
+            if (workerRuntime == "powershell")
+            {
+                files.Add(new FileResult
+                {
+                    Name = "profile.ps1",
+                    ContentContains = new[] { "# Azure Functions profile.ps1" }
+                });
+            }
+
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init --{workerRuntime}" },
+                CheckFiles = files.ToArray(),
+                OutputContains = new[]
+                {
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                },
+                OutputDoesntContain = new[] { "Initialized empty Git repository" }
+            }, _output);
+        }
+
         [Fact]
         public Task init_dotnet_app()
         {
