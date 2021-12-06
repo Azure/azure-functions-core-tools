@@ -137,6 +137,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
                     }
                 }
+                else if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime))
+                {
+                    InferAndUpdateLanguage(workerRuntime);
+                }
             }
             else if (!string.IsNullOrWhiteSpace(Language))
             {
