@@ -41,13 +41,13 @@ namespace Azure.Functions.Cli.Helpers
             }, workerRuntime);
         }
 
-        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
+        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             await TemplateOperation(async () =>
             {
                 // In .NET 6.0, the 'dotnet new' command requires the short name.
                 string templateShortName = GetTemplateShortName(templateName);
-                string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr}";
+                string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr} --language {language}";
                 if (httpAuthorizationLevel != null)
                 {
                     if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
