@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Helpers
             { Constants.Languages.Python, new [] { "py" } },
             { Constants.Languages.Powershell, new [] { "pwsh" } },
             { Constants.Languages.CSharp, new [] { "csharp", "dotnet" } },
-            { Constants.Languages.CSharpIsolated, new [] { "csharp", "dotnet", "dotnet-isolated", "dotnetIsolated" } },
+            { Constants.Languages.CSharpIsolated, new [] { "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.Java, new string[] { } },
             { Constants.Languages.Custom, new string[] { } }
         };
