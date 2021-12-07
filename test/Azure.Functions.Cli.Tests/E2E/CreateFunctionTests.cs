@@ -19,12 +19,12 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    $"init . --worker-runtime dotnet",
-                    $"new --template HttpTrigger --name testfunc"
+                    "init . --worker-runtime dotnet",
+                    "new --template HttpTrigger --name testfunc"
                 },
                 OutputContains = new[]
                 {
-                    $"The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
                 }
             }, _output);
         }
