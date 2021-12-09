@@ -17,7 +17,7 @@ namespace Build
     public static class BuildSteps
     {
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
-        private static IntegrationTestBuildManifest _manifest;
+        private static IntegrationTestBuildManifest _integrationManifest;
 
         public static void Clean()
         {
@@ -43,7 +43,7 @@ namespace Build
 
             Dictionary<string, string> buildPackages = new Dictionary<string, string>();
 
-            _manifest = new IntegrationTestBuildManifest();
+            _integrationManifest = new IntegrationTestBuildManifest();
 
             try
             {
@@ -63,7 +63,7 @@ namespace Build
             {
                 if (buildPackages.Count > 0)
                 {
-                    _manifest.Packages = buildPackages;
+                    _integrationManifest.Packages = buildPackages;
                 }
 
                 Directory.SetCurrentDirectory(currentDirectory);
@@ -128,9 +128,9 @@ namespace Build
                 }
             }
 
-            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
+            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
-                _manifest.CommitId = Settings.CommitId;
+                _integrationManifest.CommitId = Settings.CommitId;
             }
         }
 
@@ -505,6 +505,56 @@ namespace Build
             }
         }
 
+        public static void GenerateSBOMManifest()
+        {
+            // Generate the SBOM manifest for each runtime
+            foreach (var runtime in Settings.TargetRuntimes)
+            {
+                var buildPath = Path.Combine(Settings.OutputDir, runtime);
+                var manifestFolderPath = Path.Combine(buildPath, "_manifest");
+                var telemetryFilePath = Path.Combine(Settings.OutputDir, Settings.SBOMManifestTelemetryDir, runtime, ".json");
+                
+                // Delete the telemetry file if it exists
+                if (File.Exists(telemetryFilePath))
+                {
+                    File.Delete(telemetryFilePath);
+                    File.Create(telemetryFilePath);
+                }
+
+                // Delete the manifest folder if it exists
+                if (Directory.Exists(manifestFolderPath))
+                {
+                    Directory.Delete(manifestFolderPath, recursive: true);
+                }
+
+                // Generate the SBOM manifest
+                var packageName = $"Azure.Functions.Cli.{runtime}.{CurrentVersion}";
+                Shell.Run("dotnet",
+                    $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {buildPath}"
+                    + $" -BuildComponentPath {buildPath} -Verbosity Information -t {telemetryFilePath}");
+            }
+            // Generate the SBOM manifest for the .nupkg file
+            // Point towards the csproj file
+            var packageName = "Microsoft.Azure.Functions.CoreTools";
+            var buildPath = Path.Combine(Settings.OutputDir);
+            var telemetryFilePath = Path.Combine(Settings.OutputDir, Settings.SBOMManifestTelemetryDir, packageName, ".json");
+            
+            if (File.Exists(telemetryFilePath))
+            {
+                File.Delete(telemetryFilePath);
+                File.Create(telemetryFilePath);
+            }
+            // Delete the manifest folder if it exists
+            if (Directory.Exists(manifestFolderPath))
+            {
+                Directory.Delete(manifestFolderPath, recursive: true);
+            }
+
+            Shell.Run("dotnet",
+                    $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {buildPath}"
+                    + $" -BuildComponentPath {buildPath} -Verbosity Information -t {telemetryFilePath}");
+        }
+
         public static void UploadToStorage()
         {
             if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
@@ -594,12 +644,12 @@ namespace Build
 
         public static void CreateIntegrationTestsBuildManifest()
         {
-            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_manifest != null))
+            if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
-                _manifest.CoreToolsVersion = _version;
-                _manifest.Build = Settings.IntegrationBuildNumber;
+                _integrationManifest.CoreToolsVersion = _version;
+                _integrationManifest.Build = Settings.IntegrationBuildNumber;
 
-                var json = JsonConvert.SerializeObject(_manifest, Formatting.Indented);
+                var json = JsonConvert.SerializeObject(_integrationManifest, Formatting.Indented);
                 var manifestFilePath = Path.Combine(Settings.OutputDir, "integrationTestsBuildManifest.json");
                 File.WriteAllText(manifestFilePath, json);
             }

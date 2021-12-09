@@ -29,6 +29,7 @@ namespace Build
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
                 .Then(Test)
+                .Then(GenerateSBOMManifest)
                 .Then(Zip)
                 .Then(DotnetPack)
                 .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))

@@ -45,6 +45,32 @@ if ($MsiGenBranches -Contains $env:APPVEYOR_REPO_BRANCH -or $CommitMessage -Cont
         $fragmentPath = "$buildDir\$fragmentName.wxs"
         $msiPath = "$artifactsPath\$msiName.msi"
 
+        if ([string]::IsNullOrEmpty($ManifestTool))
+        {
+            throw "The `$ManifestTool parameter cannot be null or empty."
+        }
+
+        $buildPath = "$PSScriptRoot/../artifacts"
+        $telemetryFilePath = Join-Path "$PSScriptRoot/../artifacts/SBOMManifestTelemetry" ($msiName + ".json")
+        $packageName = $msiName
+
+        # Delete the telemetry file if it exists
+        if (Test-Path $telemetryFilePath)
+        {
+            Remove-Item $telemetryFilePath -Force -ErrorAction Ignore
+        }
+
+        # Delete the manifest folder if it exists
+        $manifestFolderPath = Join-Path $buildPath "_manifest"
+        if (Test-Path $manifestFolderPath)
+        {
+            Remove-Item $manifestFolderPath -Recurse -Force -ErrorAction Ignore
+        }
+
+        Write-Log "Running: dotnet $manifestTool generate -BuildDropPath $buildPath -BuildComponentPath $buildPath -Verbosity Information -t $telemetryFilePath"
+        & { dotnet $manifestTool generate -PackageName $packageName -BuildDropPath $buildPath -BuildComponentPath $buildPath -Verbosity Information -t $telemetryFilePath }
+
+
         Invoke-Expression "heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source"
         Invoke-Expression "candle -arch $platform -dPlatform='$platform' -dSource='.' -dProductVersion='$cliVersion' $masterWxsPath $fragmentPath"
         Invoke-Expression "light -ext WixUIExtension -out $msiPath -sice:ICE61 $masterWxsName.wixobj $fragmentName.wixobj"

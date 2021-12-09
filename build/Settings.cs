@@ -25,6 +25,7 @@ namespace Build
         public const string DotnetProjectTemplatesVersion = "4.0.1964";
         public const string TemplateJsonVersion = "3.1.1648";
 
+        public static readonly string SBOMManifestToolPath = Path.GetFullPath("./ManifestTool/Microsoft.ManifestTool.dll");
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
         public static readonly string ConstantsFile = Path.Combine(SrcProjectPath, "Common", "Constants.cs");
@@ -90,6 +91,7 @@ namespace Build
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
+        public static readonly string SBOMManifestTelemetryDir = "SBOMManifestTelemetry";
         public static readonly string PreSignTestDir = "PreSignTest";
 
         public static readonly string SignTestDir = "SignTest";

@@ -35,11 +35,16 @@ jobs:
   - pwsh: |
       Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
     displayName: Set up environment variables
+  # # Authenticate nuget.exe, dotnet, and MSBuild with Azure Artifacts and optionally other repositories
+  # - task: NuGetAuthenticate@0
+  #   #inputs:
+  #     #nuGetServiceConnections: MyOtherOrganizationFeed, MyExternalPackageRepository # Optional
+  #     #forceReinstallCredentialProvider: false # Optional
   - task: NodeTool@0
     inputs:
       versionSpec: '14.x'
   - task: PowerShell@2
-    displayName: 'Install .NET 6'
+    displayName: 'Install required .NET dependencies'
     inputs:
       targetType: 'inline'
       script: |
@@ -47,6 +52,22 @@ jobs:
         # Official release versions can be found at: https://dotnet.microsoft.com/download/dotnet/6.0
         # Newer versions can be found at: https://github.com/dotnet/installer#installers-and-binaries
         ./dotnet-install.ps1 -InstallDir 'C:\Program Files\dotnet' -Verbose -Version 6.0.100
+        # .NET SDK 3.1 is required by the Microsoft.ManifestTool.dll
+        if (env:$AddSBOM)
+        {
+            ./dotnet-install.ps1 -InstallDir 'C:\Program Files\dotnet' -Verbose -Version 3.1.415
+        }
+    env:
+      AddSBOM: $(AddSBOM)
+  - pwsh: |
+      Import-Module "$PSScriptRoot/helper.psm1" -Force
+      $manifestTool = Install-SBOMUtil $env:SBOMUtilSASUrl
+      Write-Host "##vso[task.setvariable variable=ManifestTool]$manifestTool"
+      Write-Host "ManifestTool: $manifestTool"
+    env:
+      SBOMUtilSASUrl: $(SBOMUtilSASUrl)
+    condition: eq(variables['AddSBOM'], 'true')
+    displayName: 'Install SBOM ManifestTool and set SBOMManifestTool variable'
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
@@ -159,6 +180,7 @@ jobs:
       .\generateMsiFiles.ps1 -MsiGenBranches @("release_4.0") -CommitMessage '$(Build.SourceVersionMessage)'
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+      AddSBOM: $(AddSBOM)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
