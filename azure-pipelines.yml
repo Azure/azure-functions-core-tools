@@ -172,7 +172,6 @@ jobs:
       .\generateMsiFiles.ps1 -MsiGenBranches @("release_4.0") -CommitMessage '$(Build.SourceVersionMessage)'
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
-      AddSBOM: $(AddSBOM)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
