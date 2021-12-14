@@ -2,6 +2,23 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE file in the project root for full license information.
 #
+
+using namespace System.Runtime.InteropServices
+
+$DLL_NAME = "Microsoft.ManifestTool.dll"
+$MANIFESTOOLNAME = "ManifestTool"
+$MANIFESTOOL_DIRECTORY = Join-Path $PSScriptRoot $MANIFESTOOLNAME
+$MANIFEST_TOOL_PATH = "$MANIFESTOOL_DIRECTORY/$DLL_NAME"
+
+function Get-ManifestToolPath
+{
+    if (Test-Path $MANIFEST_TOOL_PATH)
+    {
+        return $MANIFEST_TOOL_PATH
+    }
+    throw "The SBOM Manifest Tool is not installed. Please run Install-SBOMUtil -SBOMUtilSASUrl <SASUrl>"
+}
+
 function Install-SBOMUtil
 {
     param(
@@ -14,24 +31,86 @@ function Install-SBOMUtil
         throw "The `$SBOMUtilSASUrl parameter cannot be null or empty when specifying `$(addSBOM)"
     }
 
-    $MANIFESTOOLNAME = "ManifestTool"
     Write-Host "Installing $MANIFESTOOLNAME..."
-
-    $MANIFESTOOL_DIRECTORY = Join-Path $PSScriptRoot $MANIFESTOOLNAME
     Remove-Item -Recurse -Force $MANIFESTOOL_DIRECTORY -ErrorAction Ignore
 
     Invoke-RestMethod -Uri $SBOMUtilSASUrl -OutFile "$MANIFESTOOL_DIRECTORY.zip"
     Expand-Archive "$MANIFESTOOL_DIRECTORY.zip" -DestinationPath $MANIFESTOOL_DIRECTORY
-
-    $dllName = "Microsoft.ManifestTool.dll"
-    $manifestToolPath = "$MANIFESTOOL_DIRECTORY/$dllName"
-
-    if (-not (Test-Path $manifestToolPath))
+    
+    if (-not (Test-Path $MANIFEST_TOOL_PATH))
     {
-        throw "$MANIFESTOOL_DIRECTORY does not contain '$dllName'"
+        throw "$MANIFESTOOL_DIRECTORY does not contain '$DLL_NAME'"
     }
 
     Write-Host 'Done.'
 
-    return $manifestToolPath
+    return $MANIFEST_TOOL_PATH
+}
+
+$IsWindowsEnv = [RuntimeInformation]::IsOSPlatform([OSPlatform]::Windows)
+
+$DotnetSDKVersionRequirements = @{
+
+    # .NET SDK 3.1 is required by the Microsoft.ManifestTool.dll tool
+    '3.1' = @{
+        MinimalPatch = '415'
+        DefaultPatch = '415'
+    }
+
+    '6.0' = @{
+        MinimalPatch = '100'
+        DefaultPatch = '100'
+    }
+}
+
+function AddLocalDotnetDirPath {
+    $LocalDotnetDirPath = if ($IsWindowsEnv) { "$env:LocalAppData\Microsoft\dotnet" } else { "$env:HOME/.dotnet" }
+    if (($env:PATH -split [IO.Path]::PathSeparator) -notcontains $LocalDotnetDirPath) {
+        $env:PATH = $LocalDotnetDirPath + [IO.Path]::PathSeparator + $env:PATH
+    }
+}
+function Find-Dotnet
+{
+    AddLocalDotnetDirPath
+    $listSdksOutput = dotnet --list-sdks
+    $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
+    Write-Log "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
+    foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
+        $minimalVersion = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].MinimalPatch)"
+        $firstAcceptable = $installedDotnetSdks |
+                                Where-Object { $_.StartsWith("$majorMinorVersion.") } |
+                                Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
+                                Select-Object -First 1
+        if (-not $firstAcceptable) {
+            throw "Cannot find the dotnet SDK for .NET Core $majorMinorVersion. Version $minimalVersion or higher is required. Please specify '-Bootstrap' to install build dependencies."
+        }
+    }
+}
+function Install-Dotnet {
+    [CmdletBinding()]
+    param(
+        [string]$Channel = 'release'
+    )
+    try {
+        Find-Dotnet
+        return  # Simply return if we find dotnet SDk with the correct version
+    } catch { }
+    $obtainUrl = "https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain"
+    try {
+        $installScript = if ($IsWindowsEnv) { "dotnet-install.ps1" } else { "dotnet-install.sh" }
+        Invoke-WebRequest -Uri $obtainUrl/$installScript -OutFile $installScript
+        foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
+            $version = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)"
+            Write-Log "Installing dotnet SDK version $version" -Warning
+            if ($IsWindowsEnv) {
+                & .\$installScript -Channel $Channel -Version $Version
+            } else {
+                bash ./$installScript -c $Channel -v $Version
+            }
+        }
+        AddLocalDotnetDirPath
+    }
+    finally {
+        Remove-Item $installScript -Force -ErrorAction SilentlyContinue
+    }
 }

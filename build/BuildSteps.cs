@@ -101,15 +101,15 @@ namespace Build
         public static void DotnetPack()
         {
             var outputPath = Path.Combine(Settings.OutputDir);
-            Shell.Run("dotnet", $"pack {Settings.ProjectFile} " +
+            Shell.Run("dotnet", $"pack {Settings.SrcProjectPath} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release ");
+                                $"-o {outputPath} -c Release --no-build");
         }
 
-        public static void DotnetPublish()
+        public static void DotnetPublishForZips()
         {
             foreach (var runtime in Settings.TargetRuntimes)
             {
@@ -471,6 +471,8 @@ namespace Build
                 ColoredConsole.WriteLine($"Creating {zipPath}");
                 ZipFile.CreateFromDirectory(path, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
 
+                // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
+                // the ./generateMsiFiles.ps1 script
                 if (!runtime.StartsWith("win"))
                 {
                     try
@@ -505,21 +507,16 @@ namespace Build
             }
         }
 
-        public static void GenerateSBOMManifest()
+        public static void GenerateSBOMManifestForZips()
         {
+            Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
             // Generate the SBOM manifest for each runtime
             foreach (var runtime in Settings.TargetRuntimes)
             {
+                var packageName = $"Azure.Functions.Cli.{runtime}.{CurrentVersion}";
                 var buildPath = Path.Combine(Settings.OutputDir, runtime);
                 var manifestFolderPath = Path.Combine(buildPath, "_manifest");
-                var telemetryFilePath = Path.Combine(Settings.OutputDir, Settings.SBOMManifestTelemetryDir, runtime, ".json");
-                
-                // Delete the telemetry file if it exists
-                if (File.Exists(telemetryFilePath))
-                {
-                    File.Delete(telemetryFilePath);
-                    File.Create(telemetryFilePath);
-                }
+                var telemetryFilePath = Path.Combine(Settings.SBOMManifestTelemetryDir, Guid.NewGuid().ToString() + ".json");
 
                 // Delete the manifest folder if it exists
                 if (Directory.Exists(manifestFolderPath))
@@ -528,22 +525,33 @@ namespace Build
                 }
 
                 // Generate the SBOM manifest
-                var packageName = $"Azure.Functions.Cli.{runtime}.{CurrentVersion}";
                 Shell.Run("dotnet",
                     $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {buildPath}"
                     + $" -BuildComponentPath {buildPath} -Verbosity Information -t {telemetryFilePath}");
             }
+        }
+
+        public static void DotnetPublishForNupkg()
+        {
+            // By default, this publishes to the /bin/Release/net6.0/publish
+            Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
+                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
+                                $"/p:NoWorkers=\"true\" " +
+                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
+                                $"-c Release");
+        }
+
+        public static void GenerateSBOMManifestForNupkg()
+        {
+            Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
             // Generate the SBOM manifest for the .nupkg file
-            // Point towards the csproj file
-            var packageName = "Microsoft.Azure.Functions.CoreTools";
-            var buildPath = Path.Combine(Settings.OutputDir);
-            var telemetryFilePath = Path.Combine(Settings.OutputDir, Settings.SBOMManifestTelemetryDir, packageName, ".json");
-            
-            if (File.Exists(telemetryFilePath))
-            {
-                File.Delete(telemetryFilePath);
-                File.Create(telemetryFilePath);
-            }
+            // var packageName = $"Microsoft.Azure.Functions.CoreTools.{CurrentVersion}.nupkg";
+            var packageName = $"Microsoft.Azure.Functions.CoreTools";
+            var buildPath = Settings.NupkgPublishDir;
+            var manifestFolderPath = Path.Combine(buildPath, "_manifest");
+            var telemetryFilePath = Path.Combine(Settings.SBOMManifestTelemetryDir, Guid.NewGuid().ToString() + ".json");
+
             // Delete the manifest folder if it exists
             if (Directory.Exists(manifestFolderPath))
             {
@@ -553,6 +561,11 @@ namespace Build
             Shell.Run("dotnet",
                     $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {buildPath}"
                     + $" -BuildComponentPath {buildPath} -Verbosity Information -t {telemetryFilePath}");
+        }
+
+        public static void DeleteSBOMTelemetryFolder()
+        {
+            Directory.Delete(Settings.SBOMManifestTelemetryDir, recursive: true);
         }
 
         public static void UploadToStorage()
