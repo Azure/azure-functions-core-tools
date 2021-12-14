@@ -45,7 +45,6 @@ if ($MsiGenBranches -Contains $env:APPVEYOR_REPO_BRANCH -or $CommitMessage -Cont
         $fragmentPath = "$buildDir\$fragmentName.wxs"
         $msiPath = "$artifactsPath\$msiName.msi"
 
-
         Invoke-Expression "heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source"
         Invoke-Expression "candle -arch $platform -dPlatform='$platform' -dSource='.' -dProductVersion='$cliVersion' $masterWxsPath $fragmentPath"
         Invoke-Expression "light -ext WixUIExtension -out $msiPath -sice:ICE61 $masterWxsName.wixobj $fragmentName.wixobj"

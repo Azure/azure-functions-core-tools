@@ -26,6 +26,7 @@ namespace Build
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
+        
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
         public static readonly string ConstantsFile = Path.Combine(SrcProjectPath, "Common", "Constants.cs");

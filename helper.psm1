@@ -3,6 +3,8 @@
 # Licensed under the MIT license. See LICENSE file in the project root for full license information.
 #
 
+#Requires -Version 6.0
+
 using namespace System.Runtime.InteropServices
 
 $DLL_NAME = "Microsoft.ManifestTool.dll"
@@ -47,8 +49,6 @@ function Install-SBOMUtil
     return $MANIFEST_TOOL_PATH
 }
 
-$IsWindowsEnv = [RuntimeInformation]::IsOSPlatform([OSPlatform]::Windows)
-
 $DotnetSDKVersionRequirements = @{
 
     # .NET SDK 3.1 is required by the Microsoft.ManifestTool.dll tool
@@ -64,11 +64,12 @@ $DotnetSDKVersionRequirements = @{
 }
 
 function AddLocalDotnetDirPath {
-    $LocalDotnetDirPath = if ($IsWindowsEnv) { "$env:LocalAppData\Microsoft\dotnet" } else { "$env:HOME/.dotnet" }
+    $LocalDotnetDirPath = if ($IsWindows) { "$env:LocalAppData\Microsoft\dotnet" } else { "$env:HOME/.dotnet" }
     if (($env:PATH -split [IO.Path]::PathSeparator) -notcontains $LocalDotnetDirPath) {
         $env:PATH = $LocalDotnetDirPath + [IO.Path]::PathSeparator + $env:PATH
     }
 }
+
 function Find-Dotnet
 {
     AddLocalDotnetDirPath
@@ -86,6 +87,7 @@ function Find-Dotnet
         }
     }
 }
+
 function Install-Dotnet {
     [CmdletBinding()]
     param(
@@ -97,12 +99,12 @@ function Install-Dotnet {
     } catch { }
     $obtainUrl = "https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain"
     try {
-        $installScript = if ($IsWindowsEnv) { "dotnet-install.ps1" } else { "dotnet-install.sh" }
+        $installScript = if ($IsWindows) { "dotnet-install.ps1" } else { "dotnet-install.sh" }
         Invoke-WebRequest -Uri $obtainUrl/$installScript -OutFile $installScript
         foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
             $version = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)"
             Write-Log "Installing dotnet SDK version $version" -Warning
-            if ($IsWindowsEnv) {
+            if ($IsWindows) {
                 & .\$installScript -Channel $Channel -Version $Version
             } else {
                 bash ./$installScript -c $Channel -v $Version

@@ -533,7 +533,7 @@ namespace Build
 
         public static void DotnetPublishForNupkg()
         {
-            // By default, this publishes to the /bin/Release/net6.0/publish
+            // By default, this publishes to the /bin/Release/$targetFramework$/publish
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
@@ -545,8 +545,6 @@ namespace Build
         public static void GenerateSBOMManifestForNupkg()
         {
             Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
-            // Generate the SBOM manifest for the .nupkg file
-            // var packageName = $"Microsoft.Azure.Functions.CoreTools.{CurrentVersion}.nupkg";
             var packageName = $"Microsoft.Azure.Functions.CoreTools";
             var buildPath = Settings.NupkgPublishDir;
             var manifestFolderPath = Path.Combine(buildPath, "_manifest");
