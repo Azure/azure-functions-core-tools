@@ -25,7 +25,7 @@ jobs:
   steps:
   - pwsh: |
       $isReleaseBuild = $false
-      if ($env:BuildSourceBranchName -like "release_4.0-*")
+      if ($env:BuildSourceBranchName -like "release_4.0*")
       {
           $isReleaseBuild = $true
       }
