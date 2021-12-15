@@ -50,11 +50,11 @@ jobs:
     inputs:
       versionSpec: '14.x'
   - pwsh: |
-      Import-Module "$PSScriptRoot/pipelineUtilities.psm1" -Force
+      Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
   - pwsh: |
-      Import-Module "$PSScriptRoot/pipelineUtilities.psm1" -Force
+      Import-Module ".\pipelineUtilities.psm1" -Force
       Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
     env:
       SBOMUtilSASUrl: $(SBOMUtilSASUrl)
