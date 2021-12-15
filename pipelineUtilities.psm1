@@ -75,7 +75,7 @@ function Find-Dotnet
     AddLocalDotnetDirPath
     $listSdksOutput = dotnet --list-sdks
     $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
-    Write-Log "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
+    Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
     foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
         $minimalVersion = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].MinimalPatch)"
         $firstAcceptable = $installedDotnetSdks |
@@ -103,7 +103,7 @@ function Install-Dotnet {
         Invoke-WebRequest -Uri $obtainUrl/$installScript -OutFile $installScript
         foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
             $version = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)"
-            Write-Log "Installing dotnet SDK version $version" -Warning
+            Write-Host "Installing dotnet SDK version $version"
             if ($IsWindows) {
                 & .\$installScript -Channel $Channel -Version $Version
             } else {
