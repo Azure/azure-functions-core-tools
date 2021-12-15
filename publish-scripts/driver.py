@@ -12,8 +12,8 @@ def main(*args):
     constants.DRIVERROOTDIR = os.path.dirname(os.path.abspath(__file__))
     platformSystem = platform.system()
     if platformSystem == "Linux":
-        d = distro.name()
-        if d == "Ubuntu":
+        d = distro.id()
+        if d == "ubuntu":
             import ubuntu.buildDEB as dist
             print("Detected Ubuntu, starting to work on a deb package...")
         else:
