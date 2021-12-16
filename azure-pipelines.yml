@@ -58,6 +58,7 @@ jobs:
       Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
     env:
       SBOMUtilSASUrl: $(SBOMUtilSASUrl)
+    condition: or(eq(variables['GenerateSBOM'], 'true'), eq(variables['IsReleaseBuild'], 'true'))
     displayName: 'Install SBOM ManifestTool'
   - task: NuGetToolInstaller@1
     inputs:
@@ -79,6 +80,7 @@ jobs:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: $(IsReleaseBuild)
+      GenerateSBOM: $(GenerateSBOM)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
@@ -244,4 +246,4 @@ jobs:
       IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
     displayName: 'Upload Core Tools build to the storage account for Integration Tests'
-    condition: eq(variables.IsIntegrationBuild, true)
+    condition: eq(variables.IsIntegrationBuild, 'true')

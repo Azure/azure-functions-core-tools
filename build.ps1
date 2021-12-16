@@ -19,7 +19,7 @@ if ($env:IntegrationBuildNumber)
 
     $buildCommand = "dotnet run --integrationTests"
 }
-elseif ($env:IsReleaseBuild)
+elseif ($env:IsReleaseBuild -or $env:GenerateSBOM)
 {
     $buildCommand = "dotnet run --ci --addSBOM"
 }
