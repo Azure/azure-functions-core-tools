@@ -9,7 +9,7 @@ Set-Location $buildFolderPath
 $buildCommand = $null
 
 $generateSBOM = $null
-if (-not([bool]::TryParse($env:GenerateSBOM, $generateSBOM)))
+if (-not([bool]::TryParse($env:GenerateSBOM, [ref] $generateSBOM)))
 {
     throw "GenerateSBOM can only be set to true or false."
 }
