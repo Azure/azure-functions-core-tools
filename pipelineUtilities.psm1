@@ -64,7 +64,7 @@ $DotnetSDKVersionRequirements = @{
 }
 
 function AddLocalDotnetDirPath {
-    $LocalDotnetDirPath = if ($IsWindows) { "$env:LocalAppData\Microsoft\dotnet" } else { "$env:HOME/.dotnet" }
+    $LocalDotnetDirPath = if ($IsWindows) { "$env:ProgramFiles/dotnet" } else { "/usr/share/dotnet" }
     if (($env:PATH -split [IO.Path]::PathSeparator) -notcontains $LocalDotnetDirPath) {
         $env:PATH = $LocalDotnetDirPath + [IO.Path]::PathSeparator + $env:PATH
     }
