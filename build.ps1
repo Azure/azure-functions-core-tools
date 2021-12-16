@@ -14,6 +14,8 @@ if (-not([bool]::TryParse($env:GenerateSBOM, [ref] $generateSBOM)))
     throw "GenerateSBOM can only be set to true or false."
 }
 
+Write-Host "env:GenerateSBOM: $env:GenerateSBOM, generateSBOM: $generateSBOM"
+
 if ($env:IntegrationBuildNumber)
 {
     if (-not ($env:IntegrationBuildNumber -like "PreRelease*-*"))
