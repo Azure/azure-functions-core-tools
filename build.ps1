@@ -8,13 +8,13 @@ Set-Location $buildFolderPath
 
 $buildCommand = $null
 
+$isReleaseBuild = $null
 $generateSBOM = $null
-if (-not([bool]::TryParse($env:GenerateSBOM, [ref] $generateSBOM)))
+if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild) -and
+    [bool]::TryParse($env:GenerateSBOM, [ref] $generateSBOM)))
 {
-    throw "GenerateSBOM can only be set to true or false."
+    throw "IsReleaseBuild and GenerateSBOM can only be set to true or false."
 }
-
-Write-Host "env: IsReleaseBuild: $env:IsReleaseBuild, env:GenerateSBOM: $env:GenerateSBOM, generateSBOM: $generateSBOM"
 
 if ($env:IntegrationBuildNumber)
 {
