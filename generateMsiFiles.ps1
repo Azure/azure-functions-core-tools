@@ -1,3 +1,5 @@
+$baseDir = Get-Location
+
 Write-Host "Generating MSI files"
 
 # Add WiX to PATH
