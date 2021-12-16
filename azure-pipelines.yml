@@ -118,7 +118,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - task: EsrpCodeSigning@1
     displayName: 'Third party signing'
     inputs:
@@ -153,7 +153,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - pwsh: |
       .\repackageBinaries.ps1
     displayName: Repackage signed binaries
@@ -162,22 +162,23 @@ jobs:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - task: DotNetCoreCLI@2
     inputs:
       command: 'run'
       workingDirectory: '.\build'
       arguments: 'TestSignedArtifacts --signTest'
     displayName: 'Verify signed binaries'
-    condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_4.0')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - pwsh: |
-      .\generateMsiFiles.ps1 -MsiGenBranches @("release_4.0") -CommitMessage '$(Build.SourceVersionMessage)'
+      .\generateMsiFiles.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
     displayName: 'Generate MSI files'
+    condition: or(eq(variables['GenerateSBOM'], 'true'), eq(variables['IsReleaseBuild'], 'true'))
   - task: EsrpCodeSigning@1
     displayName: 'MSI Code Signing'
     inputs:

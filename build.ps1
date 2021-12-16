@@ -27,12 +27,13 @@ if ($env:IntegrationBuildNumber)
 }
 elseif ($env:IsReleaseBuild -or $generateSBOM)
 {
-    $buildCommand = "dotnet run --ci --addSBOM"
+    $buildCommand = "dotnet run --ci --generateSBOM"
 }
 else
 {
     $buildCommand = "dotnet run --ci"
 }
 
+Write-Host "Running $buildCommand"
 Invoke-Expression -Command $buildCommand
 if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
