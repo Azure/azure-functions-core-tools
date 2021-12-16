@@ -30,7 +30,7 @@ function Install-SBOMUtil
     
     if ([string]::IsNullOrEmpty($SBOMUtilSASUrl))
     {
-        throw "The `$SBOMUtilSASUrl parameter cannot be null or empty when specifying `$(addSBOM)"
+        throw "The `$SBOMUtilSASUrl parameter cannot be null or empty."
     }
 
     Write-Host "Installing $MANIFESTOOLNAME..."
@@ -55,11 +55,6 @@ $DotnetSDKVersionRequirements = @{
     '3.1' = @{
         MinimalPatch = '415'
         DefaultPatch = '415'
-    }
-
-    '6.0' = @{
-        MinimalPatch = '100'
-        DefaultPatch = '100'
     }
 }
 
@@ -107,7 +102,7 @@ function Install-Dotnet {
             if ($IsWindows) {
                 & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
             } else {
-                bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
+                bash ./$installScript --install-dir "/usr/share/dotnet" -c $Channel -v $Version
             }
         }
         AddLocalDotnetDirPath

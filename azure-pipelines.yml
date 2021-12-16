@@ -3,16 +3,12 @@ name: $(Build.SourceBranchName)_$(Build.Reason)
 pr:
   branches:
     include:
-    - master
-    - dev
     - v3.x
     - release_3.0
 
 trigger:
   branches:
     include:
-    - dev
-    - master
     - v3.x
     - release_3.0
 
@@ -57,7 +53,7 @@ jobs:
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
-    displayName: 'Install .NET 6.0 and 3.1'
+    displayName: 'Install .NET 3.1'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
