@@ -8,6 +8,12 @@ Set-Location $buildFolderPath
 
 $buildCommand = $null
 
+$generateSBOM = $null
+if (-not([bool]::TryParse($env:GenerateSBOM, $generateSBOM)))
+{
+    throw "GenerateSBOM can only be set to true or false."
+}
+
 if ($env:IntegrationBuildNumber)
 {
     if (-not ($env:IntegrationBuildNumber -like "PreRelease*-*"))
@@ -19,7 +25,7 @@ if ($env:IntegrationBuildNumber)
 
     $buildCommand = "dotnet run --integrationTests"
 }
-elseif ($env:IsReleaseBuild -or $env:GenerateSBOM)
+elseif ($env:IsReleaseBuild -or $generateSBOM)
 {
     $buildCommand = "dotnet run --ci --addSBOM"
 }
