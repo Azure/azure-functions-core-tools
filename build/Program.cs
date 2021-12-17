@@ -18,7 +18,7 @@ namespace Build
                 .Then(LogIntoAzure, skip: !args.Contains("--ci"))
                 .Then(RestorePackages)
                 .Then(ReplaceTelemetryInstrumentationKey, skip: !args.Contains("--ci"))
-                .Then(DotnetPublishForZips)
+                .Then(DotnetPublish)
                 .Then(FilterPowershellRuntimes)
                 .Then(AddDistLib)
                 .Then(AddTemplatesNupkgs)
