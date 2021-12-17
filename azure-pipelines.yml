@@ -38,9 +38,9 @@ steps:
   inputs:
     versionSpec: '10.x'
 - pwsh: |
-      Import-Module ".\pipelineUtilities.psm1" -Force
-      Install-Dotnet
-    displayName: 'Install .NET 2.2'
+    Import-Module ".\pipelineUtilities.psm1" -Force
+    Install-Dotnet
+  displayName: 'Install .NET 2.2'
 - pwsh: |
     Import-Module ".\pipelineUtilities.psm1" -Force
     Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
