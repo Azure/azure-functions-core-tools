@@ -78,7 +78,7 @@ namespace Build
 
         public static readonly string SBOMManifestTelemetryDir = Path.Combine(OutputDir, "SBOMManifestTelemetry");
         
-        public static string TargetFramework = "netcoreapp3.1";
+        public static string TargetFramework = "netcoreapp2.2";
 
         public static readonly string NupkgPublishDir = Path.GetFullPath($"../src/Azure.Functions.Cli/bin/Release/{TargetFramework}/publish");
         
