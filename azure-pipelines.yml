@@ -3,16 +3,12 @@ name: $(Build.SourceBranchName)_$(Build.Reason)
 pr:
   branches:
     include:
-    - master
-    - dev
     - v3.x
     - release_3.0
 
 trigger:
   branches:
     include:
-    - dev
-    - master
     - v3.x
     - release_3.0
 
@@ -20,13 +16,25 @@ jobs:
 - job: Default
   timeoutInMinutes: "90"
   pool:
-    vmImage: 'vs2017-win2016'
+    name: '1ES-Hosted-AzFunc'
+    vmImage: 'MMS2022TLS'
 
   variables:
     devops_buildNumber: $[counter(format(''), 1500)]
     APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
   steps:
+  - pwsh: |
+      $isReleaseBuild = $false
+      if ($env:BuildSourceBranchName -like "release_3.0*")
+      {
+          $isReleaseBuild = $true
+      }
+      Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
+      Write-Host "IsReleaseBuild: $isReleaseBuild"
+    displayName: 'Set IsReleaseBuild variable'
+    env:
+      BuildSourceBranchName: $(Build.SourceBranchName)
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -42,11 +50,17 @@ jobs:
   - task: NodeTool@0
     inputs:
       versionSpec: '10.x'
-  - task: UseDotNet@2
-    inputs:
-      packageType: 'sdk'
-      version: '3.1.x'
-      performMultiLevelLookup: true
+  - pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET 3.1'
+  - pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
+    env:
+      SBOMUtilSASUrl: $(SBOMUtilSASUrl)
+    condition: or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true'))
+    displayName: 'Install SBOM ManifestTool'
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
@@ -66,6 +80,8 @@ jobs:
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
+      IsReleaseBuild: $(IsReleaseBuild)
+      SimulateReleaseBuild: $(SimulateReleaseBuild)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
@@ -103,7 +119,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
   - task: EsrpCodeSigning@1
     displayName: 'Third party signing'
     inputs:
@@ -138,7 +154,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
   - pwsh: |
       .\repackageBinaries.ps1
     displayName: Repackage signed binaries
@@ -147,22 +163,23 @@ jobs:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-    condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
   - task: DotNetCoreCLI@2
     inputs:
       command: 'run'
       workingDirectory: '.\build'
       arguments: 'TestSignedArtifacts --signTest'
     displayName: 'Verify signed binaries'
-    condition: and(succeeded(), or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0')))
+    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
   - pwsh: |
-      .\generateMsiFiles.ps1 -MsiGenBranches @("release_3.0") -CommitMessage '$(Build.SourceVersionMessage)'
+      .\generateMsiFiles.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
     displayName: 'Generate MSI files'
+    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
   - task: EsrpCodeSigning@1
     displayName: 'MSI Code Signing'
     inputs:
@@ -196,7 +213,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/release_3.0'))
+    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
 
   - pwsh: |
       .\generateSha.ps1
@@ -231,4 +248,4 @@ jobs:
       IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
     displayName: 'Upload Core Tools build to the storage account for Integration Tests'
-    condition: eq(variables.IsIntegrationBuild, true)
+    condition: eq(variables.IsIntegrationBuild, 'true')

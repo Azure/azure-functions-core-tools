@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Copyright (c) Microsoft. All rights reserved.
+Licensed under the MIT license. See LICENSE file in the project root for full license information.
+-->
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Azure.Functions.CoreTools.V3</id>
+    <!-- Needed to specify the version here for the nuspec to be valid -->
+    <version>$version$</version>
+    <title>Azure Functions Core Tools</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/Azure/azure-functions-core-tools</projectUrl>
+    <description>The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.</description>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+    <tags>azure,functions,azure-function,core-tools,cli</tags>
+  </metadata>
+  <files>
+    <file src=".\bin\$configuration$\$targetFramework$\publish\tools\python\packapp\__main__.py" target="content" />
+    <file src=".\bin\$configuration$\$targetFramework$\publish\tools\python\packapp\__main__.py" target="contentFiles\any\$targetFramework$" />
+    <file src=".\bin\$configuration$\$targetFramework$\publish\**\*" target="tools\$targetFramework$\any" />
+  </files>
+</package>
