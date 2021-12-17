@@ -3,17 +3,16 @@ name: $(Build.SourceBranchName)_$(Build.Reason)
 pr:
   branches:
     include:
-    - master
     - dev
 
 trigger:
   branches:
     include:
     - dev
-    - master
 
 pool:
-  vmImage: 'vs2017-win2016'
+  name: '1ES-Hosted-AzFunc'
+  vmImage: 'MMS2022TLS'
 
 variables:
   devops_buildNumber: $[counter(format(''), 1500)]
@@ -22,11 +21,33 @@ variables:
 
 steps:
 - pwsh: |
+      $isReleaseBuild = $false
+      if ($env:BuildSourceBranchName -like "release_2.0*")
+      {
+          $isReleaseBuild = $true
+      }
+      Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
+      Write-Host "IsReleaseBuild: $isReleaseBuild"
+    displayName: 'Set IsReleaseBuild variable'
+    env:
+      BuildSourceBranchName: $(Build.SourceBranchName)
+- pwsh: |
     Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
   displayName: Set up environment variables
 - task: NodeTool@0
   inputs:
     versionSpec: '10.x'
+- pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET 2.2'
+- pwsh: |
+    Import-Module ".\pipelineUtilities.psm1" -Force
+    Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
+  env:
+    SBOMUtilSASUrl: $(SBOMUtilSASUrl)
+  condition: or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true'))
+  displayName: 'Install SBOM ManifestTool'
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec:
@@ -42,22 +63,12 @@ steps:
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 - pwsh: |
-    # Set DotNetPath
-    $sdkBasePath = dotnet --info | Where-Object {$_ -match "Base Path"} | ForEach-Object {($_ -replace '\s+Base Path:','').trim()}
-    $dotnetPath = Split-Path (Split-Path $sdkBasePath)
-    Write-Host "dotnet path: $dotnetPath"
-    Write-Host "##vso[task.setvariable variable=DotNetPath]$dotnetPath"
-  displayName: 'Set DotNetPath'
-- task: UseDotNet@2
-  inputs:
-    packageType: 'sdk'
-    version: '2.2.207'
-    installationPath: $(DotNetPath)
-- pwsh: |
     .\build.ps1
   env:
     AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
     BuildArtifactsStorage: $(BuildArtifactsStorage)
+    IsReleaseBuild: $(IsReleaseBuild)
+    SimulateReleaseBuild: $(SimulateReleaseBuild)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
   displayName: 'Executing build script'
@@ -94,7 +105,7 @@ steps:
     SessionTimeout: '60'
     MaxConcurrency: '50'
     MaxRetryAttempts: '5'
-  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/3.0')))
+  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
 - task: EsrpCodeSigning@1
   displayName: 'Third party signing'
   inputs:
@@ -129,7 +140,7 @@ steps:
     SessionTimeout: '60'
     MaxConcurrency: '50'
     MaxRetryAttempts: '5'
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/3.0')))
+  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
 - pwsh: |
     .\repackageBinaries.ps1
   displayName: Repackage signed binaries
@@ -138,14 +149,14 @@ steps:
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/3.0')))
+  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
 - task: DotNetCoreCLI@2
   inputs:
     command: 'run'
     workingDirectory: '.\build'
     arguments: 'TestSignedArtifacts --signTest'
   displayName: 'Verify signed binaries'
-  condition: and(succeeded(),or (eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/3.0')))
+  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
 - pwsh: |
     .\generateSha.ps1
   displayName: 'Generate sha files'

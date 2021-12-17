@@ -1,4 +1,3 @@
-
 if ($env:APPVEYOR_REPO_BRANCH -eq "disabled") {
     Set-Location ".\src\Azure.Functions.Cli"
     $result = Invoke-Expression -Command "NuGet list Microsoft.Azure.Functions.JavaWorker -Source  https://ci.appveyor.com/NuGet/azure-functions-java-worker-fejnnsvmrkqg -PreRelease"
@@ -26,5 +25,25 @@ else {
     Set-Location ".\build"
 }
 
-Invoke-Expression -Command  "dotnet run --ci"
+$buildCommand = $null
+
+$isReleaseBuild = $null
+$simulateReleaseBuild = $null
+if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild) -and
+    [bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+{
+    throw "IsReleaseBuild and GenerateSBOM can only be set to true or false."
+}
+
+if ($isReleaseBuild -or $simulateReleaseBuild)
+{
+    $buildCommand = "dotnet run --ci --generateSBOM"
+}
+else
+{
+    $buildCommand = "dotnet run --ci"
+}
+
+Write-Host "Running $buildCommand"
+Invoke-Expression -Command $buildCommand
 if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
