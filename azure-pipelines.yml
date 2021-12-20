@@ -17,7 +17,8 @@ jobs:
   timeoutInMinutes: "90"
   pool:
     name: '1ES-Hosted-AzFunc'
-    vmImage: 'MMS2022TLS'
+    demands:
+      - ImageOverride -equals MMS2022TLS
 
   variables:
     devops_buildNumber: $[counter(format(''), 1500)]
