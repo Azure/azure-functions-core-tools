@@ -14,8 +14,6 @@ pool:
   name: '1ES-Hosted-AzFunc'
   demands:
   - ImageOverride -equals MMS2022TLS
-  - visualstudio
-  - msbuild
 
 variables:
   devops_buildNumber: $[counter(format(''), 1500)]
@@ -54,11 +52,11 @@ steps:
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 - task: PowerShell@2
-  displayName: 'Install the Windows 10 SDK'
+  displayName: 'Install the Windows 7 SDK'
   inputs:
     targetType: 'inline'
     script: |
-      choco install windows-sdk-10.0
+      choco install windows-sdk-7.1
 - pwsh: |
     .\build.cmd
   env:
