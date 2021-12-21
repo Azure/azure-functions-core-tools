@@ -12,7 +12,7 @@ trigger:
 
 pool:
   name: '1ES-Hosted-AzFunc'
-    demands:
+  demands:
     - ImageOverride -equals MMS2022TLS
 
 variables:
