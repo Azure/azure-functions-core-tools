@@ -1,7 +1,6 @@
 .paket\paket.exe install
 
-cd "C:\" && dir "AxImp.exe" /s
-dir "AxImp.exe" /s
+dir "AxImp.exe" -Path C:\ -Recurse
 
 packages\FAKE\tools\fake .\build.fsx clean platform=x86
 packages\FAKE\tools\fake .\build.fsx clean platform=x64
