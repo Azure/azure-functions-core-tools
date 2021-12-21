@@ -42,11 +42,11 @@ let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + platform + ".zip"
-let toSignThirdPartyName = version + platform + "-thridparty.zip"
+let toSignThirdPartyName = version + platform + "-thirdparty.zip"
 let toSignZipPath = deployDir @@ toSignZipName
-let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
+let toSignThirdPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
-let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
+let signedThirdPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
 let finalZipPath = deployDir @@ "Azure.Functions.Cli." + platform + ".zip"
 
 
@@ -204,7 +204,7 @@ Target "GenerateZipToSign" (fun _ ->
 
     !! (buildDir @@ "/**/*.dll")
         |> Seq.filter (fun f -> thirdParty |> Array.contains (f |> Path.GetFileName))
-        |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
+        |> CreateZip buildDir toSignThirdPartyPath String.Empty 7 true
 )
 
 let storageAccount = lazy CloudStorageAccount.Parse connectionString
@@ -218,7 +218,7 @@ Target "UploadZipToSign" (fun _ ->
     blobRef.UploadFromStream <| File.OpenRead toSignZipPath
 
     let blobRef = container.GetBlockBlobReference toSignThirdPartyName
-    blobRef.UploadFromStream <| File.OpenRead toSignThridPartyPath
+    blobRef.UploadFromStream <| File.OpenRead toSignThirdPartyPath
 
 )
 

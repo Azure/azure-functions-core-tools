@@ -1,0 +1,79 @@
+name: $(Build.SourceBranchName)_$(Build.Reason)
+
+pr:
+  branches:
+    include:
+    - v1.x
+
+trigger:
+  branches:
+    include:
+    - v1.x
+
+pool:
+  name: '1ES-Hosted-AzFunc'
+    demands:
+      - ImageOverride -equals MMS2022TLS
+
+variables:
+  devops_buildNumber: $[counter(format(''), 1500)]
+  APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+  APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
+
+steps:
+- pwsh: |
+    $isReleaseBuild = $false
+    if ($env:BuildSourceBranchName -like "release_2.0*")
+    {
+        $isReleaseBuild = $true
+    }
+    Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
+    Write-Host "IsReleaseBuild: $isReleaseBuild"
+  displayName: 'Set IsReleaseBuild variable'
+  env:
+    BuildSourceBranchName: $(Build.SourceBranchName)
+- pwsh: |
+    Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+  displayName: Set up environment variables
+- task: NodeTool@0
+  inputs:
+    versionSpec: '10.x'
+- task: AzureCLI@2
+  displayName: Login via Azure CLI to acquire access token
+  inputs:
+    azureSubscription: $(E2ETestServiceConnectionName)
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+      # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
+      $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
+      echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+- pwsh: |
+    .\build.cmd
+  env:
+    FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
+    FILES_ACCOUNT_KEY: $(FILES_ACCOUNT_KEY)
+    # AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+    # BuildArtifactsStorage: $(BuildArtifactsStorage)
+    # IsReleaseBuild: $(IsReleaseBuild)
+    # SimulateReleaseBuild: $(SimulateReleaseBuild)
+    # DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+    # TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+  displayName: 'Executing build script'
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '**/*.trx'
+    failTaskOnFailedTests: true
+  condition: succeededOrFailed()
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(Build.Repository.LocalPath)\artifacts'
+    Contents: 'Azure.Functions.Cli.*'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    CleanTargetFolder: true
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
