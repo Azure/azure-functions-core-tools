@@ -15,6 +15,7 @@ pool:
   demands:
   - ImageOverride -equals MMS2022TLS
   - visualstudio
+  - msbuild
 
 variables:
   devops_buildNumber: $[counter(format(''), 1500)]
