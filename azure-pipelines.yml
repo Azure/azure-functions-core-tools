@@ -37,9 +37,9 @@ steps:
 - pwsh: |
     Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
   displayName: Set up environment variables
-- task: ChocolateyToolInstaller@1
-  inputs:
-    force: false
+# - task: ChocolateyToolInstaller@1
+#   inputs:
+#     force: false
 - task: NodeTool@0
   inputs:
     versionSpec: '10.x'
