@@ -58,7 +58,7 @@ steps:
     script: |
       choco install windows-sdk-7.1
 - pwsh: |
-    .\build.cmd
+    .\build.ps1
   env:
     FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
     FILES_ACCOUNT_KEY: $(FILES_ACCOUNT_KEY)
