@@ -1,7 +1,7 @@
 .paket\paket.exe install
 
-cd "C:\"
-dir "Microsoft.Common.targets*" /s
+cd "C:\" && dir "AxImp.exe" /s
+dir "AxImp.exe" /s
 
 packages\FAKE\tools\fake .\build.fsx clean platform=x86
 packages\FAKE\tools\fake .\build.fsx clean platform=x64
