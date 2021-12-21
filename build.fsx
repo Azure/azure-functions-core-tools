@@ -36,18 +36,18 @@ let toolsDir = "./buildtools/"
 let platform = getBuildParamOrDefault "platform" "x86"
 let buildDir  = "./dist/build" + platform + "/"
 let testDir   = "./dist/test" + platform + "/"
-let deployDir = "./deploy" + platform + "/"
+let artifactsDir = "./artifacts/"
 let downloadDir  = "./dist/download" + platform + "/"
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + platform + ".zip"
 let toSignThirdPartyName = version + platform + "-thirdparty.zip"
-let toSignZipPath = deployDir @@ toSignZipName
-let toSignThirdPartyPath = deployDir @@ toSignThirdPartyName
+let toSignZipPath = artifactsDir @@ toSignZipName
+let toSignThirdPartyPath = artifactsDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThirdPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let finalZipPath = deployDir @@ "Azure.Functions.Cli." + platform + ".zip"
+let finalZipPath = artifactsDir @@ "Azure.Functions.Cli." + platform + ".zip"
 
 
 
@@ -67,7 +67,7 @@ Target "RestorePackages" (fun _ ->
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
-    CleanDirs [buildDir; testDir; downloadDir; deployDir]
+    CleanDirs [buildDir; testDir; downloadDir; artifactsDir]
 )
 
 Target "SetVersion" (fun _ ->
