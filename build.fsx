@@ -84,7 +84,7 @@ Target "SetVersion" (fun _ ->
 
 Target "Compile" (fun _ ->
     !! @"src\**\*.csproj"
-      |> MSBuildReleaseExt buildDir [("platform", platform)] "Build"
+      |> MSBuildReleaseExt buildDir [("platform", platform), ("ToolPath", toolsDir)] "Build"
       |> Log "AppBuild-Output: "
 )
 
