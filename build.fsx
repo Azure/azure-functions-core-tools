@@ -36,18 +36,18 @@ let toolsDir = "./buildtools/"
 let platform = getBuildParamOrDefault "platform" "x86"
 let buildDir  = "./dist/build" + platform + "/"
 let testDir   = "./dist/test" + platform + "/"
-let artifactsDir = "./artifacts/"
+let deployDir = "./deploy" + platform + "/"
 let downloadDir  = "./dist/download" + platform + "/"
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + platform + ".zip"
-let toSignThirdPartyName = version + platform + "-thirdparty.zip"
-let toSignZipPath = artifactsDir @@ toSignZipName
-let toSignThirdPartyPath = artifactsDir @@ toSignThirdPartyName
+let toSignThirdPartyName = version + platform + "-thridparty.zip"
+let toSignZipPath = deployDir @@ toSignZipName
+let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
-let signedThirdPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let finalZipPath = artifactsDir @@ "Azure.Functions.Cli." + platform + ".zip"
+let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
+let finalZipPath = deployDir @@ "Azure.Functions.Cli." + platform + ".zip"
 
 
 
@@ -67,7 +67,7 @@ Target "RestorePackages" (fun _ ->
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
-    CleanDirs [buildDir; testDir; downloadDir; artifactsDir]
+    CleanDirs [buildDir; testDir; downloadDir; deployDir]
 )
 
 Target "SetVersion" (fun _ ->
@@ -204,7 +204,7 @@ Target "GenerateZipToSign" (fun _ ->
 
     !! (buildDir @@ "/**/*.dll")
         |> Seq.filter (fun f -> thirdParty |> Array.contains (f |> Path.GetFileName))
-        |> CreateZip buildDir toSignThirdPartyPath String.Empty 7 true
+        |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
 )
 
 let storageAccount = lazy CloudStorageAccount.Parse connectionString
@@ -218,7 +218,7 @@ Target "UploadZipToSign" (fun _ ->
     blobRef.UploadFromStream <| File.OpenRead toSignZipPath
 
     let blobRef = container.GetBlockBlobReference toSignThirdPartyName
-    blobRef.UploadFromStream <| File.OpenRead toSignThirdPartyPath
+    blobRef.UploadFromStream <| File.OpenRead toSignThridPartyPath
 
 )
 
