@@ -57,6 +57,7 @@ steps:
     targetType: 'inline'
     script: |
       choco install windows-sdk-7.1
+      choco install windows-sdk-8.1
 - pwsh: |
     .\build.ps1
   env:
