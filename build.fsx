@@ -84,7 +84,7 @@ Target "SetVersion" (fun _ ->
 
 Target "Compile" (fun _ ->
     !! @"src\**\*.csproj"
-      |> MSBuildReleaseExt buildDir [("platform", platform); ("ToolPath", "C:\\Program Files\\Microsoft SDKs\\Windows\\v8.1A\\bin\\NETFX 4.5.1 Tools")] "Build"
+      |> MSBuildReleaseExt buildDir [("platform", platform)] "Build"
       |> Log "AppBuild-Output: "
 )
 
