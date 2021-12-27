@@ -35,9 +35,6 @@ steps:
 - pwsh: |
     Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
   displayName: Set up environment variables
-# - task: ChocolateyToolInstaller@1
-#   inputs:
-#     force: false
 - task: NodeTool@0
   inputs:
     versionSpec: '10.x'
@@ -52,11 +49,11 @@ steps:
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 - task: PowerShell@2
-  displayName: 'Install the Windows 7 SDK'
+  displayName: 'Install the Windows 8.0 SDK'
   inputs:
     targetType: 'inline'
     script: |
-      choco install windows-sdk-8.0
+      choco install windows-sdk-8.0 --verbose
 - pwsh: |
     .\build.ps1
   env:
