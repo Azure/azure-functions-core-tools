@@ -54,8 +54,8 @@ steps:
     targetType: 'inline'
     script: |
       choco install windows-sdk-8.1
-      $env:PATH += ";C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools"
 - pwsh: |
+    $env:PATH += ";C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools"
     .\build.ps1
   env:
     FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
