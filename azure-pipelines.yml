@@ -53,7 +53,7 @@ steps:
     ./sdksetup.exe /features + /norestart /q
   displayName: 'Install the Windows 8.0 SDK'
   env:
-    WindowsSDK8DownloadUrl: $(WindowsSDK8DonwloadUrl)
+    WindowsSDK8DownloadUrl: $(WindowsSDK8DownloadUrl)
 - pwsh: |
     $env:PATH += ";C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools"
     .\build.ps1
