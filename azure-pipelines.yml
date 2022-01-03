@@ -55,6 +55,8 @@ steps:
     script: |
       Invoke-WebRequest $env:WindowsSDK8DownloadUrl -OutFile "sdksetup.exe"
       ./sdksetup.exe /features + /norestart /q
+    env:
+      WindowsSDK8DownloadUrl: $(WindowsSDK8DonwloadUrl)
 - pwsh: |
     $env:PATH += ";C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools"
     .\build.ps1
