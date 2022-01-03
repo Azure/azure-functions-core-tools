@@ -49,11 +49,12 @@ steps:
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 - task: PowerShell@2
-  displayName: 'Install the Windows 8.1 SDK'
+  displayName: 'Install the Windows 8.0 SDK'
   inputs:
     targetType: 'inline'
     script: |
-      choco install windows-sdk-8.1
+      Invoke-WebRequest $env:WindowsSDK8DownloadUrl -OutFile "sdksetup.exe"
+      ./sdksetup.exe /features + /norestart /q
 - pwsh: |
     $env:PATH += ";C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools"
     .\build.ps1
