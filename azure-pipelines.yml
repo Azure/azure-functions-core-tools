@@ -13,7 +13,7 @@ trigger:
 pool:
   name: '1ES-Hosted-AzFunc'
   demands:
-  - ImageOverride -equals MMS2022TLS
+  - ImageOverride -equals MMS2022TLSSDK8
 
 variables:
   devops_buildNumber: $[counter(format(''), 1500)]
