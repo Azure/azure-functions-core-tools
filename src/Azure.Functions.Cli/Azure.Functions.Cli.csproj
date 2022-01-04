@@ -29,6 +29,10 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
+
+    <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
+    <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
+    <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
   </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
     <PublishReadyToRun>true</PublishReadyToRun>
@@ -166,5 +170,4 @@
       <Output TaskParameter="Include" ItemName="PublishReadyToRunExclude" />
     </CreateItem>
   </Target>
-
 </Project>

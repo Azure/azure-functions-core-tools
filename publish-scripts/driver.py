@@ -1,4 +1,5 @@
-#! /usr/bin/env python3.6
+#! /usr/bin/env python3
+import distro
 import platform
 import sys
 import os
@@ -11,9 +12,9 @@ def main(*args):
     constants.DRIVERROOTDIR = os.path.dirname(os.path.abspath(__file__))
     platformSystem = platform.system()
     if platformSystem == "Linux":
-        d, _, __ = platform.linux_distribution()
-        if d == "Ubuntu":
-            import ubuntu.bulidDEB as dist
+        d = distro.id()
+        if d == "ubuntu":
+            import ubuntu.buildDEB as dist
             print("Detected Ubuntu, starting to work on a deb package...")
         else:
             print(f"Does not support distribution {d} yet.")
