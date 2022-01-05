@@ -227,7 +227,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static string LanguageSelectionIfRelevant(WorkerRuntime workerRuntime)
         {
-            if (workerRuntime == Helpers.WorkerRuntime.node)
+            if (workerRuntime == Helpers.WorkerRuntime.node
+                || workerRuntime == Helpers.WorkerRuntime.dotnetIsolated
+                || workerRuntime == Helpers.WorkerRuntime.dotnet)
             {
                 if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
                     && languages.Count() != 0)
