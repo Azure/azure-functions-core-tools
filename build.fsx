@@ -36,18 +36,18 @@ let toolsDir = "./buildtools/"
 let platform = getBuildParamOrDefault "platform" "x86"
 let buildDir  = "./dist/build" + platform + "/"
 let testDir   = "./dist/test" + platform + "/"
-let deployDir = "./deploy" + platform + "/"
+let artifactsDir = "./artifacts" + platform + "/"
 let downloadDir  = "./dist/download" + platform + "/"
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + platform + ".zip"
-let toSignThirdPartyName = version + platform + "-thridparty.zip"
-let toSignZipPath = deployDir @@ toSignZipName
-let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
+let toSignThirdPartyName = version + platform + "-thirdparty.zip"
+let toSignZipPath = artifactsDir @@ toSignZipName
+let toSignThirdPartyPath = artifactsDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
-let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let finalZipPath = deployDir @@ "Azure.Functions.Cli." + platform + ".zip"
+let signedThirdPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
+let finalZipPath = artifactsDir @@ "Azure.Functions.Cli." + platform + ".zip"
 
 
 
@@ -204,7 +204,7 @@ Target "GenerateZipToSign" (fun _ ->
 
     !! (buildDir @@ "/**/*.dll")
         |> Seq.filter (fun f -> thirdParty |> Array.contains (f |> Path.GetFileName))
-        |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
+        |> CreateZip buildDir toSignThirdPartyPath String.Empty 7 true
 )
 
 let storageAccount = lazy CloudStorageAccount.Parse connectionString

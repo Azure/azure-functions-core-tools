@@ -49,23 +49,10 @@ steps:
       $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
       echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 - pwsh: |
-    Invoke-WebRequest $env:WindowsSDK8DownloadUrl -OutFile "sdksetup.exe"
-    ./sdksetup.exe /features + /norestart /q
-  displayName: 'Install the Windows 8.0 SDK'
-  env:
-    WindowsSDK8DownloadUrl: $(WindowsSDK8DownloadUrl)
-- pwsh: |
-    $env:PATH += ";C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools"
     .\build.ps1
   env:
     FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
     FILES_ACCOUNT_KEY: $(FILES_ACCOUNT_KEY)
-    # AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
-    # BuildArtifactsStorage: $(BuildArtifactsStorage)
-    # IsReleaseBuild: $(IsReleaseBuild)
-    # SimulateReleaseBuild: $(SimulateReleaseBuild)
-    # DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
-    # TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
   displayName: 'Executing build script'
 - task: PublishTestResults@2
   inputs:
