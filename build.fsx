@@ -67,7 +67,7 @@ Target "RestorePackages" (fun _ ->
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
-    CleanDirs [buildDir; testDir; downloadDir; deployDir]
+    CleanDirs [buildDir; testDir; downloadDir; artifactsDir]
 )
 
 Target "SetVersion" (fun _ ->
