@@ -56,7 +56,7 @@ steps:
   displayName: 'Executing build script'
 - task: PublishTestResults@2
   inputs:
-    testResultsFormat: 'VSTest'
+    testResultsFormat: 'xUnit'
     testResultsFiles: '**/result.html'
     failTaskOnFailedTests: true
   condition: succeededOrFailed()
