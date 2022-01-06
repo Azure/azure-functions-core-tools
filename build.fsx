@@ -98,7 +98,7 @@ Target "XUnitTest" (fun _ ->
     !! (testDir + @"\Azure.Functions.Cli.Tests.dll")
       |> xUnit2 (fun p ->
         {p with
-            HtmlOutputPath = Some (testDir @@ "result.html")
+            XmlOutputPath = Some (testDir @@ "result.xml")
             ToolPath = packagesDir @@ @"xunit.runner.console\tools\net452\xunit.console" + (if platform = "x86" then @".x86.exe" else ".exe")
             Parallel = NoParallelization
         })

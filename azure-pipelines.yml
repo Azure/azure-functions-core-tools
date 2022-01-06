@@ -57,7 +57,7 @@ steps:
 - task: PublishTestResults@2
   inputs:
     testResultsFormat: 'xUnit'
-    testResultsFiles: '**/result.html'
+    testResultsFiles: '**/result.xml'
     failTaskOnFailedTests: true
   condition: succeededOrFailed()
 - task: CopyFiles@2
