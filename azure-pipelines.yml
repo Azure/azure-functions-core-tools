@@ -57,7 +57,7 @@ steps:
 - task: PublishTestResults@2
   inputs:
     testResultsFormat: 'VSTest'
-    testResultsFiles: '**/*.trx'
+    testResultsFiles: '**/result.html'
     failTaskOnFailedTests: true
   condition: succeededOrFailed()
 - task: CopyFiles@2
