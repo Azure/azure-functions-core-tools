@@ -218,7 +218,7 @@ Target "UploadZipToSign" (fun _ ->
     blobRef.UploadFromStream <| File.OpenRead toSignZipPath
 
     let blobRef = container.GetBlockBlobReference toSignThirdPartyName
-    blobRef.UploadFromStream <| File.OpenRead toSignThridPartyPath
+    blobRef.UploadFromStream <| File.OpenRead toSignThirdPartyPath
 
 )
 
