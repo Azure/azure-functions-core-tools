@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
@@ -158,7 +158,7 @@
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.8.2-SNAPSHOT" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.10.0-SNAPSHOT" />
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="2.1.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS6" Version="3.0.630" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.1045" />
