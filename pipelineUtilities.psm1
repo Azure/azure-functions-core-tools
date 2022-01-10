@@ -10,7 +10,7 @@ using namespace System.Runtime.InteropServices
 $DLL_NAME = "Microsoft.ManifestTool.dll"
 $MANIFESTOOLNAME = "ManifestTool"
 $MANIFESTOOL_DIRECTORY = Join-Path $PSScriptRoot $MANIFESTOOLNAME
-$MANIFEST_TOOL_PATH = "$MANIFESTOOL_DIRECTORY/$DLL_NAME"
+$MANIFEST_TOOL_PATH = Join-Path $MANIFESTOOL_DIRECTORY $DLL_NAME
 
 function Get-ManifestToolPath
 {

@@ -291,13 +291,14 @@ Target "DownloadTools" (fun _ ->
 
 Target "GenerateSBOMManifestBeforeZipping" (fun _ ->
     let manifestToolDllResult =
-        ExecProcess (fun info ->
+        ExecProcessAndReturnMessages (fun info ->
                 info.FileName <- "dotnet"
                 info.WorkingDirectory <- Environment.CurrentDirectory
                 info.Arguments <- manifestToolDll + " generate -PackageName " + packageName + " -BuildDropPath " + buildDir
                     + " -BuildComponentPath " + buildDir + " -Verbosity Information -t " + telemetryFilePath
             ) (TimeSpan.FromMinutes 2.0)
-    if manifestToolDllResult <> 0 then 
+    if manifestToolDllResult.ExitCode <> 0 then 
+        Seq.iter (fun e -> printfn "%s" e) manifestToolDllResult.Errors
         failwith "Something went wrong during SBOM Manifest generation"
     else
         printfn "%s" "SBOM Manifest successfully generated"
