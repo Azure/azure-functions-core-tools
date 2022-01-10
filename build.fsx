@@ -40,9 +40,10 @@ let testDir   = "./dist/test" + platform + "/"
 let artifactsDir = "./artifacts/"
 let telemetryDir = artifactsDir + "SBOMManifestTelemetry/"
 let downloadDir  = "./dist/download" + platform + "/"
-let manifestToolDll = manifestToolDir @@ "Microsoft.ManifestTool.dll"
+let manifestToolDll = Path.GetFullPath (manifestToolDir @@ "Microsoft.ManifestTool.dll")
 let packageName = "Azure.Functions.Cli." + platform
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
+let dotnetExe = "dotnet.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + platform + ".zip"
@@ -292,7 +293,7 @@ Target "DownloadTools" (fun _ ->
 Target "GenerateSBOMManifestBeforeZipping" (fun _ ->
     let manifestToolDllResult =
         ExecProcessAndReturnMessages (fun info ->
-                info.FileName <- "dotnet"
+                info.FileName <- dotnetExe
                 info.WorkingDirectory <- Environment.CurrentDirectory
                 info.Arguments <- manifestToolDll + " generate -PackageName " + packageName + " -BuildDropPath " + buildDir
                     + " -BuildComponentPath " + buildDir + " -Verbosity Information -t " + telemetryFilePath
