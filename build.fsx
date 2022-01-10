@@ -31,7 +31,7 @@ let MoveFileTo (source, destination) =
 let env = Environment.GetEnvironmentVariable
 let connectionString =
     "DefaultEndpointsProtocol=https;AccountName=" + (env "FILES_ACCOUNT_NAME") + ";AccountKey=" + (env "FILES_ACCOUNT_KEY")
-let manifestToolDir = "./Manifest/"
+let manifestToolDir = "./ManifestTool/"
 let packagesDir = "./packages/"
 let toolsDir = "./buildtools/"
 let platform = getBuildParamOrDefault "platform" "x86"
