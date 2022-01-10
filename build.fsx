@@ -31,13 +31,17 @@ let MoveFileTo (source, destination) =
 let env = Environment.GetEnvironmentVariable
 let connectionString =
     "DefaultEndpointsProtocol=https;AccountName=" + (env "FILES_ACCOUNT_NAME") + ";AccountKey=" + (env "FILES_ACCOUNT_KEY")
+let manifestToolDir = "./Manifest/"
 let packagesDir = "./packages/"
 let toolsDir = "./buildtools/"
 let platform = getBuildParamOrDefault "platform" "x86"
 let buildDir  = "./dist/build" + platform + "/"
 let testDir   = "./dist/test" + platform + "/"
 let artifactsDir = "./artifacts/"
+let telemetryDir = artifactsDir + "SBOMManifestTelemetry/"
 let downloadDir  = "./dist/download" + platform + "/"
+let manifestToolDll = manifestToolDir @@ "Microsoft.ManifestTool.dll"
+let packageName = "Azure.Functions.Cli." + platform
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
@@ -47,7 +51,8 @@ let toSignZipPath = artifactsDir @@ toSignZipName
 let toSignThirdPartyPath = artifactsDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
 let signedThirdPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let finalZipPath = artifactsDir @@ "Azure.Functions.Cli." + platform + ".zip"
+let telemetryFilePath = telemetryDir @@ (platform + ".json")
+let finalZipPath = artifactsDir @@ packageName + ".zip"
 
 
 
@@ -284,6 +289,28 @@ Target "DownloadTools" (fun _ ->
         |> webClient.DownloadFile
 )
 
+Target "GenerateSBOMManifestBeforeZipping" (fun _ ->
+    let manifestToolDllResult =
+        ExecProcess (fun info ->
+                info.FileName <- "dotnet"
+                info.WorkingDirectory <- Environment.CurrentDirectory
+                info.Arguments <- manifestToolDll + " generate -PackageName " + packageName + " -BuildDropPath " + buildDir
+                    + " -BuildComponentPath " + buildDir + " -Verbosity Information -t " + telemetryFilePath
+            ) (TimeSpan.FromMinutes 2.0)
+    if manifestToolDllResult <> 0 then 
+        failwith "Something went wrong during SBOM Manifest generation"
+    else
+        printfn "%s" "SBOM Manifest successfully generated"
+)
+
+Target "CreateSBOMTelemetryFolder" (fun _ ->
+    if not <| Directory.Exists telemetryDir then Directory.CreateDirectory telemetryDir |> ignore
+)
+
+Target "DeleteSBOMTelemetryFolder" (fun _ ->
+    CleanDirs [telemetryDir]
+)
+
 Dependencies
 "DownloadTools"
   ==> "RestorePackages"
@@ -292,6 +319,9 @@ Dependencies
   ==> "DownloadNugetExe"
   ==> "CompileTest"
   ==> "XUnitTest"
+  =?> ("CreateSBOMTelemetryFolder", hasBuildParam "generateSBOM")
+  =?> ("GenerateSBOMManifestBeforeZipping", hasBuildParam "generateSBOM")
+  =?> ("DeleteSBOMTelemetryFolder", hasBuildParam "generateSBOM")
   =?> ("GenerateZipToSign", hasBuildParam "sign")
   =?> ("UploadZipToSign", hasBuildParam "sign")
   =?> ("EnqueueSignMessage", hasBuildParam "sign")

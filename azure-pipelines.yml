@@ -23,7 +23,7 @@ variables:
 steps:
 - pwsh: |
     $isReleaseBuild = $false
-    if ($env:BuildSourceBranchName -like "release_2.0*")
+    if ($env:BuildSourceBranchName -like "release_1.0*")
     {
         $isReleaseBuild = $true
     }
@@ -38,6 +38,13 @@ steps:
 - task: NodeTool@0
   inputs:
     versionSpec: '10.x'
+- pwsh: |
+    Import-Module ".\pipelineUtilities.psm1" -Force
+    Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
+  env:
+    SBOMUtilSASUrl: $(SBOMUtilSASUrl)
+  condition: or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true'))
+  displayName: 'Install SBOM ManifestTool'
 - task: AzureCLI@2
   displayName: Login via Azure CLI to acquire access token
   inputs:
@@ -53,6 +60,7 @@ steps:
   env:
     FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
     FILES_ACCOUNT_KEY: $(FILES_ACCOUNT_KEY)
+    SimulateReleaseBuild: $(SimulateReleaseBuild)
   displayName: 'Executing build script'
 - task: PublishTestResults@2
   inputs:
