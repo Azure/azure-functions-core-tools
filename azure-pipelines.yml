@@ -62,6 +62,7 @@ steps:
 - pwsh: |
     .\build.ps1
   env:
+    DEVOPS_BUILDNUMBER: $(DEVOPS_BUILDNUMBER)
     FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
     FILES_ACCOUNT_KEY: $(FILES_ACCOUNT_KEY)
     SimulateReleaseBuild: $(SimulateReleaseBuild)
