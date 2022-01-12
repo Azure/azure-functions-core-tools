@@ -37,11 +37,11 @@ if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild) -and
 
 if ($isReleaseBuild -or $simulateReleaseBuild)
 {
-    $buildCommand = "dotnet run --ci --generateSBOM"
+    $buildCommand = { dotnet run --ci --generateSBOM }
 }
 else
 {
-    $buildCommand = "dotnet run --ci"
+    $buildCommand = { dotnet run --ci }
 }
 
 Write-Host "Running $buildCommand"
