@@ -45,9 +45,7 @@ let packageName = "Azure.Functions.Cli." + platform
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
 let dotnetExe = "dotnet.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
-// devOpsBuildVersion is not defined at the moment; we simply replaced an old reference to appVeyorBuildVersion with a
-// more appropriate name. So long as the version matches the expected format of x.x.x.x, this pipeline should still work
-let version = if isNull devOpsBuildVersion then "1.0.0.0" else devOpsBuildVersion
+let version = if isNull buildVersion then "1.0.0.0" else buildVersion
 let toSignZipName = version + platform + ".zip"
 let toSignThirdPartyName = version + platform + "-thirdparty.zip"
 let toSignZipPath = artifactsDir @@ toSignZipName
