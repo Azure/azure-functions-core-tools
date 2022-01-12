@@ -1,0 +1,86 @@
+name: $(Build.SourceBranchName)_$(Build.Reason)
+
+pr:
+  branches:
+    include:
+    - v1.x
+
+trigger:
+  branches:
+    include:
+    - v1.x
+
+pool:
+  name: '1ES-Hosted-AzFunc'
+  demands:
+  - ImageOverride -equals MMS2022TLSSDK8
+
+variables:
+  DEVOPS_BUILDNUMBER: $[counter(format(''), 1500)]
+  DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+  DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+
+steps:
+- pwsh: |
+    $isReleaseBuild = $false
+    if ($env:BuildSourceBranchName -like "release_1.0*")
+    {
+        $isReleaseBuild = $true
+    }
+    Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
+    Write-Host "IsReleaseBuild: $isReleaseBuild"
+  displayName: 'Set IsReleaseBuild variable'
+  env:
+    BuildSourceBranchName: $(Build.SourceBranchName)
+- pwsh: |
+    Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
+  displayName: Set up environment variables
+- task: NodeTool@0
+  inputs:
+    versionSpec: '10.x'
+- pwsh: |
+    Import-Module ".\pipelineUtilities.psm1" -Force
+    Install-Dotnet
+  displayName: 'Install .NET 3.1'
+- pwsh: |
+    Import-Module ".\pipelineUtilities.psm1" -Force
+    Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
+  env:
+    SBOMUtilSASUrl: $(SBOMUtilSASUrl)
+  condition: or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true'))
+  displayName: 'Install SBOM ManifestTool'
+- task: AzureCLI@2
+  displayName: Login via Azure CLI to acquire access token
+  inputs:
+    azureSubscription: $(E2ETestServiceConnectionName)
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+      # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
+      $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
+      echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+- pwsh: |
+    .\build.ps1
+  env:
+    DEVOPS_BUILDNUMBER: $(DEVOPS_BUILDNUMBER)
+    FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
+    FILES_ACCOUNT_KEY: $(FILES_ACCOUNT_KEY)
+    SimulateReleaseBuild: $(SimulateReleaseBuild)
+  displayName: 'Executing build script'
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'xUnit'
+    testResultsFiles: '**/result.xml'
+    failTaskOnFailedTests: true
+  condition: succeededOrFailed()
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(Build.Repository.LocalPath)\artifacts'
+    Contents: 'Azure.Functions.Cli.*'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    CleanTargetFolder: true
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'

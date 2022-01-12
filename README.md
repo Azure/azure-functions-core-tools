@@ -2,7 +2,7 @@
 
 |Branch|Status|
 |---|---|
-|master|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/master?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/master)|
+|v1.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=v1.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=v1.x)|
 
 # Azure Functions Core Tools
 

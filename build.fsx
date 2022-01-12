@@ -31,23 +31,32 @@ let MoveFileTo (source, destination) =
 let env = Environment.GetEnvironmentVariable
 let connectionString =
     "DefaultEndpointsProtocol=https;AccountName=" + (env "FILES_ACCOUNT_NAME") + ";AccountKey=" + (env "FILES_ACCOUNT_KEY")
+let manifestToolDir = "./ManifestTool/"
 let packagesDir = "./packages/"
 let toolsDir = "./buildtools/"
 let platform = getBuildParamOrDefault "platform" "x86"
 let buildDir  = "./dist/build" + platform + "/"
 let testDir   = "./dist/test" + platform + "/"
-let deployDir = "./deploy" + platform + "/"
+let artifactsDir = "./artifacts/"
+let telemetryDir = artifactsDir + "SBOMManifestTelemetry/"
 let downloadDir  = "./dist/download" + platform + "/"
+let manifestToolDll = Path.GetFullPath (manifestToolDir @@ "Microsoft.ManifestTool.dll")
+let packageName = "Azure.Functions.Cli." + platform
 let sigCheckExe = toolsDir @@ "sigcheck.exe"
+let dotnetExe = "dotnet.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
+// This build pipeline was moved from AppVeyor to Azure DevOps. We maintain this the reference to appVeyorBuildVersion,
+// a built-in variable for FAKE 4, not because we expect it to be defined within Azure DevOps, but rather because it
+// contains the necessary version (major.minor.build.revision) format to ensure the build pipeline works. 
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + platform + ".zip"
-let toSignThirdPartyName = version + platform + "-thridparty.zip"
-let toSignZipPath = deployDir @@ toSignZipName
-let toSignThridPartyPath = deployDir @@ toSignThirdPartyName
+let toSignThirdPartyName = version + platform + "-thirdparty.zip"
+let toSignZipPath = artifactsDir @@ toSignZipName
+let toSignThirdPartyPath = artifactsDir @@ toSignThirdPartyName
 let signedZipPath = downloadDir @@ ("signed-" + toSignZipName)
-let signedThridPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
-let finalZipPath = deployDir @@ "Azure.Functions.Cli." + platform + ".zip"
+let signedThirdPartyPath = downloadDir @@ ("signed-" + toSignThirdPartyName)
+let telemetryFilePath = telemetryDir @@ (platform + ".json")
+let finalZipPath = artifactsDir @@ packageName + ".zip"
 
 
 
@@ -67,7 +76,7 @@ Target "RestorePackages" (fun _ ->
 
 Target "Clean" (fun _ ->
     if not <| Directory.Exists toolsDir then Directory.CreateDirectory toolsDir |> ignore
-    CleanDirs [buildDir; testDir; downloadDir; deployDir]
+    CleanDirs [buildDir; testDir; downloadDir; artifactsDir]
 )
 
 Target "SetVersion" (fun _ ->
@@ -98,7 +107,7 @@ Target "XUnitTest" (fun _ ->
     !! (testDir + @"\Azure.Functions.Cli.Tests.dll")
       |> xUnit2 (fun p ->
         {p with
-            HtmlOutputPath = Some (testDir @@ "result.html")
+            XmlOutputPath = Some (testDir @@ "result.xml")
             ToolPath = packagesDir @@ @"xunit.runner.console\tools\net452\xunit.console" + (if platform = "x86" then @".x86.exe" else ".exe")
             Parallel = NoParallelization
         })
@@ -204,7 +213,7 @@ Target "GenerateZipToSign" (fun _ ->
 
     !! (buildDir @@ "/**/*.dll")
         |> Seq.filter (fun f -> thirdParty |> Array.contains (f |> Path.GetFileName))
-        |> CreateZip buildDir toSignThridPartyPath String.Empty 7 true
+        |> CreateZip buildDir toSignThirdPartyPath String.Empty 7 true
 )
 
 let storageAccount = lazy CloudStorageAccount.Parse connectionString
@@ -218,7 +227,7 @@ Target "UploadZipToSign" (fun _ ->
     blobRef.UploadFromStream <| File.OpenRead toSignZipPath
 
     let blobRef = container.GetBlockBlobReference toSignThirdPartyName
-    blobRef.UploadFromStream <| File.OpenRead toSignThridPartyPath
+    blobRef.UploadFromStream <| File.OpenRead toSignThirdPartyPath
 
 )
 
@@ -284,6 +293,29 @@ Target "DownloadTools" (fun _ ->
         |> webClient.DownloadFile
 )
 
+Target "GenerateSBOMManifestBeforeZipping" (fun _ ->
+    let manifestToolDllResult =
+        ExecProcessAndReturnMessages (fun info ->
+                info.FileName <- dotnetExe
+                info.WorkingDirectory <- Environment.CurrentDirectory
+                info.Arguments <- manifestToolDll + " generate -PackageName " + packageName + " -BuildDropPath " + buildDir
+                    + " -BuildComponentPath " + buildDir + " -Verbosity Information -t " + telemetryFilePath
+            ) (TimeSpan.FromMinutes 2.0)
+    if manifestToolDllResult.ExitCode <> 0 then 
+        Seq.iter (fun e -> printfn "%s" e) manifestToolDllResult.Errors
+        failwith "Something went wrong during SBOM Manifest generation"
+    else
+        printfn "%s" "SBOM Manifest successfully generated"
+)
+
+Target "CreateSBOMTelemetryFolder" (fun _ ->
+    if not <| Directory.Exists telemetryDir then Directory.CreateDirectory telemetryDir |> ignore
+)
+
+Target "DeleteSBOMTelemetryFolder" (fun _ ->
+    CleanDirs [telemetryDir]
+)
+
 Dependencies
 "DownloadTools"
   ==> "RestorePackages"
@@ -292,6 +324,9 @@ Dependencies
   ==> "DownloadNugetExe"
   ==> "CompileTest"
   ==> "XUnitTest"
+  =?> ("CreateSBOMTelemetryFolder", hasBuildParam "generateSBOM")
+  =?> ("GenerateSBOMManifestBeforeZipping", hasBuildParam "generateSBOM")
+  =?> ("DeleteSBOMTelemetryFolder", hasBuildParam "generateSBOM")
   =?> ("GenerateZipToSign", hasBuildParam "sign")
   =?> ("UploadZipToSign", hasBuildParam "sign")
   =?> ("EnqueueSignMessage", hasBuildParam "sign")
