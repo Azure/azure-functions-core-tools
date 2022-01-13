@@ -45,5 +45,5 @@ else
 }
 
 Write-Host "Running $buildCommand"
-& { $buildCommand }
+& $buildCommand
 if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
