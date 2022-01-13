@@ -8,6 +8,14 @@ Set-Location $buildFolderPath
 
 $buildCommand = $null
 
+$isReleaseBuild = $null
+$simulateReleaseBuild = $null
+if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild) -and
+    [bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+{
+    throw "IsReleaseBuild and GenerateSBOM can only be set to true or false."
+}
+
 if ($env:IntegrationBuildNumber)
 {
     if (-not ($env:IntegrationBuildNumber -like "PreRelease*-*"))
@@ -19,10 +27,15 @@ if ($env:IntegrationBuildNumber)
 
     $buildCommand = "dotnet run --integrationTests"
 }
+elseif ($isReleaseBuild -or $simulateReleaseBuild)
+{
+    $buildCommand = "dotnet run --ci --generateSBOM"
+}
 else
 {
     $buildCommand = "dotnet run --ci"
 }
 
+Write-Host "Running $buildCommand"
 Invoke-Expression -Command $buildCommand
 if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
