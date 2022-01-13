@@ -4,14 +4,12 @@ packages\FAKE\tools\fake .\build.fsx clean platform=x86
 packages\FAKE\tools\fake .\build.fsx clean platform=x64
 
 $isReleaseBuild = $null
-$simulateReleaseBuild = $null
-if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild) -and
-    [bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild)))
 {
-    throw "IsReleaseBuild and SimulateReleaseBuild can only be set to true or false."
+    throw "IsReleaseBuild can only be set to true or false."
 }
 
-if ($isReleaseBuild -or $simulateReleaseBuild)
+if ($isReleaseBuild)
 {
     packages\FAKE\tools\fake .\build.fsx platform=x86 -ev sign -ev generateSBOM
     packages\FAKE\tools\fake .\build.fsx platform=x64 -ev sign -ev generateSBOM
