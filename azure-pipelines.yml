@@ -16,8 +16,8 @@ pool:
 
 variables:
   devops_buildNumber: $[counter(format(''), 1500)]
-  APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
-  APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
+  DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+  DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
 
 steps:
 - pwsh: |
@@ -32,7 +32,7 @@ steps:
   env:
     BuildSourceBranchName: $(Build.SourceBranchName)
 - pwsh: |
-    Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+    Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
   displayName: Set up environment variables
 - task: NodeTool@0
   inputs:
