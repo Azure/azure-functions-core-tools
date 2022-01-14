@@ -22,16 +22,24 @@ variables:
 
 steps:
 - pwsh: |
+    $simulateReleaseBuild = $null
+    if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+    {
+        throw "SimulateReleaseBuild can only be set to true or false."
+    }
+
     $isReleaseBuild = $false
-    if ($env:BuildSourceBranchName -like "release_1.0*")
+    if (($env:BuildSourceBranchName -like "release_1.0*") -or $simulateReleaseBuild)
     {
         $isReleaseBuild = $true
     }
+    Write-Host "Setting IsReleaseBuild to $isReleaseBuild because the branch name is $env:BuildSourceBranchName and SimulateReleaseBuild is $env:SimulateReleaseBuild"
     Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
     Write-Host "IsReleaseBuild: $isReleaseBuild"
   displayName: 'Set IsReleaseBuild variable'
   env:
     BuildSourceBranchName: $(Build.SourceBranchName)
+    SimulateReleaseBuild: $(SimulateReleaseBuild)
 - pwsh: |
     Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
   displayName: Set up environment variables
@@ -47,7 +55,7 @@ steps:
     Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
   env:
     SBOMUtilSASUrl: $(SBOMUtilSASUrl)
-  condition: or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true'))
+  condition: eq(variables['IsReleaseBuild'], 'true')
   displayName: 'Install SBOM ManifestTool'
 - task: AzureCLI@2
   displayName: Login via Azure CLI to acquire access token
@@ -65,7 +73,6 @@ steps:
     DEVOPS_BUILDNUMBER: $(DEVOPS_BUILDNUMBER)
     FILES_ACCOUNT_NAME: $(FILES_ACCOUNT_NAME)
     FILES_ACCOUNT_KEY: $(FILES_ACCOUNT_KEY)
-    SimulateReleaseBuild: $(SimulateReleaseBuild)
   displayName: 'Executing build script'
 - task: PublishTestResults@2
   inputs:

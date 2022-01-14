@@ -47,7 +47,7 @@ let dotnetExe = "dotnet.exe"
 let nugetUri = Uri ("https://dist.nuget.org/win-x86-commandline/v3.5.0/nuget.exe")
 // This build pipeline was moved from AppVeyor to Azure DevOps. We maintain this the reference to appVeyorBuildVersion,
 // a built-in variable for FAKE 4, not because we expect it to be defined within Azure DevOps, but rather because it
-// contains the necessary version (major.minor.build.revision) format to ensure the build pipeline works. 
+// contains the necessary version format (major.minor.build.revision) to ensure the build pipeline works. 
 let version = if isNull appVeyorBuildVersion then "1.0.0.0" else appVeyorBuildVersion
 let toSignZipName = version + platform + ".zip"
 let toSignThirdPartyName = version + platform + "-thirdparty.zip"
