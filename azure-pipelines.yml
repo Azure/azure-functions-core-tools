@@ -18,7 +18,7 @@ jobs:
   pool:
     name: '1ES-Hosted-AzFunc'
     demands:
-    - ImageOverride -equals MMS2022TLS
+    - ImageOverride -equals MMS2019TLS
 
   variables:
     devops_buildNumber: $[counter(format(''), 1500)]
