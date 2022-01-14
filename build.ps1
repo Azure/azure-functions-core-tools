@@ -13,7 +13,7 @@ $simulateReleaseBuild = $null
 if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild) -and
     [bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
 {
-    throw "IsReleaseBuild and GenerateSBOM can only be set to true or false."
+    throw "IsReleaseBuild and SimulateReleaseBuild can only be set to true or false."
 }
 
 if ($env:IntegrationBuildNumber)
@@ -29,13 +29,13 @@ if ($env:IntegrationBuildNumber)
 }
 elseif ($isReleaseBuild -or $simulateReleaseBuild)
 {
-    $buildCommand = "dotnet run --ci --generateSBOM"
+    $buildCommand = { dotnet run --ci --generateSBOM }
 }
 else
 {
-    $buildCommand = "dotnet run --ci"
+    $buildCommand = { dotnet run --ci }
 }
 
 Write-Host "Running $buildCommand"
-Invoke-Expression -Command $buildCommand
+& $buildCommand
 if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
