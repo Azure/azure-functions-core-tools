@@ -153,7 +153,7 @@
     <PackageReference Include="DotNetZip" Version="1.13.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.3.1" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="3.4.2" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
@@ -161,7 +161,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="1.9.0" />
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="2.1.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS6" Version="3.0.630" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.1272" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7" Version="3.0.1450" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="3.1.2.6" />
   </ItemGroup>
 
