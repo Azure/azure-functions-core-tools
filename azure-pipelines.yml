@@ -21,16 +21,24 @@ variables:
 
 steps:
 - pwsh: |
+    $simulateReleaseBuild = $null
+    if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+    {
+        throw "SimulateReleaseBuild can only be set to true or false."
+    }
+
     $isReleaseBuild = $false
-    if ($env:BuildSourceBranchName -like "release_2.0*")
+    if ($env:BuildSourceBranchName -like "release_2.0*" -or $simulateReleaseBuild)
     {
         $isReleaseBuild = $true
     }
+    Write-Host "Setting IsReleaseBuild to $isReleaseBuild because the branch name is $env:BuildSourceBranchName and SimulateReleaseBuild is $env:SimulateReleaseBuild"
     Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
     Write-Host "IsReleaseBuild: $isReleaseBuild"
   displayName: 'Set IsReleaseBuild variable'
   env:
     BuildSourceBranchName: $(Build.SourceBranchName)
+    SimulateReleaseBuild: $(SimulateReleaseBuild)
 - pwsh: |
     Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
   displayName: Set up environment variables
@@ -46,7 +54,7 @@ steps:
     Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
   env:
     SBOMUtilSASUrl: $(SBOMUtilSASUrl)
-  condition: or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true'))
+  condition: eq(variables['IsReleaseBuild'], 'true')
   displayName: 'Install SBOM ManifestTool'
 - task: NuGetToolInstaller@1
   inputs:
@@ -68,7 +76,6 @@ steps:
     AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     IsReleaseBuild: $(IsReleaseBuild)
-    SimulateReleaseBuild: $(SimulateReleaseBuild)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
   displayName: 'Executing build script'
@@ -105,7 +112,7 @@ steps:
     SessionTimeout: '60'
     MaxConcurrency: '50'
     MaxRetryAttempts: '5'
-  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+  condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 - task: EsrpCodeSigning@1
   displayName: 'Third party signing'
   inputs:
@@ -140,7 +147,7 @@ steps:
     SessionTimeout: '60'
     MaxConcurrency: '50'
     MaxRetryAttempts: '5'
-  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+  condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 - pwsh: |
     .\repackageBinaries.ps1
   displayName: Repackage signed binaries
@@ -149,14 +156,14 @@ steps:
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+  condition: and(succeeded(), eq(variables['IsReleaseBuild'])
 - task: DotNetCoreCLI@2
   inputs:
     command: 'run'
     workingDirectory: '.\build'
     arguments: 'TestSignedArtifacts --signTest'
   displayName: 'Verify signed binaries'
-  condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+  condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 - pwsh: |
     .\generateSha.ps1
   displayName: 'Generate sha files'
