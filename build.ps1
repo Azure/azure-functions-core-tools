@@ -23,7 +23,7 @@ if ($env:IntegrationBuildNumber)
         throw $errorMessage
     }
 
-    $buildCommand = "dotnet run --integrationTests"
+    $buildCommand = { dotnet run --integrationTests }
 }
 elseif ($isReleaseBuild)
 {
