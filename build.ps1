@@ -9,11 +9,9 @@ Set-Location $buildFolderPath
 $buildCommand = $null
 
 $isReleaseBuild = $null
-$simulateReleaseBuild = $null
-if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild) -and
-    [bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild)))
 {
-    throw "IsReleaseBuild and SimulateReleaseBuild can only be set to true or false."
+    throw "IsReleaseBuild can only be set to true or false."
 }
 
 if ($env:IntegrationBuildNumber)
@@ -27,7 +25,7 @@ if ($env:IntegrationBuildNumber)
 
     $buildCommand = "dotnet run --integrationTests"
 }
-elseif ($isReleaseBuild -or $simulateReleaseBuild)
+elseif ($isReleaseBuild)
 {
     $buildCommand = { dotnet run --ci --generateSBOM }
 }
