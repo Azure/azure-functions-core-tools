@@ -156,7 +156,7 @@ steps:
     BuildArtifactsStorage: $(BuildArtifactsStorage)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-  condition: and(succeeded(), eq(variables['IsReleaseBuild']))
+  condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 - task: DotNetCoreCLI@2
   inputs:
     command: 'run'
