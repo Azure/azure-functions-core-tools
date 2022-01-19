@@ -22,20 +22,28 @@ jobs:
 
   variables:
     devops_buildNumber: $[counter(format(''), 1500)]
-    APPVEYOR_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
-    APPVEYOR_REPO_COMMIT: $(Build.SourceVersion)
+    DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+    DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
   steps:
   - pwsh: |
+      $simulateReleaseBuild = $null
+      if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+      {
+          throw "SimulateReleaseBuild can only be set to true or false."
+      }
+
       $isReleaseBuild = $false
-      if ($env:BuildSourceBranchName -like "release_3.0*")
+      if ($env:BuildSourceBranchName -like "release_3.0*" -or $simulateReleaseBuild)
       {
           $isReleaseBuild = $true
       }
+      Write-Host "Setting IsReleaseBuild to $isReleaseBuild because the branch name is $env:BuildSourceBranchName and SimulateReleaseBuild is $env:SimulateReleaseBuild"
       Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
       Write-Host "IsReleaseBuild: $isReleaseBuild"
     displayName: 'Set IsReleaseBuild variable'
     env:
       BuildSourceBranchName: $(Build.SourceBranchName)
+      SimulateReleaseBuild: $(SimulateReleaseBuild)
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -46,7 +54,7 @@ jobs:
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
     displayName: 'Set IsIntegrationBuild variable'
   - pwsh: |
-      Write-Host "Target branch: '$(APPVEYOR_REPO_BRANCH)'"
+      Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
     displayName: Set up environment variables
   - task: NodeTool@0
     inputs:
@@ -60,7 +68,7 @@ jobs:
       Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
     env:
       SBOMUtilSASUrl: $(SBOMUtilSASUrl)
-    condition: or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true'))
+    condition: eq(variables['IsReleaseBuild'], 'true')
     displayName: 'Install SBOM ManifestTool'
   - task: NuGetToolInstaller@1
     inputs:
@@ -82,7 +90,6 @@ jobs:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: $(IsReleaseBuild)
-      SimulateReleaseBuild: $(SimulateReleaseBuild)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
@@ -120,7 +127,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - task: EsrpCodeSigning@1
     displayName: 'Third party signing'
     inputs:
@@ -155,7 +162,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - pwsh: |
       .\repackageBinaries.ps1
     displayName: Repackage signed binaries
@@ -164,14 +171,14 @@ jobs:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - task: DotNetCoreCLI@2
     inputs:
       command: 'run'
       workingDirectory: '.\build'
       arguments: 'TestSignedArtifacts --signTest'
     displayName: 'Verify signed binaries'
-    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - pwsh: |
       .\generateMsiFiles.ps1
     env:
@@ -180,7 +187,7 @@ jobs:
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
     displayName: 'Generate MSI files'
-    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - task: EsrpCodeSigning@1
     displayName: 'MSI Code Signing'
     inputs:
@@ -214,7 +221,7 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
-    condition: and(succeeded(), or(eq(variables['IsReleaseBuild'], 'true'), eq(variables['SimulateReleaseBuild'], 'true')))
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 
   - pwsh: |
       .\generateSha.ps1
