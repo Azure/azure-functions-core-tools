@@ -23,6 +23,7 @@ namespace Azure.Functions.Cli.Common
         public const string PythonGettingStarted = "getting_started.md";
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
+        public const string ProxiesJsonFileName = "proxies.json";
         public const string ExtenstionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
@@ -98,6 +99,7 @@ namespace Azure.Functions.Cli.Common
             public const string WebJobsStorageNotFoundWithUserSecrets = "Missing value for AzureWebJobsStorage in {0} and User Secrets. This is required for all triggers other than {1}. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {2} or User Secrets.";
             public const string AppSettingNotFound = "Warning: Cannot find value named '{0}' in {1} that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5}.";
             public const string AppSettingNotFoundWithUserSecrets = "Warning: Cannot find value named '{0}' in {1} or User Secrets that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5} or User Secrets.";
+            public const string ProxiesNotSupported = $"Warning: Proxies are not supported in Azure Functions v4. Instead of '{Constants.ProxiesJsonFileName}', try Azure API Management: https://aka.ms/AAfiueq";
         }
 
         public static class Languages
