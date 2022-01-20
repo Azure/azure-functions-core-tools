@@ -114,11 +114,11 @@ namespace Build
 
         public static readonly string TelemetryKeyToReplace = "00000000-0000-0000-0000-000000000000";
 
-        public static string BuildNumber => config(null, "devops_buildNumber") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
+        public static string BuildNumber => config("9999", "devops_buildNumber");
 
         public static string IntegrationBuildNumber => config(null, "integrationBuildNumber") ?? string.Empty;
 
-        public static string CommitId => config(null, "Build.SourceVersion") ?? config("N/A", "APPVEYOR_REPO_COMMIT");
+        public static string CommitId => config("N/A", "Build.SourceVersion");
 
         public static string TelemetryInstrumentationKey => config(null, "TELEMETRY_INSTRUMENTATION_KEY");
 
