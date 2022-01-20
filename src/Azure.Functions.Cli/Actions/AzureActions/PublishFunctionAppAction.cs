@@ -147,7 +147,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
-            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime);
+            var additionalAppSettings = await ValidateFunctionAppPublish(functionApp, workerRuntime, functionAppRoot);
 
             // Update build option
             PublishBuildOption = PublishHelper.ResolveBuildOption(PublishBuildOption, workerRuntime, functionApp, BuildNativeDeps, NoBuild);
@@ -187,7 +187,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime)
+        private async Task<IDictionary<string, string>> ValidateFunctionAppPublish(Site functionApp, WorkerRuntime workerRuntime, string functionAppRoot)
         {
             var result = new Dictionary<string, string>();
 
@@ -273,6 +273,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
                         $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{functionApp.LinuxFxVersion}'."));
                 }
+            }
+
+            if (File.Exists(Path.Combine(functionAppRoot, Constants.ProxiesJsonFileName)))
+            {
+                ColoredConsole.WriteLine(WarningColor(Constants.Errors.ProxiesNotSupported));
             }
 
             return result;

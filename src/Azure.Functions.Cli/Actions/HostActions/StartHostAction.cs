@@ -355,6 +355,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             ValidateAndBuildHostJsonConfigurationIfFileExists(hostOptions);
 
+            if (File.Exists(Path.Combine(Environment.CurrentDirectory, Constants.ProxiesJsonFileName)))
+            {
+                ColoredConsole.WriteLine(WarningColor(Constants.Errors.ProxiesNotSupported));
+            }
+
             (var listenUri, var baseUri, var certificate) = await Setup();
 
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
