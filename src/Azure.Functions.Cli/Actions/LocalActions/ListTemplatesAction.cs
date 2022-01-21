@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 ? templates
                 : templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase));
 
-            foreach (var languageGrouping in templates.GroupBy(t => t.Metadata.Language))
+            foreach (var languageGrouping in templates.GroupBy(t => t.Metadata.Language, StringComparer.OrdinalIgnoreCase))
             {
                 ColoredConsole.WriteLine(TitleColor($"{languageGrouping.Key} Templates:"));
                 foreach (var template in languageGrouping)
