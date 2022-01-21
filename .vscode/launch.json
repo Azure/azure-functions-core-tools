@@ -7,7 +7,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/src/Azure.Functions.Cli/bin/Debug/net6.0/func.dll",
+            "program": "${workspaceFolder}/src/Azure.Functions.Cli/bin/Debug/netcoreapp3.1/func.dll",
             "env": {
                 "CLI_DEBUG": "1"
             },
