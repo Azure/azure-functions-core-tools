@@ -24,6 +24,8 @@ namespace Build
         public const string ProjectTemplatesVersion = "2.1.1579";
         public const string TemplateJsonVersion = "2.1.1579";
 
+        public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
+        
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
         public static readonly string ConstantsFile = Path.Combine(SrcProjectPath, "Common", "Constants.cs");
@@ -74,6 +76,12 @@ namespace Build
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
+        public static readonly string SBOMManifestTelemetryDir = Path.Combine(OutputDir, "SBOMManifestTelemetry");
+        
+        public static string TargetFramework = "netcoreapp2.2";
+
+        public static readonly string NupkgPublishDir = Path.GetFullPath($"../src/Azure.Functions.Cli/bin/Release/{TargetFramework}/publish");
+        
         public static readonly string PreSignTestDir = "PreSignTest";
 
         public static readonly string SignTestDir = "SignTest";
@@ -86,9 +94,9 @@ namespace Build
 
         public static readonly string TelemetryKeyToReplace = "00000000-0000-0000-0000-000000000000";
 
-        public static string BuildNumber => config(null, "devops_buildNumber") ?? config("9999", "APPVEYOR_BUILD_NUMBER");
+        public static string BuildNumber => config("9999", "devops_buildNumber");
 
-        public static string CommitId => config(null, "Build.SourceVersion") ?? config("N/A", "APPVEYOR_REPO_COMMIT");
+        public static string CommitId => config("N/A", "Build.SourceVersion");
 
         public static string TelemetryInstrumentationKey => config(null, "TELEMETRY_INSTRUMENTATION_KEY");
 

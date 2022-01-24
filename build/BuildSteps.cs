@@ -550,6 +550,35 @@ namespace Build
             }
         }
 
+        public static void GenerateSBOMManifestForZips()
+        {
+            Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
+            // Generate the SBOM manifest for each runtime
+            foreach (var runtime in Settings.TargetRuntimes)
+            {
+                var packageName = $"Azure.Functions.Cli.{runtime}.{CurrentVersion}";
+                var buildPath = Path.Combine(Settings.OutputDir, runtime);
+                var manifestFolderPath = Path.Combine(buildPath, "_manifest");
+                var telemetryFilePath = Path.Combine(Settings.SBOMManifestTelemetryDir, Guid.NewGuid().ToString() + ".json");
+
+                // Delete the manifest folder if it exists
+                if (Directory.Exists(manifestFolderPath))
+                {
+                    Directory.Delete(manifestFolderPath, recursive: true);
+                }
+
+                // Generate the SBOM manifest
+                Shell.Run("dotnet",
+                    $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {buildPath}"
+                    + $" -BuildComponentPath {buildPath} -Verbosity Information -t {telemetryFilePath}");
+            }
+        }
+
+        public static void DeleteSBOMTelemetryFolder()
+        {
+            Directory.Delete(Settings.SBOMManifestTelemetryDir, recursive: true);
+        }
+
         public static void UploadToStorage()
         {
             if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))

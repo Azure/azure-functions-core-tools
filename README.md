@@ -4,7 +4,7 @@
 |---|---|
 |master|[![Build Status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=master)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=master)
 |dev|[![Build Status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=dev)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=dev)
-|v1.x|[![Build status](https://ci.appveyor.com/api/projects/status/max86pwo54y44j36/branch/v1.x?svg=true)](https://ci.appveyor.com/project/appsvc/azure-functions-cli/branch/v1.x)|
+|v1.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=v1.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=v1.x)|
 
 # Azure Functions Core Tools
 
@@ -16,7 +16,9 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 **v2** (master branch): Self-contained cross-platform package
 
-**v3**: (v3.x branch): Self-contained cross-platform package **(recommended)**
+**v3**: (v3.x branch): Self-contained cross-platform package
+
+**v4**: (v4.x branch): Self-contained cross-platform package **(recommended)**
 
 ## Installing
 
@@ -24,12 +26,22 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 #### To download and install with MSI:
 
+##### v4
+
+- [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2174087) (VS Code debugging requires 64-bit)
+- [Windows 32-bit](https://go.microsoft.com/fwlink/?linkid=2174159)
+
 ##### v3
 
 - [Windows 64-bit](https://go.microsoft.com/fwlink/?linkid=2135274) (VS Code debugging requires 64-bit)
 - [Windows 32-bit](https://go.microsoft.com/fwlink/?linkid=2135275)
 
 #### To install with npm:
+
+##### v4
+```bash
+npm i -g azure-functions-core-tools@4 --unsafe-perm true
+```
 
 ##### v3
 ```bash
@@ -61,6 +73,13 @@ choco install azure-functions-core-tools-2
 ### Mac
 
 #### Homebrew:
+
+#### v4
+    
+```bash
+brew tap azure/functions
+brew install azure-functions-core-tools@4
+```
 
 ##### v3
 ```bash
@@ -134,6 +153,12 @@ sudo chown root:root /etc/apt/sources.list.d/microsoft-prod.list
 ```
 
 #### 2. Install
+
+##### v4
+```bash
+sudo apt-get update
+sudo apt-get install azure-functions-core-tools-4
+```
 
 ##### v3
 ```bash

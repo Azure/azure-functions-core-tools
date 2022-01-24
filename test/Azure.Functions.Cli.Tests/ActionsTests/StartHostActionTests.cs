@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
     public class StartHostActionTests : IDisposable
     {
         [SkippableFact]
-        public async Task CheckNonOptionalSettingsThrowsOnMissingAzureWebJobsStorage()
+        public async Task CheckNonOptionalSettingsThrowsOnMissingAzureWebJobsStorageAndManagedIdentity()
         {
             Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
                 reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
@@ -46,6 +46,37 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             exception.Should().BeOfType<CliException>();
             exception.Message.Should().Contain($"Missing value for AzureWebJobsStorage in local.settings.json. " +
                 $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}.");
+        }
+
+        [Fact]
+        public async Task CheckNonOptionalSettingsDoesntThrowMissingStorageUsingManagedIdentity()
+        {
+            Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
+                reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
+            var fileSystem = GetFakeFileSystem(new[]
+                {
+                ("x:\\folder1", "{'bindings': [{'type': 'blobTrigger'}]}"),
+                ("x:\\folder2", "{'bindings': [{'type': 'httpTrigger'}]}")
+            });
+
+            var secrets = new Dictionary<string, string>()
+            {
+                { "AzureWebJobsStorage:blobServiceUri", "myuri" },
+                { "AzureWebJobsStorage__queueServiceUri", "queueuri" }
+            };
+
+            FileSystemHelpers.Instance = fileSystem;
+
+            Exception exception = null;
+            try
+            {
+                await StartHostAction.CheckNonOptionalSettings(secrets, "x:\\");
+            }
+            catch (Exception e)
+            {
+                exception = e;
+            }
+            exception.Should().BeNull();
         }
 
         [Fact]
@@ -99,7 +130,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         public async Task CheckNonOptionalSettingsPrintsWarningForMissingSettings()
         {
             Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
-                reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failling");
+                reason: "Environment.CurrentDirectory throws in linux in test cases for some reason. Revisit this once we figure out why it's failing");
 
             var fileSystem = GetFakeFileSystem(new[]
             {

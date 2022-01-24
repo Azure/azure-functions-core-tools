@@ -27,7 +27,9 @@ namespace Build
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
                 .Then(Test)
+                .Then(GenerateSBOMManifestForZips, skip: !args.Contains("--generateSBOM"))
                 .Then(Zip)
+                .Then(DeleteSBOMTelemetryFolder, skip: !args.Contains("--generateSBOM"))
                 .Then(UploadToStorage, skip: !args.Contains("--ci"))
                 .Run();
         }
