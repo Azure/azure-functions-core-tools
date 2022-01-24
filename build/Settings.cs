@@ -166,6 +166,7 @@ namespace Build
             public static readonly string[] thirdPartyBinaries = new[] {
                 "AccentedCommandLineParser.dll",
                 "Autofac.dll",
+                "Azure.Security.KeyVault.*",
                 "BouncyCastle.Crypto.dll",
                 "Colors.Net.dll",
                 "DotNetZip.dll",
