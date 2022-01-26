@@ -72,13 +72,13 @@ choco install azure-functions-core-tools-2
 
 #### To install with winget:
 
-#### v4
+##### v4
 
 ```bash
 winget install Microsoft.AzureFunctionsCoreTools
 ```
 
-#### v3
+##### v3
 
 ```bash
 winget install Microsoft.AzureFunctionsCoreTools -v 3.0.3904
