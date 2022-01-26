@@ -88,7 +88,7 @@ winget install Microsoft.AzureFunctionsCoreTools -v 3.0.3904
 
 #### Homebrew:
 
-#### v4
+##### v4
     
 ```bash
 brew tap azure/functions
