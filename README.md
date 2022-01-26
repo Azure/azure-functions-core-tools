@@ -70,6 +70,20 @@ choco install azure-functions-core-tools-3 --params "'/x64'"
 choco install azure-functions-core-tools-2
 ```
 
+#### To install with winget:
+
+#### v4
+
+```bash
+winget install Microsoft.AzureFunctionsCoreTools
+```
+
+#### v3
+
+```bash
+winget install Microsoft.AzureFunctionsCoreTools -v 3.0.3904
+```
+
 ### Mac
 
 #### Homebrew:
