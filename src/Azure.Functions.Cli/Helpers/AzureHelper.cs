@@ -391,7 +391,7 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         internal static async Task WaitUntilFunctionAppReadyAsync(Site functionApp, string accessToken, string managementURL,
-            bool showKeys, HttpMessageHandler messageHandler = null)
+            HttpMessageHandler messageHandler = null)
         {
             var masterKey = await GetMasterKeyAsync(functionApp.SiteId, accessToken, managementURL);
 
@@ -457,7 +457,7 @@ namespace Azure.Functions.Cli.Helpers
             if (functionApp.IsKubeApp)
             {
                 ColoredConsole.Write("Waiting for the functions host up and running ");
-                await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL, showKeys);
+                await WaitUntilFunctionAppReadyAsync(functionApp, accessToken, managementURL);
             }
 
             ArmArrayWrapper<FunctionInfo> functions = await GetFunctions(functionApp, accessToken, managementURL);
