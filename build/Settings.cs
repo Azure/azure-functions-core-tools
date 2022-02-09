@@ -70,7 +70,7 @@ namespace Build
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
                     { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
-                    // NOTE: arm support wasn't added until PowerShell 7.2
+                    // NOTE: PowerShell 7.0 does not support arm. First version supporting it is 7.2
                     // https://docs.microsoft.com/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#installation-via-direct-download
                     // That being said, we might as well include "osx" and "unix" since it'll hardly affect package size and should lead to more accurate error messages
                     { "osx-arm64", new [] { "osx", "unix" } }
