@@ -1,7 +1,4 @@
 {
-    // Use IntelliSense to find out which attributes exist for C# debugging
-    // Use hover for the description of the existing attributes
-    // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
     "version": "0.2.0",
     "configurations": [
         {
@@ -10,25 +7,27 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceRoot}/src/Azure.Functions.Cli/bin/Debug/netcoreapp2.0/func.dll",
+            "program": "${workspaceFolder}/src/Azure.Functions.Cli/bin/Debug/netcoreapp3.1/func.dll",
             "env": {
                 "CLI_DEBUG": "1"
             },
-            "args": [
-                "azure",
-                "login"
-            ],
-            "cwd": "${workspaceRoot}/src/Azure.Functions.Cli",
-            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
+            "args": "${input:funcArgs}",
+            "cwd": "${workspaceFolder}/src/Azure.Functions.Cli",
             "console": "internalConsole",
-            "stopAtEntry": false,
-            "internalConsoleOptions": "openOnSessionStart"
+            "stopAtEntry": false
         },
         {
             "name": ".NET Core Attach",
             "type": "coreclr",
-            "request": "attach",
-            "processId": "${command:pickProcess}"
+            "request": "attach"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "funcArgs",
+            "type": "promptString",
+            "description": "Args to pass to the 'func' command",
+            "default": "--version"
         }
     ]
 }

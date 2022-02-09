@@ -127,7 +127,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     var displayList = _templates.Value
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
-                            .Distinct()
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToArray();
                     if (displayList.Length == 1)
                     {

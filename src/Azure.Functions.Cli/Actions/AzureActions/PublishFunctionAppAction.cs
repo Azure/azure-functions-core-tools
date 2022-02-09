@@ -36,6 +36,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         public bool ListIgnoredFiles { get; set; }
         public bool ListIncludedFiles { get; set; }
         public bool RunFromPackageDeploy { get; private set; }
+        public bool ShowKeys { get; set; }
         public bool Force { get; set; }
         public bool Csx { get; set; }
         public bool BuildNativeDeps { get; set; }
@@ -94,6 +95,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("no-bundler")
                 .WithDescription("[Deprecated] Skips generating a bundle when publishing python function apps with build-native-deps.")
                 .Callback(nb => ColoredConsole.WriteLine(WarningColor($"Warning: Argument {AdditionalInfoColor("--no-bundler")} is deprecated and a no-op. Python function apps are not bundled anymore.")));
+            Parser
+                .Setup<bool>("show-keys")
+                .WithDescription("Adds function keys to the URLs displayed in the logs.")
+                .Callback(sk => ShowKeys = sk)
+                .SetDefault(false);
             Parser
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
@@ -492,7 +498,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (!(functionApp.IsLinux && functionApp.IsElasticPremium)
                 && !(isFunctionAppDedicatedLinux && PublishBuildOption == BuildOption.Remote))
             {
-                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
+                await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: ShowKeys);
             }
         }
 
