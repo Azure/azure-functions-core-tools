@@ -4,7 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>func</AssemblyName>
 
-    <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
 
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
     <MajorMinorProductVersion>4.0</MajorMinorProductVersion>

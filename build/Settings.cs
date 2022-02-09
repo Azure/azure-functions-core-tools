@@ -44,6 +44,7 @@ namespace Build
             "min.win-x64",
             "linux-x64",
             "osx-x64",
+            "osx-arm64",
             "win-x86",
             "win-x64" };
 
@@ -53,6 +54,7 @@ namespace Build
             { "win-x64", "WINDOWS" },
             { "linux-x64", "LINUX" },
             { "osx-x64", "OSX" },
+            { "osx-arm64", "OSX" },
             { "min.win-x86", "WINDOWS" },
             { "min.win-x64", "WINDOWS" },
         };
@@ -67,7 +69,11 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } }
+                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
+                    // NOTE: PowerShell 7.0 does not support arm. First version supporting it is 7.2
+                    // https://docs.microsoft.com/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#installation-via-direct-download
+                    // That being said, we might as well include "osx" and "unix" since it'll hardly affect package size and should lead to more accurate error messages
+                    { "osx-arm64", new [] { "osx", "unix" } }
                 }
             },
             {
@@ -77,7 +83,8 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } }
+                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
+                    { "osx-arm64", new [] { "osx", "osx-arm64", "unix" } }
                 }
             }
         };

@@ -27,7 +27,11 @@ let platform = '';
 if (os.platform() === 'win32') {
     platform = 'win-x64';
 } else if (os.platform() === 'darwin') {
-    platform = 'osx-x64';
+    if (os.arch() === 'arm64') {
+        platform = 'osx-arm64';
+    } else {
+        platform = 'osx-x64';
+    }
 } else if (os.platform() === 'linux') {
     platform = 'linux-x64';
 } else {
