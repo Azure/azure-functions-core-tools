@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 # same for all different OSes
-PACKAGENAME = "azure-functions-core-tools-4"
+PACKAGENAME = "azure-functions-core-tools"
 CMD = "func"
 ARTIFACTFOLDER = "artifact"
 BUILDFOLDER = "build"
