@@ -14,4 +14,4 @@
 * @michaelpeng36 @AnatoliB
 
 # Adding codeowner for Language specific files such that GitHub automatically adds language owners as a reviewers.
-src/Azure.Functions.Cli/Azure.Functions.Cli.csproj @vrdmr @Francisco-Gamino @amamounelsayed @alrod @michaelpeng36 @AnatoliB
+src/Azure.Functions.Cli/Azure.Functions.Cli.csproj @vrdmr @gavin-aguiar @YunchuWang @Francisco-Gamino @michaelpeng36 @AnatoliB @ejizba @alrod @kaibocai @shreyas-gopalakrishna @amamounelsayed
