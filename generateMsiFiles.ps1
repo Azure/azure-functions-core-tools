@@ -41,9 +41,12 @@ $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVer
     $fragmentPath = "$buildDir\$fragmentName.wxs"
     $msiPath = "$artifactsPath\$msiName.msi"
 
-    & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
-    & { candle -arch $platform -dPlatform='$platform' -dSource='.' -dProductVersion='$cliVersion' $masterWxsPath $fragmentPath }
-    & { light -ext WixUIExtension -out $msiPath -sice:ICE61 $masterWxsName.wixobj $fragmentName.wixobj }
+    & {
+        heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source
+        candle -arch $platform -dPlatform="$platform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath
+        light -ext WixUIExtension -out $msiPath -sice:ICE61 $masterWxsName.wixobj $fragmentName.wixobj
+    }
+    if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)}
 
     Set-Location $baseDir
     Get-ChildItem -Path $targetDir -Recurse | Remove-Item -Force -Recurse -ea SilentlyContinue
