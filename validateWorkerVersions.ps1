@@ -39,10 +39,15 @@ function getPackageVersion([string]$packageName, [string]$csprojContent)
     return $version
 }
 
-function setCliPackageVersion([string]$packageName, [string]$version)
+function setCliPackageVersion([string]$packageName, [string]$newVersion)
 {
     $node = $cliCsprojXml.SelectSingleNode("/Project//PackageReference[@Include='$packageName']")
-    $node.Version = $version
+    if (-Not $node) {
+        throw "Failed to find reference for package $packageName"
+    }
+    $oldVersion = $node.Version
+    $node.Version = $newVersion
+    Write-Output "Updated $packageName from $oldVersion to $newVersion"
 }
 
 $hostPackageName = "Microsoft.Azure.WebJobs.Script.WebHost"
@@ -52,9 +57,12 @@ if (-Not $hostVersion) {
     setCliPackageVersion $hostPackageName $hostVersion
 }
 
-$hostRepoUrlBase = "https://raw.githubusercontent.com/Azure/azure-functions-host/v$hostVersion"
-$hostCsprojContent = removeBomIfExists((Invoke-WebRequest -Uri "$hostRepoUrlBase/src/WebJobs.Script/WebJobs.Script.csproj").Content)
-$pythonPropsContent = removeBomIfExists((Invoke-WebRequest -Uri "$hostRepoUrlBase/build/python.props").Content)
+function getHostFileContent([string]$filePath) {
+    $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/v$hostVersion/$filePath"
+    return removeBomIfExists((Invoke-WebRequest -Uri $uri -MaximumRetryCount 5 -RetryIntervalSec 2).Content)
+}
+$hostCsprojContent = getHostFileContent "src/WebJobs.Script/WebJobs.Script.csproj"
+$pythonPropsContent = getHostFileContent "build/python.props"
 
 $workers = "JavaWorker", "NodeJsWorker", "PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PythonWorker"
 
