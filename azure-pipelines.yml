@@ -85,6 +85,9 @@ jobs:
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
   - pwsh: |
+      .\validateWorkerVersions.ps1
+    displayName: 'Validate worker versions'
+  - pwsh: |
       .\build.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
