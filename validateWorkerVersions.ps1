@@ -64,7 +64,7 @@ function getHostFileContent([string]$filePath) {
 $hostCsprojContent = getHostFileContent "src/WebJobs.Script/WebJobs.Script.csproj"
 $pythonPropsContent = getHostFileContent "build/python.props"
 
-$workers = "JavaWorker", "NodeJsWorker", "PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PythonWorker"
+$workers = "JavaWorker", "NodeJsWorker", "PowerShellWorker.PS6", "PowerShellWorker.PS7", "PythonWorker"
 
 $failedValidation = $false
 foreach($worker in $workers) {
