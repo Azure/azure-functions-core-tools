@@ -303,7 +303,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var secret in secrets)
             {
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
+                if (string.IsNullOrEmpty(secret.Key)) {
+                    ColoredConsole.WriteLine(WarningColor($"Skipping local setting with empty key."));
+                }
+                else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Skipping '{secret.Key}' from local settings as it's already defined in current environment variables."));
                 }
