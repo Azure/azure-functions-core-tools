@@ -24,17 +24,26 @@ namespace Azure.Functions.Cli.Common
         {
             foreach (var key in settings.Keys.ToList())
             {
-                var keyVaultValue = GetSecretValue(settings[key]);
-                if (keyVaultValue != null)
+                try
                 {
-                    settings[key] = keyVaultValue;
+                    var keyVaultValue = GetSecretValue(key, settings[key]);
+                    if (keyVaultValue != null)
+                    {
+                        settings[key] = keyVaultValue;
+                    }
                 }
+                catch
+                {
+                    // Do not block StartHostAction if secret cannot be resolved: instead, skip it
+                    // and attempt to resolve other secrets
+                    continue;
+                }   
             }
         }
 
-        private string GetSecretValue(string value)
+        private string GetSecretValue(string key, string value)
         {
-            var result = ParseSecret(value);
+            var result = ParseSecret(key, value);
 
             if (result != null)
             {
@@ -46,7 +55,7 @@ namespace Azure.Functions.Cli.Common
             return null;
         }
 
-        private ParseSecretResult ParseSecret(string value)
+        internal ParseSecretResult ParseSecret(string key, string value)
         {
             // If the value is null, then we return nothing, as the subsequent call to
             // UpdateEnvironmentVariables(settings) will log to the user that the setting
@@ -66,14 +75,14 @@ namespace Azure.Functions.Cli.Common
                 // the supported formats, we write a warning to the console.
                 if (result == null)
                 {
-                    ColoredConsole.WriteLine(WarningColor($"Unable to parse the Key Vault reference: {value}"));
+                    ColoredConsole.WriteLine(WarningColor($"Unable to parse the Key Vault reference for setting: {key}"));
                 }
                 return result;
             }
             return null;
         }
 
-        private ParseSecretResult ParsePrimaryRegexSecret(string value)
+        internal ParseSecretResult ParsePrimaryRegexSecret(string value)
         {
             var match = PrimaryReferenceStringRegex.Match(value);
             if (match.Success)
@@ -88,7 +97,7 @@ namespace Azure.Functions.Cli.Common
             return null;
         }
 
-        private ParseSecretResult ParseSecondaryRegexSecret(string value)
+        internal ParseSecretResult ParseSecondaryRegexSecret(string value)
         {
             var altMatch = SecondaryReferenceStringRegex.Match(value);
             if (altMatch.Success)
@@ -107,7 +116,7 @@ namespace Azure.Functions.Cli.Common
             return clients.GetOrAdd(vaultUri.ToString(), _ => new SecretClient(vaultUri, credential));
         }
 
-        private class ParseSecretResult
+        internal class ParseSecretResult
         {
             public Uri Uri { get; set; }
             public string Name { get; set; }
