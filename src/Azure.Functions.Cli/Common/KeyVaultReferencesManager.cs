@@ -14,9 +14,9 @@ namespace Azure.Functions.Cli.Common
     class KeyVaultReferencesManager
     {
         private const string vaultUriSuffix = "vault.azure.net";
-        private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(\S*\)$", RegexOptions.Compiled);
-        private static readonly Regex PrimaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(SecretUri=(?<VaultUri>https://[^\s/]+)/(?<Secrets>[^\s/]+)/(?<SecretName>[^\s/]+)/(?<Version>[^\s/]+)\)$", RegexOptions.Compiled);
-        private static readonly Regex SecondaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(VaultName=(?<VaultName>[^\s;]+);SecretName=(?<SecretName>[^\s;]+)\)$", RegexOptions.Compiled); 
+        private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\((?<ReferenceString>\S*)\)$", RegexOptions.Compiled);
+        private static readonly Regex PrimaryReferenceStringRegex = new Regex(@"^SecretUri=(?<VaultUri>https://[^\s/]+)/(?<Secrets>[^\s/]+)/(?<SecretName>[^\s/]+)/(?<Version>[^\s/]+)$", RegexOptions.Compiled);
+        private static readonly Regex SecondaryReferenceStringRegex = new Regex(@"^VaultName=(?<VaultName>[^\s;]+);SecretName=(?<SecretName>[^\s;]+)$", RegexOptions.Compiled); 
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
         private readonly TokenCredential credential = new DefaultAzureCredential();
 
@@ -56,11 +56,12 @@ namespace Azure.Functions.Cli.Common
             {
                 return null;
             }
-
             // Determine if the secret value is attempting to use a key vault reference
-            if (BasicKeyVaultReferenceRegex.Match(value).Success)
+            var keyVaultReferenceMatch = BasicKeyVaultReferenceRegex.Match(value);
+            if (keyVaultReferenceMatch.Success)
             {
-                var result = ParsePrimaryRegexSecret(value) ?? ParseSecondaryRegexSecret(value);
+                var referenceString = keyVaultReferenceMatch.Groups["ReferenceString"].Value;
+                var result = ParsePrimaryRegexSecret(referenceString) ?? ParseSecondaryRegexSecret(referenceString);
                 // If we detect that a key vault reference was attempted, but did not match any of
                 // the supported formats, we write a warning to the console.
                 if (result == null)
@@ -74,7 +75,7 @@ namespace Azure.Functions.Cli.Common
 
         private ParseSecretResult ParsePrimaryRegexSecret(string value)
         {
-            var match = PrimaryKeyVaultReferenceRegex.Match(value);
+            var match = PrimaryReferenceStringRegex.Match(value);
             if (match.Success)
             {
                 return new ParseSecretResult
@@ -89,7 +90,7 @@ namespace Azure.Functions.Cli.Common
 
         private ParseSecretResult ParseSecondaryRegexSecret(string value)
         {
-            var altMatch = SecondaryKeyVaultReferenceRegex.Match(value);
+            var altMatch = SecondaryReferenceStringRegex.Match(value);
             if (altMatch.Success)
             {
                 return new ParseSecretResult
