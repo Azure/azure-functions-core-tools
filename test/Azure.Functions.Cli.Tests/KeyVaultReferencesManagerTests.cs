@@ -12,23 +12,21 @@ namespace Azure.Functions.Cli.Tests
 {
     public class KeyVaultReferencesManagerTests
     {
-        private static IDictionary<string, string> _settings = new Dictionary<string, string>
-        {
-            { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-        };
+        private IDictionary<string, string> _settings;
 
         private readonly KeyVaultReferencesManager _keyVaultReferencesManager = new KeyVaultReferencesManager();
 
         [Theory]
-        [InlineData(null, null)]
         [InlineData("", null)]
-        [InlineData(null, "")]
         [InlineData("testKey", null)]
         [InlineData("testKey", "")]
-        [InlineData(null, "testValue")]
         [InlineData("testKey", "testValue")]
         public void ResolveKeyVaultReferencesDoesNotThrow(string key, string value)
         {
+            _settings = new Dictionary<string, string>
+            {
+                { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
+            };
             _settings.Add(key, value);
             Exception exception = null;
             try
@@ -74,10 +72,11 @@ namespace Azure.Functions.Cli.Tests
         // See https://docs.microsoft.com/en-us/azure/app-service/app-service-key-vault-references
         // for more detail on supported key vault reference syntax.
         [Theory]
-        [InlineData("https://sampleURL/secrets/mysecret/", true)]
-        [InlineData("https://sampleURL/secrets/mysecret/version", true)]
+        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/version", true)]
         [InlineData("VaultName=sampleVault;SecretName=mysecret", false)]
         [InlineData("VaultName=sampleVault;SecretName=mysecret;SecretVersion=secretVersion", false)]
+        // The below syntax is not yet supported in Core Tools
+        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/", false)]
         public void PrimaryReferenceStringRegexMatchesAppropriately(string value, bool shouldMatch)
         {
             var match = _keyVaultReferencesManager.ParsePrimaryRegexSecret(value) != null;
@@ -85,10 +84,11 @@ namespace Azure.Functions.Cli.Tests
         }
 
         [Theory]
-        [InlineData("https://sampleURL/secrets/mysecret/", false)]
-        [InlineData("https://sampleURL/secrets/mysecret/version", false)]
+        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/", false)]
+        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/version", false)]
         [InlineData("VaultName=sampleVault;SecretName=mysecret", true)]
-        [InlineData("VaultName=sampleVault;SecretName=mysecret;SecretVersion=secretVersion", true)]
+        // The below syntax is not yet supported in Core Tools
+        [InlineData("VaultName=sampleVault;SecretName=mysecret;SecretVersion=secretVersion", false)]
         public void SecondaryReferenceStringRegexMatchesAppropriately(string value, bool shouldMatch)
         {
             var match = _keyVaultReferencesManager.ParseSecondaryRegexSecret(value) != null;
