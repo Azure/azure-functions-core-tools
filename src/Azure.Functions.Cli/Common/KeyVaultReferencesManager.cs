@@ -67,6 +67,7 @@ namespace Azure.Functions.Cli.Common
                 if (result == null)
                 {
                     ColoredConsole.WriteLine(WarningColor($"Unable to parse the Key Vault reference: {value}"));
+                    ColoredConsole.WriteLine(AdditionalInfoColor("Please see https://docs.microsoft.com/en-us/azure/app-service/app-service-key-vault-references for more detail on Key Vault reference syntax."));
                 }
                 return result;
             }
@@ -90,13 +91,14 @@ namespace Azure.Functions.Cli.Common
 
         private ParseSecretResult ParseSecondaryRegexSecret(string value)
         {
-            var altMatch = SecondaryReferenceStringRegex.Match(value);
-            if (altMatch.Success)
+            var match = SecondaryReferenceStringRegex.Match(value);
+            if (match.Success)
             {
                 return new ParseSecretResult
                 {
-                    Uri = new Uri($"https://{altMatch.Groups["VaultName"]}.{vaultUriSuffix}"),
-                    Name = altMatch.Groups["SecretName"].Value
+                    Uri = new Uri($"https://{match.Groups["VaultName"]}.{vaultUriSuffix}"),
+                    Name = match.Groups["SecretName"].Value,
+                    Version = match.Groups["Version"].Value
                 };
             }
             return null;
