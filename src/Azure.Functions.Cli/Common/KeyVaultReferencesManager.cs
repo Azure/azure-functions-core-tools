@@ -14,9 +14,9 @@ namespace Azure.Functions.Cli.Common
     class KeyVaultReferencesManager
     {
         private const string vaultUriSuffix = "vault.azure.net";
-        private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\([\S]*\)$", RegexOptions.Compiled);
-        private static readonly Regex PrimaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(SecretUri=(?<VaultUri>https://[\S^/]+)/(?<Secrets>[\S^/]+)/(?<SecretName>[\S^/]+)/(?<Version>[\S^/]+)\)$", RegexOptions.Compiled);
-        private static readonly Regex SecondaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(VaultName=(?<VaultName>[\S^;]+);SecretName=(?<SecretName>[\S^;]+)\)$", RegexOptions.Compiled); 
+        private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(\S*\)$", RegexOptions.Compiled);
+        private static readonly Regex PrimaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(SecretUri=(?<VaultUri>https://[^\s/]+)/(?<Secrets>[^\s/]+)/(?<SecretName>[^\s/]+)/(?<Version>[^\s/]+)\)$", RegexOptions.Compiled);
+        private static readonly Regex SecondaryKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\(VaultName=(?<VaultName>[^\s;]+);SecretName=(?<SecretName>[^\s;]+)\)$", RegexOptions.Compiled); 
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
         private readonly TokenCredential credential = new DefaultAzureCredential();
 
@@ -65,7 +65,7 @@ namespace Azure.Functions.Cli.Common
                 // the supported formats, we write a warning to the console.
                 if (result == null)
                 {
-                    ColoredConsole.WriteLine(WarningColor($"Invalid Key Vault reference format: {value}"));
+                    ColoredConsole.WriteLine(WarningColor($"Unable to parse the Key Vault reference: {value}"));
                 }
                 return result;
             }
