@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Common
     {
         private const string vaultUriSuffix = "vault.azure.net";
         private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\((?<ReferenceString>\S*)\)$", RegexOptions.Compiled);
-        private static readonly Regex PrimaryReferenceStringRegex = new Regex(@"^SecretUri=(?<VaultUri>https://[^\s/]+)/(?<Secrets>[^\s/]+)/(?<SecretName>[^\s/]+)/(?<Version>[^\s/]+)$", RegexOptions.Compiled);
+        private static readonly Regex PrimaryReferenceStringRegex = new Regex(@"^SecretUri=(?<VaultUri>https://[^\s/]+)/secrets/(?<SecretName>[^\s/]+)/(?<Version>[^\s/]+)$", RegexOptions.Compiled);
         private static readonly Regex SecondaryReferenceStringRegex = new Regex(@"^VaultName=(?<VaultName>[^\s;]+);SecretName=(?<SecretName>[^\s;]+)$", RegexOptions.Compiled); 
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
         private readonly TokenCredential credential = new DefaultAzureCredential();
