@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("testKey", null)]
         [InlineData("testKey", "")]
         [InlineData("testKey", "testValue")]
+        [InlineData("testKey", "testValue: {\"nestedKey\": \"nestedValue\"}")]
         public void ResolveKeyVaultReferencesDoesNotThrow(string key, string value)
         {
             _settings = new Dictionary<string, string>
