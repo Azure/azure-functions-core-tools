@@ -65,7 +65,7 @@ namespace Azure.Functions.Cli.Common
                 // the supported formats, we write a warning to the console.
                 if (result == null)
                 {
-                    ColoredConsole.WriteLine(WarningColor($"Invalid Key Vault Reference format: {value}"));
+                    ColoredConsole.WriteLine(WarningColor($"Invalid Key Vault reference format: {value}"));
                 }
                 return result;
             }
