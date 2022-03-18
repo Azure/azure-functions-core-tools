@@ -72,27 +72,26 @@ namespace Azure.Functions.Cli.Tests
         // See https://docs.microsoft.com/en-us/azure/app-service/app-service-key-vault-references
         // for more detail on supported key vault reference syntax.
         [Theory]
-        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/version", true)]
-        [InlineData("VaultName=sampleVault;SecretName=mysecret", false)]
-        [InlineData("VaultName=sampleVault;SecretName=mysecret;SecretVersion=secretVersion", false)]
-        // The below syntax is not yet supported in Core Tools
-        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/", false)]
-        public void PrimaryReferenceStringRegexMatchesAppropriately(string value, bool shouldMatch)
+        [InlineData("SecretUri=https://sampleurl/secrets/mysecret/version", true, "https://sampleurl/", "mysecret", "version")]
+        [InlineData("SecretUri=https://sampleurl/secrets/mysecret/", true, "https://sampleurl/", "mysecret", null)]
+        [InlineData("VaultName=sampleVault;SecretName=mysecret", true, "https://samplevault.vault.azure.net/", "mysecret", null)]
+        [InlineData("VaultName=sampleVault;SecretName=mysecret;SecretVersion=secretVersion", true, "https://samplevault.vault.azure.net/", "mysecret", "secretVersion")]
+        public void ParseVaultReferenceMatchesFieldsAppropriately(
+            string vaultReference,
+            bool shouldMatch,
+            string expectedVaultUri = null,
+            string expectedSecretName = null,
+            string expectedVersion = null)
         {
-            var match = _keyVaultReferencesManager.ParsePrimaryRegexSecret(value) != null;
-            Assert.True(!(match ^ shouldMatch));
-        }
+            var matchResult = _keyVaultReferencesManager.ParseVaultReference(vaultReference);
 
-        [Theory]
-        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/", false)]
-        [InlineData("SecretUri=https://sampleURL/secrets/mysecret/version", false)]
-        [InlineData("VaultName=sampleVault;SecretName=mysecret", true)]
-        // The below syntax is not yet supported in Core Tools
-        [InlineData("VaultName=sampleVault;SecretName=mysecret;SecretVersion=secretVersion", false)]
-        public void SecondaryReferenceStringRegexMatchesAppropriately(string value, bool shouldMatch)
-        {
-            var match = _keyVaultReferencesManager.ParseSecondaryRegexSecret(value) != null;
-            Assert.True(!(match ^ shouldMatch));
+            Assert.True(!((matchResult != null) ^ shouldMatch));
+            if (shouldMatch)
+            {
+                Assert.Equal(matchResult.Uri.ToString(), expectedVaultUri);
+                Assert.Equal(matchResult.Name, expectedSecretName);
+                Assert.Equal(matchResult.Version, expectedVersion);
+            }
         }
     }
 }

@@ -15,8 +15,6 @@ namespace Azure.Functions.Cli.Common
     {
         private const string vaultUriSuffix = "vault.azure.net";
         private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\((?<ReferenceString>\S*)\)$", RegexOptions.Compiled);
-        private static readonly Regex PrimaryReferenceStringRegex = new Regex(@"^SecretUri=(?<VaultUri>https://[^\s/]+)/secrets/(?<SecretName>[^\s/]+)/(?<Version>[^\s/]+)$", RegexOptions.Compiled);
-        private static readonly Regex SecondaryReferenceStringRegex = new Regex(@"^VaultName=(?<VaultName>[^\s;]+);SecretName=(?<SecretName>[^\s;]+)$", RegexOptions.Compiled); 
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
         private readonly TokenCredential credential = new DefaultAzureCredential();
 
@@ -37,7 +35,7 @@ namespace Azure.Functions.Cli.Common
                     // Do not block StartHostAction if secret cannot be resolved: instead, skip it
                     // and attempt to resolve other secrets
                     continue;
-                }   
+                }
             }
         }
 
@@ -70,7 +68,7 @@ namespace Azure.Functions.Cli.Common
             if (keyVaultReferenceMatch.Success)
             {
                 var referenceString = keyVaultReferenceMatch.Groups["ReferenceString"].Value;
-                var result = ParsePrimaryRegexSecret(referenceString) ?? ParseSecondaryRegexSecret(referenceString);
+                var result = ParseVaultReference(referenceString);
                 // If we detect that a key vault reference was attempted, but did not match any of
                 // the supported formats, we write a warning to the console.
                 if (result == null)
@@ -82,31 +80,42 @@ namespace Azure.Functions.Cli.Common
             return null;
         }
 
-        internal ParseSecretResult ParsePrimaryRegexSecret(string value)
+        internal ParseSecretResult ParseVaultReference(string vaultReference)
         {
-            var match = PrimaryReferenceStringRegex.Match(value);
-            if (match.Success)
+            var secretUriString = GetValueFromVaultReference("SecretUri", vaultReference);
+            if (!string.IsNullOrEmpty(secretUriString))
+            {
+                var secretUri = new Uri(secretUriString);
+                var secretIdentifier = new KeyVaultSecretIdentifier(secretUri);
+                return new ParseSecretResult
+                {
+                    Uri = secretIdentifier.VaultUri,
+                    Name = secretIdentifier.Name,
+                    Version = secretIdentifier.Version
+                };
+            }
+            var vaultName = GetValueFromVaultReference("VaultName", vaultReference);
+            var secretName = GetValueFromVaultReference("SecretName", vaultReference);
+            var version = GetValueFromVaultReference("SecretVersion", vaultReference);
+            if (!string.IsNullOrEmpty(vaultName) && !string.IsNullOrEmpty(secretName))
             {
                 return new ParseSecretResult
                 {
-                    Uri = new Uri(match.Groups["VaultUri"].Value),
-                    Name = match.Groups["SecretName"].Value,
-                    Version = match.Groups["Version"].Value
+                    Uri = new Uri($"https://{vaultName}.{vaultUriSuffix}"),
+                    Name = secretName,
+                    Version = version
                 };
             }
             return null;
         }
 
-        internal ParseSecretResult ParseSecondaryRegexSecret(string value)
+        internal string GetValueFromVaultReference(string key, string vaultReference)
         {
-            var altMatch = SecondaryReferenceStringRegex.Match(value);
-            if (altMatch.Success)
+            var regex = new Regex(key + "=(?<Value>[^;]+)(;|$)");
+            var match = regex.Match(vaultReference);
+            if (match.Success)
             {
-                return new ParseSecretResult
-                {
-                    Uri = new Uri($"https://{altMatch.Groups["VaultName"]}.{vaultUriSuffix}"),
-                    Name = altMatch.Groups["SecretName"].Value
-                };
+                return match.Groups["Value"].Value;
             }
             return null;
         }
