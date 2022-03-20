@@ -209,7 +209,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         private async Task<TriggersPayload> GetTriggersLocalFiles()
         {
             var functionsPath = Environment.CurrentDirectory;
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
+                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
             {
                 if (DotnetHelpers.CanDotnetBuild())
                 {
@@ -219,16 +220,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
             }
 
-            var functionJsonFiles = FileSystemHelpers
-                    .GetDirectories(functionsPath)
-                    .Select(d => Path.Combine(d, "function.json"))
-                    .Where(FileSystemHelpers.FileExists)
-                    .Select(f => (filePath: f, content: FileSystemHelpers.ReadAllTextFromFile(f)));
-
-            var functionsJsons = functionJsonFiles
-                .Select(t => (filePath: t.filePath, jObject: JsonConvert.DeserializeObject<JObject>(t.content)))
-                .Where(b => b.jObject["bindings"] != null)
-                .ToDictionary(k => Path.GetFileName(Path.GetDirectoryName(k.filePath)), v => v.jObject);
+            var functionsJsons = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated
+                ? ReadFunctionsMetadata(functionsPath)
+                : ReadFunctionJsons(functionsPath);
 
             var hostJson = JsonConvert.DeserializeObject<JObject>(FileSystemHelpers.ReadAllTextFromFile("host.json"));
 
@@ -237,6 +231,37 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 HostJson = hostJson,
                 FunctionsJson = functionsJsons
             };
+        }
+
+        private static Dictionary<string, JObject> ReadFunctionsMetadata(string functionsPath)
+        {
+            var functionsMetadataPath = Path.Combine(functionsPath, "functions.metadata");
+
+            if (!FileSystemHelpers.FileExists(functionsMetadataPath))
+            {
+                return new();
+            }
+
+            var functionsMetadataContents = FileSystemHelpers.ReadAllTextFromFile(functionsMetadataPath);
+            var functionsMetadata = JsonConvert.DeserializeObject<JArray>(functionsMetadataContents);
+
+            return functionsMetadata
+                .Where(x => x["bindings"] != null)
+                .ToDictionary(k => k["name"].ToString(), v => v.ToObject<JObject>());
+        }
+
+        private static Dictionary<string, JObject> ReadFunctionJsons(string functionsPath)
+        {
+            var functionJsonFiles = FileSystemHelpers
+                .GetDirectories(functionsPath)
+                .Select(d => Path.Combine(d, "function.json"))
+                .Where(FileSystemHelpers.FileExists)
+                .Select(f => (filePath: f, content: FileSystemHelpers.ReadAllTextFromFile(f)));
+
+            return functionJsonFiles
+                .Select(t => (t.filePath, jObject: JsonConvert.DeserializeObject<JObject>(t.content)))
+                .Where(b => b.jObject["bindings"] != null)
+                .ToDictionary(k => Path.GetFileName(Path.GetDirectoryName(k.filePath)), v => v.jObject);
         }
 
         private async Task<(string, bool)> ResolveImageName()
