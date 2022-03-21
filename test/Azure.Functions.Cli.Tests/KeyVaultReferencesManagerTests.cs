@@ -74,9 +74,12 @@ namespace Azure.Functions.Cli.Tests
         // for more detail on supported key vault reference syntax.
         [Theory]
         [InlineData("SecretUri=https://sampleurl/secrets/mysecret/version", true, "https://sampleurl/", "mysecret", "version")]
+        [InlineData("SecretUri=https://sampleurl/secrets/mysecret/version;", true, "https://sampleurl/", "mysecret", "version")] // with semicolon at the end
         [InlineData("SecretUri=https://sampleurl/secrets/mysecret/", true, "https://sampleurl/", "mysecret", null)]
         [InlineData("VaultName=sampleVault;SecretName=mysecret", true, "https://samplevault.vault.azure.net/", "mysecret", null)]
+        [InlineData("VaultName=sampleVault;SecretName=mysecret;", true, "https://samplevault.vault.azure.net/", "mysecret", null)] // with semicolon at the end
         [InlineData("VaultName=sampleVault;SecretName=mysecret;SecretVersion=secretVersion", true, "https://samplevault.vault.azure.net/", "mysecret", "secretVersion")]
+        [InlineData("SecretName=mysecret;VaultName=sampleVault;SecretVersion=secretVersion", true, "https://samplevault.vault.azure.net/", "mysecret", "secretVersion")] // different order
         public void ParseVaultReferenceMatchesFieldsAppropriately(
             string vaultReference,
             bool shouldMatch,
