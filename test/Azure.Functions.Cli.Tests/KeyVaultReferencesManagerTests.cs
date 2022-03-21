@@ -45,8 +45,12 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("test", null, false)]
         [InlineData("test", "@Microsoft.KeyVault()", true)]
         [InlineData("test", "@Microsoft.KeyVault(string)", true)]
+        [InlineData("test", "@Microsoft.KeyVault(SecretUri=bad uri)", true)]
+        [InlineData("test", "@Microsoft.KeyVault(VaultName=vault;)", true)] // missing secret name
+        [InlineData("test", "@Microsoft.KeyVault(SecretName=vault;)", true)] // missing vault name
+        [InlineData("test", "@Microsoft-KeyVault()", false)] // hyphen instead of dot
         // Attempted Key Vault references are seen as those matching the regular expression
-        // "^@Microsoft.KeyVault(\S*)$".
+        // "^@Microsoft.KeyVault(.*)$".
         public void ParseSecretEmitsWarningWithUnsuccessullyMatchedKeyVaultReferences(string key, string value, bool attemptedKeyVaultReference)
         {
             var output = new StringBuilder();
