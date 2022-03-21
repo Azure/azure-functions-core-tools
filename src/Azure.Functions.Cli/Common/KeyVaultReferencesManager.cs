@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Common
     class KeyVaultReferencesManager
     {
         private const string vaultUriSuffix = "vault.azure.net";
-        private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft.KeyVault\((?<ReferenceString>\S*)\)$", RegexOptions.Compiled);
+        private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft\.KeyVault\((?<ReferenceString>.*)\)$", RegexOptions.Compiled);
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
         private readonly TokenCredential credential = new DefaultAzureCredential();
 
