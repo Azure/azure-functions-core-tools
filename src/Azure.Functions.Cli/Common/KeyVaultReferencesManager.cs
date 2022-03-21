@@ -68,7 +68,16 @@ namespace Azure.Functions.Cli.Common
             if (keyVaultReferenceMatch.Success)
             {
                 var referenceString = keyVaultReferenceMatch.Groups["ReferenceString"].Value;
-                var result = ParseVaultReference(referenceString);
+                ParseSecretResult result = null;
+                try
+                {
+                    result = ParseVaultReference(referenceString);
+                }
+                catch
+                {
+                    // ignore and show warning below
+                }
+
                 // If we detect that a key vault reference was attempted, but did not match any of
                 // the supported formats, we write a warning to the console.
                 if (result == null)
