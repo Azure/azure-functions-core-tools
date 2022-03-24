@@ -79,6 +79,11 @@ steps:
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
   displayName: 'Executing build script'
+- task: ComponentGovernanceComponentDetection@0
+  inputs:
+    scanType: 'Register'
+    verbosity: 'Verbose'
+    alertWarningLevel: 'High'
 - task: EsrpCodeSigning@1
   displayName: 'Authenticode signing'
   inputs:
