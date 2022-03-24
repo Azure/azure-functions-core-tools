@@ -92,6 +92,8 @@ namespace Azure.Functions.Cli.Helpers
                 "HttpTrigger",
                 "BlobTrigger",
                 "TimerTrigger",
+                "KafkaTrigger",
+                "KafkaOutput",
                 "DurableFunctionsOrchestration",
                 "SendGrid",
                 "EventHubTrigger",
