@@ -84,6 +84,7 @@ steps:
     scanType: 'Register'
     verbosity: 'Verbose'
     alertWarningLevel: 'High'
+  displayName: 'Component Governance Detection'
 - task: EsrpCodeSigning@1
   displayName: 'Authenticode signing'
   inputs:
