@@ -2,7 +2,8 @@
 
 |Branch|Status|
 |---|---|
-|master|[![Build Status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=master)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=master)
+|v4.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=v4.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=v4.x)|
+|v3.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=v3.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=v3.x)|
 |dev|[![Build Status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=dev)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=dev)
 |v1.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=v1.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=v1.x)|
 
@@ -14,7 +15,7 @@ The Azure Functions Core Tools provide a local development experience for creati
 
 **v1** (v1.x branch): Requires .NET 4.7.1 Windows Only
 
-**v2** (master branch): Self-contained cross-platform package
+**v2** (dev branch): Self-contained cross-platform package
 
 **v3**: (v3.x branch): Self-contained cross-platform package
 
