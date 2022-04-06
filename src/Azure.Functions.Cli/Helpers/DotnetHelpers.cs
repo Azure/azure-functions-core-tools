@@ -264,7 +264,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "templates");
 
-        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", "net5-isolated"));
+        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", "net6-isolated"));
 
         private static async Task DotnetTemplatesAction(string action, string templateDirectory)
         {

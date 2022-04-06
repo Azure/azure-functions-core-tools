@@ -240,7 +240,7 @@ namespace Build
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
-            var isolatedTemplatesPath = Path.Combine(templatesPath, "net5-isolated");
+            var isolatedTemplatesPath = Path.Combine(templatesPath, "net6-isolated");
 
             Directory.CreateDirectory(templatesPath);
             Directory.CreateDirectory(isolatedTemplatesPath);
