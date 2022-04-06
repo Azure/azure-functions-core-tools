@@ -20,10 +20,10 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "3.1.1733";
-        public const string DotnetIsolatedProjectTemplatesVersion = "3.1.1733";
-        public const string DotnetItemTemplatesVersion = "3.1.1648";
-        public const string DotnetProjectTemplatesVersion = "3.1.1648";
+        public const string DotnetIsolatedItemTemplatesVersion = "3.1.2040";
+        public const string DotnetIsolatedProjectTemplatesVersion = "3.1.2040";
+        public const string DotnetItemTemplatesVersion = "3.1.2040";
+        public const string DotnetProjectTemplatesVersion = "3.1.2040";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
