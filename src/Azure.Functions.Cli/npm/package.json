@@ -35,5 +35,8 @@
         "rimraf": "3.0.2",
         "tmp": "0.1.0",
         "unzipper": "0.10.10"
+    },
+    "publishConfig": {
+        "tag": "v3"
     }
 }
