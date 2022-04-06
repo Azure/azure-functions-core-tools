@@ -13,9 +13,9 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class KuduLiteDeploymentHelpers
     {
-        public static async Task<Dictionary<string, string>> GetAppSettings(HttpClient client)
+        public static async Task<Dictionary<string, object>> GetAppSettings(HttpClient client)
         {
-            return await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, "/api/settings");
+            return await InvokeRequest<Dictionary<string, object>>(client, HttpMethod.Get, "/api/settings");
         }
 
         public static async Task<DeployStatus> WaitForRemoteBuild(HttpClient client, Site functionApp)
@@ -51,17 +51,17 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
         {
-            var json = await InvokeRequest<List<Dictionary<string, string>>>(client, HttpMethod.Get, "/deployments");
+            var json = await InvokeRequest<List<Dictionary<string, object>>>(client, HttpMethod.Get, "/deployments");
 
             // Automatically ordered by received time
             var latestDeployment = json.First();
-            if (latestDeployment.TryGetValue("status", out string statusString))
+            if (latestDeployment.TryGetValue("status", out object statusObject))
             {
-                DeployStatus status = ConvertToDeployementStatus(statusString);
+                DeployStatus status = ConvertToDeploymentStatus(statusObject);
                 if (status == DeployStatus.Building || status == DeployStatus.Deploying
                  || status == DeployStatus.Success || status == DeployStatus.Failed)
                 {
-                    return latestDeployment["id"];
+                    return GetJsonPropertyStringValue(latestDeployment, "id");
                 }
             }
             return null;
@@ -69,13 +69,12 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
-            Dictionary<string, string> json = await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, $"/deployments/{id}");
-            if (!json.TryGetValue("status", out string statusString))
+            var json = await InvokeRequest<Dictionary<string, object>>(client, HttpMethod.Get, $"/deployments/{id}");
+            if (!json.TryGetValue("status", out object statusObject))
             {
                 return DeployStatus.Unknown;
             }
-
-            return ConvertToDeployementStatus(statusString);
+            return ConvertToDeploymentStatus(statusObject);
         }
 
         private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
@@ -83,20 +82,20 @@ namespace Azure.Functions.Cli.Helpers
             string logUrl = innerUrl != null ? innerUrl.ToString() : $"/deployments/{id}/log";
             StringBuilder sbLogger = innerLogger != null ? innerLogger : new StringBuilder();
 
-            var json = await InvokeRequest<List<Dictionary<string, string>>>(client, HttpMethod.Get, logUrl);
-            var logs = json.Where(dict => DateTime.Parse(dict["log_time"]) > lastUpdate || dict["details_url"] != null);
+            var json = await InvokeRequest<List<Dictionary<string, object>>>(client, HttpMethod.Get, logUrl);
+            var logs = json.Where(dict => DateTime.Parse(GetJsonPropertyStringValue(dict, "log_time")) > lastUpdate || dict["details_url"] != null);
             DateTime currentLogDatetime = lastUpdate;
 
             foreach (var log in logs)
             {
                 // Filter out details_url log
-                if (DateTime.Parse(log["log_time"]) > lastUpdate)
+                if (DateTime.Parse(GetJsonPropertyStringValue(log, "log_time")) > lastUpdate)
                 {
-                    sbLogger.AppendLine(log["message"]);
+                    sbLogger.AppendLine(GetJsonPropertyStringValue(log, "message"));
                 }
 
                 // Recursively log details_url from scm/api/deployments/xxx/log endpoint
-                if (log["details_url"] != null && Uri.TryCreate(log["details_url"], UriKind.Absolute, out Uri detailsUrl))
+                if (log["details_url"] != null && Uri.TryCreate(GetJsonPropertyStringValue(log, "details_url"), UriKind.Absolute, out Uri detailsUrl))
                 {
                     DateTime innerLogDatetime = await DisplayDeploymentLog(client, functionApp, id, currentLogDatetime, detailsUrl, sbLogger);
                     currentLogDatetime = innerLogDatetime > currentLogDatetime ? innerLogDatetime : currentLogDatetime;
@@ -105,7 +104,7 @@ namespace Azure.Functions.Cli.Helpers
 
             if (logs.LastOrDefault() != null)
             {
-                DateTime lastLogDatetime = DateTime.Parse(logs.Last()["log_time"]);
+                DateTime lastLogDatetime = DateTime.Parse(GetJsonPropertyStringValue(logs.Last(), "log_time"));
                 currentLogDatetime = lastLogDatetime > currentLogDatetime ? lastLogDatetime : currentLogDatetime;
             }
 
@@ -140,9 +139,16 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static DeployStatus ConvertToDeployementStatus(string statusString)
+        // Gets the string value of a JSON property
+        private static string GetJsonPropertyStringValue(Dictionary<string, object> json, string property)
         {
-            if (Enum.TryParse(statusString, out DeployStatus result))
+            return json[property].ToString();
+        }
+
+        private static DeployStatus ConvertToDeploymentStatus(object statusObject)
+        {
+            // We assume the statusObject can be converted to a string
+            if (Enum.TryParse(statusObject.ToString(), out DeployStatus result))
             {
                 return result;
             }
