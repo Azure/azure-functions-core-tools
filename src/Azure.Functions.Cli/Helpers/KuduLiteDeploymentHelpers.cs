@@ -1,5 +1,6 @@
 ﻿using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Models;
 using Colors.Net;
 using Newtonsoft.Json;
 using System;
@@ -51,31 +52,28 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
         {
-            var json = await InvokeRequest<List<Dictionary<string, string>>>(client, HttpMethod.Get, "/deployments");
+            var deployments = await InvokeRequest<List<DeploymentResponse>>(client, HttpMethod.Get, "/deployments");
 
             // Automatically ordered by received time
-            var latestDeployment = json.First();
-            if (latestDeployment.TryGetValue("status", out string statusString))
+            var latestDeployment = deployments.First();
+            DeployStatus? status = latestDeployment.Status;
+            if (status == DeployStatus.Building || status == DeployStatus.Deploying
+                || status == DeployStatus.Success || status == DeployStatus.Failed)
             {
-                DeployStatus status = ConvertToDeployementStatus(statusString);
-                if (status == DeployStatus.Building || status == DeployStatus.Deploying
-                 || status == DeployStatus.Success || status == DeployStatus.Failed)
-                {
-                    return latestDeployment["id"];
-                }
+                return latestDeployment.Id;
             }
             return null;
         }
 
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
-            Dictionary<string, string> json = await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, $"/deployments/{id}");
-            if (!json.TryGetValue("status", out string statusString))
+            var deploymentInfo = await InvokeRequest<DeploymentResponse>(client, HttpMethod.Get, $"/deployments/{id}");
+            DeployStatus? status = deploymentInfo.Status;
+            if (status == null)
             {
                 return DeployStatus.Unknown;
             }
-
-            return ConvertToDeployementStatus(statusString);
+            return status.Value;
         }
 
         private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
@@ -83,29 +81,29 @@ namespace Azure.Functions.Cli.Helpers
             string logUrl = innerUrl != null ? innerUrl.ToString() : $"/deployments/{id}/log";
             StringBuilder sbLogger = innerLogger != null ? innerLogger : new StringBuilder();
 
-            var json = await InvokeRequest<List<Dictionary<string, string>>>(client, HttpMethod.Get, logUrl);
-            var logs = json.Where(dict => DateTime.Parse(dict["log_time"]) > lastUpdate || dict["details_url"] != null);
+            var deploymentLogs = await InvokeRequest<List<DeploymentLogResponse>>(client, HttpMethod.Get, logUrl);
+            var newLogs = deploymentLogs.Where(deploymentLog => deploymentLog.LogTime > lastUpdate || !string.IsNullOrEmpty(deploymentLog.DetailsUrlString));
             DateTime currentLogDatetime = lastUpdate;
 
-            foreach (var log in logs)
+            foreach (var log in newLogs)
             {
                 // Filter out details_url log
-                if (DateTime.Parse(log["log_time"]) > lastUpdate)
+                if (log.LogTime > lastUpdate)
                 {
-                    sbLogger.AppendLine(log["message"]);
+                    sbLogger.AppendLine(log.Message);
                 }
 
                 // Recursively log details_url from scm/api/deployments/xxx/log endpoint
-                if (log["details_url"] != null && Uri.TryCreate(log["details_url"], UriKind.Absolute, out Uri detailsUrl))
+                if (!string.IsNullOrEmpty(log.DetailsUrlString) && Uri.TryCreate(log.DetailsUrlString, UriKind.Absolute, out Uri detailsUrl))
                 {
                     DateTime innerLogDatetime = await DisplayDeploymentLog(client, functionApp, id, currentLogDatetime, detailsUrl, sbLogger);
                     currentLogDatetime = innerLogDatetime > currentLogDatetime ? innerLogDatetime : currentLogDatetime;
                 }
             }
 
-            if (logs.LastOrDefault() != null)
+            if (newLogs.LastOrDefault() != null)
             {
-                DateTime lastLogDatetime = DateTime.Parse(logs.Last()["log_time"]);
+                DateTime lastLogDatetime = newLogs.Last().LogTime;
                 currentLogDatetime = lastLogDatetime > currentLogDatetime ? lastLogDatetime : currentLogDatetime;
             }
 
@@ -138,15 +136,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return default(T);
             }
-        }
-
-        private static DeployStatus ConvertToDeployementStatus(string statusString)
-        {
-            if (Enum.TryParse(statusString, out DeployStatus result))
-            {
-                return result;
-            }
-            return DeployStatus.Unknown;
         }
     }
 }
