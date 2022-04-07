@@ -1,5 +1,6 @@
 ﻿using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Models;
 using Colors.Net;
 using Newtonsoft.Json;
 using System;
@@ -13,9 +14,9 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class KuduLiteDeploymentHelpers
     {
-        public static async Task<Dictionary<string, object>> GetAppSettings(HttpClient client)
+        public static async Task<Dictionary<string, string>> GetAppSettings(HttpClient client)
         {
-            return await InvokeRequest<Dictionary<string, object>>(client, HttpMethod.Get, "/api/settings");
+            return await InvokeRequest<Dictionary<string, string>>(client, HttpMethod.Get, "/api/settings");
         }
 
         public static async Task<DeployStatus> WaitForRemoteBuild(HttpClient client, Site functionApp)
@@ -51,30 +52,28 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
         {
-            var json = await InvokeRequest<List<Dictionary<string, object>>>(client, HttpMethod.Get, "/deployments");
+            var deployments = await InvokeRequest<List<DeploymentResponse>>(client, HttpMethod.Get, "/deployments");
 
             // Automatically ordered by received time
-            var latestDeployment = json.First();
-            if (latestDeployment.TryGetValue("status", out object statusObject))
+            var latestDeployment = deployments.First();
+            DeployStatus? status = latestDeployment.Status;
+            if (status == DeployStatus.Building || status == DeployStatus.Deploying
+                || status == DeployStatus.Success || status == DeployStatus.Failed)
             {
-                DeployStatus status = ConvertToDeploymentStatus(statusObject);
-                if (status == DeployStatus.Building || status == DeployStatus.Deploying
-                 || status == DeployStatus.Success || status == DeployStatus.Failed)
-                {
-                    return GetJsonPropertyStringValue(latestDeployment, "id");
-                }
+                return latestDeployment.Id;
             }
             return null;
         }
 
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
-            var json = await InvokeRequest<Dictionary<string, object>>(client, HttpMethod.Get, $"/deployments/{id}");
-            if (!json.TryGetValue("status", out object statusObject))
+            var deploymentInfo = await InvokeRequest<DeploymentResponse>(client, HttpMethod.Get, $"/deployments/{id}");
+            var status = deploymentInfo.Status;
+            if (status == null)
             {
                 return DeployStatus.Unknown;
             }
-            return ConvertToDeploymentStatus(statusObject);
+            return status.Value;
         }
 
         private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
@@ -82,29 +81,29 @@ namespace Azure.Functions.Cli.Helpers
             string logUrl = innerUrl != null ? innerUrl.ToString() : $"/deployments/{id}/log";
             StringBuilder sbLogger = innerLogger != null ? innerLogger : new StringBuilder();
 
-            var json = await InvokeRequest<List<Dictionary<string, object>>>(client, HttpMethod.Get, logUrl);
-            var logs = json.Where(dict => DateTime.Parse(GetJsonPropertyStringValue(dict, "log_time")) > lastUpdate || dict["details_url"] != null);
+            var deploymentLogs = await InvokeRequest<List<DeploymentLogResponse>>(client, HttpMethod.Get, logUrl);
+            var newLogs = deploymentLogs.Where(deploymentLog => deploymentLog.LogTime > lastUpdate || !string.IsNullOrEmpty(deploymentLog.DetailsUrlString));
             DateTime currentLogDatetime = lastUpdate;
 
-            foreach (var log in logs)
+            foreach (var log in newLogs)
             {
                 // Filter out details_url log
-                if (DateTime.Parse(GetJsonPropertyStringValue(log, "log_time")) > lastUpdate)
+                if (log.LogTime > lastUpdate)
                 {
-                    sbLogger.AppendLine(GetJsonPropertyStringValue(log, "message"));
+                    sbLogger.AppendLine(log.Message);
                 }
 
                 // Recursively log details_url from scm/api/deployments/xxx/log endpoint
-                if (log["details_url"] != null && Uri.TryCreate(GetJsonPropertyStringValue(log, "details_url"), UriKind.Absolute, out Uri detailsUrl))
+                if (!string.IsNullOrEmpty(log.DetailsUrlString) && Uri.TryCreate(log.DetailsUrlString, UriKind.Absolute, out Uri detailsUrl))
                 {
                     DateTime innerLogDatetime = await DisplayDeploymentLog(client, functionApp, id, currentLogDatetime, detailsUrl, sbLogger);
                     currentLogDatetime = innerLogDatetime > currentLogDatetime ? innerLogDatetime : currentLogDatetime;
                 }
             }
 
-            if (logs.LastOrDefault() != null)
+            if (newLogs.LastOrDefault() != null)
             {
-                DateTime lastLogDatetime = DateTime.Parse(GetJsonPropertyStringValue(logs.Last(), "log_time"));
+                DateTime lastLogDatetime = newLogs.Last().LogTime;
                 currentLogDatetime = lastLogDatetime > currentLogDatetime ? lastLogDatetime : currentLogDatetime;
             }
 
@@ -137,22 +136,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return default(T);
             }
-        }
-
-        // Gets the string value of a JSON property
-        private static string GetJsonPropertyStringValue(Dictionary<string, object> json, string property)
-        {
-            return json[property].ToString();
-        }
-
-        private static DeployStatus ConvertToDeploymentStatus(object statusObject)
-        {
-            // We assume the statusObject can be converted to a string
-            if (Enum.TryParse(statusObject.ToString(), out DeployStatus result))
-            {
-                return result;
-            }
-            return DeployStatus.Unknown;
         }
     }
 }
