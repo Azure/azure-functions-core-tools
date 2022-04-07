@@ -68,7 +68,7 @@ namespace Azure.Functions.Cli.Helpers
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
             var deploymentInfo = await InvokeRequest<DeploymentResponse>(client, HttpMethod.Get, $"/deployments/{id}");
-            var status = deploymentInfo.Status;
+            DeployStatus? status = deploymentInfo.Status;
             if (status == null)
             {
                 return DeployStatus.Unknown;
