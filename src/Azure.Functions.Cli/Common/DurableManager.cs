@@ -30,6 +30,8 @@ namespace Azure.Functions.Cli.Common
 
         private string _connectionStringKey;
 
+        private int? _partitionCount;
+
         public const string DefaultConnectionStringKey = "AzureWebJobsStorage";
 
         public const string DefaultTaskHubName = "DurableFunctionsHub";
@@ -80,6 +82,12 @@ namespace Azure.Functions.Cli.Common
                             ?? _connectionStringKey;
                         _taskHubName = durableTask.GetValue("HubName", StringComparison.OrdinalIgnoreCase)?.ToString()
                             ?? _taskHubName;
+
+                        if (durableTask.TryGetValue("storageProvider", StringComparison.OrdinalIgnoreCase, out JToken storageProviderToken))
+                        {
+                            JObject storageProviderObject = storageProviderToken as JObject;
+                            _partitionCount = storageProviderObject?.GetValue("partitionCount", StringComparison.OrdinalIgnoreCase)?.Value<int?>();
+                        }
                     }
                 }
                 else
@@ -109,6 +117,11 @@ namespace Azure.Functions.Cli.Common
                     TaskHubName = _taskHubName,
                     StorageConnectionString = connectionString,
                 };
+
+                if (_partitionCount.HasValue)
+                {
+                    settings.PartitionCount = _partitionCount.Value;
+                }
 
                 orchestrationService = new AzureStorageOrchestrationService(settings);
                 taskHubClient = new TaskHubClient(orchestrationService);
