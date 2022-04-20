@@ -166,6 +166,27 @@ jobs:
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+  - task: EsrpCodeSigning@1
+    displayName: 'Mac signing'
+    inputs:
+      ConnectedServiceName: 'ESRP Service'
+      FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Mac\'
+      Pattern: '*.zip'
+      signConfigType: 'inlineSignParams'
+      inlineOperation: |
+        [
+          {
+              "KeyCode" : "CP-401337-Apple",
+              "OperationCode" : "MacAppDeveloperSign",
+              "Parameters" : {},
+              "ToolName" : "sign",
+              "ToolVersion" : "1.0"
+          }
+        ]
+      SessionTimeout: '60'
+      MaxConcurrency: '50'
+      MaxRetryAttempts: '5'
+    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - pwsh: |
       .\repackageBinaries.ps1
     displayName: Repackage signed binaries

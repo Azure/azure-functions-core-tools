@@ -49,14 +49,14 @@ try
     }
 
     # Runtimes with signed binaries
-    $runtimesIdentifiers = @("min.win-x86","min.win-x64")
+    $runtimesIdentifiers = @("min.win-x86","min.win-x64", "osx-arm64", "osx-x64")
     $tempDirectory = New-Item $tempDirectoryPath -ItemType Directory
     LogSuccess "$tempDirectoryPath created"
 
     # Unzip the coretools artifact to add signed binaries
     foreach($rid in $runtimesIdentifiers)
     {
-        $files= Get-ChildItem -Recurse -Path "..\artifacts\*.zip"
+        $files= Get-ChildItem -Path "..\artifacts\*.zip"
         foreach($file in $files)
         {
             if ($file.Name.Contains($rid))
@@ -97,6 +97,15 @@ try
     {
         $sourcePath = $directory.FullName
         Copy-Item -Path $sourcePath -Destination $tempDirectoryPath -Recurse -Force
+    }
+
+    # mac signing requires the files to be in a zip to sign, so we have to extract the zip before copying over the signed files
+    $macZipFiles  = Get-ChildItem "..\artifacts\ToSign\Mac\*.zip"
+    foreach($macZipFile in $macZipFiles)
+    {
+        $macUnzippedDir = Join-Path $macZipFile.DirectoryName $macZipFile.BaseName
+        Unzip $macZipFile.FullName $macUnzippedDir
+        Copy-Item -Path $macUnzippedDir -Destination $tempDirectoryPath -Recurse -Force
     }
 
     $fileCountAfter = (Get-ChildItem $tempDirectoryPath -Recurse | Measure-Object).Count
