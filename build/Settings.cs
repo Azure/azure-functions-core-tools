@@ -145,7 +145,8 @@ namespace Build
             public static readonly string ToAuthenticodeSign = "Authenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string ToThirdPartySign = "ThirdParty";
-            public static readonly string[] RuntimesToSign = new string[] { "min.win-x86", "min.win-x64" };
+            public static readonly string ToMacSign = "Mac";
+            public static readonly string[] RuntimesToSign = new string[] { "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
             public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
@@ -153,6 +154,11 @@ namespace Build
                 "aspnetcorev2_inprocess.dll",
                 "Microsoft.AspNetCore.Buffering.dll",
                 "Microsoft.AspNetCore.Server.IIS.dll"
+            };
+
+            public static readonly string[] macBinaries = new[] {
+                "func",
+                "gozip"
             };
 
             public static readonly string[] authentiCodeBinaries = new[] {
