@@ -3,7 +3,9 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>func</AssemblyName>
+
     <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
     <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
     <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
@@ -12,6 +14,7 @@
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
     <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
     <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
+
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
@@ -21,10 +24,12 @@
     <RepositoryType>git</RepositoryType>
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+
     <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
+
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
@@ -33,6 +38,7 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
@@ -64,7 +70,7 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python38">
       <LogicalName>$(AssemblyName).Dockerfile.python38</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python39">
+      <EmbeddedResource Include="StaticResources\Dockerfile.python39">
       <LogicalName>$(AssemblyName).Dockerfile.python39</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
@@ -128,10 +134,10 @@
       <LogicalName>$(AssemblyName).keda-v2.yaml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ziptofs.sh">
-      <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
+        <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\getting_started_python_function.md">
-      <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
+        <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -163,6 +169,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.1567" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.0.0" />
   </ItemGroup>
+
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
       <Output TaskParameter="Include" ItemName="PublishReadyToRunExclude" />
