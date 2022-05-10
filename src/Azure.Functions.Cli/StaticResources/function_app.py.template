@@ -1,0 +1,74 @@
+import azure.functions as func
+
+app = func.FunctionApp()
+
+
+# To run wsgi app using new prog model python function, please uncomment below section and comment out rest of file
+# from flask import Flask, make_response, request
+# flask_app = Flask(__name__)
+# @flask_app.route("/")
+# def index():
+#     return (
+#         "Try /hello/Chris for parameterized Flask route.\n"
+#         "Try /module for module import guidance"
+#     )
+
+# @flask_app.route("/hello/<name>", methods=['GET','POST','DELETE'])
+# def hello(name: str):
+#     return f"hello {name}"
+# app = func.FunctionApp(wsgi_app=flask_app.wsgi_app, auth_level=func.AuthLevel.ANONYMOUS)
+
+
+# To run asgi app using new prog model python function, please uncomment below section and comment out rest of file
+# import fastapi
+# import json
+# import mimesis
+# from pydantic import BaseModel
+# fast_app = fastapi.FastAPI()
+# @fast_app.get("/hello")
+# async def get_food(
+#     name: str
+# ):
+#     return f"hello {name}"
+
+# class FoodItem(BaseModel):
+#     id: int
+#     vegetable: str
+#     dish: str
+#     drink: str
+
+# @fast_app.get("/hello")
+# async def get_food(
+#     name: str
+# ):
+#     return f"hello {name}"
+
+# @fast_app.get("/food/{food_id}")
+# async def get_food(
+#     food_id: int,
+# ):
+#     food = mimesis.Food()
+#     return {
+#         "food_id": food_id,
+#         "vegetable": food.vegetable(),
+#         "dish": food.dish(),
+#         "drink": food.drink(),
+#     }
+
+# @fast_app.post("/food/")
+# async def create_food(food: FoodItem):
+#     # Write the food item to the database here.
+#     return food
+
+# @fast_app.get("/users/{user_id}")
+# async def read_item(user_id: int, locale: Optional[str] = None):
+#     fake_user = mimesis.Person(locale=locale)
+#     return {
+#         "user_id": user_id,
+#         "username": fake_user.username(),
+#         "fullname": fake_user.full_name(),
+#         "age": fake_user.age(),
+#         "firstname": fake_user.first_name(),
+#         "lastname": fake_user.last_name(),
+#     }
+# app = func.FunctionApp(asgi_app=fast_app, auth_level=func.AuthLevel.ANONYMOUS)
