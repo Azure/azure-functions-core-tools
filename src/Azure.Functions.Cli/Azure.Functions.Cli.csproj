@@ -109,6 +109,9 @@
     <EmbeddedResource Include="StaticResources\funcignore">
       <LogicalName>$(AssemblyName).funcignore</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\function_app.py.template">
+      <LogicalName>$(AssemblyName).function_app.py</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\requirements.psd1">
       <LogicalName>$(AssemblyName).requirements.psd1</LogicalName>
     </EmbeddedResource>
