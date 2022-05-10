@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli
 {
     public static class StaticResources
     {
-        private static async Task<string> GetValue(string name)
+        public static async Task<string> GetValue(string name)
         {
             var assembly = typeof(StaticResources).Assembly;
             var resourceName = $"{assembly.GetName().Name}.{name}";

@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
         public const string PythonGettingStarted = "getting_started.md";
+        public const string PySteinFunctionAppPy = "function_app.py";
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
         public const string ProxiesJsonFileName = "proxies.json";
@@ -30,6 +31,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsExtensionVersion = "FUNCTIONS_EXTENSION_VERSION";
         public const string StorageEmulatorConnectionString = "UseDevelopmentStorage=true";
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
+        public const string AzureWebJobsFeatureFlags = "AzureWebJobsFeatureFlags";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";
         public const string DotnetFrameworkVersion = "netFrameworkVersion";
@@ -54,6 +56,7 @@ namespace Azure.Functions.Cli.Common
         public const string AuthLevelErrorMessage = "Unable to configure Authorization level. The selected template does not use Http Trigger";
         public const string HttpTriggerTemplateName = "HttpTrigger";
         public const string PowerShellWorkerDefaultVersion = "~7";
+        public const string EnableWorkerIndexing = "EnableWorkerIndexing";
         public const string UserSecretsIdElementName = "UserSecretsId";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";

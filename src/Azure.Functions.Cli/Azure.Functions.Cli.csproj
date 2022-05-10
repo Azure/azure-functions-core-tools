@@ -67,6 +67,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python39">
       <LogicalName>$(AssemblyName).Dockerfile.python39</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python39.PyStein">
+      <LogicalName>$(AssemblyName).Dockerfile.python39.PyStein</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
       <LogicalName>$(AssemblyName).Dockerfile.powershell</LogicalName>
     </EmbeddedResource>
