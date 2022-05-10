@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -19,17 +18,27 @@ namespace Azure.Functions.Cli.Helpers
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
         private static WorkerLanguageVersionInfo _pythonVersionCache = null;
 
-        public static async Task SetupPythonProject(bool generatePythonDocumentation = true)
+        public static async Task SetupPythonProject(ProgrammingModel programmingModel, bool generatePythonDocumentation = true)
         {
             var pyVersion = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pyVersion, errorIfNoVersion: false);
 
+            // We print this message to the user irrespective of whether they choose the stable or preview programming model
+            // for awareness and reference purposes respectively
+            ColoredConsole.Write(AdditionalInfoColor("The PyStein Python programming model is in public preview. Learn more at "));
+            ColoredConsole.WriteLine(LinksColor("aka.ms/pythonprogrammingmodel"));
+
             await CreateRequirements();
-            await EnsureVirtualEnvrionmentIgnored();
+            await EnsureVirtualEnvironmentIgnored();
+
+            if (programmingModel == ProgrammingModel.Preview)
+            {
+                await CreateFile(Constants.PySteinFunctionAppPy);
+            }
 
             if (generatePythonDocumentation)
             {
-                await CreateGettingStartedMarkdown();
+                await CreateGettingStartedMarkdown(programmingModel);
             }
         }
 
@@ -45,7 +54,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task EnsureVirtualEnvrionmentIgnored()
+        public static async Task EnsureVirtualEnvironmentIgnored()
         {
             if (InVirtualEnvironment)
             {
@@ -81,8 +90,23 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private async static Task CreateGettingStartedMarkdown()
+        private async static Task CreateFile(string fileName)
         {
+            if (!FileSystemHelpers.FileExists(fileName))
+            {
+                ColoredConsole.WriteLine($"Writing {fileName}");
+                string fileContent = await StaticResources.GetValue(fileName);
+                await FileSystemHelpers.WriteAllTextToFileAsync(fileName, fileContent);
+            }
+            else
+            {
+                ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
+            }
+        }
+
+        private async static Task CreateGettingStartedMarkdown(ProgrammingModel programmingModel)
+        {
+            // TODO: Include a GettingStarted or README.md document for PyStein applications and write it here
             if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
             {
                 ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
