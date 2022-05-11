@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     foreach (FileInfo file in projectFiles)
                     {
-                        if (string.Equals(projectFiles[0].Name, Constants.ExtenstionsCsProjFile, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(file.Name, Constants.ExtenstionsCsProjFile, StringComparison.OrdinalIgnoreCase)) continue;
                         logger.LogDebug($"Found {file.FullName}. Using for user secrets file configuration.");
                         return file.FullName;
                     }
