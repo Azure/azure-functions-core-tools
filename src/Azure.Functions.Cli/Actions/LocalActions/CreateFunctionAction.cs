@@ -147,6 +147,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
 
+            // Check if the programming model is PyStein
+            if (string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
+                && FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "function_app.py")))
+            {
+                throw new CliException(
+                    "Function not created!\nWhen using the new Python programming model, triggers and bindings are created as decorators within the Python file itself.\nFor information on how to create a new function with the new programming model, see aka.ms/pythonprogrammingmodel");
+            }
+
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
@@ -205,6 +213,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
+            if (string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
+                && !FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "function_app.py")))
+            {
+                ColoredConsole.WriteLine(AdditionalInfoColor("Did you know? The new Python programming model is in public preview. For fewer files and a decorator based approach, learn how you can try it out today at aka.ms/pythonprogrammingmodel"));
+            }
         }
 
         private void ConfigureAuthorizationLevel(Template template)
