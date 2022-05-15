@@ -179,7 +179,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
                 // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
                 // before attempting to resolve the programming model.
+                var supportedProgrammingModels = ProgrammingModelHelper.GetSupportedProgrammingModels(ResolvedWorkerRuntime);
                 ResolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, ResolvedWorkerRuntime, ResolvedLanguage);
+                if (!supportedProgrammingModels.Contains(ResolvedProgrammingModel))
+                {
+                    string supportedProgrammingModelsString = supportedProgrammingModels
+                        .Select(pm => pm.ToString())
+                        .Aggregate((total, next) => total + "\n" + next);
+                    throw new CliArgumentsException(
+                        $"The {ResolvedProgrammingModel.ToString()} programming model is not supported for worker runtime {ResolvedWorkerRuntime.ToString()}. Supported programming models for worker runtime {ResolvedWorkerRuntime.ToString()} are:\n{supportedProgrammingModelsString}");
+                }
             }
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());

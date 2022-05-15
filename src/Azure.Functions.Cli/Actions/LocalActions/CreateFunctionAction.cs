@@ -151,8 +151,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
                 && FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "function_app.py")))
             {
+                ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
+                ColoredConsole.WriteLine(AdditionalInfoColor("For information on how to create a new function with the new programming model, see aka.ms/pythonprogrammingmodel"));
                 throw new CliException(
-                    "Function not created!\nWhen using the new Python programming model, triggers and bindings are created as decorators within the Python file itself.\nFor information on how to create a new function with the new programming model, see aka.ms/pythonprogrammingmodel");
+                    "Function not created!");
             }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)

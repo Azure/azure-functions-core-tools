@@ -12,6 +12,17 @@ namespace Azure.Functions.Cli.Helpers
             return Enum.GetValues<ProgrammingModel>();
         }
 
+        // Given a worker runtime, this function returns a collection of the programming models that are supported.
+        public static IEnumerable<ProgrammingModel> GetSupportedProgrammingModels(WorkerRuntime workerRuntime)
+        {
+            var allProgrammingModels = GetProgrammingModels();
+            if (workerRuntime != WorkerRuntime.python)
+            {
+                return allProgrammingModels.Where(pm => pm != ProgrammingModel.Preview);
+            }
+            return allProgrammingModels;
+        }
+
         public static ProgrammingModel ResolveProgrammingModel(string programmingModel, WorkerRuntime workerRuntime, string language)
         {
             if (GlobalCoreToolsSettings.CurrentProgrammingModel != null)
