@@ -2,7 +2,7 @@ namespace Azure.Functions.Cli.Common
 {
     public enum ProgrammingModel
     {
-        Stable,
+        Default,
         Preview
     }
 }

@@ -179,7 +179,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
                 // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
                 // before attempting to resolve the programming model.
-                ResolvedProgrammingModel = ResolveProgrammingModel(ProgrammingModel);
+                ResolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, ResolvedWorkerRuntime, ResolvedLanguage);
             }
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
@@ -236,21 +236,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             return (workerRuntime, language);
-        }
-
-        private ProgrammingModel ResolveProgrammingModel(string programmingModel)
-        {
-            // We default to the stable programming model if the model parameter is not specified or matches stable (case-insensitive)
-            if (string.IsNullOrEmpty(programmingModel) || string.Equals(programmingModel, Common.ProgrammingModel.Stable.ToString(), StringComparison.InvariantCultureIgnoreCase))
-            {
-                return Common.ProgrammingModel.Stable;
-            }
-            else if (string.Equals(programmingModel, Common.ProgrammingModel.Preview.ToString(), StringComparison.InvariantCultureIgnoreCase))
-            {
-                return Common.ProgrammingModel.Preview;
-            }
-            // TODO: Explicitly define the association between language, worker-runtime, and programming model
-            throw new CliArgumentsException($"The programming model {ProgrammingModel} is not supported. Valid options for language {ResolvedLanguage} and worker-runtime {ResolvedWorkerRuntime} are: TODO");
         }
 
         private static string LanguageSelectionIfRelevant(WorkerRuntime workerRuntime)
