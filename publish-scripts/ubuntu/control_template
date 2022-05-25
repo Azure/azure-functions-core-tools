@@ -6,7 +6,7 @@ Homepage: https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-l
 Vcs-Git: https://github.com/Azure/azure-functions-core-tools.git
 Package: $PACKAGENAME
 Architecture: amd64
-Conflicts: azure-functions-core-tools, azure-functions-core-tools-2, azure-functions-core-tools-3
+Conflicts: azure-functions-core-tools-2, azure-functions-core-tools-3
 Replaces: azure-functions-core-tools, azure-functions-core-tools-2, azure-functions-core-tools-3
 Depends: $DEPENDENCY
 Description: Azure Function Core Tools v4
