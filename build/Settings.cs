@@ -237,6 +237,7 @@ namespace Build
                 "System.Private.ServiceModel.dll",
                 "System.Reactive.*.dll",
                 "System.Security.Cryptography.ProtectedData.dll",
+                "Microsoft.Security.Utilities.dll",
                 "YamlDotNet.dll",
                 "Marklio.Metadata.dll",
                 "Microsoft.Azure.Cosmos.Table.dll",
