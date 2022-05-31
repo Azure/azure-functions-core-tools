@@ -1,8 +1,7 @@
 ﻿﻿using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
+using Microsoft.Azure.WebJobs.Script.WebHost.Security;
 
 namespace Azure.Functions.Cli.Kubernetes.FuncKeys
 {
