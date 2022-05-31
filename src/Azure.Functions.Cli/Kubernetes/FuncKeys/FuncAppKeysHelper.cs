@@ -1,12 +1,7 @@
 ﻿﻿using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
-using Colors.Net;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs.Script.WebHost.Security;
 
 namespace Azure.Functions.Cli.Kubernetes.FuncKeys
 {
@@ -30,16 +25,16 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
         {
             var funcAppKeys = new Dictionary<string, string>
             {
-                { MasterKey, GenerateKey() },
-                { HostFunctionKey, GenerateKey() },
-                { HostSystemKey, GenerateKey() }
+                { MasterKey, SecretGenerator.GenerateMasterKeyValue() },
+                { HostFunctionKey, SecretGenerator.GenerateFunctionKeyValue() },
+                { HostSystemKey, SecretGenerator.GenerateSystemKeyValue() }
             };
 
             if (functionNames?.Any() == true)
             {
                 foreach (var funcName in functionNames)
                 {
-                    funcAppKeys[$"{FunctionKeyPrefix}{funcName.ToLower()}.{FunctionDefaultKeyName}"] = GenerateKey();
+                    funcAppKeys[$"{FunctionKeyPrefix}{funcName.ToLower()}.{FunctionDefaultKeyName}"] = SecretGenerator.GenerateFunctionKeyValue();
                 }
             }
 
@@ -91,19 +86,6 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
                             MountPath = KubernetesSecretsMountPath
                         }
                 };
-            }
-        }
-
-        private static string GenerateKey()
-        {
-            using (var rng = RandomNumberGenerator.Create())
-            {
-                byte[] data = new byte[40];
-                rng.GetBytes(data);
-                string secret = Convert.ToBase64String(data);
-
-                // Replace pluses as they are problematic as URL values
-                return secret.Replace('+', 'a');
             }
         }
     }
