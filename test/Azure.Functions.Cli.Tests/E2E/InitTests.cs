@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -97,6 +98,66 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputDoesntContain = new[] { "Initialized empty Git repository" }
             }, _output);
+        }
+
+        [Theory]
+        [InlineData("node", "default")]
+        [InlineData("java", "preview")]
+        [InlineData("python", "default")]
+        [InlineData("python", "preview")]
+        public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
+        {
+            var workerRuntimesWithPreviewProgrammingModel = new[] { "python" };
+
+            var files = new List<FileResult>
+            {
+                new FileResult
+                {
+                    Name = "local.settings.json",
+                    ContentContains = new []
+                    {
+                        "FUNCTIONS_WORKER_RUNTIME",
+                        workerRuntime
+                    }
+                }
+            };
+
+            if (workerRuntime == "python" && programmingModel == "preview")
+            {
+                files.Add(new FileResult
+                {
+                    Name = "function_app.py",
+                });
+            }
+
+            if (programmingModel != "preview" || workerRuntimesWithPreviewProgrammingModel.Contains(workerRuntime))
+            {
+                return CliTester.Run(new RunConfiguration
+                {
+                    Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                    CheckFiles = files.ToArray(),
+                    OutputContains = new[]
+                    {
+                        "Writing .gitignore",
+                        "Writing host.json",
+                        "Writing local.settings.json",
+                        $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    },
+                    OutputDoesntContain = new[] { "Initialized empty Git repository" }
+                }, _output);
+            }
+            else
+            {
+                return CliTester.Run(new RunConfiguration
+                {
+                    Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                    HasStandardError = true,
+                    ErrorContains = new[]
+                    {
+                        $"programming model is not supported for worker runtime {workerRuntime}. Supported programming models for worker runtime {workerRuntime} are:"
+                    }
+                }, _output);
+            }
         }
 
         [Fact]
