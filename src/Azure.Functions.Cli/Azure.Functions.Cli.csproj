@@ -55,8 +55,14 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python36">
-      <LogicalName>$(AssemblyName).Dockerfile.python36</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.java">
+      <LogicalName>$(AssemblyName).Dockerfile.java</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.node">
+      <LogicalName>$(AssemblyName).Dockerfile.node</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.python37">
       <LogicalName>$(AssemblyName).Dockerfile.python37</LogicalName>
@@ -66,12 +72,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.python39">
       <LogicalName>$(AssemblyName).Dockerfile.python39</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
-      <LogicalName>$(AssemblyName).Dockerfile.powershell</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.node">
-      <LogicalName>$(AssemblyName).Dockerfile.node</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
       <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
