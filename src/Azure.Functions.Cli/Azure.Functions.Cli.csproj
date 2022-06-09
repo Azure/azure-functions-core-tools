@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
@@ -55,23 +55,32 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.java">
-      <LogicalName>$(AssemblyName).Dockerfile.java</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.java8">
+      <LogicalName>$(AssemblyName).Dockerfile.java8</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.node">
-      <LogicalName>$(AssemblyName).Dockerfile.node</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.java11">
+      <LogicalName>$(AssemblyName).Dockerfile.java11</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
-      <LogicalName>$(AssemblyName).Dockerfile.powershell</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.node14">
+      <LogicalName>$(AssemblyName).Dockerfile.node14</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python37">
-      <LogicalName>$(AssemblyName).Dockerfile.python37</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.node16">
+      <LogicalName>$(AssemblyName).Dockerfile.node16</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python38">
-      <LogicalName>$(AssemblyName).Dockerfile.python38</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.powershell7">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell7</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python39">
-      <LogicalName>$(AssemblyName).Dockerfile.python39</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.powershell7.2">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell7.2</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.7">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.7</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.8">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.8</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.9">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
       <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>

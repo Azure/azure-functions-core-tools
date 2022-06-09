@@ -342,7 +342,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
                 else
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode16);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
@@ -351,7 +351,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell);
+                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell7);
             }
             else if(workerRuntime == Helpers.WorkerRuntime.custom)
             {

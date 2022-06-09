@@ -491,8 +491,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
-                    case 6:
-                        return StaticResources.DockerfilePython36;
                     case 7:
                         return StaticResources.DockerfilePython37;
                     case 8:
@@ -501,7 +499,7 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython39;
                 }
             }
-            return StaticResources.DockerfilePython36;
+            return StaticResources.DockerfilePython37;
         }
 
         private static string GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
