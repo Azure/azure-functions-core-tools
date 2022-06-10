@@ -55,5 +55,48 @@ namespace Azure.Functions.Cli.Tests
             Assert.Equal("myQueue", metadata["queueName"]);
             Assert.Equal("RabbitMQConnection", metadata["hostFromEnv"]);
         }
+
+        [Fact]
+        public void PopulateMetadataDictionary_KedaV2_CorrectlyPopulatesAzureStorageQueueMetadata()
+        {
+            string jsonText = @"
+            {
+                ""type"": ""queuetrigger"",
+                ""connection"": ""StorageQueueConnection"",
+                ""queueName"": ""myQueue"",
+                ""name"": ""context""
+            }";
+
+            JToken jsonObj = JToken.Parse(jsonText);
+
+            IDictionary<string, string> metadata = new KedaV2Resource().PopulateMetadataDictionary(jsonObj);
+
+            Assert.Equal(2, metadata.Count);
+            Assert.True(metadata.ContainsKey("queueName"));
+            Assert.True(metadata.ContainsKey("connectionFromEnv"));
+            Assert.Equal("myQueue", metadata["queueName"]);
+            Assert.Equal("StorageQueueConnection", metadata["connectionFromEnv"]);
+        }
+
+        [Fact]
+        public void PopulateMetadataDictionary_KedaV2_CorrectlyPopulatesAzureStorageQueueMetadata_WithoutConnection()
+        {
+            string jsonText = @"
+            {
+                ""type"": ""queuetrigger"",
+                ""queueName"": ""myQueue"",
+                ""name"": ""context""
+            }";
+
+            JToken jsonObj = JToken.Parse(jsonText);
+
+            IDictionary<string, string> metadata = new KedaV2Resource().PopulateMetadataDictionary(jsonObj);
+
+            Assert.Equal(2, metadata.Count);
+            Assert.True(metadata.ContainsKey("queueName"));
+            Assert.True(metadata.ContainsKey("connectionFromEnv"));
+            Assert.Equal("myQueue", metadata["queueName"]);
+            Assert.Equal("AzureWebJobsStorage", metadata["connectionFromEnv"]);
+        }
     }
 }
