@@ -338,12 +338,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
-                localSettingsJsonContent = AddWorkerVersion(localSettingsJsonContent, Constants.PowerShellWorkerDefaultVersion);
+                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
             }
 
             if (programmingModel == Common.ProgrammingModel.Preview)
             {
-                localSettingsJsonContent = AddAzureWebJobsFeatureFlags(localSettingsJsonContent, Constants.EnableWorkerIndexing);
+                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.AzureWebJobsFeatureFlags, Constants.EnableWorkerIndexing);
             }
 
             await WriteFiles("local.settings.json", localSettingsJsonContent);
@@ -498,7 +498,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
         }
 
-        private static string AddWorkerVersion(string localSettingsContent, string workerVersion)
+        private static string AddLocalSetting(string localSettingsContent, string key, string value)
         {
             var localSettingsObj = JsonConvert.DeserializeObject<JObject>(localSettingsContent);
 
@@ -506,21 +506,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 var values = valuesContent as JObject;
                 values.Property(Constants.FunctionsWorkerRuntime).AddAfterSelf(
-                        new JProperty(Constants.FunctionsWorkerRuntimeVersion, workerVersion));
-            }
-
-            return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
-        }
-
-        private static string AddAzureWebJobsFeatureFlags(string localSettingsContent, string workerIndexing)
-        {
-            var localSettingsObj = JsonConvert.DeserializeObject<JObject>(localSettingsContent);
-
-            if (localSettingsObj.TryGetValue("Values", StringComparison.OrdinalIgnoreCase, out var valuesContent))
-            {
-                var values = valuesContent as JObject;
-                values.Property(Constants.FunctionsWorkerRuntime).AddAfterSelf(
-                        new JProperty(Constants.AzureWebJobsFeatureFlags, workerIndexing));
+                        new JProperty(key, value));
             }
 
             return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
