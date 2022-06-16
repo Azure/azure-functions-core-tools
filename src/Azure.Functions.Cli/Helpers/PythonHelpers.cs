@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static void PrintPySteinAwarenessMessage()
         {
-            ColoredConsole.WriteLine(AdditionalInfoColor("Did you know? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at "));
+            ColoredConsole.Write(AdditionalInfoColor("Did you know? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at "));
             PrintPySteinWikiLink();
         }
 
