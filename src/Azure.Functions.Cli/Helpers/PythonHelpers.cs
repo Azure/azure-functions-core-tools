@@ -23,10 +23,17 @@ namespace Azure.Functions.Cli.Helpers
             var pyVersion = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pyVersion, errorIfNoVersion: false);
 
-            // We print this message to the user irrespective of whether they choose the stable or preview programming model
-            // for awareness and reference purposes respectively
-            ColoredConsole.Write(AdditionalInfoColor("The PyStein Python programming model is in public preview. Learn more at "));
-            ColoredConsole.WriteLine(LinksColor("https://aka.ms/pythonprogrammingmodel"));
+            // We print a message to the user irrespective of whether they choose the default or preview programming model for
+            // awareness and reference purposes respectively. These messages differ slightly to better indicate which model the
+            // user selected.
+            if (programmingModel == ProgrammingModel.Default)
+            {
+                PrintPySteinReferenceMessage();
+            }
+            else
+            {
+                PrintPySteinAwarenessMessage();
+            }
 
             await CreateRequirements();
             await EnsureVirtualEnvironmentIgnored();
@@ -40,6 +47,23 @@ namespace Azure.Functions.Cli.Helpers
             {
                 await CreateGettingStartedMarkdown(programmingModel);
             }
+        }
+
+        public static void PrintPySteinReferenceMessage()
+        {
+            ColoredConsole.Write(AdditionalInfoColor("The new Python programming model is in public preview. Learn more at "));
+            PrintPySteinWikiLink();
+        }
+
+        public static void PrintPySteinAwarenessMessage()
+        {
+            ColoredConsole.WriteLine(AdditionalInfoColor("Did you know? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at "));
+            PrintPySteinWikiLink();
+        }
+
+        public static void PrintPySteinWikiLink()
+        {
+            ColoredConsole.WriteLine(LinksColor("https://aka.ms/pythonprogrammingmodel"));
         }
 
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
