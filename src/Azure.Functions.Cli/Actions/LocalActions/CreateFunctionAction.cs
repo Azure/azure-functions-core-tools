@@ -218,7 +218,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
                 && !FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "function_app.py")))
             {
-                ColoredConsole.WriteLine(AdditionalInfoColor("Did you know? The new Python programming model is in public preview. For fewer files and a decorator based approach, learn how you can try it out today at https://aka.ms/pythonprogrammingmodel"));
+                ColoredConsole.WriteLine(AdditionalInfoColor("Did you know? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at https://aka.ms/pythonprogrammingmodel"));
             }
         }
 
