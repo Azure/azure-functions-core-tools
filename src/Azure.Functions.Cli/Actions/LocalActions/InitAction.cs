@@ -117,8 +117,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => ManagedDependencies = f);
             
             Parser
-                .Setup<string>("model")
-                .WithDescription("Selects the programming model for the function app. Currently, only the Python worker runtime supports this functionality.")
+                .Setup<string>('m', "model")
+                .WithDescription($"Selects the programming model for the function app. Options are {EnumerationHelper.Join(", ", ProgrammingModelHelper.GetProgrammingModels())}. Currently, only the Python worker runtime supports the preview programming model")
                 .Callback(m => ProgrammingModel = m);
 
             Parser
@@ -183,11 +183,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 ResolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, ResolvedWorkerRuntime, ResolvedLanguage);
                 if (!supportedProgrammingModels.Contains(ResolvedProgrammingModel))
                 {
-                    string supportedProgrammingModelsString = supportedProgrammingModels
-                        .Select(pm => pm.ToString())
-                        .Aggregate((total, next) => total + "\n" + next);
                     throw new CliArgumentsException(
-                        $"The {ResolvedProgrammingModel.ToString()} programming model is not supported for worker runtime {ResolvedWorkerRuntime.ToString()}. Supported programming models for worker runtime {ResolvedWorkerRuntime.ToString()} are:\n{supportedProgrammingModelsString}");
+                        $"The {ResolvedProgrammingModel.ToString()} programming model is not supported for worker runtime {ResolvedWorkerRuntime.ToString()}. Supported programming models for worker runtime {ResolvedWorkerRuntime.ToString()} are:\n{EnumerationHelper.Join<ProgrammingModel>("\n", supportedProgrammingModels)}");
                 }
             }
 

@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 // TODO: Explicitly define the association between language, worker-runtime, and programming model
-                throw new CliArgumentsException($"The programming model {programmingModel} is not supported. Valid options for language {language} and worker-runtime {workerRuntime.ToString()} are: {GetProgrammingModels()}");
+                throw new CliArgumentsException($"The programming model {programmingModel} is not supported. Valid options for language {language} and worker-runtime {workerRuntime.ToString()} are:\n{EnumerationHelper.Join("\n", GetSupportedProgrammingModels(workerRuntime))}");
             }
             return GlobalCoreToolsSettings.CurrentProgrammingModel.Value;
         }

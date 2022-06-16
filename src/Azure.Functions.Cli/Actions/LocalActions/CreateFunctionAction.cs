@@ -152,7 +152,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 // TODO: Remove these messages once creating new functions in the new programming model is supported
                 ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
-                ColoredConsole.WriteLine(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
+                ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
                 PythonHelpers.PrintPySteinWikiLink();
                 throw new CliException(
                     "Function not created!");
@@ -216,9 +216,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
-            if (isNewPythonProgrammingModel())
+            if (!isNewPythonProgrammingModel())
             {
-                PythonHelpers.PrintPySteinReferenceMessage();
+                PythonHelpers.PrintPySteinAwarenessMessage();
             }
         }
 

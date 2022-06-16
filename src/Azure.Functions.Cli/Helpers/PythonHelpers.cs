@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
             // We print a message to the user irrespective of whether they choose the default or preview programming model for
             // awareness and reference purposes respectively. These messages differ slightly to better indicate which model the
             // user selected.
-            if (programmingModel == ProgrammingModel.Default)
+            if (programmingModel == ProgrammingModel.Preview)
             {
                 PrintPySteinReferenceMessage();
             }
