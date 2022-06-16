@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
             // We print this message to the user irrespective of whether they choose the stable or preview programming model
             // for awareness and reference purposes respectively
             ColoredConsole.Write(AdditionalInfoColor("The PyStein Python programming model is in public preview. Learn more at "));
-            ColoredConsole.WriteLine(LinksColor("aka.ms/pythonprogrammingmodel"));
+            ColoredConsole.WriteLine(LinksColor("https://aka.ms/pythonprogrammingmodel"));
 
             await CreateRequirements();
             await EnsureVirtualEnvironmentIgnored();

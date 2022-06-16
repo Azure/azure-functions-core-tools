@@ -152,7 +152,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 && FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "function_app.py")))
             {
                 ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
-                ColoredConsole.WriteLine(AdditionalInfoColor("For information on how to create a new function with the new programming model, see aka.ms/pythonprogrammingmodel"));
+                ColoredConsole.WriteLine(AdditionalInfoColor("For information on how to create a new function with the new programming model, see https://aka.ms/pythonprogrammingmodel"));
                 throw new CliException(
                     "Function not created!");
             }
@@ -218,7 +218,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
                 && !FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "function_app.py")))
             {
-                ColoredConsole.WriteLine(AdditionalInfoColor("Did you know? The new Python programming model is in public preview. For fewer files and a decorator based approach, learn how you can try it out today at aka.ms/pythonprogrammingmodel"));
+                ColoredConsole.WriteLine(AdditionalInfoColor("Did you know? The new Python programming model is in public preview. For fewer files and a decorator based approach, learn how you can try it out today at https://aka.ms/pythonprogrammingmodel"));
             }
         }
 
