@@ -130,16 +130,19 @@ namespace Azure.Functions.Cli.Helpers
 
         private async static Task CreateGettingStartedMarkdown(ProgrammingModel programmingModel)
         {
-            // TODO: Include a GettingStarted or README.md document for PyStein applications and write it here
-            if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+            if (programmingModel == ProgrammingModel.Default)
             {
-                ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
-                string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
-                await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
-            }
-            else
-            {
-                ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
+                // TODO: Include a GettingStarted or README.md document for PyStein applications and write it here
+                if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+                {
+                    ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
+                    string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
+                    await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
+                }
             }
         }
 
