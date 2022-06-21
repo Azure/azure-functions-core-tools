@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.Helpers
         internal static string GetPemRsaKey(X509Certificate2 cert)
         {
             var sw = new StringWriter();
-            ExportPrivateKey((RSA)cert.PrivateKey, sw);
+            ExportPrivateKey(cert.GetRSAPrivateKey(), sw);
             return Convert.ToBase64String(Encoding.ASCII.GetBytes(sw.ToString()));
         }
 
