@@ -3,6 +3,11 @@ import azure.functions as func
 app = func.FunctionApp()
 
 
+@app.function_name(name="HttpTrigger1")
+@app.route(route="hello") # HTTP Trigger
+def test_function(req: func.HttpRequest) -> func.HttpResponse:
+    return func.HttpResponse("HttpTrigger1 function processed a request!!!")
+
 # To run wsgi app using new prog model python function, please uncomment below section and comment out rest of file
 # from flask import Flask, make_response, request
 # flask_app = Flask(__name__)
