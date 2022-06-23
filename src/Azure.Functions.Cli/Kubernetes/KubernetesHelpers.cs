@@ -217,13 +217,13 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            IDictionary<string, string> resultantFunctionKeys = new Dictionary<string, string>();
+            IDictionary<string, string> currentImageFuncKeys = new Dictionary<string, string>();
             if (httpFunctions.Any())
             {
-                var currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
+                currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
                 if (currentImageFuncKeys.Any())
                 {
-                    result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, resultantFunctionKeys));
+                    result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, currentImageFuncKeys));
                     resourceIndex++;
                 }
 
@@ -258,7 +258,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             result = result.Concat(deployments).ToList();
-            return (scaledObject != null ? result.Append(scaledObject) : result, resultantFunctionKeys);
+            return (scaledObject != null ? result.Append(scaledObject) : result, currentImageFuncKeys);
         }
 
         internal static async Task WaitForDeploymentRollout(DeploymentV1Apps deployment)
