@@ -221,8 +221,7 @@ namespace Azure.Functions.Cli.Kubernetes
             if (httpFunctions.Any())
             {
                 var currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
-                resultantFunctionKeys = GetFunctionKeys(currentImageFuncKeys, await GetExistingFunctionKeys(keysSecretCollectionName, @namespace));
-                if (resultantFunctionKeys?.Any() == true)
+                if (currentImageFuncKeys.Any())
                 {
                     result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, resultantFunctionKeys));
                     resourceIndex++;
@@ -450,25 +449,6 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             return string.Empty;
-        }
-
-        private static IDictionary<string, string> GetFunctionKeys(IDictionary<string, string> currentImageFuncKeys, IDictionary<string, string> existingFuncKeys)
-        {
-            if ((currentImageFuncKeys == null || !currentImageFuncKeys.Any())
-                || (existingFuncKeys == null || !existingFuncKeys.Any()))
-            {
-                return currentImageFuncKeys;
-            }
-
-            //The function keys that doesn't exist in Kubernetes yet
-            IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-            //Merge the new keys with the keys that already exist in kubernetes
-            foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
-            {
-                funcKeys.Add(commonKey);
-            }
-
-            return funcKeys;
         }
 
         public class QuoteNumbersEventEmitter : ChainedEventEmitter
