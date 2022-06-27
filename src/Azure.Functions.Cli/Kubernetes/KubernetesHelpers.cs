@@ -275,26 +275,6 @@ namespace Azure.Functions.Cli.Kubernetes
             await KubectlHelper.RunKubectl(statement, showOutput: true, timeout: TimeSpan.FromMinutes(4));
         }
 
-         private static IDictionary<string, string> GetFunctionKeys(IDictionary<string, string> currentImageFuncKeys, IDictionary<string, string> existingFuncKeys)
-        {
-            if ((currentImageFuncKeys == null || !currentImageFuncKeys.Any())
-                || (existingFuncKeys == null || !existingFuncKeys.Any()))
-            {
-                return currentImageFuncKeys;
-            }
-
-            //The function keys that doesn't exist in Kubernetes yet
-            IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
-             //Merge the new keys with the keys that already exist in kubernetes
-            foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
-            {
-                funcKeys.Add(commonKey);
-            }
-
-            return funcKeys;
-        }
-
         private static async Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
         {
             if (string.IsNullOrWhiteSpace(keysSecretCollectionName)
@@ -470,6 +450,26 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             return string.Empty;
+        }
+
+        private static IDictionary<string, string> GetFunctionKeys(IDictionary<string, string> currentImageFuncKeys, IDictionary<string, string> existingFuncKeys)
+        {
+            if ((currentImageFuncKeys == null || !currentImageFuncKeys.Any())
+                || (existingFuncKeys == null || !existingFuncKeys.Any()))
+            {
+                return currentImageFuncKeys;
+            }
+
+            //The function keys that doesn't exist in Kubernetes yet
+            IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+             //Merge the new keys with the keys that already exist in kubernetes
+            foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
+            {
+                funcKeys.Add(commonKey);
+            }
+
+            return funcKeys;
         }
 
         public class QuoteNumbersEventEmitter : ChainedEventEmitter
