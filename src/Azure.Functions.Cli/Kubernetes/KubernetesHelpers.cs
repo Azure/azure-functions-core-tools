@@ -217,13 +217,14 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            IDictionary<string, string> currentImageFuncKeys = new Dictionary<string, string>();
+            IDictionary<string, string> resultantFunctionKeys = new Dictionary<string, string>();
             if (httpFunctions.Any())
             {
-                currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
-                if (currentImageFuncKeys.Any())
+                var currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
+                resultantFunctionKeys = GetFunctionKeys(currentImageFuncKeys, await GetExistingFunctionKeys(keysSecretCollectionName, @namespace));
+                if (resultantFunctionKeys.Any())
                 {
-                    result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, currentImageFuncKeys));
+                    result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, resultantFunctionKeys));
                     resourceIndex++;
                 }
 
@@ -258,7 +259,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             result = result.Concat(deployments).ToList();
-            return (scaledObject != null ? result.Append(scaledObject) : result, currentImageFuncKeys);
+            return (scaledObject != null ? result.Append(scaledObject) : result, resultantFunctionKeys);
         }
 
         internal static async Task WaitForDeploymentRollout(DeploymentV1Apps deployment)
@@ -272,6 +273,26 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             await KubectlHelper.RunKubectl(statement, showOutput: true, timeout: TimeSpan.FromMinutes(4));
+        }
+
+         private static IDictionary<string, string> GetFunctionKeys(IDictionary<string, string> currentImageFuncKeys, IDictionary<string, string> existingFuncKeys)
+        {
+            if ((currentImageFuncKeys == null || !currentImageFuncKeys.Any())
+                || (existingFuncKeys == null || !existingFuncKeys.Any()))
+            {
+                return currentImageFuncKeys;
+            }
+
+            //The function keys that doesn't exist in Kubernetes yet
+            IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+             //Merge the new keys with the keys that already exist in kubernetes
+            foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
+            {
+                funcKeys.Add(commonKey);
+            }
+
+            return funcKeys;
         }
 
         private static async Task<IDictionary<string, string>> GetExistingFunctionKeys(string keysSecretCollectionName, string @namespace)
