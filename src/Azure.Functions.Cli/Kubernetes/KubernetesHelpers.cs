@@ -222,7 +222,7 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 var currentImageFuncKeys = FuncAppKeysHelper.CreateKeys(httpFunctions.Select(f => f.Key));
                 resultantFunctionKeys = GetFunctionKeys(currentImageFuncKeys, await GetExistingFunctionKeys(keysSecretCollectionName, @namespace));
-                if (resultantFunctionKeys?.Any() == true)
+                if (resultantFunctionKeys.Any())
                 {
                     result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, resultantFunctionKeys));
                     resourceIndex++;
@@ -462,7 +462,8 @@ namespace Azure.Functions.Cli.Kubernetes
 
             //The function keys that doesn't exist in Kubernetes yet
             IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-            //Merge the new keys with the keys that already exist in kubernetes
+
+             //Merge the new keys with the keys that already exist in kubernetes
             foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
             {
                 funcKeys.Add(commonKey);
