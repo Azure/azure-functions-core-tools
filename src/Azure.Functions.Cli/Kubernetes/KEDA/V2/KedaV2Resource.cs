@@ -113,11 +113,11 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
             {
                 case TriggerTypes.AzureBlobStorage:
                 case TriggerTypes.AzureStorageQueue:
-                    metadata[ConnectionFromEnvField] = metadata[ConnectionField] ?? "AzureWebJobsStorage";
+                    metadata[ConnectionFromEnvField] = metadata.ContainsKey(ConnectionField) ? metadata[ConnectionField] : "AzureWebJobsStorage";
                     metadata.Remove(ConnectionField);
                     break;
                 case TriggerTypes.AzureServiceBus:
-                    metadata[ConnectionFromEnvField] = metadata[ConnectionField] ?? "AzureWebJobsServiceBus";
+                    metadata[ConnectionFromEnvField] = metadata.ContainsKey(ConnectionField) ? metadata[ConnectionField] : "AzureWebJobsServiceBus";
                     metadata.Remove(ConnectionField);
                     break;
                 case TriggerTypes.AzureEventHubs:
