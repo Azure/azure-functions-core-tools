@@ -69,12 +69,13 @@ namespace Azure.Functions.Cli.Helpers
         {
             await TemplateOperation(async () =>
             {
-                var shortName = "func";
-                var framework = await GetTargetFramework();
+                var frameworkString = workerRuntime == WorkerRuntime.dotnetIsolated
+                    ? $"--Framework \"{await GetTargetFramework()}\""
+                    : string.Empty;
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new {shortName} --Framework {framework} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {

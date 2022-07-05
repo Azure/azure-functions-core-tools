@@ -109,9 +109,9 @@ namespace Build
 
         public static readonly string SignTestDir = "SignTest";
        
-        public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
+        public static readonly string DotnetIsolatedItemTemplates = $"https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}"; //$"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}"
 
-        public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
+        public static readonly string DotnetIsolatedProjectTemplates = $"https://www.myget.org/F/azure-appservice/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";    //$"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
 
         public static readonly string DotnetItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}";
 
