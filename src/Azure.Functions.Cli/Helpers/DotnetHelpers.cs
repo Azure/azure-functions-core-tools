@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -26,52 +25,13 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task<int> GetDotnetMajorVersion()
-        {
-            EnsureDotnet();
-            Version dotnetVersion;
-            var exe = new Executable("dotnet", "--version");
-            var stdout = new StringBuilder();
-            var exitCode = await exe.RunAsync(o => stdout.AppendLine(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-            // We split based on the the '-' character and take the first element to ensure that version parsing still works with preview/RC verisons of dotnet
-            var dotnetVersionString = stdout.ToString().Split("-")[0];
-            if (exitCode != 0)
-            {
-                throw new CliException("Error running dotnet --version");
-            }
-            else if (!Version.TryParse(dotnetVersionString, out dotnetVersion))
-            {
-                throw new CliException("dotnet version unable to be parsed!");
-            }
-            return dotnetVersion.Major;
-        }
-
-        public static async Task<string> GetTargetFramework()
-        {
-            var framework = "net";
-            var dotnetMajorVersion = await GetDotnetMajorVersion();
-            if (dotnetMajorVersion == 7)
-            {
-                framework += "7.0";
-            }
-            else if (dotnetMajorVersion == 6)
-            {
-                framework += "6.0";
-            }
-            else
-            {
-                framework += "48";
-            }
-            return framework;
-        }
-
-        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime)
+        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
             await TemplateOperation(async () =>
             {
-                var frameworkString = workerRuntime == WorkerRuntime.dotnetIsolated
-                    ? $"--Framework \"{await GetTargetFramework()}\""
-                    : string.Empty;
+                var frameworkString = string.IsNullOrEmpty(targetFramework)
+                    ? string.Empty
+                    : $"--Framework \"{targetFramework}\"";
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
