@@ -112,7 +112,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>("target-framework")
                 .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net48\", \"net6.0\", and \"net7.0\"")
-                .Callback(l => Language = l);
+                .Callback(tf => TargetFramework = tf);
 
             Parser
                 .Setup<bool>("managed-dependencies")
