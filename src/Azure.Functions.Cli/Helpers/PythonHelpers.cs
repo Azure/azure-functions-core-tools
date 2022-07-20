@@ -520,8 +520,8 @@ namespace Azure.Functions.Cli.Helpers
                         return Constants.DockerImages.LinuxPython38ImageAmd64;
                     case 9:
                         return Constants.DockerImages.LinuxPython39ImageAmd64;
-                    case 9:
-                        return Constants.DockerImages.LinuxPython39ImageAmd64;
+                    case 10:
+                        return Constants.DockerImages.LinuxPython310ImageAmd64;
                 }
             }
             return Constants.DockerImages.LinuxPython36ImageAmd64;
