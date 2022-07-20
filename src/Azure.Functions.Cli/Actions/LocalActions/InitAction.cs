@@ -42,6 +42,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string Language { get; set; }
 
+        public string TargetFramework { get; set; }
+
         public bool? ManagedDependencies { get; set; }
 
         public WorkerRuntime ResolvedWorkerRuntime { get; set; }
@@ -108,6 +110,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(l => Language = l);
 
             Parser
+                .Setup<string>("target-framework")
+                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net48\", \"net6.0\", and \"net7.0\"")
+                .Callback(tf => TargetFramework = tf);
+
+            Parser
                 .Setup<bool>("managed-dependencies")
                 .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
                 .Callback(f => ManagedDependencies = f);
@@ -170,10 +177,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
-
+            
+            ValidateTargetFramework();
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
-                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
+                await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime, TargetFramework);
             }
             else
             {
@@ -298,6 +306,27 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
+        private void ValidateTargetFramework()
+        {
+            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            {
+                if (string.IsNullOrEmpty(TargetFramework))
+                {
+                    // Default to .NET 6 if the target framework is not specified
+                    // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
+                    TargetFramework = Common.TargetFramework.net6;
+                }
+                if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
+                {
+                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net48\", \"net6.0\", and \"net7.0\"");
+                }
+            }
+            else if (!string.IsNullOrEmpty(TargetFramework))
+            {
+                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated");
+            }
+        }
+
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime)
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
@@ -342,7 +371,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
                 else
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode);
+                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode16);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
@@ -351,7 +380,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell);
+                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell7);
             }
             else if(workerRuntime == Helpers.WorkerRuntime.custom)
             {

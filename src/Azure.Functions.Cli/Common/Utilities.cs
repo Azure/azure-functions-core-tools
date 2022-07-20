@@ -238,7 +238,7 @@ namespace Azure.Functions.Cli
         {
             if (LogCategories.IsFunctionUserCategory(category)
                 || LogCategories.IsFunctionCategory(category)
-                || category.Equals(WorkerConstants.FunctionConsoleLogCategoryName, StringComparison.OrdinalIgnoreCase))
+                || category.Equals(WorkerConstants.ConsoleLogCategoryName, StringComparison.OrdinalIgnoreCase))
             {
                 return actualLevel >= userLogMinLevel;
             }

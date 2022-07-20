@@ -19,10 +19,10 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2057";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2057";
-        public const string DotnetItemTemplatesVersion = "4.0.2057";
-        public const string DotnetProjectTemplatesVersion = "4.0.2057";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2226";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2226";
+        public const string DotnetItemTemplatesVersion = "4.0.2185";
+        public const string DotnetProjectTemplatesVersion = "4.0.2185";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
@@ -108,7 +108,7 @@ namespace Build
         public static readonly string PreSignTestDir = "PreSignTest";
 
         public static readonly string SignTestDir = "SignTest";
-
+       
         public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
 
         public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
@@ -145,7 +145,8 @@ namespace Build
             public static readonly string ToAuthenticodeSign = "Authenticode";
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string ToThirdPartySign = "ThirdParty";
-            public static readonly string[] RuntimesToSign = new string[] { "min.win-x86", "min.win-x64" };
+            public static readonly string ToMacSign = "Mac";
+            public static readonly string[] RuntimesToSign = new string[] { "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
             public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
@@ -153,6 +154,11 @@ namespace Build
                 "aspnetcorev2_inprocess.dll",
                 "Microsoft.AspNetCore.Buffering.dll",
                 "Microsoft.AspNetCore.Server.IIS.dll"
+            };
+
+            public static readonly string[] macBinaries = new[] {
+                "func",
+                "gozip"
             };
 
             public static readonly string[] authentiCodeBinaries = new[] {

@@ -240,7 +240,7 @@ namespace Build
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
-            var isolatedTemplatesPath = Path.Combine(templatesPath, "net6-isolated");
+            var isolatedTemplatesPath = Path.Combine(templatesPath, "net-isolated");
 
             Directory.CreateDirectory(templatesPath);
             Directory.CreateDirectory(isolatedTemplatesPath);
@@ -314,28 +314,45 @@ namespace Build
             string toSignDirPath = Path.Combine(Settings.OutputDir, Settings.SignInfo.ToSignDir);
             string authentiCodeDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToAuthenticodeSign);
             string thirdPartyDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToThirdPartySign);
+            string macDirectory = Path.Combine(toSignDirPath, Settings.SignInfo.ToMacSign);
 
             Directory.CreateDirectory(authentiCodeDirectory);
             Directory.CreateDirectory(thirdPartyDirectory);
+            Directory.CreateDirectory(macDirectory);
 
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
                 var sourceDir = Path.Combine(Settings.OutputDir, supportedRuntime);
-                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(sourceDir, el));
-                // Grab all the files and filter the extensions not to be signed
-                var toAuthenticodeSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
-                                  .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                var dirName = $"Azure.Functions.Cli.{supportedRuntime}.{CurrentVersion}";
 
-                string dirName = $"Azure.Functions.Cli.{supportedRuntime}.{CurrentVersion}";
-                string targetDirectory = Path.Combine(authentiCodeDirectory, dirName);
-                toAuthenticodeSignFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetDirectory, sourceDir));
+                if (supportedRuntime.StartsWith("osx"))
+                {
+                    var toSignMacFiles = Settings.SignInfo.macBinaries.Select(el => Path.Combine(sourceDir, el)).ToList();
+                    var targetMacDirectory = Path.Combine(macDirectory, dirName);
+                    toSignMacFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetMacDirectory, sourceDir));
 
-                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(sourceDir, el));
-                // Grab all the files and filter the extensions not to be signed
-                var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
-                                            .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
-                string targetThirdPartyDirectory = Path.Combine(thirdPartyDirectory, dirName);
-                toSignThirdPartyFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetThirdPartyDirectory, sourceDir));
+                    // mac signing requires the files to be in a zip
+                    var zipPath = Path.Combine(macDirectory, $"{dirName}.zip");
+                    ColoredConsole.WriteLine($"Creating {zipPath}");
+                    ZipFile.CreateFromDirectory(targetMacDirectory, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+                    Directory.Delete(targetMacDirectory, recursive: true);
+                }
+                else
+                {
+                    var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(sourceDir, el));
+                    // Grab all the files and filter the extensions not to be signed
+                    var toAuthenticodeSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
+                                    .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                    string targetAuthenticodeDirectory = Path.Combine(authentiCodeDirectory, dirName);
+                    toAuthenticodeSignFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetAuthenticodeDirectory, sourceDir));
+
+                    var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(sourceDir, el));
+                    // Grab all the files and filter the extensions not to be signed
+                    var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
+                                                .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                    string targetThirdPartyDirectory = Path.Combine(thirdPartyDirectory, dirName);
+                    toSignThirdPartyFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetThirdPartyDirectory, sourceDir));
+                }
             }
 
             // binaries we know are unsigned via sigcheck.exe
@@ -359,6 +376,12 @@ namespace Build
         {
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
+                if (supportedRuntime.StartsWith("osx"))
+                {
+                    // sigcheck.exe does not work for mac signatures
+                    continue;
+                }
+
                 var sourceDir = Path.Combine(Settings.OutputDir, supportedRuntime);
                 var targetDir = Path.Combine(Settings.OutputDir, Settings.PreSignTestDir, supportedRuntime);
                 Directory.CreateDirectory(targetDir);
@@ -391,6 +414,12 @@ namespace Build
 
             foreach (string zipFilePath in zipFiles)
             {
+                if (zipFilePath.Contains("osx"))
+                {
+                    // sigcheck.exe does not work for mac signatures
+                    continue;
+                }
+
                 bool isSignedRuntime = Settings.SignInfo.RuntimesToSign.Any(r => zipFilePath.Contains(r));
                 if (isSignedRuntime)
                 {
