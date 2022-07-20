@@ -76,17 +76,17 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.powershell7.2">
       <LogicalName>$(AssemblyName).Dockerfile.powershell7.2</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python37">
-      <LogicalName>$(AssemblyName).Dockerfile.python37</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.7">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.7</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python38">
-      <LogicalName>$(AssemblyName).Dockerfile.python38</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.8">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.8</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python39">
-      <LogicalName>$(AssemblyName).Dockerfile.python39</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.9">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python310">
-      <LogicalName>$(AssemblyName).Dockerfile.python310</LogicalName>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.10">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.10</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
       <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
