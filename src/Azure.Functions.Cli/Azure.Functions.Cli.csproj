@@ -64,9 +64,6 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.node14">
       <LogicalName>$(AssemblyName).Dockerfile.node14</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.powershell">
-      <LogicalName>$(AssemblyName).Dockerfile.powershell</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.node16">
       <LogicalName>$(AssemblyName).Dockerfile.node16</LogicalName>
     </EmbeddedResource>
