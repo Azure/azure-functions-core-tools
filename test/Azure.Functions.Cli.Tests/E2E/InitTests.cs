@@ -664,7 +664,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = "requirements.txt",
                         ContentContains = new []
                         {
-                            "# Do not include azure-functions-worker as it may conflict with the Azure Functions platform",
+                            "# Do not include azure-functions-worker",
                             "azure-functions"
                         }
                     }
