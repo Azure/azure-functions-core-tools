@@ -23,7 +23,7 @@ $cli = Get-ChildItem -Path $artifactsPath -Include func.dll -Recurse | Select-Ob
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 
 # Generate MSI installers for Windows
-@('x64', 'x86') | ForEach-Object { 
+@('arm64', 'x64', 'x86') | ForEach-Object { 
     $platform = $_
     $targetDir = "$artifactsPath\win-$platform"
 
