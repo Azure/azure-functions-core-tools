@@ -200,7 +200,7 @@ namespace Build
                 Path.Combine("templates", "itemTemplates.2.0.10328.nupkg"),
                 Path.Combine("templates", "projectTemplates.2.0.10328.nupkg"),
                 Path.Combine("tools", "python", "packapp", "__main__.py"),
-                Path.Combine("workers", "python")
+                Path.Combine("workers", "*")
             };
 
             public static readonly string[] thirdPartyBinaries = new[] {
