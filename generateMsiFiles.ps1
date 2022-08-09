@@ -23,7 +23,10 @@ $cli = Get-ChildItem -Path $artifactsPath -Include func.dll -Recurse | Select-Ob
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 
 # Generate MSI installers for Windows
-@('arm64', 'x64', 'x86') | ForEach-Object { 
+# TODO: add 'arm64' to the below array once a production-ready version of the WiX toolset supporting
+# it is released. Currently, only v3.14 and v4 preview support it: https://github.com/wixtoolset/issues/issues/6513
+# However, neither are production-ready: https://wixtoolset.org/releases/
+@('x64', 'x86') | ForEach-Object { 
     $platform = $_
     $targetDir = "$artifactsPath\win-$platform"
 

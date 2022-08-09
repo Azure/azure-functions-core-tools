@@ -88,15 +88,11 @@ namespace Build
 
         private static string GetRuntimeId(string runtime)
         {
-            switch (runtime)
+            if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
             {
-                case "min.win-arm64":
-                case "min.win-x86":
-                case "min.win-x64":
-                    return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
-                default:
-                    return runtime;
+                return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
             }
+            return runtime;
         }
 
         public static void DotnetPack()
