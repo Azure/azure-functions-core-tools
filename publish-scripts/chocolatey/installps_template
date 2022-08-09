@@ -9,11 +9,7 @@ $checksum_arm64 = '$CHECKSUM_ARM64'
 $checksum_x86   = '$CHECKSUM_X86'
 $checksum_x64   = '$CHECKSUM_X64'
 
-# By default, we want 32-bit installer
-$url = $url_x86
-$checksum = $checksum_x86
-
-# If specifically asked for 64-bit, we use that
+# If specifically asked for x64 or arm64, we use that
 $pp = Get-PackageParameters
 if ($pp['x64'])
 {
@@ -24,6 +20,12 @@ elseif ($pp['arm64'])
 {
   $url =  $url_arm64
   $checksum = $checksum_arm64
+}
+else
+{
+  # By default, we want the x86 installer
+  $url = $url_x86
+  $checksum = $checksum_x86
 }
 
 $packageArgs = @{
