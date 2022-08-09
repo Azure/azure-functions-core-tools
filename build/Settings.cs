@@ -40,6 +40,7 @@ namespace Build
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
         public static readonly string[] TargetRuntimes = new[] {
+            "min.win-arm64",
             "min.win-x86",
             "min.win-x64",
             "linux-x64",
@@ -59,6 +60,7 @@ namespace Build
             { "osx-arm64", "OSX" },
             { "min.win-x86", "WINDOWS" },
             { "min.win-x64", "WINDOWS" },
+            { "min.win-arm64", "WINDOWS"},
         };
 
         private static readonly string[] _winPowershellRuntimes = new[] {
@@ -165,7 +167,7 @@ namespace Build
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string ToThirdPartySign = "ThirdParty";
             public static readonly string ToMacSign = "Mac";
-            public static readonly string[] RuntimesToSign = new string[] { "win-arm64", "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
+            public static readonly string[] RuntimesToSign = new string[] { "min.win-arm64", "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
             public static readonly string[] FilterExtensionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
@@ -197,10 +199,7 @@ namespace Build
                 "Microsoft.Extensions.Azure.dll",
                 "Microsoft.Identity.Client.dll",
                 "Microsoft.Identity.Client.Extensions.Msal.dll",
-                Path.Combine("templates", "itemTemplates.2.0.10328.nupkg"),
-                Path.Combine("templates", "projectTemplates.2.0.10328.nupkg"),
-                Path.Combine("tools", "python", "packapp", "__main__.py"),
-                Path.Combine("workers", "*")
+                Path.Combine("workers", "python")
             };
 
             public static readonly string[] thirdPartyBinaries = new[] {
