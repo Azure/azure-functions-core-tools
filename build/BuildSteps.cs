@@ -90,6 +90,7 @@ namespace Build
         {
             switch (runtime)
             {
+                case "min.win-arm64":
                 case "min.win-x86":
                 case "min.win-x64":
                     return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
