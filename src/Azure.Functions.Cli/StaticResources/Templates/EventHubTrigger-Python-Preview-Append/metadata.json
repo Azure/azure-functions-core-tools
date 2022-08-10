@@ -1,0 +1,17 @@
+{
+    "defaultFunctionName": "EventHubTrigger",
+    "description": "$EventHubTrigger_description",
+    "name": "Azure Event Hub trigger",
+    "language": "Python",
+    "category": [
+      "$temp_category_core",
+      "$temp_category_dataProcessing"
+    ],
+    "categoryStyle": "eventHub",
+    "enabledInTryMode": false,
+    "userPrompt": [
+      "connection",
+      "eventHubName",
+      "consumerGroup"
+    ]
+  }

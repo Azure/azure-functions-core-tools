@@ -1,0 +1,17 @@
+{
+    "defaultFunctionName": "ServiceBusTopicTrigger",
+    "description": "$ServiceBusTopicTrigger_description",
+    "name": "Azure Service Bus Topic trigger",
+    "language": "Python",
+    "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+    ],
+    "categoryStyle": "serviceBus",
+    "enabledInTryMode": false,
+    "userPrompt": [
+        "connection",
+        "topicName",
+        "subscriptionName"
+    ]
+}

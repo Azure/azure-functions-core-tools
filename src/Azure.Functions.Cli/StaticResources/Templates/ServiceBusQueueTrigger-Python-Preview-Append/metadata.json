@@ -1,0 +1,16 @@
+{
+    "defaultFunctionName": "ServiceBusQueueTrigger",
+    "description": "$ServiceBusQueueTrigger_description",
+    "name": "Azure Service Bus Queue trigger",
+    "language": "Python",
+    "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+    ],
+    "categoryStyle": "serviceBus",
+    "enabledInTryMode": false,
+    "userPrompt": [
+        "connection",
+        "queueName"
+    ]
+}

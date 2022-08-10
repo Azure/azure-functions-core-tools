@@ -1,0 +1,19 @@
+{
+    "defaultFunctionName": "QueueTrigger",
+    "description": "$QueueTrigger_description",
+    "name": "Azure Queue Storage trigger",
+    "language": "Python",
+    "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+    ],
+    "categoryStyle": "queue",
+    "enabledInTryMode": true,
+    "userPrompt": [
+        "connection",
+        "queueName"
+    ],
+    "filters": [
+        "Python3"
+    ]
+  }
