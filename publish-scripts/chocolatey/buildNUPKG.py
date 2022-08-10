@@ -29,7 +29,11 @@ def getChocoVersion(version):
 # output a deb nupkg
 # depends on chocolatey
 def preparePackage():
-    archList = ["ARM64", "X86", "X64"]
+    archList = [
+        "ARM64",
+        "X86",
+        "X64"
+    ]
     substitutionMapping = {
         "PACKAGENAME": constants.PACKAGENAME,
         "HASHALG": HASH,
@@ -40,7 +44,7 @@ def preparePackage():
     os.makedirs(tools)
 
     for arch in archList:
-        fileName = f"Azure.Functions.Cli.{arch}.{constants.VERSION}.zip"
+        fileName = f"Azure.Functions.Cli.win-{arch.lower()}.{constants.VERSION}.zip"
         url = f'https://functionscdn.azureedge.net/public/{constants.VERSION}/{fileName}'
         substitutionMapping[f"ZIPURL_{arch}"] = url
 
@@ -62,7 +66,7 @@ def preparePackage():
     t = Template(stringData)
     with open(os.path.join(tools, "chocolateyinstall.ps1"), "w") as f:
         print("writing install powershell script")
-    f.write(t.safe_substitute(substitutionMapping))
+        f.write(t.safe_substitute(substitutionMapping))
 
     # write nuspec package metadata
     with open(os.path.join(scriptDir,"nuspec_template")) as f:
