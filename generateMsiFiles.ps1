@@ -24,8 +24,7 @@ $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVer
 
 # Generate MSI installers for Windows
 # TODO: add 'arm64' to the below array once a production-ready version of the WiX toolset supporting
-# it is released. Currently, only v3.14 and v4 preview support it: https://github.com/wixtoolset/issues/issues/6513
-# However, neither are production-ready: https://wixtoolset.org/releases/
+# it is released. See https://github.com/Azure/azure-functions-core-tools/issues/3122
 @('x64', 'x86') | ForEach-Object { 
     $platform = $_
     $targetDir = "$artifactsPath\win-$platform"

@@ -9,14 +9,15 @@ $checksum_arm64 = '$CHECKSUM_ARM64'
 $checksum_x86   = '$CHECKSUM_X86'
 $checksum_x64   = '$CHECKSUM_X64'
 
-# If specifically asked for x64 or arm64, we use that
+# Get-PackageParameters returns a hash table array of values
 $pp = Get-PackageParameters
-if ($pp['x64'])
+# If specifically asked for x64 or arm64, we use that
+if ($pp.ContainsKey('x64'))
 {
   $url = $url_x64
   $checksum = $checksum_x64
 }
-elseif ($pp['arm64'])
+elseif ($pp.ContainsKey('arm64'))
 {
   $url =  $url_arm64
   $checksum = $checksum_arm64

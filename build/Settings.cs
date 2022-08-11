@@ -63,20 +63,20 @@ namespace Build
             { "min.win-arm64", "WINDOWS"},
         };
 
-        private static readonly string[] _winPowershellRuntimes = new[] {
-            "win-x64",
+        private static readonly string[] _winPowershellRuntimes = new[]
+        {
             "win-x86",
-            "win-arm64",
             "win",
             "win10-x86",
             "win8-x86",
             "win81-x86",
             "win7-x86",
+            "win-arm64",
             "win-x64",
             "win10-x64",
             "win8-x64",
             "win81-x64",
-            "win7-x64" 
+            "win7-x64"
         };
 
         public static readonly Dictionary<string, Dictionary<string, string[]>> ToolsRuntimeToPowershellRuntimes = new Dictionary<string, Dictionary<string, string[]>>
