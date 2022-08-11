@@ -25,7 +25,11 @@ function getPath() {
 let platform = '';
 
 if (os.platform() === 'win32') {
-    platform = 'win-x64';
+    if (os.arch() === 'arm64') {
+        platform = 'win-arm64';
+    } else {
+        platform = 'win-x64';
+    }
 } else if (os.platform() === 'darwin') {
     if (os.arch() === 'arm64') {
         platform = 'osx-arm64';
