@@ -17,6 +17,10 @@ namespace Azure.Functions.Cli.Common
 
         [JsonProperty("files")]
         public Dictionary<string, string> Files { get; set; }
+
+        // TODO: remove this once a long-term solution for templates for the new programming models is implemented
+        [JsonProperty("programming_model")]
+        public ProgrammingModel ProgrammingModel { get; set; }
     }
 
     internal class TemplateMetadata

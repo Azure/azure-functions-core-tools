@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Common
         {
             get
             {
-                var secretsFile = "local.settings.json";
+                var secretsFile = Constants.LocalSettingsJsonFileName;
                 var rootPath = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory, new List<string>
                 {
                     ScriptConstants.HostMetadataFileName,

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
@@ -15,6 +16,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string Language { get; set; }
 
+        public string ProgrammingModel { get; set; }
+
         public ListTemplatesAction(ITemplatesManager templatesManager)
         {
             _templatesManager = templatesManager;
@@ -27,16 +30,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Language to list templates for. Default is all languages.")
                 .SetDefault(string.Empty)
                 .Callback(l => Language = l);
-
+            Parser
+                .Setup<string>('m', "model")
+                .WithDescription($"Selects the programming model to list templates for. Options are {EnumerationHelper.Join(", ", ProgrammingModelHelper.GetProgrammingModels())}. Default is {Common.ProgrammingModel.Default.ToString()}")
+                .Callback(m => ProgrammingModel = m);
             return base.ParseArgs(args);
         }
 
         public override async Task RunAsync()
         {
             var templates = await _templatesManager.Templates;
+            var resolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, Language);
             templates = string.IsNullOrWhiteSpace(Language)
-                ? templates
-                : templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase));
+            ? templates
+            : templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase))
+                .Where(t => t.ProgrammingModel == resolvedProgrammingModel);
 
             foreach (var languageGrouping in templates.GroupBy(t => t.Metadata.Language, StringComparer.OrdinalIgnoreCase))
             {

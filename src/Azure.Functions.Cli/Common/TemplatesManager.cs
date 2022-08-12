@@ -44,7 +44,45 @@ namespace Azure.Functions.Cli.Common
                 templatesJson = GetTemplatesJson();
             }
 
-            return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
+            var extensionBundleTemplates = JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
+            return extensionBundleTemplates.Concat(await GetStaticTemplates());
+        }
+
+        // TODO: Remove this method once a solution for templates has been found
+        private static async Task<IEnumerable<Template>> GetStaticTemplates()
+        {
+            var templatesList = new string[] {
+                "BlobTrigger-Python-Preview-Append",
+                "CosmosDBTrigger-Python-Preview-Append",
+                "EventHubTrigger-Python-Preview-Append",
+                "HttpTrigger-Python-Preview-Append",
+                "QueueTrigger-Python-Preview-Append",
+                "ServiceBusQueueTrigger-Python-Preview-Append",
+                "ServiceBusTopicTrigger-Python-Preview-Append",
+                "TimerTrigger-Python-Preview-Append"
+            };
+
+            IEnumerable<Template> templates = new List<Template>();
+            foreach (var templateName in templatesList)
+            {
+                templates.Append(await CreateStaticTemplate(templateName));
+            }
+            return templates;
+        }
+
+        // TODO: Remove this hardcoding once a solution for templates has been found
+        private static async Task<Template> CreateStaticTemplate(string templateName)
+        {
+            Template template = new Template();
+            template.Id = templateName;
+            template.Metadata = JsonConvert.DeserializeObject<TemplateMetadata>(
+                await StaticResources.GetValue($"{templateName}.metadata.json"
+            ));
+            template.Files = new Dictionary<string, string> {
+                { "function_app.py", await StaticResources.GetValue($"{templateName}.function_app.py") }
+            };
+            template.ProgrammingModel = ProgrammingModel.Preview;
+            return template;
         }
 
         private static string GetTemplatesJson()

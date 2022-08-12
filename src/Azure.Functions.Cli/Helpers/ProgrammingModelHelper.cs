@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Azure.Functions.Cli.Common;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -13,17 +15,17 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         // Given a worker runtime, this function returns a collection of the programming models that are supported.
-        public static IEnumerable<ProgrammingModel> GetSupportedProgrammingModels(WorkerRuntime workerRuntime)
+        public static IEnumerable<ProgrammingModel> GetSupportedProgrammingModels(string language)
         {
             var allProgrammingModels = GetProgrammingModels();
-            if (workerRuntime != WorkerRuntime.python)
+            if (!string.Equals(language, Constants.Languages.Python))
             {
                 return allProgrammingModels.Where(pm => pm != ProgrammingModel.Preview);
             }
             return allProgrammingModels;
         }
 
-        public static ProgrammingModel ResolveProgrammingModel(string programmingModel, WorkerRuntime workerRuntime, string language)
+        public static ProgrammingModel ResolveProgrammingModel(string programmingModel, string language)
         {
             if (GlobalCoreToolsSettings.CurrentProgrammingModel != null)
             {
@@ -42,9 +44,25 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 // TODO: Explicitly define the association between language, worker-runtime, and programming model
-                throw new CliArgumentsException($"The programming model {programmingModel} is not supported. Valid options for language {language} and worker-runtime {workerRuntime.ToString()} are:\n{EnumerationHelper.Join("\n", GetSupportedProgrammingModels(workerRuntime))}");
+                throw new CliArgumentsException($"The programming model {programmingModel} is not supported. Valid options for language {language} are:\n{EnumerationHelper.Join("\n", GetSupportedProgrammingModels(language))}");
             }
             return GlobalCoreToolsSettings.CurrentProgrammingModel.Value;
+        }
+
+        // Checks if the existing function application is using the new programming model (irrespective of language)
+        public static bool isNewProgrammingModel()
+        {
+            if (GlobalCoreToolsSettings.CurrentProgrammingModel == ProgrammingModel.Preview)
+            {
+                return true;
+            }
+            // If the programming model is not apparent from GlobalCoreToolsSettings, check local.settings.json
+            var localSettingsJsonContent = JObject.Parse(
+                FileSystemHelpers.ReadAllTextFromFile(
+                    Path.Join(Environment.CurrentDirectory, Constants.LocalSettingsJsonFileName)));
+            JToken workerIndexingEnabled;
+            return localSettingsJsonContent.TryGetValue(Constants.EnableWorkerIndexing, out workerIndexingEnabled)
+                && Boolean.Parse(workerIndexingEnabled.ToString());
         }
     }
 }

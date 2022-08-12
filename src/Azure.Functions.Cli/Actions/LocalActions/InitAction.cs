@@ -179,8 +179,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
                 // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
                 // before attempting to resolve the programming model.
-                var supportedProgrammingModels = ProgrammingModelHelper.GetSupportedProgrammingModels(ResolvedWorkerRuntime);
-                ResolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, ResolvedWorkerRuntime, ResolvedLanguage);
+                var supportedProgrammingModels = ProgrammingModelHelper.GetSupportedProgrammingModels(ResolvedLanguage);
+                ResolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, ResolvedLanguage);
                 if (!supportedProgrammingModels.Contains(ResolvedProgrammingModel))
                 {
                     throw new CliArgumentsException(

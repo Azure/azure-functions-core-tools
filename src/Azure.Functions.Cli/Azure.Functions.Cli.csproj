@@ -34,6 +34,56 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
   <ItemGroup>
+    
+    <EmbeddedResource Include="StaticResources\Templates\BlobTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\BlobTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\CosmosDBTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).CosmosDBTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\CosmosDBTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).CosmosDBTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\EventHubTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).EventHubTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\EventHubTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).EventHubTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\HttpTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\HttpTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\QueueTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).QueueTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\QueueTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).QueueTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\ServiceBusQueueTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).ServiceBusQueueTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\ServiceBusQueueTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).ServiceBusQueueTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+  <EmbeddedResource Include="StaticResources\Templates\ServiceBusTopicTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).ServiceBusTopicTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\ServiceBusTopicTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).ServiceBusTopicTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\TimerTrigger-Python-Preview-Append\function_app.py">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Templates\TimerTrigger-Python-Preview-Append\metadata.json">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>

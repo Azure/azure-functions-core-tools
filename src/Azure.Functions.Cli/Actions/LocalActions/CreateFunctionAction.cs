@@ -148,7 +148,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             // Check if the programming model is PyStein
-            if (isNewPythonProgrammingModel())
+            if (ProgrammingModelHelper.isNewProgrammingModel())
             {
                 // TODO: Remove these messages once creating new functions in the new programming model is supported
                 ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
@@ -216,7 +216,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
-            if (!isNewPythonProgrammingModel())
+            if (!ProgrammingModelHelper.isNewProgrammingModel() && string.Equals(Language, Constants.Languages.Python, StringComparison.CurrentCultureIgnoreCase))
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }
@@ -275,12 +275,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 funcObj.Add("scriptFile", $"../dist/{functionName}/index.js");
                 FileSystemHelpers.WriteAllTextToFile(funcJsonFile, JsonConvert.SerializeObject(funcObj, Formatting.Indented));
             }
-        }
-
-        private bool isNewPythonProgrammingModel()
-        {
-            return string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
-                && FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy));
         }
     }
 }
