@@ -148,7 +148,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             // Check if the programming model is PyStein
-            if (ProgrammingModelHelper.isNewProgrammingModel())
+            if (ProgrammingModelHelper.IsNewProgrammingModel())
             {
                 // TODO: Remove these messages once creating new functions in the new programming model is supported
                 ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
@@ -216,7 +216,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
-            if (!ProgrammingModelHelper.isNewProgrammingModel() && string.Equals(Language, Constants.Languages.Python, StringComparison.CurrentCultureIgnoreCase))
+            if (!ProgrammingModelHelper.IsNewProgrammingModel() && string.Equals(Language, Constants.Languages.Python, StringComparison.CurrentCultureIgnoreCase))
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }

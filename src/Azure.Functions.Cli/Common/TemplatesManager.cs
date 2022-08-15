@@ -62,10 +62,10 @@ namespace Azure.Functions.Cli.Common
                 "TimerTrigger-Python-Preview-Append"
             };
 
-            IEnumerable<Template> templates = new List<Template>();
+            IList<Template> templates = new List<Template>();
             foreach (var templateName in templatesList)
             {
-                templates.Append(await CreateStaticTemplate(templateName));
+                templates.Add(await CreateStaticTemplate(templateName));
             }
             return templates;
         }

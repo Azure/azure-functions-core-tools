@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Helpers;
@@ -41,19 +42,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             var templates = await _templatesManager.Templates;
             var resolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, Language);
+
             templates = string.IsNullOrWhiteSpace(Language)
             ? templates
-            : templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase))
-                .Where(t => t.ProgrammingModel == resolvedProgrammingModel);
+            : templates.Where(t => t.Metadata.Language.Equals(Language, StringComparison.OrdinalIgnoreCase));
+            templates = string.IsNullOrWhiteSpace(ProgrammingModel)
+            ? templates
+            : templates.Where(t => t.ProgrammingModel == resolvedProgrammingModel);
 
-            foreach (var languageGrouping in templates.GroupBy(t => t.Metadata.Language, StringComparer.OrdinalIgnoreCase))
+            foreach (var languageGrouping in templates.GroupBy(t => t.Metadata.Language, StringComparer.InvariantCultureIgnoreCase))
             {
                 ColoredConsole.WriteLine(TitleColor($"{languageGrouping.Key} Templates:"));
-                foreach (var template in languageGrouping)
+                foreach (var programmingModelGrouping in languageGrouping.GroupBy(t => t.ProgrammingModel))
                 {
-                    ColoredConsole.WriteLine($"  {template.Metadata.Name}");
+                    ColoredConsole.WriteLine(ExampleColor($"{programmingModelGrouping.Key}:"));
+                    foreach (var template in programmingModelGrouping)
+                    {
+                        ColoredConsole.WriteLine($"  {template.Metadata.Name}");
+                    }
+                    ColoredConsole.WriteLine();
                 }
-                ColoredConsole.WriteLine();
             }
         }
     }

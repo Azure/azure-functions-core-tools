@@ -25,6 +25,7 @@ namespace Azure.Functions.Cli.Helpers
             return allProgrammingModels;
         }
 
+        // Parses out the corresponding ProgrammingModel given arguments supplied by the Core Tools user
         public static ProgrammingModel ResolveProgrammingModel(string programmingModel, string language)
         {
             if (GlobalCoreToolsSettings.CurrentProgrammingModel != null)
@@ -49,8 +50,9 @@ namespace Azure.Functions.Cli.Helpers
             return GlobalCoreToolsSettings.CurrentProgrammingModel.Value;
         }
 
-        // Checks if the existing function application is using the new programming model (irrespective of language)
-        public static bool isNewProgrammingModel()
+        // Checks if the existing function application is using the new programming model (irrespective of language).
+        // This function assumes that `local.settings.json` has been written.
+        public static bool IsNewProgrammingModel()
         {
             if (GlobalCoreToolsSettings.CurrentProgrammingModel == ProgrammingModel.Preview)
             {
@@ -59,7 +61,7 @@ namespace Azure.Functions.Cli.Helpers
             // If the programming model is not apparent from GlobalCoreToolsSettings, check local.settings.json
             var localSettingsJsonContent = JObject.Parse(
                 FileSystemHelpers.ReadAllTextFromFile(
-                    Path.Join(Environment.CurrentDirectory, Constants.LocalSettingsJsonFileName)));
+                    Path.Join(Environment.CurrentDirectory, "local.settings.json")));
             JToken workerIndexingEnabled;
             return localSettingsJsonContent.TryGetValue(Constants.EnableWorkerIndexing, out workerIndexingEnabled)
                 && Boolean.Parse(workerIndexingEnabled.ToString());
