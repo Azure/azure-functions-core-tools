@@ -29,9 +29,15 @@ namespace Azure.Functions.Cli.Helpers
             return userSecretsId;
         }
 
-        public static string FindProjectFile(string path, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions)
+        public static string FindProjectFile(string path, LoggingFilterHelper loggingFilterHelper = null, LoggerFilterOptions loggerFilterOptions = null)
         {
-            ColoredConsoleLogger logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper, loggerFilterOptions);
+            ColoredConsoleLogger logger = null;
+            if (loggingFilterHelper != null && loggerFilterOptions != null)
+            {
+                logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper, loggerFilterOptions);
+            }
+            var shouldLog = logger == null;
+            
             DirectoryInfo filePath = new DirectoryInfo(path);
             do
             {
@@ -40,8 +46,11 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     foreach (FileInfo file in projectFiles)
                     {
-                        if (string.Equals(file.Name, Constants.ExtenstionsCsProjFile, StringComparison.OrdinalIgnoreCase)) continue;
-                        logger.LogDebug($"Found {file.FullName}. Using for user secrets file configuration.");
+                        if (string.Equals(file.Name, Constants.ExtensionsCsProjFile, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (shouldLog)
+                        {
+                            logger.LogDebug($"Found {file.FullName}. Using for user secrets file configuration.");
+                        }
                         return file.FullName;
                     }
                 }
@@ -49,7 +58,10 @@ namespace Azure.Functions.Cli.Helpers
             }
             while (filePath.FullName != filePath.Root.FullName);
 
-            logger.LogDebug($"Csproj not found in {path} directory tree. Skipping user secrets file configuration.");
+            if (shouldLog)
+            {
+                logger.LogDebug($"Csproj not found in {path} directory tree. Skipping user secrets file configuration.");
+            }
             return null;
         }
 

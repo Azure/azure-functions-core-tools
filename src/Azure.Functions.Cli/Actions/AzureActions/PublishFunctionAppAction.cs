@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
-        private const string _requiredNetFrameworkVersion = "6.0";
+        private static string _requiredNetFrameworkVersion = "6.0";
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
@@ -150,6 +150,31 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Get the WorkerRuntime
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+
+            // Determine the appropriate default targetFramework
+            if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime))
+            {
+                string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
+                if (projectFilePath != null)
+                {
+                    var projectRoot = ProjectHelpers.GetProject(projectFilePath);
+                    var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
+                    switch (targetFramework)
+                    {
+                        case "net7.0":
+                            _requiredNetFrameworkVersion = "7.0";
+                            break;
+                        case "net6.0":
+                            break;
+                        case "net48":
+                            _requiredNetFrameworkVersion = "48";
+                            break;
+                        default:
+                            throw new CliException($"Detected unsupported targetFramework {targetFramework} in {projectFilePath}");
+                    }
+                }
+                // We do not change the default targetFramework if no .csproj file is found
+            }
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
@@ -1103,7 +1128,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // remove any leading "v" and try again
                 if (!Version.TryParse(version.ToLower().TrimStart('v'), out parsedVersion))
                 {
-                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '{_requiredNetFrameworkVersion}'.");
+                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '6.0'.");
                 }
             }
 

@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
                 extensionsDir = Environment.CurrentDirectory;
             }
 
-            var extensionsProj = Path.Combine(extensionsDir, Constants.ExtenstionsCsProjFile);
+            var extensionsProj = Path.Combine(extensionsDir, Constants.ExtensionsCsProjFile);
             if (!FileSystemHelpers.FileExists(extensionsProj))
             {
                 FileSystemHelpers.EnsureDirectory(extensionsDir);

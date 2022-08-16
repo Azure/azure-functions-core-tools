@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
         public const string ProxiesJsonFileName = "proxies.json";
-        public const string ExtenstionsCsProjFile = "extensions.csproj";
+        public const string ExtensionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
         public const string FunctionsExtensionVersion = "FUNCTIONS_EXTENSION_VERSION";
@@ -55,6 +55,7 @@ namespace Azure.Functions.Cli.Common
         public const string HttpTriggerTemplateName = "HttpTrigger";
         public const string PowerShellWorkerDefaultVersion = "~7";
         public const string UserSecretsIdElementName = "UserSecretsId";
+        public const string TargetFrameworkElementName = "TargetFramework";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
         public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
