@@ -18,6 +18,13 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
+    internal enum BackendType
+    {
+        AzureStorage,
+        Netherite,
+        MSSQL
+    }
+
     internal class DurableManager : IDurableManager
     {
         private ISecretsManager _secretsManager;
@@ -49,6 +56,8 @@ namespace Azure.Functions.Cli.Common
             _secretsManager = secretsManager;
             SetConnectionStringAndTaskHubName();
         }
+
+        public BackendType BackendType { get; private set; } = BackendType.AzureStorage;
 
         private void SetConnectionStringAndTaskHubName()
         {
@@ -85,8 +94,18 @@ namespace Azure.Functions.Cli.Common
 
                         if (durableTask.TryGetValue("storageProvider", StringComparison.OrdinalIgnoreCase, out JToken storageProviderToken))
                         {
-                            JObject storageProviderObject = storageProviderToken as JObject;
-                            _partitionCount = storageProviderObject?.GetValue("partitionCount", StringComparison.OrdinalIgnoreCase)?.Value<int?>();
+                            if (storageProviderToken is JObject storageProviderObject)
+                            {
+                                if (storageProviderObject.TryGetValue("type", out JToken typeValue) && typeValue.Type == JTokenType.String)
+                                {
+                                    if (Enum.TryParse(typeValue.Value<string>(), ignoreCase: true, out BackendType backendType))
+                                    {
+                                        this.BackendType = backendType;
+                                    }
+                                }
+
+                                _partitionCount = storageProviderObject?.GetValue("partitionCount", StringComparison.OrdinalIgnoreCase)?.Value<int?>();
+                            }
                         }
                     }
                 }
@@ -135,6 +154,12 @@ namespace Azure.Functions.Cli.Common
         private void Initialize(out AzureStorageOrchestrationService orchestrationService, out TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
         {
             CheckAssemblies();
+
+            if (this.BackendType != BackendType.AzureStorage)
+            {
+                throw new CliException($"The {this.BackendType} storage provider for Durable Functions is not yet supported by this command.");
+            }
+
             SetStorageServiceAndTaskHubClient(out orchestrationService, out taskHubClient, connectionStringKey, taskHubName);
         }
 
