@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper, loggerFilterOptions);
             }
-            var shouldLog = logger == null;
+            bool shouldLog = logger != null;
             
             DirectoryInfo filePath = new DirectoryInfo(path);
             do

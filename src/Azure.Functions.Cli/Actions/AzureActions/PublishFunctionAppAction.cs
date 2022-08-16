@@ -405,47 +405,28 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
 
-            string linuxFxVersion;
+            string linuxFxVersion = $"DOTNET-ISOLATED|{normalizedVersion}";
 
-            if (functionApp.IsDynamic)
+            // If things are already set, do nothing
+            if (string.Equals(functionApp.LinuxFxVersion, linuxFxVersion, StringComparison.OrdinalIgnoreCase))
             {
-                if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
-                {
-                    linuxFxVersion = string.Empty;
-                }
-                else
-                {
-                    return;
-                }
-            }
-            else
-            {
-                linuxFxVersion = $"DOTNET-ISOLATED|{normalizedVersion}";
-
-                // If things are already set, do nothing
-                if (string.Equals(functionApp.LinuxFxVersion, linuxFxVersion, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                return;
             }
 
-            if (linuxFxVersion != null)
+            ColoredConsole.WriteLine($"Updating '{Constants.LinuxFxVersion}' to '{linuxFxVersion}'.");
+
+            var updatedSettings = new Dictionary<string, string>
             {
-                ColoredConsole.WriteLine($"Updating '{Constants.LinuxFxVersion}' to '{linuxFxVersion}'.");
+                [Constants.LinuxFxVersion] = linuxFxVersion
+            };
 
-                var updatedSettings = new Dictionary<string, string>
-                {
-                    [Constants.LinuxFxVersion] = linuxFxVersion
-                };
+            var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
 
-                var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
-
-                if (!settingsResult.IsSuccessful)
-                {
-                    ColoredConsole.Error
-                        .WriteLine(ErrorColor("Error updating linux image property:"))
-                        .WriteLine(ErrorColor(settingsResult.ErrorResult));
-                }
+            if (!settingsResult.IsSuccessful)
+            {
+                ColoredConsole.Error
+                    .WriteLine(ErrorColor("Error updating linux image property:"))
+                    .WriteLine(ErrorColor(settingsResult.ErrorResult));
             }
         }
 
