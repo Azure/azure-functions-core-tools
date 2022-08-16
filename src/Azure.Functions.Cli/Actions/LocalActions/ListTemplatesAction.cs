@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 ColoredConsole.WriteLine(TitleColor($"{languageGrouping.Key} Templates:"));
                 foreach (var programmingModelGrouping in languageGrouping.GroupBy(t => t.ProgrammingModel))
                 {
-                    ColoredConsole.WriteLine(ExampleColor($"{programmingModelGrouping.Key}:"));
+                    ColoredConsole.WriteLine(ExampleColor($"{programmingModelGrouping.Key.ToString()}:"));
                     foreach (var template in programmingModelGrouping)
                     {
                         ColoredConsole.WriteLine($"  {template.Metadata.Name}");
