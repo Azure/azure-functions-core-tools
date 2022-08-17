@@ -152,7 +152,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Determine the appropriate default targetFramework
-            if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime))
+            // NOTE: .NET 7.0 and .NET Framework 4.8 are only supported on dotnet-isolated
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
@@ -167,7 +168,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         case "net6.0":
                             break;
                         case "net48":
-                            _requiredNetFrameworkVersion = "48";
+                            _requiredNetFrameworkVersion = "4.8";
                             break;
                         default:
                             throw new CliException($"Detected unsupported targetFramework {targetFramework} in {projectFilePath}");
