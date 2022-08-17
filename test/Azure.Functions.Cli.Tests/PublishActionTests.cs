@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Tests
             // update it to empty
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
-            Assert.Equal(expectedNetFrameworkVersion, setting.Value);
+            Assert.Equal($"DOTNET-ISOLATED|{expectedNetFrameworkVersion}", setting.Value);
         }
 
         [Theory]
