@@ -166,10 +166,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         case "net7.0":
                             _requiredNetFrameworkVersion = "7.0";
                             break;
-                        case "net6.0":
-                            break;
                         default:
-                            throw new CliException($"Detected unsupported targetFramework {targetFramework} in {projectFilePath}");
+                            break;
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found
