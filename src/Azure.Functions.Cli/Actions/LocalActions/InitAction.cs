@@ -246,20 +246,24 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static string LanguageSelectionIfRelevant(WorkerRuntime workerRuntime)
         {
-            if (workerRuntime == Helpers.WorkerRuntime.node
-                || workerRuntime == Helpers.WorkerRuntime.dotnetIsolated
-                || workerRuntime == Helpers.WorkerRuntime.dotnet)
+            var language = string.Empty;
+            if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
+                && languages.Count() != 0)
             {
-                if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
-                    && languages.Count() != 0)
+                if (languages.Count() > 1)
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                    var language = SelectionMenuHelper.DisplaySelectionWizard(languages);
+                    language = SelectionMenuHelper.DisplaySelectionWizard(languages);
                     ColoredConsole.WriteLine(TitleColor(language));
                     return language;
                 }
+                else
+                {
+                    language = languages.First();
+                }
+                
             }
-            return string.Empty;
+            return language;
         }
 
         private static async Task InitLanguageSpecificArtifacts(

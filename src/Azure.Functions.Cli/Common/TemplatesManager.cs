@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Colors.Net;
 using Newtonsoft.Json;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
+using Azure.Functions.Cli.Helpers;
 using System.Linq;
 using System.Reflection;
 
@@ -96,49 +98,67 @@ namespace Azure.Functions.Cli.Common
             return FileSystemHelpers.ReadAllTextFromFile(templatesLocation);
         }
 
-        public async Task Deploy(string Name, Template template)
+        public async Task Deploy(string Name, Template template, bool isNewProgrammingModel)
         {
-            var path = Path.Combine(Environment.CurrentDirectory, Name);
-            if (FileSystemHelpers.DirectoryExists(path))
+            if (isNewProgrammingModel)
             {
-                var response = "n";
-                do
+                var fileName = ProgrammingModelHelper.GetNewProgrammingModelFunctionAppFileName(template.Metadata.Language);
+                var path = Path.Join(Environment.CurrentDirectory, fileName);
+                if (!FileSystemHelpers.FileExists(path))
                 {
-                    ColoredConsole.Write($"A directory with the name {Name} already exists. Overwrite [y/n]? [n] ");
-                    response = Console.ReadLine();
-                } while (response != "n" && response != "y");
-                if (response == "n")
-                {
-                    return;
+                    throw new CliException($"{fileName} was not found! This file is required for the new programming model for {template.Metadata.Language}");
                 }
-            }
+                
+                var templateContent = template.Files[fileName];
+                templateContent = Regex.Replace(templateContent, template.Metadata.DefaultFunctionName, Name);
 
-            if (FileSystemHelpers.DirectoryExists(path))
-            {
-                FileSystemHelpers.DeleteDirectorySafe(path, ignoreErrors: false);
+                // Add a new line before appending the function
+                FileSystemHelpers.AppendAllTextToFile(path, Environment.NewLine + templateContent);                
             }
-
-            FileSystemHelpers.EnsureDirectory(path);
-
-            foreach (var file in template.Files.Where(kv => !kv.Key.EndsWith(".dat")))
+            else
             {
-                var filePath = Path.Combine(path, file.Key);
-                ColoredConsole.WriteLine($"Writing {filePath}");
-                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, file.Value);
-            }
-            var functionJsonPath = Path.Combine(path, "function.json");
-            ColoredConsole.WriteLine($"Writing {functionJsonPath}");
-            await FileSystemHelpers.WriteAllTextToFileAsync(functionJsonPath, JsonConvert.SerializeObject(template.Function, Formatting.Indented));
-            if (template.Metadata.Extensions != null)
-            {
-                foreach (var extension in template.Metadata.Extensions)
+                var path = Path.Combine(Environment.CurrentDirectory, Name);
+                if (FileSystemHelpers.DirectoryExists(path))
                 {
-                    var installAction = new InstallExtensionAction(_secretsManager, false)
+                    var response = "n";
+                    do
                     {
-                        Package = extension.Id,
-                        Version = extension.Version
-                    };
-                    await installAction.RunAsync();
+                        ColoredConsole.Write($"A directory with the name {Name} already exists. Overwrite [y/n]? [n] ");
+                        response = Console.ReadLine();
+                    } while (response != "n" && response != "y");
+                    if (response == "n")
+                    {
+                        return;
+                    }
+                }
+
+                if (FileSystemHelpers.DirectoryExists(path))
+                {
+                    FileSystemHelpers.DeleteDirectorySafe(path, ignoreErrors: false);
+                }
+
+                FileSystemHelpers.EnsureDirectory(path);
+
+                foreach (var file in template.Files.Where(kv => !kv.Key.EndsWith(".dat")))
+                {
+                    var filePath = Path.Combine(path, file.Key);
+                    ColoredConsole.WriteLine($"Writing {filePath}");
+                    await FileSystemHelpers.WriteAllTextToFileAsync(filePath, file.Value);
+                }
+                var functionJsonPath = Path.Combine(path, "function.json");
+                ColoredConsole.WriteLine($"Writing {functionJsonPath}");
+                await FileSystemHelpers.WriteAllTextToFileAsync(functionJsonPath, JsonConvert.SerializeObject(template.Function, Formatting.Indented));
+                if (template.Metadata.Extensions != null)
+                {
+                    foreach (var extension in template.Metadata.Extensions)
+                    {
+                        var installAction = new InstallExtensionAction(_secretsManager, false)
+                        {
+                            Package = extension.Id,
+                            Version = extension.Version
+                        };
+                        await installAction.RunAsync();
+                    }
                 }
             }
         }

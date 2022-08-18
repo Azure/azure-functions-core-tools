@@ -68,9 +68,13 @@ namespace Azure.Functions.Cli.Helpers
 
         public static readonly IDictionary<WorkerRuntime, IEnumerable<string>> WorkerToSupportedLanguages = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
-            { WorkerRuntime.node, new [] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
             { WorkerRuntime.dotnet, new [] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
-            { WorkerRuntime.dotnetIsolated, new [] { Constants.Languages.CSharpIsolated, Constants.Languages.FSharpIsolated } }
+            { WorkerRuntime.dotnetIsolated, new [] { Constants.Languages.CSharpIsolated, Constants.Languages.FSharpIsolated } },
+            { WorkerRuntime.node, new [] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
+            { WorkerRuntime.python, new [] { Constants.Languages.Python } },
+            { WorkerRuntime.java, new [] { Constants.Languages.Java } },
+            { WorkerRuntime.powershell, new [] { Constants.Languages.Powershell } },
+            { WorkerRuntime.custom, new [] { Constants.Languages.JavaScript, Constants.Languages.Custom } }
         };
 
         public static string AvailableWorkersRuntimeString =>

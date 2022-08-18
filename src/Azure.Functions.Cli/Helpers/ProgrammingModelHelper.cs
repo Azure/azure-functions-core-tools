@@ -62,9 +62,25 @@ namespace Azure.Functions.Cli.Helpers
             var localSettingsJsonContent = JObject.Parse(
                 FileSystemHelpers.ReadAllTextFromFile(
                     Path.Join(Environment.CurrentDirectory, "local.settings.json")));
-            JToken workerIndexingEnabled;
-            return localSettingsJsonContent.TryGetValue(Constants.EnableWorkerIndexing, out workerIndexingEnabled)
-                && Boolean.Parse(workerIndexingEnabled.ToString());
+            
+            if (localSettingsJsonContent.TryGetValue("Values", StringComparison.OrdinalIgnoreCase, out var valuesContent))
+            {
+                var values = valuesContent as JObject;
+                var isNewProgrammingModel = values.TryGetValue(Constants.AzureWebJobsFeatureFlags, out var workerIndexingEnabled)
+                    && workerIndexingEnabled.ToObject<string>().Equals(Constants.EnableWorkerIndexing);
+                GlobalCoreToolsSettings.CurrentProgrammingModel = isNewProgrammingModel ? ProgrammingModel.Preview : ProgrammingModel.Default;
+                return isNewProgrammingModel;
+            }
+            return false;          
+        }
+
+        public static string GetNewProgrammingModelFunctionAppFileName(string language)
+        {
+            if (language.Equals(Constants.Languages.Python, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return Constants.PySteinFunctionAppPy;
+            }
+            return null;
         }
     }
 }

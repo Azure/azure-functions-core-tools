@@ -52,6 +52,11 @@ namespace Azure.Functions.Cli.Common
             Instance.File.WriteAllText(path, content);
         }
 
+        public static void AppendAllTextToFile(string path, string content)
+        {
+            Instance.File.AppendAllText(path, content);
+        }
+
         public static async Task WriteAllTextToFileAsync(string path, string content)
         {
             using (var fileStream = OpenFile(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))

@@ -94,7 +94,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             if (!FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json")))
             {
-                // we're assuming "func init" has not been run
+                // Assume that "func init" has not been run
                 await _initAction.RunAsync();
                 workerRuntime = _initAction.ResolvedWorkerRuntime;
                 Language = _initAction.ResolvedLanguage;
@@ -147,13 +147,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
 
-            // Check if the programming model is PyStein
-            if (ProgrammingModelHelper.IsNewProgrammingModel())
+            var x = ProgrammingModelHelper.IsNewProgrammingModel();
+
+            // Check if the programming model is new and NOT PyStein
+            if (ProgrammingModelHelper.IsNewProgrammingModel() && !string.Equals(Language, Constants.Languages.Python, StringComparison.InvariantCultureIgnoreCase))
             {
+                ColoredConsole.WriteLine(WarningColor($"The {GlobalCoreToolsSettings.CurrentProgrammingModel.ToString()} is not yet supported for language {Language}"));
                 // TODO: Remove these messages once creating new functions in the new programming model is supported
-                ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
-                ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
-                PythonHelpers.PrintPySteinWikiLink();
+                // ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
+                // ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
+                // PythonHelpers.PrintPySteinWikiLink();
                 throw new CliException(
                     "Function not created!");
             }
@@ -183,10 +186,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
                 TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(
+                    _templates.Value
+                        .Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase) && 
+                            t.ProgrammingModel == GlobalCoreToolsSettings.CurrentProgrammingModel)
+                        .Select(t => t.Metadata.Name).Distinct());
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
-                var template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                var template = _templates.Value
+                    .FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName)
+                         && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)
+                         && t.ProgrammingModel == GlobalCoreToolsSettings.CurrentProgrammingModel);
 
                 if (template == null)
                 {
@@ -211,7 +221,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
                     FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
-                    await _templatesManager.Deploy(FunctionName, template);
+                    await _templatesManager.Deploy(FunctionName, template, ProgrammingModelHelper.IsNewProgrammingModel());
                     PerformPostDeployTasks(FunctionName, Language);
                 }
             }
