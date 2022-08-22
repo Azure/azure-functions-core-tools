@@ -15,12 +15,12 @@ namespace Azure.Functions.Cli.Tests
         TestAzureHelperService _helperService = new TestAzureHelperService();
 
         [Theory]
-        [InlineData(null)]
+        [InlineData(null, "6.0")]
         [InlineData("something")]
-        public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_Updated(string initialLinuxFxVersion)
+        [InlineData("6.0", "6.0")]
+        [InlineData("7.0", "7.0")]
+        public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_Updated(string initialLinuxFxVersion, string expectedNetFrameworkVersion)
         {
-            var expectedNetFrameworkVersion = "6.0";
-
             var site = new Site("test")
             {
                 Kind = "linux",
