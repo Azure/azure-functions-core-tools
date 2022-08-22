@@ -161,13 +161,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     var projectRoot = ProjectHelpers.GetProject(projectFilePath);
                     var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
-                    switch (targetFramework)
+                    if (targetFramework.Equals("net7.0", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        case "net7.0":
-                            _requiredNetFrameworkVersion = "7.0";
-                            break;
-                        default:
-                            break;
+                        _requiredNetFrameworkVersion = "7.0";
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found
@@ -373,9 +369,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private static async Task UpdateNetFrameworkVersionWindows(Site functionApp, string dotnetFramworkVersion, AzureHelperService helperService)
+        private static async Task UpdateNetFrameworkVersionWindows(Site functionApp, string dotnetFrameworkVersion, AzureHelperService helperService)
         {
-            string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
+            string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFrameworkVersion);
 
             // Websites ensure it begins with 'v'.
             string version = $"v{normalizedVersion}";
