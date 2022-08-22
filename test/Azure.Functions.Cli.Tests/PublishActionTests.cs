@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Tests
 
         [Theory]
         [InlineData(null, "6.0")]
-        [InlineData("something")]
+        [InlineData("something", "6.0")]
         [InlineData("6.0", "6.0")]
         [InlineData("7.0", "7.0")]
         public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_Updated(string initialLinuxFxVersion, string expectedNetFrameworkVersion)
