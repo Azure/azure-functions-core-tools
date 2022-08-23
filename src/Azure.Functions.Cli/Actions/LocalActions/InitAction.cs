@@ -380,7 +380,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell7);
+                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell72);
             }
             else if(workerRuntime == Helpers.WorkerRuntime.custom)
             {
