@@ -147,16 +147,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
 
-            var x = ProgrammingModelHelper.IsNewProgrammingModel();
+            var isNewProgrammingModel = ProgrammingModelHelper.IsNewProgrammingModel();
 
             // Check if the programming model is new and NOT PyStein
-            if (ProgrammingModelHelper.IsNewProgrammingModel() && !string.Equals(Language, Constants.Languages.Python, StringComparison.InvariantCultureIgnoreCase))
+            if (isNewProgrammingModel && !string.Equals(Language, Constants.Languages.Python, StringComparison.InvariantCultureIgnoreCase))
             {
                 ColoredConsole.WriteLine(WarningColor($"The {GlobalCoreToolsSettings.CurrentProgrammingModel.ToString()} is not yet supported for language {Language}"));
-                // TODO: Remove these messages once creating new functions in the new programming model is supported
-                // ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
-                // ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
-                // PythonHelpers.PrintPySteinWikiLink();
                 throw new CliException(
                     "Function not created!");
             }
@@ -221,12 +217,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
                     FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
-                    await _templatesManager.Deploy(FunctionName, template, ProgrammingModelHelper.IsNewProgrammingModel());
+                    await _templatesManager.Deploy(FunctionName, template, isNewProgrammingModel);
                     PerformPostDeployTasks(FunctionName, Language);
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
-            if (!ProgrammingModelHelper.IsNewProgrammingModel() && string.Equals(Language, Constants.Languages.Python, StringComparison.CurrentCultureIgnoreCase))
+            if (!isNewProgrammingModel && string.Equals(Language, Constants.Languages.Python, StringComparison.CurrentCultureIgnoreCase))
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }

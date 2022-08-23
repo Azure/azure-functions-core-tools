@@ -47,7 +47,13 @@ namespace Azure.Functions.Cli.Common
             }
 
             var extensionBundleTemplates = JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
-            return extensionBundleTemplates.Concat(await GetStaticTemplates());
+            // Extension bundle versions are strings in the form <majorVersion>.<minorVersion>.<patchVersion>
+            var extensionBundleMajorVersion = (await extensionBundleManager.GetExtensionBundleDetails()).Version[0];
+            if (extensionBundleMajorVersion == '2' || extensionBundleMajorVersion == '3')
+            {
+                return extensionBundleTemplates.Concat(await GetStaticTemplates());
+            }
+            return extensionBundleTemplates;
         }
 
         // TODO: Remove this method once a solution for templates has been found
@@ -109,9 +115,10 @@ namespace Azure.Functions.Cli.Common
                     throw new CliException($"{fileName} was not found! This file is required for the new programming model for {template.Metadata.Language}");
                 }
                 
-                var templateContent = template.Files[fileName];
+                ColoredConsole.WriteLine($"Writing {Name} to {path}");
+                // Assume the function code is located in the file named after the main function app file for that programming model
+                template.Files.TryGetValue(fileName, out string templateContent);
                 templateContent = Regex.Replace(templateContent, template.Metadata.DefaultFunctionName, Name);
-
                 // Add a new line before appending the function
                 FileSystemHelpers.AppendAllTextToFile(path, Environment.NewLine + templateContent);                
             }
