@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
             // We print a message to the user irrespective of whether they choose the default or preview programming model for
             // awareness and reference purposes respectively. These messages differ slightly to better indicate which model the
             // user selected.
-            if (programmingModel == ProgrammingModel.Preview)
+            if (programmingModel == ProgrammingModel.V2)
             {
                 PrintPySteinReferenceMessage();
             }
@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Helpers
             await CreateRequirements();
             await EnsureVirtualEnvironmentIgnored();
 
-            if (programmingModel == ProgrammingModel.Preview)
+            if (programmingModel == ProgrammingModel.V2)
             {
                 await CreateFile(Constants.PySteinFunctionAppPy);
             }
@@ -130,7 +130,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private async static Task CreateGettingStartedMarkdown(ProgrammingModel programmingModel)
         {
-            if (programmingModel == ProgrammingModel.Default)
+            if (programmingModel == ProgrammingModel.V1)
             {
                 // TODO: Include a GettingStarted or README.md document for PyStein applications and write it here
                 if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))

@@ -338,7 +338,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
             }
 
-            if (programmingModel == Common.ProgrammingModel.Preview)
+            if (programmingModel == Common.ProgrammingModel.V2)
             {
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.AzureWebJobsFeatureFlags, Constants.EnableWorkerIndexing);
             }

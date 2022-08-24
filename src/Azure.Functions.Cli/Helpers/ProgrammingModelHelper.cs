@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Helpers
             var allProgrammingModels = GetProgrammingModels();
             if (workerRuntime != WorkerRuntime.python)
             {
-                return allProgrammingModels.Where(pm => pm != ProgrammingModel.Preview);
+                return allProgrammingModels.Where(pm => pm != ProgrammingModel.V2);
             }
             return allProgrammingModels;
         }
@@ -32,7 +32,7 @@ namespace Azure.Functions.Cli.Helpers
             // We default to the "Default" programming model if the model parameter is not specified
             if (string.IsNullOrEmpty(programmingModel))
             {
-                GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.Default;
+                GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.V1;
             }
             else if (GetProgrammingModels().Any(pm => string.Equals(programmingModel, pm.ToString(), StringComparison.InvariantCultureIgnoreCase)))
             {
