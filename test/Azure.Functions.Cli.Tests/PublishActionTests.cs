@@ -14,38 +14,26 @@ namespace Azure.Functions.Cli.Tests
     {
         TestAzureHelperService _helperService = new TestAzureHelperService();
 
-        [Fact]
-        public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_AlreadyEmpty()
+        [Theory]
+        [InlineData(null, "6.0")]
+        [InlineData("something", "6.0")]
+        [InlineData("6.0", "6.0")]
+        [InlineData("7.0", "7.0")]
+        public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_Updated(string initialLinuxFxVersion, string expectedNetFrameworkVersion)
         {
             var site = new Site("test")
             {
                 Kind = "linux",
                 Sku = "dynamic",
-                LinuxFxVersion = null
+                LinuxFxVersion = initialLinuxFxVersion
             };
 
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, "6.0", false, _helperService);
-
-            // no-op if already null or empty
-            Assert.Null(_helperService.UpdatedSettings);
-        }
-
-        [Fact]
-        public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_Updated()
-        {
-            var site = new Site("test")
-            {
-                Kind = "linux",
-                Sku = "dynamic",
-                LinuxFxVersion = "something"
-            };
-
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, "6.0", false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, expectedNetFrameworkVersion, false, _helperService);
 
             // update it to empty
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
-            Assert.Equal(string.Empty, setting.Value);
+            Assert.Equal($"DOTNET-ISOLATED|{expectedNetFrameworkVersion}", setting.Value);
         }
 
         [Theory]

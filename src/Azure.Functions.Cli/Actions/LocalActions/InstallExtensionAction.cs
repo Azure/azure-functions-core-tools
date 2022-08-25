@@ -155,7 +155,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var extensionsProjDir = string.IsNullOrEmpty(ConfigPath) ? Environment.CurrentDirectory : ConfigPath;
-            var extensionsProjFile = Path.Combine(extensionsProjDir, Constants.ExtenstionsCsProjFile);
+            var extensionsProjFile = Path.Combine(extensionsProjDir, Constants.ExtensionsCsProjFile);
 
             // CASE 3: No extensions.csproj
             if (!FileSystemHelpers.FileExists(extensionsProjFile))

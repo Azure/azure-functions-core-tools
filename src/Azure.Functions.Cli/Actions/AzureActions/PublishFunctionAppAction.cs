@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
-        private const string _requiredNetFrameworkVersion = "6.0";
+        private static string _requiredNetFrameworkVersion = "6.0";
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
@@ -150,6 +150,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Get the WorkerRuntime
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+
+            // Determine the appropriate default targetFramework
+            // NOTE: .NET 7.0 is only supported on dotnet-isolated
+            // TODO: Include proper steps for publishing a .NET Framework 4.8 application
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            {
+                string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
+                if (projectFilePath != null)
+                {
+                    var projectRoot = ProjectHelpers.GetProject(projectFilePath);
+                    var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
+                    if (targetFramework.Equals("net7.0", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _requiredNetFrameworkVersion = "7.0";
+                    }
+                }
+                // We do not change the default targetFramework if no .csproj file is found
+            }
 
             // Check for any additional conditions or app settings that need to change
             // before starting any of the publish activity.
@@ -351,9 +369,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private static async Task UpdateNetFrameworkVersionWindows(Site functionApp, string dotnetFramworkVersion, AzureHelperService helperService)
+        private static async Task UpdateNetFrameworkVersionWindows(Site functionApp, string dotnetFrameworkVersion, AzureHelperService helperService)
         {
-            string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
+            string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFrameworkVersion);
 
             // Websites ensure it begins with 'v'.
             string version = $"v{normalizedVersion}";
@@ -380,47 +398,28 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             string normalizedVersion = NormalizeDotnetFrameworkVersion(dotnetFramworkVersion);
 
-            string linuxFxVersion;
+            string linuxFxVersion = $"DOTNET-ISOLATED|{normalizedVersion}";
 
-            if (functionApp.IsDynamic)
+            // If things are already set, do nothing
+            if (string.Equals(functionApp.LinuxFxVersion, linuxFxVersion, StringComparison.OrdinalIgnoreCase))
             {
-                if (!string.IsNullOrEmpty(functionApp.LinuxFxVersion))
-                {
-                    linuxFxVersion = string.Empty;
-                }
-                else
-                {
-                    return;
-                }
-            }
-            else
-            {
-                linuxFxVersion = $"DOTNET-ISOLATED|{normalizedVersion}";
-
-                // If things are already set, do nothing
-                if (string.Equals(functionApp.LinuxFxVersion, linuxFxVersion, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                return;
             }
 
-            if (linuxFxVersion != null)
+            ColoredConsole.WriteLine($"Updating '{Constants.LinuxFxVersion}' to '{linuxFxVersion}'.");
+
+            var updatedSettings = new Dictionary<string, string>
             {
-                ColoredConsole.WriteLine($"Updating '{Constants.LinuxFxVersion}' to '{linuxFxVersion}'.");
+                [Constants.LinuxFxVersion] = linuxFxVersion
+            };
 
-                var updatedSettings = new Dictionary<string, string>
-                {
-                    [Constants.LinuxFxVersion] = linuxFxVersion
-                };
+            var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
 
-                var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
-
-                if (!settingsResult.IsSuccessful)
-                {
-                    ColoredConsole.Error
-                        .WriteLine(ErrorColor("Error updating linux image property:"))
-                        .WriteLine(ErrorColor(settingsResult.ErrorResult));
-                }
+            if (!settingsResult.IsSuccessful)
+            {
+                ColoredConsole.Error
+                    .WriteLine(ErrorColor("Error updating linux image property:"))
+                    .WriteLine(ErrorColor(settingsResult.ErrorResult));
             }
         }
 
@@ -1103,7 +1102,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // remove any leading "v" and try again
                 if (!Version.TryParse(version.ToLower().TrimStart('v'), out parsedVersion))
                 {
-                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '{_requiredNetFrameworkVersion}'.");
+                    throw new CliException($"The dotnet-version value of '{version}' is invalid. Specify a value like '6.0'.");
                 }
             }
 
