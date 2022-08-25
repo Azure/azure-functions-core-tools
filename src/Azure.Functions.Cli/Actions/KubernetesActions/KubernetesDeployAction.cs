@@ -197,7 +197,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     .Cast<DeploymentV1Apps>()
                     .FirstOrDefault(d => d.Metadata.Name.Contains("http"));
 
-                if (httpDeployment != null && httpDeployment != null)
+                if (httpDeployment != null)
                 {
                     await KubernetesHelper.WaitForDeploymentRollout(httpDeployment);
                     //Print the function keys message to the console

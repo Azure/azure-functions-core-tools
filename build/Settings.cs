@@ -19,10 +19,10 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2057";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2057";
-        public const string DotnetItemTemplatesVersion = "4.0.2057";
-        public const string DotnetProjectTemplatesVersion = "4.0.2057";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2226";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2226";
+        public const string DotnetItemTemplatesVersion = "4.0.2185";
+        public const string DotnetProjectTemplatesVersion = "4.0.2185";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
@@ -108,7 +108,7 @@ namespace Build
         public static readonly string PreSignTestDir = "PreSignTest";
 
         public static readonly string SignTestDir = "SignTest";
-
+       
         public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
 
         public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";

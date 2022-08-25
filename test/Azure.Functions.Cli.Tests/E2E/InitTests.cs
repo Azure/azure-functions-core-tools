@@ -220,8 +220,8 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Theory]
         [InlineData("dotnet", "4")]
-        [InlineData("node", "3.0")]
-        [InlineData("powershell", "3.0")]
+        [InlineData("node", "4")]
+        [InlineData("powershell", "4")]
         public Task init_with_Dockerfile(string workerRuntime, string version)
         {
             return CliTester.Run(new RunConfiguration
@@ -253,7 +253,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:3.0-python{worker.Major}.{worker.Minor}" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:4-python{worker.Major}.{worker.Minor}" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -290,7 +290,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         Name = "Dockerfile",
                         ContentNotContains = new[] { "dotnet publish" },
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:3.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:4" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -363,7 +363,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Name = "Dockerfile",
                         ContentContains = new []
                         {
-                            "mcr.microsoft.com/azure-functions/node:3.0",
+                            "mcr.microsoft.com/azure-functions/node:4",
                             "npm run build"
                         }
                     }
@@ -445,8 +445,8 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Theory]
         [InlineData("dotnet", "4")]
-        [InlineData("node", "3.0")]
-        [InlineData("powershell", "3.0")]
+        [InlineData("node", "4")]
+        [InlineData("powershell", "4")]
         public Task init_docker_only_for_existing_project(string workerRuntime, string version)
         {
             return CliTester.Run(new RunConfiguration
@@ -484,7 +484,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         Name = "Dockerfile",
                         ContentNotContains = new[] { "dotnet publish" },
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:3.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:4" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }

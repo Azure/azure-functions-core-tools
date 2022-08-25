@@ -6,8 +6,8 @@ Homepage: https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-l
 Vcs-Git: https://github.com/Azure/azure-functions-core-tools.git
 Package: $PACKAGENAME
 Architecture: amd64
-Conflicts: azure-functions-core-tools, azure-functions-core-tools-2
-Replaces: azure-functions-core-tools, azure-functions-core-tools-2
+Conflicts: azure-functions-core-tools-2, azure-functions-core-tools-3
+Replaces: azure-functions-core-tools-2, azure-functions-core-tools-3
 Depends: $DEPENDENCY
-Description: Azure Function Core Tools v3
+Description: Azure Function Core Tools v4
  The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.

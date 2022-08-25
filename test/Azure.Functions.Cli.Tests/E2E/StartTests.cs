@@ -528,8 +528,10 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
-        public async Task start_with_user_secrets()
+        [Theory]
+        [InlineData("dotnet")]
+        [InlineData("dotnet-isolated")]
+        public async Task start_with_user_secrets(string language)
         {
             await CliTester.Run(new RunConfiguration[]
             {
@@ -537,7 +539,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime dotnet",
+                        $"init . --worker-runtime {language}",
                         "new --template \"Http trigger\" --name http1",
                         "new --template \"Queue trigger\" --name queue1"
                     },

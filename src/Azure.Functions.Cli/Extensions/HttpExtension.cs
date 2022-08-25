@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
-using System.Text;
 
 namespace Azure.Functions.Cli.Extensions
 {
@@ -25,9 +24,11 @@ namespace Azure.Functions.Cli.Extensions
                 Content = request.Content.Clone(),
                 Version = request.Version
             };
-            foreach (KeyValuePair<string, object> prop in request.Properties)
+            // We can use TryAdd method below without checking if the method is successful because we are
+            // guaranteed that keys are not duplicated in request.Options, as it implements IDictionary
+            foreach (KeyValuePair<string, object> option in request.Options)
             {
-                clone.Properties.Add(prop);
+                clone.Options.TryAdd(option.Key, option.Value);
             }
             foreach (KeyValuePair<string, IEnumerable<string>> header in request.Headers)
             {

@@ -25,14 +25,17 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime)
+        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
             await TemplateOperation(async () =>
             {
+                var frameworkString = string.IsNullOrEmpty(targetFramework)
+                    ? string.Empty
+                    : $"--Framework \"{targetFramework}\"";
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new func --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
@@ -206,7 +209,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                return WebJobsTemplateOpetation(action);
+                return WebJobsTemplateOperation(action);
             }
         }
 
@@ -224,7 +227,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task WebJobsTemplateOpetation(Func<Task> action)
+        private static async Task WebJobsTemplateOperation(Func<Task> action)
         {
             try
             {
@@ -264,7 +267,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "templates");
 
-        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", "net6-isolated"));
+        private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $"net-isolated"));
 
         private static async Task DotnetTemplatesAction(string action, string templateDirectory)
         {
