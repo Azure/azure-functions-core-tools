@@ -351,7 +351,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime)
+        private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
