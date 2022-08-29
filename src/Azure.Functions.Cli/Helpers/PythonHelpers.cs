@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -19,18 +18,52 @@ namespace Azure.Functions.Cli.Helpers
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
         private static WorkerLanguageVersionInfo _pythonVersionCache = null;
 
-        public static async Task SetupPythonProject(bool generatePythonDocumentation = true)
+        public static async Task SetupPythonProject(ProgrammingModel programmingModel, bool generatePythonDocumentation = true)
         {
             var pyVersion = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pyVersion, errorIfNoVersion: false);
 
+            // We print a message to the user irrespective of whether they choose the default or preview programming model for
+            // awareness and reference purposes respectively. These messages differ slightly to better indicate which model the
+            // user selected.
+            if (programmingModel == ProgrammingModel.V2)
+            {
+                PrintPySteinReferenceMessage();
+            }
+            else
+            {
+                PrintPySteinAwarenessMessage();
+            }
+
             await CreateRequirements();
-            await EnsureVirtualEnvrionmentIgnored();
+            await EnsureVirtualEnvironmentIgnored();
+
+            if (programmingModel == ProgrammingModel.V2)
+            {
+                await CreateFile(Constants.PySteinFunctionAppPy);
+            }
 
             if (generatePythonDocumentation)
             {
-                await CreateGettingStartedMarkdown();
+                await CreateGettingStartedMarkdown(programmingModel);
             }
+        }
+
+        public static void PrintPySteinReferenceMessage()
+        {
+            ColoredConsole.Write(AdditionalInfoColor("The new Python programming model is in public preview. Learn more at "));
+            PrintPySteinWikiLink();
+        }
+
+        public static void PrintPySteinAwarenessMessage()
+        {
+            ColoredConsole.Write(AdditionalInfoColor("Did you know? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at "));
+            PrintPySteinWikiLink();
+        }
+
+        public static void PrintPySteinWikiLink()
+        {
+            ColoredConsole.WriteLine(LinksColor("https://aka.ms/pythonprogrammingmodel"));
         }
 
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
@@ -45,7 +78,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task EnsureVirtualEnvrionmentIgnored()
+        public static async Task EnsureVirtualEnvironmentIgnored()
         {
             if (InVirtualEnvironment)
             {
@@ -81,17 +114,35 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private async static Task CreateGettingStartedMarkdown()
+        private async static Task CreateFile(string fileName)
         {
-            if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+            if (!FileSystemHelpers.FileExists(fileName))
             {
-                ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
-                string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
-                await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
+                ColoredConsole.WriteLine($"Writing {fileName}");
+                string fileContent = await StaticResources.GetValue(fileName);
+                await FileSystemHelpers.WriteAllTextToFileAsync(fileName, fileContent);
             }
             else
             {
-                ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
+                ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
+            }
+        }
+
+        private async static Task CreateGettingStartedMarkdown(ProgrammingModel programmingModel)
+        {
+            if (programmingModel == ProgrammingModel.V1)
+            {
+                // TODO: Include a GettingStarted or README.md document for PyStein applications and write it here
+                if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+                {
+                    ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
+                    string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
+                    await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
+                }
             }
         }
 

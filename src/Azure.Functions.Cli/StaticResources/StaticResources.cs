@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli
 {
     public static class StaticResources
     {
-        private static async Task<string> GetValue(string name)
+        public static async Task<string> GetValue(string name)
         {
             var assembly = typeof(StaticResources).Assembly;
             var resourceName = $"{assembly.GetName().Name}.{name}";
@@ -66,6 +66,9 @@ namespace Azure.Functions.Cli
         public static Task<string> HostJson => GetValue("host.json");
 
         public static Task<string> BundleConfig => GetValue("bundleConfig.json");
+        
+        public static Task<string> BundleConfigPyStein => GetValue("bundleConfigPyStein.json");
+
 
         public static Task<string> CustomHandlerConfig => GetValue("customHandlerConfig.json");
 

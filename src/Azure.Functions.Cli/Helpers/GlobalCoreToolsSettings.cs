@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -9,6 +10,7 @@ namespace Azure.Functions.Cli.Helpers
     public static class GlobalCoreToolsSettings
     {
         private static WorkerRuntime _currentWorkerRuntime;
+        public static ProgrammingModel? CurrentProgrammingModel { get; set; }
         public static WorkerRuntime CurrentWorkerRuntime
         {
             get

@@ -46,9 +46,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool? ManagedDependencies { get; set; }
 
+        public string ProgrammingModel { get; set; }
+
         public WorkerRuntime ResolvedWorkerRuntime { get; set; }
 
         public string ResolvedLanguage { get; set; }
+
+        public ProgrammingModel ResolvedProgrammingModel { get; set; }
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -118,6 +122,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("managed-dependencies")
                 .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
                 .Callback(f => ManagedDependencies = f);
+            
+            Parser
+                .Setup<string>('m', "model")
+                .WithDescription($"Selects the programming model for the function app. Options are {EnumerationHelper.Join(", ", ProgrammingModelHelper.GetProgrammingModels())}. Currently, only the Python worker runtime supports the preview programming model")
+                .Callback(m => ProgrammingModel = m);
 
             Parser
                 .Setup<bool>("no-bundle")
@@ -174,6 +183,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
+                // Order here is important: each language may have multiple runtimes, and each unique (language, worker-runtime) pair
+                // may have its own programming model. Thus, we assume that ResolvedLanguage and ResolvedWorkerRuntime are properly set
+                // before attempting to resolve the programming model.
+                var supportedProgrammingModels = ProgrammingModelHelper.GetSupportedProgrammingModels(ResolvedWorkerRuntime);
+                ResolvedProgrammingModel = ProgrammingModelHelper.ResolveProgrammingModel(ProgrammingModel, ResolvedWorkerRuntime, ResolvedLanguage);
+                if (!supportedProgrammingModels.Contains(ResolvedProgrammingModel))
+                {
+                    throw new CliArgumentsException(
+                        $"The {ResolvedProgrammingModel.ToString()} programming model is not supported for worker runtime {ResolvedWorkerRuntime.ToString()}. Supported programming models for worker runtime {ResolvedWorkerRuntime.ToString()} are:\n{EnumerationHelper.Join<ProgrammingModel>("\n", supportedProgrammingModels)}");
+                }
             }
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
@@ -186,10 +205,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 bool managedDependenciesOption = ResolveManagedDependencies(ResolvedWorkerRuntime, ManagedDependencies);
-                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, managedDependenciesOption, GeneratePythonDocumentation);
+                await InitLanguageSpecificArtifacts(ResolvedWorkerRuntime, ResolvedLanguage, ResolvedProgrammingModel, managedDependenciesOption, GeneratePythonDocumentation);
                 await WriteFiles();
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
-                await WriteLocalSettingsJson(ResolvedWorkerRuntime);
+                await WriteLocalSettingsJson(ResolvedWorkerRuntime, ResolvedProgrammingModel);
             }
 
             await WriteExtensionsJson();
@@ -251,11 +270,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return string.Empty;
         }
 
-        private static async Task InitLanguageSpecificArtifacts(WorkerRuntime workerRuntime, string language, bool managedDependenciesOption, bool generatePythonDocumentation=true)
+        private static async Task InitLanguageSpecificArtifacts(
+            WorkerRuntime workerRuntime,
+            string language,
+            ProgrammingModel programmingModel,
+            bool managedDependenciesOption,
+            bool generatePythonDocumentation=true)
         {
             switch (workerRuntime) {
                 case Helpers.WorkerRuntime.python:
-                    await PythonHelpers.SetupPythonProject(generatePythonDocumentation);
+                    await PythonHelpers.SetupPythonProject(programmingModel, generatePythonDocumentation);
                     break;
                 case Helpers.WorkerRuntime.powershell:
                     await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
@@ -327,7 +351,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime)
+        private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
@@ -340,7 +364,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
-                localSettingsJsonContent = AddWorkerVersion(localSettingsJsonContent, Constants.PowerShellWorkerDefaultVersion);
+                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
+            }
+
+            if (programmingModel == Common.ProgrammingModel.V2)
+            {
+                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.AzureWebJobsFeatureFlags, Constants.EnableWorkerIndexing);
             }
 
             await WriteFiles("local.settings.json", localSettingsJsonContent);
@@ -473,7 +502,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return true;
         }
 
-        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
+        private async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
         {
             var hostJsonContent = await StaticResources.HostJson;
 
@@ -484,7 +513,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (extensionBundle)
             {
-                hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
+                if (ResolvedProgrammingModel == Common.ProgrammingModel.V2 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.python)
+                {
+                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
+                }
+                else
+                {
+                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
+                }
             }
 
             if(workerRuntime == Helpers.WorkerRuntime.custom)
@@ -495,7 +531,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
         }
 
-        private static string AddWorkerVersion(string localSettingsContent, string workerVersion)
+        private static string AddLocalSetting(string localSettingsContent, string key, string value)
         {
             var localSettingsObj = JsonConvert.DeserializeObject<JObject>(localSettingsContent);
 
@@ -503,7 +539,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 var values = valuesContent as JObject;
                 values.Property(Constants.FunctionsWorkerRuntime).AddAfterSelf(
-                        new JProperty(Constants.FunctionsWorkerRuntimeVersion, workerVersion));
+                        new JProperty(key, value));
             }
 
             return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
