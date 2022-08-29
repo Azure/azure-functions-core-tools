@@ -155,7 +155,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
                 PythonHelpers.PrintPySteinWikiLink();
                 throw new CliException(
-                    "Function not created!");
+                    "Function not created! 'func new' is not supported for the preview of the V2 Python programming model.");
             }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
