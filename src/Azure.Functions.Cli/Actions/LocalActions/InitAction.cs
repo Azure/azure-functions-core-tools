@@ -502,7 +502,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return true;
         }
 
-        private static async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
+        private async Task WriteHostJson(WorkerRuntime workerRuntime, bool managedDependenciesOption, bool extensionBundle = true)
         {
             var hostJsonContent = await StaticResources.HostJson;
 
@@ -513,7 +513,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (extensionBundle)
             {
-                hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
+                if (ResolvedProgrammingModel == Common.ProgrammingModel.V2 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.python)
+                {
+                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
+                }
+                else
+                {
+                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
+                }
             }
 
             if(workerRuntime == Helpers.WorkerRuntime.custom)

@@ -66,6 +66,9 @@ namespace Azure.Functions.Cli
         public static Task<string> HostJson => GetValue("host.json");
 
         public static Task<string> BundleConfig => GetValue("bundleConfig.json");
+        
+        public static Task<string> BundleConfigPyStein => GetValue("bundleConfigPyStein.json");
+
 
         public static Task<string> CustomHandlerConfig => GetValue("customHandlerConfig.json");
 

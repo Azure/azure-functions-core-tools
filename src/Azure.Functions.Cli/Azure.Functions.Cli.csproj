@@ -37,6 +37,9 @@
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\bundleConfigPyStein.json">
+      <LogicalName>$(AssemblyName).bundleConfigPyStein.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
@@ -66,9 +69,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.node16">
       <LogicalName>$(AssemblyName).Dockerfile.node16</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.python39.PyStein">
-      <LogicalName>$(AssemblyName).Dockerfile.python39.PyStein</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.powershell7">
       <LogicalName>$(AssemblyName).Dockerfile.powershell7</LogicalName>
@@ -165,7 +165,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.20.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.9.0" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.9.1" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
@@ -176,7 +176,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.4.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2045" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2040" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.3.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.4.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
