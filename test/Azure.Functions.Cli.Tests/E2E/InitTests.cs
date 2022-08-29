@@ -101,13 +101,13 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("node", "default")]
-        [InlineData("java", "preview")]
-        [InlineData("python", "default")]
-        [InlineData("python", "preview")]
+        [InlineData("node", "v1")]
+        [InlineData("java", "v2")]
+        [InlineData("python", "v1")]
+        [InlineData("python", "v2")]
         public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
         {
-            var workerRuntimesWithPreviewProgrammingModel = new[] { "python" };
+            var workerRuntimesWithV2ProgrammingModel = new[] { "python" };
 
             var files = new List<FileResult>
             {
@@ -122,7 +122,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             };
 
-            if (workerRuntime == "python" && programmingModel == "preview")
+            if (workerRuntime == "python" && programmingModel == "v2")
             {
                 files.Add(new FileResult
                 {
@@ -130,7 +130,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
             }
 
-            if (programmingModel != "preview" || workerRuntimesWithPreviewProgrammingModel.Contains(workerRuntime))
+            if (programmingModel != "v2" || workerRuntimesWithV2ProgrammingModel.Contains(workerRuntime))
             {
                 return CliTester.Run(new RunConfiguration
                 {
