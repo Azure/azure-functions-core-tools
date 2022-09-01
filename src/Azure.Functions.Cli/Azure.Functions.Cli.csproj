@@ -159,7 +159,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.20.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.8.1" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.10.2" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
@@ -170,7 +170,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.4.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2045" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2040" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.2.0-hotfix" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.6.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
