@@ -216,7 +216,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
-            if (!isNewPythonProgrammingModel())
+            if (string.Equals(Language, Languages.Python, StringComparison.CurrentCultureIgnoreCase) && !isNewPythonProgrammingModel())
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }
