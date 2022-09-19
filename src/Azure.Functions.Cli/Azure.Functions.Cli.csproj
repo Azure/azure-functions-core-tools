@@ -85,6 +85,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.9">
       <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.10">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.10</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
       <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
     </EmbeddedResource>
