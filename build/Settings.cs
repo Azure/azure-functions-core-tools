@@ -40,26 +40,45 @@ namespace Build
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
         public static readonly string[] TargetRuntimes = new[] {
+            "min.win-arm64",
             "min.win-x86",
             "min.win-x64",
             "linux-x64",
             "osx-x64",
             "osx-arm64",
             "win-x86",
-            "win-x64" };
+            "win-x64",
+            "win-arm64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
             { "win-x86", "WINDOWS" },
             { "win-x64", "WINDOWS" },
+            { "win-arm64", "WINDOWS"},
             { "linux-x64", "LINUX" },
             { "osx-x64", "OSX" },
             { "osx-arm64", "OSX" },
             { "min.win-x86", "WINDOWS" },
             { "min.win-x64", "WINDOWS" },
+            { "min.win-arm64", "WINDOWS"},
         };
 
-        private static readonly string[] _winPowershellRuntimes = new[] { "win-x86", "win", "win10-x86", "win8-x86", "win81-x86", "win7-x86", "win-x64", "win10-x64", "win8-x64", "win81-x64", "win7-x64" };
+        private static readonly string[] _winPowershellRuntimes = new[]
+        {
+            "win-x86",
+            "win",
+            "win10-x86",
+            "win8-x86",
+            "win81-x86",
+            "win7-x86",
+            "win-arm64",
+            "win-x64",
+            "win10-x64",
+            "win8-x64",
+            "win81-x64",
+            "win7-x64"
+        };
+
         public static readonly Dictionary<string, Dictionary<string, string[]>> ToolsRuntimeToPowershellRuntimes = new Dictionary<string, Dictionary<string, string[]>>
         {
             {
@@ -68,10 +87,11 @@ namespace Build
                 {
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
+                    { "win-arm64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
                     { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
                     // NOTE: PowerShell 7.0 does not support arm. First version supporting it is 7.2
-                    // https://docs.microsoft.com/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#installation-via-direct-download
+                    // https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#supported-versions
                     // That being said, we might as well include "osx" and "unix" since it'll hardly affect package size and should lead to more accurate error messages
                     { "osx-arm64", new [] { "osx", "unix" } }
                 }
@@ -82,6 +102,7 @@ namespace Build
                 {
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
+                    { "win-arm64", _winPowershellRuntimes },
                     { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
                     { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
                     { "osx-arm64", new [] { "osx", "osx-arm64", "unix" } }
@@ -146,8 +167,8 @@ namespace Build
             public static readonly string ThirdParty = "Sign3rdParty";
             public static readonly string ToThirdPartySign = "ThirdParty";
             public static readonly string ToMacSign = "Mac";
-            public static readonly string[] RuntimesToSign = new string[] { "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
-            public static readonly string[] FilterExtenstionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
+            public static readonly string[] RuntimesToSign = new string[] { "min.win-arm64", "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
+            public static readonly string[] FilterExtensionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
             public static readonly string[] SkipSigcheckTest = new[] {
@@ -178,9 +199,6 @@ namespace Build
                 "Microsoft.Extensions.Azure.dll",
                 "Microsoft.Identity.Client.dll",
                 "Microsoft.Identity.Client.Extensions.Msal.dll",
-                Path.Combine("templates", "itemTemplates.2.0.10328.nupkg"),
-                Path.Combine("templates", "projectTemplates.2.0.10328.nupkg"),
-                Path.Combine("tools", "python", "packapp", "__main__.py"),
                 Path.Combine("workers", "python")
             };
 

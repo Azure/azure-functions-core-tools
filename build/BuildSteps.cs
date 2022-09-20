@@ -88,14 +88,11 @@ namespace Build
 
         private static string GetRuntimeId(string runtime)
         {
-            switch (runtime)
+            if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
             {
-                case "min.win-x86":
-                case "min.win-x64":
-                    return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
-                default:
-                    return runtime;
+                return runtime.Substring(Settings.MinifiedVersionPrefix.Length);
             }
+            return runtime;
         }
 
         public static void DotnetPack()
@@ -342,14 +339,14 @@ namespace Build
                     var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(sourceDir, el));
                     // Grab all the files and filter the extensions not to be signed
                     var toAuthenticodeSignFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
-                                    .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                                    .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
                     string targetAuthenticodeDirectory = Path.Combine(authentiCodeDirectory, dirName);
                     toAuthenticodeSignFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetAuthenticodeDirectory, sourceDir));
 
                     var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(sourceDir, el));
                     // Grab all the files and filter the extensions not to be signed
                     var toSignThirdPartyFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
-                                                .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                                                .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
                     string targetThirdPartyDirectory = Path.Combine(thirdPartyDirectory, dirName);
                     toSignThirdPartyFiles.ForEach(f => FileHelpers.CopyFileRelativeToBase(f, targetThirdPartyDirectory, sourceDir));
                 }
@@ -390,10 +387,10 @@ namespace Build
                 var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
                 var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
-                                    .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                                    .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
 
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
-                                        .Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))));
+                                        .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))));
 
                 unSignedFiles.ForEach(filePath => File.Delete(filePath));
 
@@ -481,7 +478,7 @@ namespace Build
             unSignedPackages = unSignedPackages.Skip(1).ToList();
 
             // Filter out the extensions we didn't want to sign
-            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtenstionsSign.Any(ext => file.EndsWith(ext))).ToList();
+            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
 
             // Filter out files we don't want to verify
             unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.SkipSigcheckTest.Any(ext => file.EndsWith(ext))).ToList();
