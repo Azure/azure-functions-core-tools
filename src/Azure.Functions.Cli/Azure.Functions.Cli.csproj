@@ -37,6 +37,9 @@
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\bundleConfigPyStein.json">
+      <LogicalName>$(AssemblyName).bundleConfigPyStein.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
@@ -82,6 +85,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.9">
       <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.10">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.10</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
       <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
     </EmbeddedResource>
@@ -117,6 +123,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\funcignore">
       <LogicalName>$(AssemblyName).funcignore</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\function_app.py.template">
+      <LogicalName>$(AssemblyName).function_app.py</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\requirements.psd1">
       <LogicalName>$(AssemblyName).requirements.psd1</LogicalName>

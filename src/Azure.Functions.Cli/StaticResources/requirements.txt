@@ -1,3 +1,5 @@
-﻿# Do not include azure-functions-worker as it may conflict with the Azure Functions platform
+﻿# Do not include azure-functions-worker in this file
+# The Python Worker is managed by the Azure Functions platform
+# Manually managing azure-functions-worker may cause unexpected issues
 
 azure-functions

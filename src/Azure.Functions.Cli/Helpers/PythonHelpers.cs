@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -19,18 +18,52 @@ namespace Azure.Functions.Cli.Helpers
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
         private static WorkerLanguageVersionInfo _pythonVersionCache = null;
 
-        public static async Task SetupPythonProject(bool generatePythonDocumentation = true)
+        public static async Task SetupPythonProject(ProgrammingModel programmingModel, bool generatePythonDocumentation = true)
         {
             var pyVersion = await GetEnvironmentPythonVersion();
             AssertPythonVersion(pyVersion, errorIfNoVersion: false);
 
+            // We print a message to the user irrespective of whether they choose the default or preview programming model for
+            // awareness and reference purposes respectively. These messages differ slightly to better indicate which model the
+            // user selected.
+            if (programmingModel == ProgrammingModel.V2)
+            {
+                PrintPySteinReferenceMessage();
+            }
+            else
+            {
+                PrintPySteinAwarenessMessage();
+            }
+
             await CreateRequirements();
-            await EnsureVirtualEnvrionmentIgnored();
+            await EnsureVirtualEnvironmentIgnored();
+
+            if (programmingModel == ProgrammingModel.V2)
+            {
+                await CreateFile(Constants.PySteinFunctionAppPy);
+            }
 
             if (generatePythonDocumentation)
             {
-                await CreateGettingStartedMarkdown();
+                await CreateGettingStartedMarkdown(programmingModel);
             }
+        }
+
+        public static void PrintPySteinReferenceMessage()
+        {
+            ColoredConsole.Write(AdditionalInfoColor("The new Python programming model is in public preview. Learn more at "));
+            PrintPySteinWikiLink();
+        }
+
+        public static void PrintPySteinAwarenessMessage()
+        {
+            ColoredConsole.Write(AdditionalInfoColor("Did you know? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at "));
+            PrintPySteinWikiLink();
+        }
+
+        public static void PrintPySteinWikiLink()
+        {
+            ColoredConsole.WriteLine(LinksColor("https://aka.ms/pythonprogrammingmodel"));
         }
 
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
@@ -45,7 +78,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task EnsureVirtualEnvrionmentIgnored()
+        public static async Task EnsureVirtualEnvironmentIgnored()
         {
             if (InVirtualEnvironment)
             {
@@ -81,17 +114,35 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private async static Task CreateGettingStartedMarkdown()
+        private async static Task CreateFile(string fileName)
         {
-            if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+            if (!FileSystemHelpers.FileExists(fileName))
             {
-                ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
-                string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
-                await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
+                ColoredConsole.WriteLine($"Writing {fileName}");
+                string fileContent = await StaticResources.GetValue(fileName);
+                await FileSystemHelpers.WriteAllTextToFileAsync(fileName, fileContent);
             }
             else
             {
-                ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
+                ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
+            }
+        }
+
+        private async static Task CreateGettingStartedMarkdown(ProgrammingModel programmingModel)
+        {
+            if (programmingModel == ProgrammingModel.V1)
+            {
+                // TODO: Include a GettingStarted or README.md document for PyStein applications and write it here
+                if (!FileSystemHelpers.FileExists(Constants.PythonGettingStarted))
+                {
+                    ColoredConsole.WriteLine($"Writing {Constants.PythonGettingStarted}");
+                    string pythonGettingStartedContent = await StaticResources.PythonGettingStartedMarkdown;
+                    await FileSystemHelpers.WriteAllTextToFileAsync(Constants.PythonGettingStarted, pythonGettingStartedContent);
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"{Constants.PythonGettingStarted} already exists. Skipped!");
+                }
             }
         }
 
@@ -113,7 +164,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. Python 3.6.x, 3.7.x, 3.8.x or 3.9.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. Python 3.6.x, 3.7.x, 3.8.x, 3.9.x, or 3.10.x is recommended, and used in Azure Functions.";
                 if (errorIfNoVersion) throw new CliException(message);
                 ColoredConsole.WriteLine(WarningColor(message));
                 return;
@@ -121,23 +172,23 @@ namespace Azure.Functions.Cli.Helpers
 
             ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
 
-            // Python 3.[6|7|8|9] (supported)
+            // Python 3.[6|7|8|9|10] (supported)
             if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
 
-            // Python 3.x (but not 3.[6|7|8|9]), not recommended, may fail. E.g.: 3.4, 3.5.
+            // Python 3.x (but not 3.[6|7|8|9|10]), not recommended, may fail. E.g.: 3.4, 3.5.
             if (pythonVersion.Major == 3)
             {
                 if (errorIfNotSupported)
-                    throw new CliException($"Python 3.6.x to 3.9.x is required for this operation. " +
-                        $"Please install Python 3.6, 3.7, 3.8, or 3.9 and use a virtual environment to switch to Python 3.6, 3.7, 3.8, or 3.9.");
-                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x, 3.8.x, or 3.9.x is recommended, and used in Azure Functions."));
+                    throw new CliException($"Python 3.6.x to 3.10.x is required for this operation. " +
+                        $"Please install Python 3.6, 3.7, 3.8, 3.9, or 3.10 and use a virtual environment to switch to Python 3.6, 3.7, 3.8, 3.9, or 3.10.");
+                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x, 3.8.x, 3.9.x, or 3.10.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.[6|7|8|9]) is required.";
+            var error = "Python 3.x (recommended version 3.[6|7|8|9|10]) is required.";
             if (errorIfNoVersion) throw new CliException(error);
             ColoredConsole.WriteLine(WarningColor(error));
         }
@@ -169,6 +220,7 @@ namespace Azure.Functions.Cli.Helpers
             var python37GetVersionTask = GetVersion("python3.7");
             var python38GetVersionTask = GetVersion("python3.8");
             var python39GetVersionTask = GetVersion("python3.9");
+            var python310GetVersionTask = GetVersion("python3.10");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
@@ -178,7 +230,8 @@ namespace Azure.Functions.Cli.Helpers
                 await python36GetVersionTask,
                 await python37GetVersionTask,
                 await python38GetVersionTask,
-                await python39GetVersionTask
+                await python39GetVersionTask,
+                await python310GetVersionTask,
             };
 
             // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
@@ -497,6 +550,8 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython38;
                     case 9:
                         return StaticResources.DockerfilePython39;
+                    case 10:
+                        return StaticResources.DockerfilePython310;
                 }
             }
             return StaticResources.DockerfilePython37;
@@ -516,6 +571,8 @@ namespace Azure.Functions.Cli.Helpers
                         return Constants.DockerImages.LinuxPython38ImageAmd64;
                     case 9:
                         return Constants.DockerImages.LinuxPython39ImageAmd64;
+                    case 10:
+                        return Constants.DockerImages.LinuxPython310ImageAmd64;
                 }
             }
             return Constants.DockerImages.LinuxPython36ImageAmd64;
@@ -527,6 +584,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
+                    case 10:
                     case 9:
                     case 8:
                     case 7:
