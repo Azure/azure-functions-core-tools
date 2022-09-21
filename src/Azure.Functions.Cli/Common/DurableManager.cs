@@ -54,12 +54,14 @@ namespace Azure.Functions.Cli.Common
         public DurableManager(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
-            SetConnectionStringAndTaskHubName();
+            this.IsValid = TrySetConnectionStringAndTaskHubName();
         }
 
         public BackendType BackendType { get; private set; } = BackendType.AzureStorage;
 
-        private void SetConnectionStringAndTaskHubName()
+        public bool IsValid { get; private set; }
+
+        private bool TrySetConnectionStringAndTaskHubName()
         {
             // Set connection string key and task hub name to defaults
             _connectionStringKey = DefaultConnectionStringKey;
@@ -106,6 +108,10 @@ namespace Azure.Functions.Cli.Common
 
                                 _partitionCount = storageProviderObject?.GetValue("partitionCount", StringComparison.OrdinalIgnoreCase)?.Value<int?>();
                             }
+                            else
+                            {
+                                throw new CliException("The host.json file contains an invalid storageProvider schema in the durableTask section.");
+                            }
                         }
                     }
                 }
@@ -116,9 +122,14 @@ namespace Azure.Functions.Cli.Common
             }
             catch (Exception e)
             {
-                ColoredConsole.WriteLine(WarningColor($"Exception thrown while attempting to parse override connection string and task hub name from '{ScriptConstants.HostMetadataFileName}':"));
+                // We can't throw here because that would result in an obscure error message about dependency injection in the command output.
+                // Instead of throwing, we write a warning and return a false value, and another part of the code will throw an exception.
+                ColoredConsole.WriteLine(WarningColor($"Exception thrown while attempting to parse task hub configuration from '{ScriptConstants.HostMetadataFileName}':"));
                 ColoredConsole.WriteLine(WarningColor(e.Message));
+                return false;
             }
+
+            return true;
         }
 
         private void SetStorageServiceAndTaskHubClient(out AzureStorageOrchestrationService orchestrationService, out TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
@@ -153,13 +164,17 @@ namespace Azure.Functions.Cli.Common
 
         private void Initialize(out AzureStorageOrchestrationService orchestrationService, out TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
         {
-            CheckAssemblies();
+            if (!this.IsValid)
+            {
+                throw new CliException($"The command failed due to a configuration issue. See previous error messages for details.");
+            }
 
             if (this.BackendType != BackendType.AzureStorage)
             {
                 throw new CliException($"The {this.BackendType} storage provider for Durable Functions is not yet supported by this command.");
             }
 
+            CheckAssemblies();
             SetStorageServiceAndTaskHubClient(out orchestrationService, out taskHubClient, connectionStringKey, taskHubName);
         }
 
