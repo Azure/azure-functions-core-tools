@@ -9,8 +9,6 @@ const chalk = require('chalk');
 const path = require('path');
 const fs = require('fs');
 const rimraf = require('rimraf');
-const glob = require('glob');
-const execSync = require('child_process').execSync;
 const ProgressBar = require('progress');
 const os = require('os');
 
