@@ -1,10 +1,7 @@
 #! /usr/bin/env node
 
 const path = require('path');
-const fs = require('fs');
 const spawn = require('child_process').spawn;
-const fork = require('child_process').fork;
-const commandExists = require('command-exists');
 const args = process.argv;
 
 function main() {
