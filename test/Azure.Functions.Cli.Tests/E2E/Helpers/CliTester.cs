@@ -11,9 +11,24 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 {
     public static class CliTester
     {
-        private static string _func = System.Environment.GetEnvironmentVariable("FUNC_PATH");
+        private static readonly string _func;
 
         private const string StartHostCommand = "start --build";
+
+        static CliTester()
+        {
+            _func = Environment.GetEnvironmentVariable("FUNC_PATH");
+
+            if (_func == null)
+            {
+                // Fallback for local testing in Visual Studio, etc.
+                _func = $@"{Environment.CurrentDirectory}\func.exe";
+                if (!File.Exists(_func))
+                {
+                    throw new ApplicationException("Could not locate the func.exe to use for testing. Make sure the FUNC_PATH environment variable is set to the full path of the func executable.");
+                }    
+            }
+        }
 
         public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null, string workingDir = null, bool startHost = false) => Run(new[] { runConfiguration }, output, workingDir, startHost);
 
