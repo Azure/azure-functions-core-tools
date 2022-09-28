@@ -83,7 +83,7 @@ jobs:
       inlineScript: |
         # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
-        echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+        echo "##vso[task.setvariable variable=AZURE_MANAGEMENT_ACCESS_TOKEN]$accessToken"
   - pwsh: |
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
