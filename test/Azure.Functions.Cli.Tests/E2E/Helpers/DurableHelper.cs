@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 if (version?.Equals("2.0") == true)
                 {
                     // If the version is (explicitly) 2.0, prepend path to 'durableTask' with 'extensions'
-                    hostSettings["extensions"]["durableTask"]["HubName"] = taskHubName;
+                    hostSettings["extensions"]["durableTask"]["hubName"] = taskHubName;
                 }
                 else
                 {
