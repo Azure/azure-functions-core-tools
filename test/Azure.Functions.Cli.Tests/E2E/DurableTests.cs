@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Actions.DurableActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Newtonsoft.Json;
@@ -384,6 +383,27 @@ namespace Azure.Functions.Cli.Tests.E2E
             startHost: true);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
+        }
+
+        [Theory]
+        [InlineData("netherite")]
+        [InlineData("mssql")]
+        public async Task DurableAlternateBackendsNotSupportedTest(string providerType)
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "durable get-instances" },
+                ExitInError = true,
+                ErrorContains = new[] { Enum.Parse<BackendType>(providerType, true).ToString(), "supported" },
+                CommandTimeout = TimeSpan.FromSeconds(10),
+                PreTest = (string workingDir) =>
+                {
+                    string hostJsonContent = $@"{{""extensions"":{{""durableTask"":{{""storageProvider"":{{""type"":""{providerType}""}}}}}},""version"": ""2.0""}}";
+                    File.WriteAllText(Path.Combine(workingDir, "host.json"), hostJsonContent);
+                }
+            },
+            _output,
+            startHost: false);
         }
     }
 }
