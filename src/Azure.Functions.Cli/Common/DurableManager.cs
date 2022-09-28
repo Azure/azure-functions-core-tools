@@ -171,7 +171,10 @@ namespace Azure.Functions.Cli.Common
 
             if (this.BackendType != BackendType.AzureStorage)
             {
-                throw new CliException($"The {this.BackendType} storage provider for Durable Functions is not yet supported by this command.");
+                throw new CliException(
+                    $"The {this.BackendType} storage provider for Durable Functions is not yet supported by this command. " +
+                    $"However, it may be supported by an SDK API or an HTTP API. " +
+                    $"To learn about alternate ways issue commands for Durable Functions, see https://aka.ms/durable-functions-instance-management.");
             }
 
             CheckAssemblies();
