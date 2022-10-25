@@ -31,6 +31,7 @@ namespace Azure.Functions.Cli.Common
 
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
+            await ExtensionBundleHelper.GetExtensionBundle();
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             string templatesJson; 
 
