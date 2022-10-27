@@ -8,6 +8,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -358,9 +359,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             (var listenUri, var baseUri, var certificate) = await Setup();
 
+            await ExtensionBundleHelper.GetExtensionBundle();
             IWebHost host = await BuildWebHost(hostOptions, listenUri, baseUri, certificate);
             var runTask = host.RunAsync();
-
             var hostService = host.Services.GetRequiredService<WebJobsScriptHostService>();
 
             await hostService.DelayUntilHostReady();
