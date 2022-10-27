@@ -36,6 +36,7 @@ namespace Azure.Functions.Cli.Common
 
             if(extensionBundleManager.IsExtensionBundleConfigured())
             {
+                await ExtensionBundleHelper.GetExtensionBundle();
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                 templatesJson = await contentProvider.GetTemplates();
             }
