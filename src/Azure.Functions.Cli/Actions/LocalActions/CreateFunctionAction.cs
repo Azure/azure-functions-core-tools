@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
@@ -158,6 +159,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     "Function not created! 'func new' is not supported for the preview of the V2 Python programming model.");
             }
 
+            var isNewNodeJsModel = isNewNodeJsProgrammingModel(workerRuntime);
+            if (isNewNodeJsModel)
+            {
+                // TODO: Remove these messages once creating new functions in the new programming model is supported
+                ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
+                NodeJSHelpers.PrintNodeV4WikiLink();
+                throw new CliException(
+                    "Function not created! 'func new' is not supported for the preview of the V4 Node.js programming model.");
+            }
+
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
@@ -220,6 +231,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }
+
+            if (workerRuntime == WorkerRuntime.node && !isNewNodeJsModel)
+            {
+                NodeJSHelpers.PrintV4AwarenessMessage();
+            }
         }
 
         private void ConfigureAuthorizationLevel(Template template)
@@ -281,6 +297,32 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             return string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
                 && FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy));
+        }
+
+        private bool isNewNodeJsProgrammingModel(WorkerRuntime workerRuntime)
+        {
+            try
+            {
+                if (workerRuntime == WorkerRuntime.node)
+                {
+                    if (FileSystemHelpers.FileExists(Constants.PackageJsonFileName))
+                    {
+                        var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(Constants.PackageJsonFileName);
+                        var packageJson = JsonConvert.DeserializeObject<JToken>(packageJsonData);
+                        var funcPackageVersion = packageJson["dependencies"]["@azure/functions"];
+                        if (new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // ignore and assume "false"
+            }
+
+            return false;
         }
     }
 }

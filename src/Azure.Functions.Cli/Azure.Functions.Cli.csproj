@@ -40,6 +40,9 @@
     <EmbeddedResource Include="StaticResources\bundleConfigPyStein.json">
       <LogicalName>$(AssemblyName).bundleConfigPyStein.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\bundleConfigNodeV4.json">
+      <LogicalName>$(AssemblyName).bundleConfigNodeV4.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
@@ -112,11 +115,17 @@
     <EmbeddedResource Include="StaticResources\profile.ps1">
       <LogicalName>$(AssemblyName).profile.ps1</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\package.json">
-      <LogicalName>$(AssemblyName).package.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\package-js-v4.json">
+      <LogicalName>$(AssemblyName).package-js-v4.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\javascriptPackage.json">
-      <LogicalName>$(AssemblyName).javascriptPackage.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\package-js.json">
+      <LogicalName>$(AssemblyName).package-js.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\package-ts-v4.json">
+      <LogicalName>$(AssemblyName).package-ts-v4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\package-ts.json">
+      <LogicalName>$(AssemblyName).package-ts.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\tsconfig.json">
       <LogicalName>$(AssemblyName).tsconfig.json</LogicalName>

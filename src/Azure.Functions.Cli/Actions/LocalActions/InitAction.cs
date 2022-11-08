@@ -122,10 +122,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("managed-dependencies")
                 .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
                 .Callback(f => ManagedDependencies = f);
-            
+
             Parser
                 .Setup<string>('m', "model")
-                .WithDescription($"Selects the programming model for the function app. Options are {EnumerationHelper.Join(", ", ProgrammingModelHelper.GetProgrammingModels())}. Currently, only the Python worker runtime supports the preview programming model")
+                .WithDescription($"Selects the programming model for the function app. Options are {EnumerationHelper.Join(", ", ProgrammingModelHelper.GetProgrammingModels())}. Currently, only Python and Node.js support this setting")
                 .Callback(m => ProgrammingModel = m);
 
             Parser
@@ -196,7 +196,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
-            
+
             ValidateTargetFramework();
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
@@ -275,14 +275,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string language,
             ProgrammingModel programmingModel,
             bool managedDependenciesOption,
-            bool generatePythonDocumentation=true)
+            bool generatePythonDocumentation = true)
         {
-            switch (workerRuntime) {
+            switch (workerRuntime)
+            {
                 case Helpers.WorkerRuntime.python:
                     await PythonHelpers.SetupPythonProject(programmingModel, generatePythonDocumentation);
                     break;
                 case Helpers.WorkerRuntime.powershell:
-                    await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
+                    await FileSystemHelpers.WriteFileIfNotExists("profile.ps1", await StaticResources.PowerShellProfilePs1);
 
                     if (managedDependenciesOption)
                     {
@@ -312,20 +313,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         }
 
                         requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance);
-                        await WriteFiles("requirements.psd1", requirementsContent);
+                        await FileSystemHelpers.WriteFileIfNotExists("requirements.psd1", requirementsContent);
                     }
                     break;
                 case Helpers.WorkerRuntime.node:
-                    if (language == Constants.Languages.TypeScript)
-                    {
-                        await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
-                        await WriteFiles("package.json", await StaticResources.PackageJson);
-                        await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
-                    }
-                    else
-                    {
-                        await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
-                    }
+                    await NodeJSHelpers.SetupProject(programmingModel, language);
                     break;
             }
         }
@@ -367,12 +359,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
             }
 
-            if (programmingModel == Common.ProgrammingModel.V2)
+            if ((workerRuntime == Helpers.WorkerRuntime.python && programmingModel == Common.ProgrammingModel.V2) || (workerRuntime == Helpers.WorkerRuntime.node && programmingModel == Common.ProgrammingModel.V4))
             {
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.AzureWebJobsFeatureFlags, Constants.EnableWorkerIndexing);
             }
 
-            await WriteFiles("local.settings.json", localSettingsJsonContent);
+            await FileSystemHelpers.WriteFileIfNotExists("local.settings.json", localSettingsJsonContent);
         }
 
         private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, bool csx)
@@ -381,26 +373,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (csx)
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileCsxDotNet);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCsxDotNet);
                 }
                 else
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
             }
             else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
                 if (language == Constants.Languages.TypeScript)
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileTypescript);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypescript);
                 }
                 else
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode16);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileNode16);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
@@ -409,23 +401,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell72);
+                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfilePowershell72);
             }
-            else if(workerRuntime == Helpers.WorkerRuntime.custom)
+            else if (workerRuntime == Helpers.WorkerRuntime.custom)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileCustom);
+                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCustom);
             }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
             {
                 throw new CliException("Can't find WorkerRuntime None");
             }
-            await WriteFiles(".dockerignore", await StaticResources.DockerIgnoreFile);
+            await FileSystemHelpers.WriteFileIfNotExists(".dockerignore", await StaticResources.DockerIgnoreFile);
         }
 
         private static async Task WritePythonDockerFile()
         {
             WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
-            await WriteFiles("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker));
+            await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker));
         }
 
         private static async Task WriteExtensionsJson()
@@ -436,7 +428,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FileSystemHelpers.CreateDirectory(Path.GetDirectoryName(file));
             }
 
-            await WriteFiles(file, await StaticResources.VsCodeExtensionsJson);
+            await FileSystemHelpers.WriteFileIfNotExists(file, await StaticResources.VsCodeExtensionsJson);
         }
 
         private static async Task SetupSourceControl()
@@ -465,20 +457,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             foreach (var pair in fileToContentMap)
             {
-                await WriteFiles(pair.Key.Value, await pair.Value);
-            }
-        }
-
-        private static async Task WriteFiles(string fileName, string fileContent)
-        {
-            if (!FileSystemHelpers.FileExists(fileName))
-            {
-                ColoredConsole.WriteLine($"Writing {fileName}");
-                await FileSystemHelpers.WriteAllTextToFileAsync(fileName, fileContent);
-            }
-            else
-            {
-                ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
+                await FileSystemHelpers.WriteFileIfNotExists(pair.Key.Value, await pair.Value);
             }
         }
 
@@ -517,18 +496,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
                 }
+                else if (ResolvedProgrammingModel == Common.ProgrammingModel.V4 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.node)
+                {
+                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigNodeV4);
+                }
                 else
                 {
                     hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
                 }
             }
 
-            if(workerRuntime == Helpers.WorkerRuntime.custom)
+            if (workerRuntime == Helpers.WorkerRuntime.custom)
             {
                 hostJsonContent = await hostJsonContent.AppendContent(Constants.CustomHandlerPropertyName, StaticResources.CustomHandlerConfig);
             }
 
-            await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
+            await FileSystemHelpers.WriteFileIfNotExists(Constants.HostJsonFileName, hostJsonContent);
         }
 
         private static string AddLocalSetting(string localSettingsContent, string key, string value)
