@@ -26,6 +26,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly ISecretsManager _secretsManager;
 
         private readonly InitAction _initAction;
+        public WorkerRuntime workerRuntime;
 
         public string Language { get; set; }
         public string TemplateName { get; set; }
@@ -78,77 +79,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            if (Console.IsOutputRedirected || Console.IsInputRedirected)
-            {
-                if (string.IsNullOrEmpty(TemplateName) ||
-                    string.IsNullOrEmpty(FunctionName))
-                {
-                    ColoredConsole
-                        .Error
-                        .WriteLine(ErrorColor("Running with stdin\\stdout redirected. Command must specify --template, and --name explicitly."))
-                        .WriteLine(ErrorColor("See 'func help function' for more details"));
-                    return;
-                }
-            }
-
-            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
-            if (!FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json")))
-            {
-                // we're assuming "func init" has not been run
-                await _initAction.RunAsync();
-                workerRuntime = _initAction.ResolvedWorkerRuntime;
-                Language = _initAction.ResolvedLanguage;
-            }
-
-
-            if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
-            {
-                // validate
-                var workerRuntimeSelected = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
-                if (workerRuntime != workerRuntimeSelected)
-                {
-                    throw new CliException("Selected language doesn't match worker set in local.settings.json." +
-                        $"Selected worker is: {workerRuntime} and selected language is: {workerRuntimeSelected}");
-                }
-            }
-            else if (string.IsNullOrWhiteSpace(Language))
-            {
-                if (workerRuntime == WorkerRuntime.None)
-                {
-                    SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
-                    workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
-                }
-                else if (!WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) || Csx)
-                {
-                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
-                    var displayList = _templates.Value
-                            .Select(t => t.Metadata.Language)
-                            .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToArray();
-                    if (displayList.Length == 1)
-                    {
-                        Language = displayList.First();
-                    }
-                    else if (!InferAndUpdateLanguage(workerRuntime))
-                    {
-                        SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                        Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
-                    }
-                }
-                else if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime))
-                {
-                    InferAndUpdateLanguage(workerRuntime);
-                }
-            }
-            else if (!string.IsNullOrWhiteSpace(Language))
-            {
-                workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
-            }
-
-            // Check if the programming model is PyStein
-            if (isNewPythonProgrammingModel())
+            await ValidateCommand();
+            // Check if the programming model is PyStein 
+            if (IsNewPythonProgrammingModel())
             {
                 // TODO: Remove these messages once creating new functions in the new programming model is supported
                 ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
@@ -216,9 +149,81 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
-            if (string.Equals(Language, Languages.Python, StringComparison.CurrentCultureIgnoreCase) && !isNewPythonProgrammingModel())
+            if (string.Equals(Language, Languages.Python, StringComparison.CurrentCultureIgnoreCase) && !IsNewPythonProgrammingModel())
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
+            }
+        }
+
+        public async Task ValidateCommand()
+        {
+            if (Console.IsOutputRedirected || Console.IsInputRedirected)
+            {
+                if (string.IsNullOrEmpty(TemplateName) ||
+                    string.IsNullOrEmpty(FunctionName))
+                {
+                    ColoredConsole
+                        .Error
+                        .WriteLine(ErrorColor("Running with stdin\\stdout redirected. Command must specify --template, and --name explicitly."))
+                        .WriteLine(ErrorColor("See 'func help function' for more details"));
+                    return;
+                }
+            }
+
+            workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            if (!FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json")))
+            {
+                // we're assuming "func init" has not been run
+                await _initAction.RunAsync();
+                workerRuntime = _initAction.ResolvedWorkerRuntime;
+                Language = _initAction.ResolvedLanguage;
+            }
+
+
+            if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
+            {
+                // validate
+                var workerRuntimeSelected = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
+                if (workerRuntime != workerRuntimeSelected)
+                {
+                    throw new CliException("Selected language doesn't match worker set in local.settings.json." +
+                        $"Selected worker is: {workerRuntime} and selected language is: {workerRuntimeSelected}");
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(Language))
+            {
+                if (workerRuntime == WorkerRuntime.None)
+                {
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
+                    workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
+                }
+                else if (!WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) || Csx)
+                {
+                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
+                    var displayList = _templates.Value
+                            .Select(t => t.Metadata.Language)
+                            .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToArray();
+                    if (displayList.Length == 1)
+                    {
+                        Language = displayList.First();
+                    }
+                    else if (!InferAndUpdateLanguage(workerRuntime))
+                    {
+                        SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
+                        Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
+                    }
+                }
+                else if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime))
+                {
+                    InferAndUpdateLanguage(workerRuntime);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(Language))
+            {
+                workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
         }
 
@@ -277,10 +282,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private bool isNewPythonProgrammingModel()
+        private bool IsNewPythonProgrammingModel()
         {
-            return string.Equals(Language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
-                && FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy));
+            return PythonHelpers.IsNewPythonProgrammingModel(Language);
         }
     }
 }

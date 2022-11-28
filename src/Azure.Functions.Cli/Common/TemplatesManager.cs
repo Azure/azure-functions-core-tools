@@ -58,15 +58,73 @@ namespace Azure.Functions.Cli.Common
             return FileSystemHelpers.ReadAllTextFromFile(templatesLocation);
         }
 
-        public async Task Deploy(string Name, Template template)
+        
+
+        public async Task Deploy(string name, Template template)
         {
-            var path = Path.Combine(Environment.CurrentDirectory, Name);
+            if (template.Metadata.ProgrammingModel)
+            {
+                await DeployNewProgrammingModel(name, template);
+            }
+            else
+            {
+                await DeployLegacyModel(name, template);
+            }
+
+            await InstallExtensions(template);
+        }
+
+        private async Task DeployNewProgrammingModel(string name, Template template)
+        {
+            var path = Path.Combine(Environment.CurrentDirectory);
+            var files = template.Files.Where(kv => !kv.Key.EndsWith(".dat"));
+            var existingFileNames = files.Where(file => FileSystemHelpers.FileExists(file.Key)).Select(file => file.Key);
+
+            if (existingFileNames.Any())
+            {
+                // Once we get the confirmation of overwriting all files then we will overwrite. 
+                foreach(var existingFileName  in existingFileNames) 
+                {
+                    var response = "n";
+                    do
+                    {
+                        ColoredConsole.Write($"A file with the name {existingFileName} already exists. Overwrite [y/n]? [n] ");
+                        response = Console.ReadLine();
+                    } while (response != "n" && response != "y");
+                    if (response == "n")
+                    {
+                        return;
+                    }
+                }
+            }
+
+            foreach (var existingFileName in existingFileNames)
+            {
+                if (FileSystemHelpers.FileExists(path))
+                {
+                    FileSystemHelpers.FileDelete(path);
+                }
+            }
+
+            foreach (var file in files)
+            {
+                var filePath = Path.Combine(path, file.Key);
+                ColoredConsole.WriteLine($"Writing {filePath}");
+                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, file.Value);
+            }
+
+
+        }
+
+        private async Task DeployLegacyModel(string name, Template template)
+        {
+            var path = Path.Combine(Environment.CurrentDirectory, name);
             if (FileSystemHelpers.DirectoryExists(path))
             {
                 var response = "n";
                 do
                 {
-                    ColoredConsole.Write($"A directory with the name {Name} already exists. Overwrite [y/n]? [n] ");
+                    ColoredConsole.Write($"A directory with the name {name} already exists. Overwrite [y/n]? [n] ");
                     response = Console.ReadLine();
                 } while (response != "n" && response != "y");
                 if (response == "n")
@@ -91,6 +149,10 @@ namespace Azure.Functions.Cli.Common
             var functionJsonPath = Path.Combine(path, "function.json");
             ColoredConsole.WriteLine($"Writing {functionJsonPath}");
             await FileSystemHelpers.WriteAllTextToFileAsync(functionJsonPath, JsonConvert.SerializeObject(template.Function, Formatting.Indented));
+        }
+
+        private async Task InstallExtensions(Template template)
+        {
             if (template.Metadata.Extensions != null)
             {
                 foreach (var extension in template.Metadata.Extensions)

@@ -33,6 +33,9 @@ namespace Azure.Functions.Cli.Common
         [JsonProperty("userPrompt")]
         public IEnumerable<string> UserPrompt { get; set; }
 
+        [JsonProperty("programmingModel")]
+        public bool ProgrammingModel { get; set; }
+
         [JsonProperty("extensions")]
         public IEnumerable<FunctionExtension> Extensions { get; set; }
     }
