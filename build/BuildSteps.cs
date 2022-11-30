@@ -28,12 +28,6 @@ namespace Build
         {
             var feeds = new[]
             {
-                "https://www.nuget.org/api/v2/",
-                "https://www.myget.org/F/azure-appservice/api/v2",
-                "https://www.myget.org/F/azure-appservice-staging/api/v2",
-                "https://www.myget.org/F/fusemandistfeed/api/v2",
-                "https://www.myget.org/F/30de4ee06dd54956a82013fa17a3accb/",
-                "https://www.myget.org/F/xunit/api/v3/index.json",
                 "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/Microsoft.Azure.Functions.PowerShellWorker/nuget/v3/index.json",
                 "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsRelease/nuget/v3/index.json",
                 "https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsPreRelease/nuget/v3/index.json"
