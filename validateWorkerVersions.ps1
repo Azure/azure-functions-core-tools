@@ -26,7 +26,7 @@ function removeBomIfExists([string]$data)
     return $data
 }
 
-$cliCsprojPath = "C:\Users\v-imohammad\Desktop\Coretools3.18.0\azure-functions-core-tools/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj"
+$cliCsprojPath = "$PSScriptRoot/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj"
 $cliCsprojContent = removeBomIfExists(Get-Content $cliCsprojPath)
 $cliCsprojXml = [xml]$cliCsprojContent
 
