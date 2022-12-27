@@ -1,0 +1,20 @@
+{
+    "defaultFunctionName": "HttpTrigger",
+    "description": "$HttpTrigger_description",
+    "name": "HTTP trigger",
+    "language": "Python",
+    "trigger": "HttpTrigger",
+    "programmingModel": true,
+    "category": [
+      "$temp_category_core",
+      "$temp_category_api"
+    ],
+    "categoryStyle": "http",
+    "enabledInTryMode": true,
+    "userPrompt": [
+      "authLevel"
+    ],
+    "filters": [
+      "Python3"
+    ]
+  }

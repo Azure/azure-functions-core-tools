@@ -34,14 +34,32 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="StaticResources\HttpTrigger-Python-Preview-Append.New.function_app.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\bundleConfigPyStein.json">
       <LogicalName>$(AssemblyName).bundleConfigPyStein.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\CosmosDBTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).CosmosDBTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\CosmosDBTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).CosmosDBTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\EventHubTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).EventHubTrigger-Python-Preview-Append.function_app.py</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
@@ -91,6 +109,19 @@
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
     </EmbeddedResource>
+
+    <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.New.function_app.py">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.New.function_app.py</LogicalName>
+     </EmbeddedResource>
+    
     <EmbeddedResource Include="StaticResources\managedDependenciesConfig.json">
       <LogicalName>$(AssemblyName).managedDependenciesConfig.json</LogicalName>
     </EmbeddedResource>
@@ -99,6 +130,30 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\QueueTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).QueueTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\QueueTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).QueueTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusQueueTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).ServiceBusQueueTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusQueueTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).ServiceBusQueueTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusTopicTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).ServiceBusTopicTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusTopicTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).ServiceBusTopicTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.metadata.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\vscode.extensions.json">
       <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>
