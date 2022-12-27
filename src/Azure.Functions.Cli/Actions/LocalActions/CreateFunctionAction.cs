@@ -80,36 +80,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public async override Task RunAsync()
         {
             await ValidateCommand();
-            
-            SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
-            string templateLanguage;
-            try
-            {
-                templateLanguage = WorkerRuntimeLanguageHelper.NormalizeLanguage(Language);
-            }
-            catch (Exception)
-            {
-                // Ideally this should never happen.
-                templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
-            }
-
-            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
-            TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
-            ColoredConsole.WriteLine(TitleColor(TemplateName));
-
-            Template template;
-            // Check if the programming model is PyStein 
-            if (IsNewPythonProgrammingModel())
-            {
-                template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.ProgrammingModel && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
-            }
-            else
-            {
-                template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
-            }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
-            { 
+            {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
                 ColoredConsole.Write("Function name: ");
@@ -118,34 +91,61 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
                 await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel);
             }
-
-            if (template == null)
-            {
-                TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", "N/A");
-                throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\"");
-            }
             else
             {
-                TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", TemplateName);
-
-                var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
-                if (template.Metadata.Extensions != null && !extensionBundleManager.IsExtensionBundleConfigured() && !CommandChecker.CommandExists("dotnet"))
+                SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
+                string templateLanguage;
+                try
                 {
-                    throw new CliException($"The {template.Metadata.Name} template has extensions. {Constants.Errors.ExtensionsNeedDotnet}");
+                    templateLanguage = WorkerRuntimeLanguageHelper.NormalizeLanguage(Language);
+                }
+                catch (Exception)
+                {
+                    // Ideally this should never happen.
+                    templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
                 }
 
-                if (AuthorizationLevel.HasValue)
+                TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+                ColoredConsole.WriteLine(TitleColor(TemplateName));
+
+                Template template;
+                if (IsNewPythonProgrammingModel())
                 {
-                    ConfigureAuthorizationLevel(template);
+                    template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.ProgrammingModel && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                }
+                else
+                {
+                    template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
                 }
 
-                ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
-                FunctionName = FunctionName ?? Console.ReadLine();
-                FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
-                await _templatesManager.Deploy(FunctionName, template);
-                PerformPostDeployTasks(FunctionName, Language);
+                if (template == null)
+                {
+                    TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", "N/A");
+                    throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\"");
+                }
+                else
+                {
+                    TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "template", TemplateName);
+
+                    var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+                    if (template.Metadata.Extensions != null && !extensionBundleManager.IsExtensionBundleConfigured() && !CommandChecker.CommandExists("dotnet"))
+                    {
+                        throw new CliException($"The {template.Metadata.Name} template has extensions. {Constants.Errors.ExtensionsNeedDotnet}");
+                    }
+
+                    if (AuthorizationLevel.HasValue)
+                    {
+                        ConfigureAuthorizationLevel(template);
+                    }
+
+                    ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
+                    FunctionName = FunctionName ?? Console.ReadLine();
+                    FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
+                    await _templatesManager.Deploy(FunctionName, template);
+                    PerformPostDeployTasks(FunctionName, Language);
+                }
             }
-            
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
             if (string.Equals(Language, Languages.Python, StringComparison.CurrentCultureIgnoreCase) && !IsNewPythonProgrammingModel())
             {
