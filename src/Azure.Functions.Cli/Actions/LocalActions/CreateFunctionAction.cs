@@ -330,7 +330,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (IsNewPythonProgrammingModel() && IsValidTriggerNameForHelp(triggerName))
             {
-                ColoredConsole.Write(AdditionalInfoColor($"Did you know about {triggerName}? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at {triggerName}"));
+                ColoredConsole.Write(AdditionalInfoColor($"Did you know about {triggerName}? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at {triggerName}. {Environment.NewLine}{Environment.NewLine}"));
                 PythonHelpers.PrintPySteinReferenceMessage();
                 return true;
             }
