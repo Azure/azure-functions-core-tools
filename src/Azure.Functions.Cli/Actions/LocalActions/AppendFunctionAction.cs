@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            await _createFunctionAction.ValidateCommand();
+            await _createFunctionAction.UpdateLanguageAndRuntime();
             Langauge = _createFunctionAction.Language;
             if (!IsNewPythonProgrammingModel())
             {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,8 +8,11 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Storage.Blobs.Models;
 using Colors.Net;
 using Fclp;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Azure.Documents;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -32,6 +36,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string TemplateName { get; set; }
         public string FunctionName { get; set; }
         public bool Csx { get; set; }
+        private string HelpForTrigger { get; set; }
+        private string FileNameToAppend { get; set; }
         public AuthorizationLevel? AuthorizationLevel { get; set; }
 
         Lazy<IEnumerable<Template>> _templates;
@@ -63,6 +69,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(n => FunctionName = n);
 
             Parser
+                .Setup<string>('f', "file")
+                .WithDescription("File Name")
+                .SetDefault(Constants.PySteinFunctionAppPy)
+                .Callback(f => FileNameToAppend = f);
+
+            Parser
                 .Setup<AuthorizationLevel?>('a', "authlevel")
                 .WithDescription("Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools")
                 .Callback(a => AuthorizationLevel = a);
@@ -74,12 +86,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             _initAction.ParseArgs(args);
 
+            ParseTriggerForHelpRequest(args);
             return base.ParseArgs(args);
         }
 
         public async override Task RunAsync()
         {
-            await ValidateCommand();
+            // Check if the new command only ran for help. 
+            if (PrintHelpForTrigger(HelpForTrigger))
+            {
+                return;
+            }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
@@ -106,7 +123,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
                 TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct());
+                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(templateLanguage));
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
                 Template template;
@@ -153,7 +170,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        public async Task ValidateCommand()
+        public async Task UpdateLanguageAndRuntime()
         {
             if (Console.IsOutputRedirected || Console.IsInputRedirected)
             {
@@ -224,6 +241,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
         }
+        private IEnumerable<string> GetTriggerNames(string templateLanguage)
+        {
+            return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct();
+        }
 
         private void ConfigureAuthorizationLevel(Template template)
         {
@@ -278,6 +299,49 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 funcObj.Add("scriptFile", $"../dist/{functionName}/index.js");
                 FileSystemHelpers.WriteAllTextToFile(funcJsonFile, JsonConvert.SerializeObject(funcObj, Formatting.Indented));
             }
+        }
+
+        private void ParseTriggerForHelpRequest(string[] args)
+        {
+            if (!PythonHelpers.HasPySteinFile() || args.Length != 2)
+            {
+                return;
+            }
+
+            var inputTriggerName = args[0];
+            var inputHelp = args[1];
+            if (HelpCommand.Equals(inputHelp, StringComparison.OrdinalIgnoreCase) && IsValidTriggerNameForHelp(inputTriggerName))
+            {
+                HelpForTrigger = inputTriggerName;
+            }
+        }
+
+        public bool PrintHelpForTrigger(string triggerName)
+        {
+            if (string.IsNullOrWhiteSpace(triggerName))
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(Language))
+            {
+                UpdateLanguageAndRuntime().Wait();
+            }
+
+            if (IsNewPythonProgrammingModel() && IsValidTriggerNameForHelp(triggerName))
+            {
+                ColoredConsole.Write(AdditionalInfoColor($"Did you know about {triggerName}? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at {triggerName}"));
+                PythonHelpers.PrintPySteinReferenceMessage();
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsValidTriggerNameForHelp(string triggerName)
+        {
+            var triggerNames = GetTriggerNames(Languages.Python).Select(x => x.Replace(" ", string.Empty)).ToList();
+            return triggerNames.Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
         }
 
         private bool IsNewPythonProgrammingModel()

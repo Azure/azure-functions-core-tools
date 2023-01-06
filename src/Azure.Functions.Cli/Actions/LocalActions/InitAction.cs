@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string ResolvedLanguage { get; set; }
 
         public ProgrammingModel ResolvedProgrammingModel { get; set; }
-
+        
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }

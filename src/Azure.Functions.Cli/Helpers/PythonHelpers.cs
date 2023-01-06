@@ -607,8 +607,12 @@ namespace Azure.Functions.Cli.Helpers
 
         public static bool IsNewPythonProgrammingModel(string language)
         {
-            return string.Equals(language, Languages.Python, StringComparison.InvariantCultureIgnoreCase)
-                && FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy));
+            return string.Equals(language, Languages.Python, StringComparison.InvariantCultureIgnoreCase) && HasPySteinFile();
+        }
+
+        public static bool HasPySteinFile()
+        {
+            return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy));
         }
     }
 }

@@ -1,0 +1,238 @@
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>func</AssemblyName>
+    <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
+    <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
+    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
+    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
+    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
+    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
+    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
+    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
+    <Company>Microsoft</Company>
+    <Authors>Microsoft</Authors>
+    <Title>Azure Functions Cli</Title>
+    <Copyright>? .NET Foundation.  All rights reserved.</Copyright>
+    <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
+    <RepositoryUrl>https://github.com/Azure/azure-functions-cli</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>func</ToolCommandName>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
+    <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
+    <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
+    <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\bundleConfig.json">
+      <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\bundleConfigPyStein.json">
+      <LogicalName>$(AssemblyName).bundleConfigPyStein.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\CosmosDBTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).CosmosDBTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\CosmosDBTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).CosmosDBTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
+      <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\EventHubTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).EventHubTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
+      <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.csx.dotnet">
+      <LogicalName>$(AssemblyName).Dockerfile.csx.dotnet</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.custom">
+      <LogicalName>$(AssemblyName).Dockerfile.custom</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.java8">
+      <LogicalName>$(AssemblyName).Dockerfile.java8</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.java11">
+      <LogicalName>$(AssemblyName).Dockerfile.java11</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.node14">
+      <LogicalName>$(AssemblyName).Dockerfile.node14</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.node16">
+      <LogicalName>$(AssemblyName).Dockerfile.node16</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.powershell7">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell7</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.powershell7.2">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell7.2</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.7">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.7</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.8">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.8</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.9">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
+      <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\gitignore">
+      <LogicalName>$(AssemblyName).gitignore</LogicalName>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+
+    <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+	
+	<EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.New.function_app.py">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.New.function_app.py</LogicalName>
+    </EmbeddedResource>
+    
+    <EmbeddedResource Include="StaticResources\managedDependenciesConfig.json">
+      <LogicalName>$(AssemblyName).managedDependenciesConfig.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\host.json">
+      <LogicalName>$(AssemblyName).host.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\local.settings.json.template">
+      <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\QueueTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).QueueTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\QueueTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).QueueTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusQueueTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).ServiceBusQueueTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusQueueTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).ServiceBusQueueTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusTopicTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).ServiceBusTopicTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ServiceBusTopicTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).ServiceBusTopicTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.function_app.py">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.metadata.json">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\vscode.extensions.json">
+      <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\python_docker_build.sh">
+      <LogicalName>$(AssemblyName).python_docker_build.sh</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\profile.ps1">
+      <LogicalName>$(AssemblyName).profile.ps1</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\package.json">
+      <LogicalName>$(AssemblyName).package.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\javascriptPackage.json">
+      <LogicalName>$(AssemblyName).javascriptPackage.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\tsconfig.json">
+      <LogicalName>$(AssemblyName).tsconfig.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\funcignore">
+      <LogicalName>$(AssemblyName).funcignore</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\function_app.py.template">
+      <LogicalName>$(AssemblyName).function_app.py</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\requirements.psd1">
+      <LogicalName>$(AssemblyName).requirements.psd1</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\requirements.txt">
+      <LogicalName>$(AssemblyName).requirements.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\dockerignore">
+      <LogicalName>$(AssemblyName).dockerignore</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\print-functions.sh">
+      <LogicalName>$(AssemblyName).print-functions.sh</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\keda-v1.yaml">
+      <LogicalName>$(AssemblyName).keda-v1.yaml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\keda-v2.yaml">
+      <LogicalName>$(AssemblyName).keda-v2.yaml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\ziptofs.sh">
+      <LogicalName>$(AssemblyName).ziptofs.sh</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\getting_started_python_function.md">
+      <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\tools\python\packapp\__main__.py">
+      <Link>tools\python\packapp\__main__.py</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="4.6.2" />
+    <PackageReference Include="Azure.Identity" Version="1.5.0" />
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.2.0" />
+    <PackageReference Include="Colors.Net" Version="1.1.0" />
+    <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />
+    <PackageReference Include="DotNetZip" Version="1.13.3" />
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.20.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.10.4" />
+    <PackageReference Include="Microsoft.Build" Version="17.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
+    <PackageReference Include="YamlDotNet" Version="6.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(NoWorkers)' != 'true'">
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.3.1" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.4.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2045" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2040" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.7.0" />
+  </ItemGroup>
+  <Target Name="ExcludeWorkersFromReadyToRun">
+    <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
+      <Output TaskParameter="Include" ItemName="PublishReadyToRunExclude" />
+    </CreateItem>
+  </Target>
+</Project>
