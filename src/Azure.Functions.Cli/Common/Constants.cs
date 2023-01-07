@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Common
         public const string PySteinFunctionAppPy = "function_app.py";
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
+        public const string PackageJsonFileName = "package.json";
         public const string ProxiesJsonFileName = "proxies.json";
         public const string ExtensionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
@@ -149,6 +150,7 @@ namespace Azure.Functions.Cli.Common
             public const string LinuxPython37ImageAmd64 = "mcr.microsoft.com/azure-functions/python:2.0.14786-python3.7-buildenv";
             public const string LinuxPython38ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.8-buildenv";
             public const string LinuxPython39ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.9-buildenv";
+            public const string LinuxPython310ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.10-buildenv";
         }
 
         public static class StaticResourcesNames

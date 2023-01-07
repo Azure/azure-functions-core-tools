@@ -1,22 +1,32 @@
-$ErrorActionPreference = 'Stop';
+$ErrorActionPreference = 'STOP';
 
 $packageName= '$PACKAGENAME'
 $toolsDir   = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
+$url_arm64      = '$ZIPURL_ARM64'
 $url_x86        = '$ZIPURL_X86'
 $url_x64        = '$ZIPURL_X64'
+$checksum_arm64 = '$CHECKSUM_ARM64'
 $checksum_x86   = '$CHECKSUM_X86'
 $checksum_x64   = '$CHECKSUM_X64'
 
-# By default, we want 32-bit installer
-$url = $url_x86
-$checksum = $checksum_x86
-
-# If specifically asked for 64-bit, we use that
+# Get-PackageParameters returns a hash table array of values
 $pp = Get-PackageParameters
-if ($pp['x64'] -eq 'true')
+# If specifically asked for x64 or arm64, we use that
+if ($pp.ContainsKey('x64'))
 {
   $url = $url_x64
   $checksum = $checksum_x64
+}
+elseif ($pp.ContainsKey('arm64'))
+{
+  $url =  $url_arm64
+  $checksum = $checksum_arm64
+}
+else
+{
+  # By default, we want the x86 installer
+  $url = $url_x86
+  $checksum = $checksum_x86
 }
 
 $packageArgs = @{
@@ -30,7 +40,7 @@ $packageArgs = @{
 Install-ChocolateyZipPackage @packageArgs
 
 # only symlink for func.exe
-$files = get-childitem $toolsDir -include *.exe -recurse
+$files = Get-ChildItem $toolsDir -include *.exe -recurse
 foreach ($file in $files) {
   if (!$file.Name.Equals("func.exe")) {
     #generate an ignore file

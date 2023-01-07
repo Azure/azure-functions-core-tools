@@ -49,7 +49,7 @@ try
     }
 
     # Runtimes with signed binaries
-    $runtimesIdentifiers = @("min.win-x86","min.win-x64", "osx-arm64", "osx-x64")
+    $runtimesIdentifiers = @("min.win-arm64", "min.win-x86","min.win-x64", "osx-arm64", "osx-x64")
     $tempDirectory = New-Item $tempDirectoryPath -ItemType Directory
     LogSuccess "$tempDirectoryPath created"
 

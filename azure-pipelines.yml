@@ -87,6 +87,7 @@ jobs:
   - pwsh: |
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
+    condition: ne(variables['skipWorkerVersionValidation'], 'true')
   - pwsh: |
       .\build.ps1
     env:

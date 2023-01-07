@@ -3,7 +3,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>func</AssemblyName>
-    <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
     <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
     <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
@@ -55,7 +55,9 @@
     <EmbeddedResource Include="StaticResources\CosmosDBTrigger-Python-Preview-Append.metadata.json">
       <LogicalName>$(AssemblyName).CosmosDBTrigger-Python-Preview-Append.metadata.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
+    <EmbeddedResource Include="StaticResources\bundleConfigNodeV4.json">
+      <LogicalName>$(AssemblyName).bundleConfigNodeV4.json</LogicalName>
+    </EmbeddedResource>    <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\EventHubTrigger-Python-Preview-Append.function_app.py">
@@ -102,6 +104,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.9">
       <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.10">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.10</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
       <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
@@ -164,11 +169,17 @@
     <EmbeddedResource Include="StaticResources\profile.ps1">
       <LogicalName>$(AssemblyName).profile.ps1</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\package.json">
-      <LogicalName>$(AssemblyName).package.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\package-js-v4.json">
+      <LogicalName>$(AssemblyName).package-js-v4.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\javascriptPackage.json">
-      <LogicalName>$(AssemblyName).javascriptPackage.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\package-js.json">
+      <LogicalName>$(AssemblyName).package-js.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\package-ts-v4.json">
+      <LogicalName>$(AssemblyName).package-ts-v4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\package-ts.json">
+      <LogicalName>$(AssemblyName).package-ts.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\tsconfig.json">
       <LogicalName>$(AssemblyName).tsconfig.json</LogicalName>
@@ -217,20 +228,20 @@
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />
     <PackageReference Include="DotNetZip" Version="1.13.3" />
-    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.20.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.21.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.10.4" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.12.2" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.3.1" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.4.0" />
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.4.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2045" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2040" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2258" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.7.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">

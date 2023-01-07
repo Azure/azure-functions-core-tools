@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
@@ -98,6 +99,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
+            if (!ValidateInputs())
+            {
+                return;
+            }
+
+            await UpdateLanguageAndRuntime();
+
+            var isNewNodeJsModel = isNewNodeJsProgrammingModel(workerRuntime);
+            if (isNewNodeJsModel)
+            {
+                // TODO: Remove these messages once creating new functions in the new programming model is supported
+                ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
+                NodeJSHelpers.PrintNodeV4WikiLink();
+                throw new CliException(
+                    "Function not created! 'func new' is not supported for the preview of the V4 Node.js programming model.");
+            }
+
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
@@ -168,9 +186,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }
+
+            if (workerRuntime == WorkerRuntime.node && !isNewNodeJsModel)
+            {
+                NodeJSHelpers.PrintV4AwarenessMessage();
+            }
         }
 
-        public async Task UpdateLanguageAndRuntime()
+        public bool ValidateInputs()
         {
             if (Console.IsOutputRedirected || Console.IsInputRedirected)
             {
@@ -181,10 +204,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         .Error
                         .WriteLine(ErrorColor("Running with stdin\\stdout redirected. Command must specify --template, and --name explicitly."))
                         .WriteLine(ErrorColor("See 'func help function' for more details"));
-                    return;
+                    return false;
                 }
             }
 
+            return true;
+        }
+
+        public async Task UpdateLanguageAndRuntime()
+        {
             workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             if (!FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json")))
             {
@@ -347,6 +375,32 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private bool IsNewPythonProgrammingModel()
         {
             return PythonHelpers.IsNewPythonProgrammingModel(Language);
+        }
+
+        private bool isNewNodeJsProgrammingModel(WorkerRuntime workerRuntime)
+        {
+            try
+            {
+                if (workerRuntime == WorkerRuntime.node)
+                {
+                    if (FileSystemHelpers.FileExists(Constants.PackageJsonFileName))
+                    {
+                        var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(Constants.PackageJsonFileName);
+                        var packageJson = JsonConvert.DeserializeObject<JToken>(packageJsonData);
+                        var funcPackageVersion = packageJson["dependencies"]["@azure/functions"];
+                        if (new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // ignore and assume "false"
+            }
+
+            return false;
         }
     }
 }

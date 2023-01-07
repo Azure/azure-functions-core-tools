@@ -42,10 +42,12 @@ namespace Azure.Functions.Cli
         public static Task<string> DockerfileJava11 => GetValue("Dockerfile.java11");
 
         public static Task<string> DockerfilePython37 => GetValue("Dockerfile.python3.7");
-
+        
         public static Task<string> DockerfilePython38 => GetValue("Dockerfile.python3.8");
 
         public static Task<string> DockerfilePython39 => GetValue("Dockerfile.python3.9");
+        
+        public static Task<string> DockerfilePython310 => GetValue("Dockerfile.python3.10");
 
         public static Task<string> DockerfilePowershell7 => GetValue("Dockerfile.powershell7");
 
@@ -69,6 +71,8 @@ namespace Azure.Functions.Cli
         
         public static Task<string> BundleConfigPyStein => GetValue("bundleConfigPyStein.json");
 
+        public static Task<string> BundleConfigNodeV4 => GetValue("bundleConfigNodeV4.json");
+
 
         public static Task<string> CustomHandlerConfig => GetValue("customHandlerConfig.json");
 
@@ -80,9 +84,13 @@ namespace Azure.Functions.Cli
 
         public static Task<string> FuncIgnore => GetValue("funcignore");
 
-        public static Task<string> PackageJson => GetValue("package.json");
+        public static Task<string> PackageJsonJsV4 => GetValue("package-js-v4.json");
 
-        public static Task<string> JavascriptPackageJson => GetValue("javascriptPackage.json");
+        public static Task<string> PackageJsonJs => GetValue("package-js.json");
+
+        public static Task<string> PackageJsonTsV4 => GetValue("package-ts-v4.json");
+
+        public static Task<string> PackageJsonTs => GetValue("package-ts.json");
 
         public static Task<string> TsConfig => GetValue("tsconfig.json");
 

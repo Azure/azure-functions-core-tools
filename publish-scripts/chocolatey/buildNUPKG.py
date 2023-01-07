@@ -2,6 +2,7 @@
 
 # depends on chocolaty
 import os
+from re import sub
 import wget
 import sys
 from string import Template
@@ -28,32 +29,34 @@ def getChocoVersion(version):
 # output a deb nupkg
 # depends on chocolatey
 def preparePackage():
-    fileName_x86 = f"Azure.Functions.Cli.win-x86.{constants.VERSION}.zip"
-    fileName_x64 = f"Azure.Functions.Cli.win-x64.{constants.VERSION}.zip"
-    url_x86 = f'https://functionscdn.azureedge.net/public/{constants.VERSION}/{fileName_x86}'
-    url_x64 = f'https://functionscdn.azureedge.net/public/{constants.VERSION}/{fileName_x64}'
-
-    # version used in url is provided from user input
-    # version used for packaging nuget packages needs a slight modification
-    chocoVersion = getChocoVersion(constants.VERSION)
-
-    # download the zip
-    # output to local folder
-    #  -- For 32 bit
-    if not os.path.exists(fileName_x86):
-        print(f"downloading from {url_x86}")
-        wget.download(url_x86)
-    #  -- For 64 bit
-    if not os.path.exists(fileName_x64):
-        print(f"downloading from {url_x64}")
-        wget.download(url_x64)
-
-    # get the checksums
-    fileHash_x86 = produceHashForfile(fileName_x86, HASH)
-    fileHash_x64 = produceHashForfile(fileName_x64, HASH)
+    archList = [
+        "ARM64",
+        "X86",
+        "X64"
+    ]
+    substitutionMapping = {
+        "PACKAGENAME": constants.PACKAGENAME,
+        "HASHALG": HASH,
+        "CHOCOVERSION": getChocoVersion(constants.VERSION)
+    }
 
     tools = os.path.join(constants.BUILDFOLDER, "tools")
     os.makedirs(tools)
+
+    for arch in archList:
+        fileName = f"Azure.Functions.Cli.win-{arch.lower()}.{constants.VERSION}.zip"
+        url = f'https://functionscdn.azureedge.net/public/{constants.VERSION}/{fileName}'
+        substitutionMapping[f"ZIPURL_{arch}"] = url
+
+        # download the zip
+        # output to local folder
+        if not os.path.exists(fileName):
+            print(f"downloading from {url}")
+            wget.download(url)
+
+        # get the checksums
+        fileHash = produceHashForfile(fileName, HASH)
+        substitutionMapping[f"CHECKSUM_{arch}"] = fileHash
 
     # write install powershell script
     scriptDir = os.path.abspath(os.path.dirname(__file__))
@@ -63,17 +66,16 @@ def preparePackage():
     t = Template(stringData)
     with open(os.path.join(tools, "chocolateyinstall.ps1"), "w") as f:
         print("writing install powershell script")
-        f.write(t.safe_substitute(ZIPURL_X86=url_x86, ZIPURL_X64=url_x64, PACKAGENAME=constants.PACKAGENAME,
-                                  CHECKSUM_X86=fileHash_x86, CHECKSUM_X64=fileHash_x64, HASHALG=HASH))
+        f.write(t.safe_substitute(substitutionMapping))
 
     # write nuspec package metadata
     with open(os.path.join(scriptDir,"nuspec_template")) as f:
         stringData = f.read()
     t = Template(stringData)
     nuspecFile = os.path.join(constants.BUILDFOLDER, constants.PACKAGENAME+".nuspec")
-    with open(nuspecFile,'w') as f:
+    with open(nuspecFile, 'w') as f:
         print("writing nuspec")
-        f.write(t.safe_substitute(PACKAGENAME=constants.PACKAGENAME, CHOCOVERSION=chocoVersion))
+        f.write(t.safe_substitute(substitutionMapping))
 
     # run choco pack, stdout is merged into python interpreter stdout
     output = printReturnOutput(["choco", "pack", nuspecFile, "--outputdirectory", constants.ARTIFACTFOLDER])
