@@ -25,6 +25,7 @@ namespace Build
         public const string DotnetItemTemplatesVersion = "3.1.2040";
         public const string DotnetProjectTemplatesVersion = "3.1.2040";
         public const string TemplateJsonVersion = "3.1.1648";
+        public const string dotnetSdkVersion = "3.1.100";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
         
