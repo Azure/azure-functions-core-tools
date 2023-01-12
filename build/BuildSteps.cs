@@ -319,7 +319,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            File.AppendAllText(Path.Combine(Settings.OutputDir, "win-x86", "func.exe"), "{\r\n  \"sdk\": {\r\n    \"version\": \"" + Settings.dotnetSdkVersion + "\",\r\n    \"rollForward\": \"latestMinor\"\r\n  }\r\n}");
+            File.AppendAllText(Path.Combine(Settings.OutputDir, "win-x86", "global.json"), "{\r\n  \"sdk\": {\r\n    \"version\": \"" + Settings.dotnetSdkVersion + "\",\r\n    \"rollForward\": \"latestMinor\"\r\n  }\r\n}");
             Shell.Run("dotnet", $"test {Settings.TestProjectFile} --logger trx");
         }
 
