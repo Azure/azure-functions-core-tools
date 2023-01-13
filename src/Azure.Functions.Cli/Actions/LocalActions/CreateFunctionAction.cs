@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             await UpdateLanguageAndRuntime();
 
-            var isNewNodeJsModel = isNewNodeJsProgrammingModel(workerRuntime);
+            var isNewNodeJsModel = IsNewNodeJsProgrammingModel(workerRuntime);
             if (isNewNodeJsModel)
             {
                 // TODO: Remove these messages once creating new functions in the new programming model is supported
@@ -147,7 +147,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 Template template;
                 if (IsNewPythonProgrammingModel())
                 {
+                    // todo: The logic will change with new template schema. 
                     template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.ProgrammingModel && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                }
+                else if (IsNewNodeJsProgrammingModel(workerRuntime))
+                {
+                    // todo: The logic will change with new template schema.
+                    template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
                 }
                 else
                 {
@@ -377,7 +383,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return PythonHelpers.IsNewPythonProgrammingModel(Language);
         }
 
-        private bool isNewNodeJsProgrammingModel(WorkerRuntime workerRuntime)
+        private bool IsNewNodeJsProgrammingModel(WorkerRuntime workerRuntime)
         {
             try
             {

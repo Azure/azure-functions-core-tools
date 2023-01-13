@@ -113,9 +113,15 @@ namespace Azure.Functions.Cli.Common
 
         public async Task Deploy(string name, Template template)
         {
+            // todo: this logic will change with the new template schema. 
             if (template.Metadata.ProgrammingModel && template.Metadata.Language.Equals("Python", StringComparison.OrdinalIgnoreCase))
             {
                 await DeployNewPythonProgrammingModel(name, template);
+            }
+            // todo: Temporary logic. This logic will change with the new template schema. 
+            else if (template.Id.EndsWith("JavaScript-4.x") || template.Id.EndsWith("TypeScript-4.x"))
+            {
+                await DeployNewNodeProgrammingModel(name, template);
             }
             else
             {
@@ -125,59 +131,66 @@ namespace Azure.Functions.Cli.Common
             await InstallExtensions(template);
         }
 
-        private async Task DeployNewPythonProgrammingModel(string name, Template template)
+        private async Task DeployNewNodeProgrammingModel (string functionName, Template template)
+        {
+            var templateFiles = template.Files.Where(kv => !kv.Key.EndsWith(".dat"));
+            var fileList = new Dictionary<string, string>();
+
+            // Running the validations here. There is no change in the user data in this loop.
+            foreach (var file in templateFiles)
+            {
+                var fileName = file.Key.Replace("%functionName%", functionName);
+                var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
+                AskToRemoveFileIfAlreadyExists(filePath, functionName);
+                fileList.Add(filePath, file.Value.Replace("%functionName%", functionName));
+            }
+
+            foreach (var filePath in fileList.Keys)
+            {
+                if (FileSystemHelpers.FileExists(filePath))
+                {
+                    FileSystemHelpers.FileDelete(filePath);
+                }
+
+                ColoredConsole.WriteLine($"Creating a new file {filePath}");
+                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileList[filePath]);
+            }
+        }
+
+        private async Task DeployNewPythonProgrammingModel(string functionName, Template template)
         {
             var files = template.Files.Where(kv => !kv.Key.EndsWith(".dat"));
 
             if (files.Count() != 2)
             {
-                throw new CliException($"The function with the name {name} couldn't be created. We couldn't find the expected files in the template.");
+                throw new CliException($"The function with the name {functionName} couldn't be created. We couldn't find the expected files in the template.");
             }
-            
+
             var mainFilePath = Path.Combine(Environment.CurrentDirectory, PythonProgrammingModelMainFileKey);
             var mainFileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(mainFilePath);
 
             // Verify that function doesn't exist
-            var functionDeclartion = $"@app.function_name(name=\"{name}\")";
+            var functionDeclartion = $"@app.function_name(name=\"{functionName}\")";
             if (mainFileContent.Contains(functionDeclartion))
             {
-                throw new CliException($"The function with the name {name} already exists.");
+                throw new CliException($"The function with the name {functionName} already exists.");
             }
 
             // Verify the target file doesn't exist. Delete with permission if it already exists. 
-            var targetFileName = $"{name}_function.py";
-            var targetFilePath = Path.Combine(Environment.CurrentDirectory, targetFileName);
-            var targetFileExists = FileSystemHelpers.FileExists(targetFilePath);
-            if (targetFileExists)
-            {
-                // Once we get the confirmation of overwriting all files then we will overwrite. 
-                var response = "n";
-                do
-                {
-                    ColoredConsole.Write($"A file with the name {targetFileName} already exists. Overwrite [y/n]? [n] ");
-                    response = Console.ReadLine();
-                } while (response != "n" && response != "y");
-                if (response == "n")
-                {
-                    throw new CliException($"The function with the name {name} couldn't be created.");
-                }
-            }
-
-            if (targetFileExists)
-            {
-                FileSystemHelpers.FileDelete(targetFilePath);
-            }
+            var fileName = $"{functionName}_function.py";
+            var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
+            AskToRemoveFileIfAlreadyExists(filePath, functionName);
 
             // Create/Update the needed files. 
             foreach (var file in files)
             {
-                var fileContent = file.Value.Replace("FunctionName", name);
+                var fileContent = file.Value.Replace("FunctionName", functionName);
                 if (file.Key == PythonProgrammingModelMainFileKey)
                 {
                     ColoredConsole.WriteLine($"Appending to {mainFilePath}");
                     mainFileContent = $"{mainFileContent}{Environment.NewLine}{Environment.NewLine}{fileContent}";
-                    var importLine = $"from {name}_function import {name}Impl";
-                    
+                    var importLine = $"from {functionName}_function import {functionName}Impl";
+
                     // Add the import line for new file.
                     var funcImportLine = "import azure.functions as func";
                     mainFileContent = mainFileContent.Replace(funcImportLine, $"{funcImportLine}{Environment.NewLine}{importLine}");
@@ -187,8 +200,27 @@ namespace Azure.Functions.Cli.Common
                 }
                 else if (file.Key == PythonProgrammingModelNewFileKey)
                 {
-                    ColoredConsole.WriteLine($"Creating a new file {targetFilePath}");
-                    await FileSystemHelpers.WriteAllTextToFileAsync(targetFilePath, fileContent);
+                    ColoredConsole.WriteLine($"Creating a new file {filePath}");
+                    await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileContent);
+                }
+            }
+        }
+
+        private static void AskToRemoveFileIfAlreadyExists(string filePath, string functionName)
+        {
+            var fileExists = FileSystemHelpers.FileExists(filePath);
+            if (fileExists)
+            {
+                // Once we get the confirmation of overwriting all files then we will overwrite. 
+                var response = "n";
+                do
+                {
+                    ColoredConsole.Write($"A file with the name {Path.GetFileName(filePath)} already exists. Overwrite [y/n]? [n] ");
+                    response = Console.ReadLine();
+                } while (response != "n" && response != "y");
+                if (response == "n")
+                {
+                    throw new CliException($"The function with the name {functionName} couldn't be created.");
                 }
             }
         }
