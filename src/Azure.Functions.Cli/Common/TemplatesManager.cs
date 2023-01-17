@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
 using System.Linq;
 using System.Reflection;
+using Microsoft.AspNetCore.Routing.Constraints;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -36,7 +37,7 @@ namespace Azure.Functions.Cli.Common
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             string templatesJson;
 
-            if (extensionBundleManager.IsExtensionBundleConfigured())
+            if (false) // temporary: For testing. (extensionBundleManager.IsExtensionBundleConfigured())
             {
                 await ExtensionBundleHelper.GetExtensionBundle();
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
@@ -111,17 +112,17 @@ namespace Azure.Functions.Cli.Common
         }
 
 
-        public async Task Deploy(string name, Template template)
+        public async Task Deploy(string name, string fileName, Template template)
         {
             // todo: this logic will change with the new template schema. 
             if (template.Metadata.ProgrammingModel && template.Metadata.Language.Equals("Python", StringComparison.OrdinalIgnoreCase))
             {
-                await DeployNewPythonProgrammingModel(name, template);
+                await DeployNewPythonProgrammingModel(name, fileName, template);
             }
             // todo: Temporary logic. This logic will change with the new template schema. 
             else if (template.Id.EndsWith("JavaScript-4.x") || template.Id.EndsWith("TypeScript-4.x"))
             {
-                await DeployNewNodeProgrammingModel(name, template);
+                await DeployNewNodeProgrammingModel(name, fileName, template);
             }
             else
             {
@@ -131,7 +132,7 @@ namespace Azure.Functions.Cli.Common
             await InstallExtensions(template);
         }
 
-        private async Task DeployNewNodeProgrammingModel (string functionName, Template template)
+        private async Task DeployNewNodeProgrammingModel (string functionName, string fileName, Template template)
         {
             var templateFiles = template.Files.Where(kv => !kv.Key.EndsWith(".dat"));
             var fileList = new Dictionary<string, string>();
@@ -139,25 +140,21 @@ namespace Azure.Functions.Cli.Common
             // Running the validations here. There is no change in the user data in this loop.
             foreach (var file in templateFiles)
             {
-                var fileName = file.Key.Replace("%functionName%", functionName);
-                var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
-                AskToRemoveFileIfAlreadyExists(filePath, functionName);
-                fileList.Add(filePath, file.Value.Replace("%functionName%", functionName));
+                fileName = ReplaceFunctionNamePlaceholder(file.Key, functionName);
+                var filePath = Path.Combine(Path.Combine(Environment.CurrentDirectory, "src"), fileName);
+                AskToRemoveFileIfExists(filePath, functionName);
+                fileList.Add(filePath, ReplaceFunctionNamePlaceholder(file.Value, functionName));
             }
 
             foreach (var filePath in fileList.Keys)
             {
-                if (FileSystemHelpers.FileExists(filePath))
-                {
-                    FileSystemHelpers.FileDelete(filePath);
-                }
-
+                RemoveFileIfExists(filePath);
                 ColoredConsole.WriteLine($"Creating a new file {filePath}");
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileList[filePath]);
             }
         }
 
-        private async Task DeployNewPythonProgrammingModel(string functionName, Template template)
+        private async Task DeployNewPythonProgrammingModel(string functionName, string fileName, Template template)
         {
             var files = template.Files.Where(kv => !kv.Key.EndsWith(".dat"));
 
@@ -177,9 +174,9 @@ namespace Azure.Functions.Cli.Common
             }
 
             // Verify the target file doesn't exist. Delete with permission if it already exists. 
-            var fileName = $"{functionName}_function.py";
+            fileName = fileName ?? $"{functionName}_function.py";
             var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
-            AskToRemoveFileIfAlreadyExists(filePath, functionName);
+            AskToRemoveFileIfExists(filePath, functionName, removeFile: true);
 
             // Create/Update the needed files. 
             foreach (var file in files)
@@ -206,7 +203,7 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        private static void AskToRemoveFileIfAlreadyExists(string filePath, string functionName)
+        private static void AskToRemoveFileIfExists(string filePath, string functionName, bool removeFile = false)
         {
             var fileExists = FileSystemHelpers.FileExists(filePath);
             if (fileExists)
@@ -222,6 +219,19 @@ namespace Azure.Functions.Cli.Common
                 {
                     throw new CliException($"The function with the name {functionName} couldn't be created.");
                 }
+            }
+
+            if (removeFile)
+            {
+                RemoveFileIfExists(filePath);
+            }
+        }
+
+        private static void RemoveFileIfExists(string filePath)
+        {
+            if (FileSystemHelpers.FileExists(filePath))
+            {
+                FileSystemHelpers.FileDelete(filePath);
             }
         }
 
@@ -274,6 +284,11 @@ namespace Azure.Functions.Cli.Common
                     await installAction.RunAsync();
                 }
             }
+        }
+
+        private string ReplaceFunctionNamePlaceholder(string str, string functionName)
+        {
+            return str?.Replace("%functionName%", functionName) ?? str;
         }
     }
 }

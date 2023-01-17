@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string FunctionName { get; set; }
         public bool Csx { get; set; }
         private string HelpForTrigger { get; set; }
-        private string FileNameToAppend { get; set; }
+        private string FileName { get; set; }
         public AuthorizationLevel? AuthorizationLevel { get; set; }
 
         Lazy<IEnumerable<Template>> _templates;
@@ -73,7 +73,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>('f', "file")
                 .WithDescription("File Name")
                 .SetDefault(Constants.PySteinFunctionAppPy)
-                .Callback(f => FileNameToAppend = f);
+                .Callback(f => FileName = f);
 
             Parser
                 .Setup<AuthorizationLevel?>('a', "authlevel")
@@ -105,16 +105,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             await UpdateLanguageAndRuntime();
-
-            var isNewNodeJsModel = IsNewNodeJsProgrammingModel(workerRuntime);
-            if (isNewNodeJsModel)
-            {
-                // TODO: Remove these messages once creating new functions in the new programming model is supported
-                ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
-                NodeJSHelpers.PrintNodeV4WikiLink();
-                throw new CliException(
-                    "Function not created! 'func new' is not supported for the preview of the V4 Node.js programming model.");
-            }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
@@ -183,7 +173,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     ColoredConsole.Write($"Function name: [{template.Metadata.DefaultFunctionName}] ");
                     FunctionName = FunctionName ?? Console.ReadLine();
                     FunctionName = string.IsNullOrEmpty(FunctionName) ? template.Metadata.DefaultFunctionName : FunctionName;
-                    await _templatesManager.Deploy(FunctionName, template);
+                    await _templatesManager.Deploy(FunctionName, FileName, template);
                     PerformPostDeployTasks(FunctionName, Language);
                 }
             }
@@ -193,6 +183,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }
 
+            var isNewNodeJsModel = IsNewNodeJsProgrammingModel(workerRuntime);
             if (workerRuntime == WorkerRuntime.node && !isNewNodeJsModel)
             {
                 NodeJSHelpers.PrintV4AwarenessMessage();
