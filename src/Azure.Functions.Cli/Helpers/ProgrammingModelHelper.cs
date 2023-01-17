@@ -15,12 +15,15 @@ namespace Azure.Functions.Cli.Helpers
         // Given a worker runtime, this function returns a collection of the programming models that are supported.
         public static IEnumerable<ProgrammingModel> GetSupportedProgrammingModels(WorkerRuntime workerRuntime)
         {
-            var allProgrammingModels = GetProgrammingModels();
-            if (workerRuntime != WorkerRuntime.python)
+            switch (workerRuntime)
             {
-                return allProgrammingModels.Where(pm => pm != ProgrammingModel.V2);
+                case WorkerRuntime.python:
+                    return new List<ProgrammingModel>() { ProgrammingModel.V1, ProgrammingModel.V2 };
+                case WorkerRuntime.node:
+                    return new List<ProgrammingModel>() { ProgrammingModel.V3, ProgrammingModel.V4 };
+                default:
+                    return new List<ProgrammingModel>() { ProgrammingModel.V1 };
             }
-            return allProgrammingModels;
         }
 
         public static ProgrammingModel ResolveProgrammingModel(string programmingModel, WorkerRuntime workerRuntime, string language)
@@ -29,10 +32,17 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return GlobalCoreToolsSettings.CurrentProgrammingModel.Value;
             }
-            // We default to the "Default" programming model if the model parameter is not specified
+            // We default to the "Default" programming model for that language if the model parameter is not specified
             if (string.IsNullOrEmpty(programmingModel))
             {
-                GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.V1;
+                if (workerRuntime == WorkerRuntime.node)
+                {
+                    GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.V3;
+                }
+                else
+                {
+                    GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.V1;
+                }
             }
             else if (GetProgrammingModels().Any(pm => string.Equals(programmingModel, pm.ToString(), StringComparison.InvariantCultureIgnoreCase)))
             {

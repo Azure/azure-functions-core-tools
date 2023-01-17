@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
+using static Azure.Functions.Cli.Common.Constants;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
@@ -609,6 +610,16 @@ namespace Azure.Functions.Cli.Helpers
             }
             // Validate LinuxFxVersion that follows the pattern PYTHON|<major>.<minor>
             return string.Equals(linuxFxVersion, $"PYTHON|{major}.{minor}", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool IsNewPythonProgrammingModel(string language)
+        {
+            return string.Equals(language, Languages.Python, StringComparison.InvariantCultureIgnoreCase) && HasPySteinFile();
+        }
+
+        public static bool HasPySteinFile()
+        {
+            return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy));
         }
     }
 }

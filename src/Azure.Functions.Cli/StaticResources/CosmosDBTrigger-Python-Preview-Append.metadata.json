@@ -1,0 +1,28 @@
+{
+    "defaultFunctionName": "CosmosTrigger",
+    "description": "$CosmosDBTrigger_description",
+    "name": "Azure Cosmos DB trigger",
+    "language": "Python",
+    "category": [
+      "$temp_category_core",
+      "$temp_category_dataProcessing"
+    ],
+    "categoryStyle": "cosmosDB",
+    "enabledInTryMode": false,
+    "userPrompt": [
+      "connectionStringSetting",
+      "databaseName",
+      "collectionName",
+      "leaseCollectionName",
+      "createLeaseCollectionIfNotExists"
+    ],
+    "extensions": [
+      {
+        "id": "Microsoft.Azure.WebJobs.Extensions.CosmosDB",
+        "version": "3.0.5"
+      }
+    ],
+    "filters": [
+      "Python3"
+    ]
+  }
