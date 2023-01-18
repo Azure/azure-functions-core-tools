@@ -540,7 +540,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Commands = new[]
                     {
                         $"init . --worker-runtime {language}",
-                        "new --template \"Http trigger\" --name http1",
+                        "new --template http --name http1",
                         "new --template \"Queue trigger\" --name queue1"
                     },
                 },
