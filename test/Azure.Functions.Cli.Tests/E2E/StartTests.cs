@@ -251,7 +251,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template Httptrigger --name HttpTrigger",
+                    "new --template http --name HttpTrigger",
                     "start --build --port 7073"
                 },
                 ExpectExit = false,
