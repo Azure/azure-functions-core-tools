@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime node",
-                    "new --template http --name testfunc --authlevel function"
+                    "new --template HttpTrigger --name testfunc --authlevel function"
                 },
                 OutputContains = new[]
                 {
