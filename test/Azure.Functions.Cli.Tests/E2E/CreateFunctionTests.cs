@@ -183,7 +183,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template \"http trigger\" --name testfunc2"
+                    "new --template http --name testfunc2"
                 },
                 OutputContains = new[]
                 {
