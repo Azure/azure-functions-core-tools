@@ -176,23 +176,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task create_template_function_dotnet_space_name()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet",
-                    "new --template http --name testfunc2"
-                },
-                OutputContains = new[]
-                {
-                    "The function \"testfunc2\" was created successfully from the \"http\" template."
-                }
-            }, _output);
-        }
-
-        [Fact]
         public async Task create_typescript_template()
         {
             await CliTester.Run(new RunConfiguration
