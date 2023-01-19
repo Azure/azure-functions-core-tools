@@ -34,15 +34,29 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="StaticResources\BlobTrigger-Python-Preview-Append.Main.function_app.py" />
+    <None Remove="StaticResources\BlobTrigger-Python-Preview-Append.New.function_app.py" />
+    <None Remove="StaticResources\HttpTrigger-javascript-help.txt" />
+    <None Remove="StaticResources\HttpTrigger-python-help.txt" />
+    <None Remove="StaticResources\HttpTrigger-Python-Preview-Append.Main.function_app.py" />
     <None Remove="StaticResources\HttpTrigger-Python-Preview-Append.New.function_app.py" />
+    <None Remove="StaticResources\HttpTrigger-typescript-help.txt" />
+    <None Remove="StaticResources\TimerTrigger-Python-Preview-Append.Main.function_app.py" />
+    <None Remove="StaticResources\TimerTrigger-Python-Preview-Append.New.function_app.py" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.function_app.py">
+     <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.Main.function_app.py">
+      <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.Main.function_app.py</LogicalName>
+    </EmbeddedResource>
+	<EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.function_app.py">
       <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.function_app.py</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.metadata.json">
       <LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.metadata.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\BlobTrigger-Python-Preview-Append.New.function_app.py">
+		<LogicalName>$(AssemblyName).BlobTrigger-Python-Preview-Append.New.function_app.py</LogicalName>
+	</EmbeddedResource>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
@@ -114,6 +128,15 @@
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\HttpTrigger-javascript-help.txt">
+      <LogicalName>$(AssemblyName).HttpTrigger-javascript-help.txt</LogicalName>
+     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\HttpTrigger-python-help.txt">
+      <LogicalName>$(AssemblyName).HttpTrigger-python-help.txt</LogicalName>
+     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.Main.function_app.py">
+      <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.Main.function_app.py</LogicalName>
+    </EmbeddedResource>
 
     <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.metadata.json">
       <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.metadata.json</LogicalName>
@@ -125,6 +148,10 @@
 
     <EmbeddedResource Include="StaticResources\HttpTrigger-Python-Preview-Append.New.function_app.py">
       <LogicalName>$(AssemblyName).HttpTrigger-Python-Preview-Append.New.function_app.py</LogicalName>
+     </EmbeddedResource>
+
+    <EmbeddedResource Include="StaticResources\HttpTrigger-typescript-help.txt">
+      <LogicalName>$(AssemblyName).HttpTrigger-typescript-help.txt</LogicalName>
      </EmbeddedResource>
     
     <EmbeddedResource Include="StaticResources\managedDependenciesConfig.json">
@@ -157,8 +184,14 @@
     <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.function_app.py">
       <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.function_app.py</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.Main.function_app.py">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.Main.function_app.py</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.metadata.json">
       <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.metadata.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\TimerTrigger-Python-Preview-Append.New.function_app.py">
+      <LogicalName>$(AssemblyName).TimerTrigger-Python-Preview-Append.New.function_app.py</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\vscode.extensions.json">
       <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>

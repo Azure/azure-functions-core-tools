@@ -17,6 +17,7 @@ namespace Azure.Functions.Cli.Common
     {
         private const string PythonProgrammingModelMainFileKey = "function_app.py";
         private const string PythonProgrammingModelNewFileKey = "function_new_app.py";
+        private const string PythonProgrammingModelMainNewFileKey = "function_app_new.py";
         private readonly ISecretsManager _secretsManager;
 
         public TemplatesManager(ISecretsManager secretsManager)
@@ -74,14 +75,14 @@ namespace Azure.Functions.Cli.Common
         private static async Task<IEnumerable<Template>> GetStaticTemplates()
         {
             var templatesList = new string[] {
-                /*"BlobTrigger-Python-Preview-Append",
-                "CosmosDBTrigger-Python-Preview-Append",
+                "BlobTrigger-Python-Preview-Append",
+                /*"CosmosDBTrigger-Python-Preview-Append",
                 "EventHubTrigger-Python-Preview-Append",*/
-                "HttpTrigger-Python-Preview-Append"
+                "HttpTrigger-Python-Preview-Append",
                 /*"QueueTrigger-Python-Preview-Append",
                 "ServiceBusQueueTrigger-Python-Preview-Append",
-                "ServiceBusTopicTrigger-Python-Preview-Append",
-                "TimerTrigger-Python-Preview-Append"*/
+                "ServiceBusTopicTrigger-Python-Preview-Append",*/
+                "TimerTrigger-Python-Preview-Append"
             };
 
             IList<Template> templates = new List<Template>();
@@ -105,8 +106,9 @@ namespace Azure.Functions.Cli.Common
             ));
             template.Files = new Dictionary<string, string> {
                 { PythonProgrammingModelMainFileKey, await StaticResources.GetValue($"{templateName}.function_app.py") },
-                { PythonProgrammingModelNewFileKey, await StaticResources.GetValue($"{templateName}.New.function_app.py") }
-            };
+                { PythonProgrammingModelNewFileKey, await StaticResources.GetValue($"{templateName}.New.function_app.py") },
+                { PythonProgrammingModelMainNewFileKey, await StaticResources.GetValue($"{templateName}.Main.function_app.py") }
+        };
             template.Metadata.ProgrammingModel = true;
             return template;
         }
@@ -174,20 +176,23 @@ namespace Azure.Functions.Cli.Common
             }
 
             // Verify the target file doesn't exist. Delete with permission if it already exists. 
-            fileName = fileName ?? $"{functionName}_function.py";
-            var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
-            AskToRemoveFileIfExists(filePath, functionName, removeFile: true);
+            //fileName = fileName ?? $"{functionName}_function.py";
+
+            if (!string.IsNullOrEmpty(fileName))
+            {
+                var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
+                AskToRemoveFileIfExists(filePath, functionName, removeFile: true);
+            }
 
             // Create/Update the needed files. 
             foreach (var file in files)
             {
                 var fileContent = file.Value.Replace("FunctionName", functionName);
-                if (file.Key == PythonProgrammingModelMainFileKey)
+                if (file.Key == PythonProgrammingModelMainFileKey && !string.IsNullOrEmpty(fileName))
                 {
                     ColoredConsole.WriteLine($"Appending to {mainFilePath}");
                     mainFileContent = $"{mainFileContent}{Environment.NewLine}{Environment.NewLine}{fileContent}";
-                    var importLine = $"from {functionName}_function import {functionName}Impl";
-
+                    var importLine = $"from {Path.GetFileNameWithoutExtension(fileName)} import {functionName}Impl";
                     // Add the import line for new file.
                     var funcImportLine = "import azure.functions as func";
                     mainFileContent = mainFileContent.Replace(funcImportLine, $"{funcImportLine}{Environment.NewLine}{importLine}");
@@ -195,10 +200,18 @@ namespace Azure.Functions.Cli.Common
                     // Update the file. 
                     await FileSystemHelpers.WriteAllTextToFileAsync(mainFilePath, mainFileContent);
                 }
-                else if (file.Key == PythonProgrammingModelNewFileKey)
+                else if (file.Key == PythonProgrammingModelNewFileKey && !string.IsNullOrEmpty(fileName))
                 {
+                    var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
                     ColoredConsole.WriteLine($"Creating a new file {filePath}");
                     await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileContent);
+                }
+                if (file.Key == PythonProgrammingModelMainNewFileKey && string.IsNullOrEmpty(fileName))
+                {
+                    ColoredConsole.WriteLine($"Appending to {mainFilePath}");
+                    mainFileContent = $"{mainFileContent}{Environment.NewLine}{Environment.NewLine}{fileContent}";
+                    // Update the file. 
+                    await FileSystemHelpers.WriteAllTextToFileAsync(mainFilePath, mainFileContent);
                 }
             }
         }

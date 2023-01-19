@@ -22,11 +22,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly CreateFunctionAction _createFunctionAction;
         private string Langauge { get; set; }
 
-        public AppendFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager)
+        public AppendFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
-            _createFunctionAction = new CreateFunctionAction(_templatesManager, _secretsManager);
+            _createFunctionAction = new CreateFunctionAction(_templatesManager, _secretsManager, contextHelpManager);
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            if (_createFunctionAction.ValidateInputs())
+            if (!_createFunctionAction.ValidateInputs())
             {
                 return;
             }

@@ -78,6 +78,9 @@ namespace Azure.Functions.Cli
             builder.RegisterType<DurableManager>()
                 .As<IDurableManager>();
 
+            builder.RegisterType<ContextHelpManager>()
+                .As<IContextHelpManager>();
+
             return builder.Build();
         }
     }

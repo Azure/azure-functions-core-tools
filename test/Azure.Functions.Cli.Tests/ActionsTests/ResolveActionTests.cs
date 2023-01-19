@@ -103,6 +103,9 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             builder.RegisterType<TemplatesManager>()
                 .As<ITemplatesManager>();
 
+            builder.RegisterType<ContextHelpManager>()
+                .As<IContextHelpManager>();
+
             builder.RegisterType<DurableManager>()
                 .As<IDurableManager>();
 

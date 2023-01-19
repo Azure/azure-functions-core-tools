@@ -29,6 +29,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         private ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
+        private readonly IContextHelpManager _contextHelpManager;
 
         private readonly InitAction _initAction;
         public WorkerRuntime workerRuntime;
@@ -44,10 +45,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         Lazy<IEnumerable<Template>> _templates;
 
 
-        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager)
+        public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
         {
             _templatesManager = templatesManager;
             _secretsManager = secretsManager;
+            _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
             _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
         }
@@ -72,7 +74,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>('f', "file")
                 .WithDescription("File Name")
-                .SetDefault(Constants.PySteinFunctionAppPy)
                 .Callback(f => FileName = f);
 
             Parser
@@ -341,8 +342,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
+        // TODO: Make this class async.
         public bool PrintHelpForTrigger(string triggerName)
-        {
+        {        
             if (string.IsNullOrWhiteSpace(triggerName))
             {
                 return false;
@@ -353,10 +355,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 UpdateLanguageAndRuntime().Wait();
             }
 
-            if (IsNewPythonProgrammingModel() && IsValidTriggerNameForHelp(triggerName))
+            if ((IsNewPythonProgrammingModel() || IsNewNodeJsProgrammingModel(workerRuntime)) && IsValidTriggerNameForHelp(triggerName))
             {
-                ColoredConsole.Write(AdditionalInfoColor($"Did you know about {triggerName}? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at {triggerName}. {Environment.NewLine}{Environment.NewLine}"));
-                PythonHelpers.PrintPySteinReferenceMessage();
+                ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, Language).Result));
                 return true;
             }
 
