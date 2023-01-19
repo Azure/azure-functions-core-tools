@@ -20,11 +20,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template HttpTrigger --name testfunc"
+                    "new --template http --name testfunc"
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                    "The function \"testfunc\" was created successfully from the \"http\" template."
                 }
             }, _output);
         }
@@ -89,11 +89,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template HttpTrigger --name testfunc --authlevel function"
+                    "new --template http --name testfunc --authlevel function"
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                    "The function \"testfunc\" was created successfully from the \"http\" template."
                 }
             }, _output);
         }
@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init 12n.e.0w-file$ --worker-runtime dotnet",
-                    "new --prefix 12n.e.0w-file$ --template HttpTrigger --name 12@n.other-file$"
+                    "new --prefix 12n.e.0w-file$ --template http --name 12@n.other-file$"
                 },
                 CommandTimeout = new TimeSpan(0, 1, 0),
                 CheckFiles = new[]
@@ -171,23 +171,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
-                }
-            }, _output);
-        }
-
-        [Fact]
-        public async Task create_template_function_dotnet_space_name()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet",
-                    "new --template \"http trigger\" --name testfunc2"
-                },
-                OutputContains = new[]
-                {
-                    "The function \"testfunc2\" was created successfully from the \"http trigger\" template."
                 }
             }, _output);
         }
