@@ -68,6 +68,25 @@ namespace Azure.Functions.Cli.Helpers
             }, workerRuntime);
         }
 
+        private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
+        {
+            "blobtrigger" => "blob",
+            "cosmosdbtrigger" => "cosmos",
+            "durablefunctionsorchestration" => "durable",
+            "eventgridtrigger" => "eventgrid",
+            "eventhubtrigger" => "eventhub",
+            "httptrigger" => "http",
+            "iothubtrigger" => "iothub",
+            "kafkatrigger" => "kafka",
+            "kafkaoutput" => "kafkao",
+            "queuetrigger" => "queue",
+            "sendgrid" => "sendgrid",
+            "servicebusqueuetrigger" => "squeue",
+            "servicebustopictrigger" => "stopic",
+            "timertrigger" => "timer",
+            _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
+        };
+
         internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
         {
             if (workerRuntime == WorkerRuntime.dotnetIsolated)
