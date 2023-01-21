@@ -142,8 +142,8 @@ namespace Azure.Functions.Cli.Common
             // Running the validations here. There is no change in the user data in this loop.
             foreach (var file in templateFiles)
             {
-                fileName = ReplaceFunctionNamePlaceholder(file.Key, functionName);
-                var filePath = Path.Combine(Path.Combine(Environment.CurrentDirectory, "src"), fileName);
+                fileName = fileName ?? ReplaceFunctionNamePlaceholder(file.Key, functionName);
+                var filePath = Path.Combine(Path.Combine(Environment.CurrentDirectory, "src", "functions"), fileName);
                 AskToRemoveFileIfExists(filePath, functionName);
                 fileList.Add(filePath, ReplaceFunctionNamePlaceholder(file.Value, functionName));
             }
@@ -160,7 +160,7 @@ namespace Azure.Functions.Cli.Common
         {
             var files = template.Files.Where(kv => !kv.Key.EndsWith(".dat"));
 
-            if (files.Count() != 2)
+            if (files.Count() != 3)
             {
                 throw new CliException($"The function with the name {functionName} couldn't be created. We couldn't find the expected files in the template.");
             }

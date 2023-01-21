@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
+using Dynamitey;
 using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -221,6 +222,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, Csx);
             }
+
+            // await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
         }
 
         private static (WorkerRuntime, string) ResolveWorkerRuntimeAndLanguage(string workerRuntimeString, string languageString)
@@ -526,6 +529,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
+        }
+
+        public async Task FetchPackages(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
+        {
+            if (workerRuntime == Helpers.WorkerRuntime.node && programmingModel == Common.ProgrammingModel.V4)
+            {
+                NpmHelper.Install();
+            }
         }
     }
 }

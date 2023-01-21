@@ -61,6 +61,12 @@ namespace Azure.Functions.Cli.Common
             return $"{triggerName}.{language}".ToLower();
         }
 
+        // Return the lenth of nullable string. 
+        // If the string is null, return 0.
+        private int GetStringLength(string str)
+        {
+            return str?.Length ?? 0;
+        }
 
 
     }
