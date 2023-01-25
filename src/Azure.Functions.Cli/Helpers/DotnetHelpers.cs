@@ -46,7 +46,8 @@ namespace Azure.Functions.Cli.Helpers
         {
             await TemplateOperation(async () =>
             {
-                string exeCommandArguments = $"new {templateName} --name {functionName} --namespace {namespaceStr} --language {language}";
+                string templateShortName = GetTemplateShortName(templateName);
+                string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr} --language {language}";
                 if (httpAuthorizationLevel != null)
                 {
                     if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
