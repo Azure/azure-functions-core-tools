@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.Common
 
         private string GetTriggerHelpKey(string triggerName, string language)
         {
-            return $"{triggerName}.{language}".ToLower();
+            return $"{triggerName?.Replace(" ", string.Empty)}.{language}".ToLower();
         }
 
         // Return the lenth of nullable string. 

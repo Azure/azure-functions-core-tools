@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Actions
             _parseResult = parseResult;
         }
 
-        public override Task RunAsync()
+        public async override Task RunAsync()
         {
             ScriptHostHelpers.SetIsHelpRunning();
             if (!string.IsNullOrEmpty(_context) || !string.IsNullOrEmpty(_subContext))
@@ -66,15 +66,16 @@ namespace Azure.Functions.Cli.Actions
 
                 if (!string.IsNullOrEmpty(_context) && !Enum.TryParse(_context, true, out context))
                 {
-                    if (ShowCreateActionHelp())
+                    // Show help for create action if the name matches with one of the supported triggers
+                    if (await ShowCreateActionHelp())
                     {
-                        return Task.CompletedTask;
+                        return;
                     }
 
                     Utilities.PrintLogo();
                     ColoredConsole.Error.WriteLine(ErrorColor($"Error: unknown argument {_context}"));
                     DisplayGeneralHelp();
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 Utilities.PrintLogo();
@@ -82,7 +83,7 @@ namespace Azure.Functions.Cli.Actions
                 {
                     ColoredConsole.Error.WriteLine(ErrorColor($"Error: unknown argument {_subContext} in {context.ToLowerCaseString()} Context"));
                     DisplayContextHelp(context, Context.None);
-                    return Task.CompletedTask;
+                    return;
                 }
                 DisplayContextHelp(context, subContext);
             }
@@ -94,15 +95,15 @@ namespace Azure.Functions.Cli.Actions
             {
                 DisplayGeneralHelp();
             }
-            return Task.CompletedTask;
+            return;
         }
 
-        private bool ShowCreateActionHelp()
+        private async Task<bool> ShowCreateActionHelp()
         {
             var actionType = _actionTypes.First(x => x.Names.Contains("new"));
             var action = _createAction.Invoke(actionType.Type);
             var createAction = (CreateFunctionAction) action;
-            return createAction.PrintHelpForTrigger(_context);
+            return await createAction.ProcessHelpRequest(_context);
         }
 
         private void DisplayContextHelp(Context context, Context subContext)

@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Storage.Blobs.Models;
 using Colors.Net;
+using DurableTask.Core;
 using Fclp;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Azure.Documents;
@@ -38,7 +39,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string TemplateName { get; set; }
         public string FunctionName { get; set; }
         public bool Csx { get; set; }
-        private string HelpForTrigger { get; set; }
+        private string TriggerNameForHelp { get; set; }
         private string FileName { get; set; }
         public AuthorizationLevel? AuthorizationLevel { get; set; }
 
@@ -94,18 +95,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            // Check if the new command only ran for help. 
-            if (PrintHelpForTrigger(HelpForTrigger))
-            {
-                return;
-            }
-
             if (!ValidateInputs())
             {
                 return;
             }
 
             await UpdateLanguageAndRuntime();
+
+            // Check if the new command only ran for help. 
+            if (await ProcessHelpRequest(TriggerNameForHelp, true))
+            {
+                return;
+            }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
@@ -135,21 +136,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(templateLanguage));
                 ColoredConsole.WriteLine(TitleColor(TemplateName));
 
-                Template template;
-                if (IsNewPythonProgrammingModel())
-                {
-                    // todo: The logic will change with new template schema. 
-                    template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.ProgrammingModel && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
-                }
-                else if (IsNewNodeJsProgrammingModel(workerRuntime))
-                {
-                    // todo: The logic will change with new template schema.
-                    template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
-                }
-                else
-                {
-                    template = _templates.Value.FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName) && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
-                }
+                Template template = GetLanguageTemplates(templateLanguage).FirstOrDefault(t => Utilities.EqualsIgnoreCaseAndSpace(t.Metadata.Name, TemplateName));
 
                 if (template == null)
                 {
@@ -269,7 +256,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         }
         private IEnumerable<string> GetTriggerNames(string templateLanguage)
         {
-            return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase)).Select(t => t.Metadata.Name).Distinct();
+            return GetLanguageTemplates(templateLanguage).Select(t => t.Metadata.Name).Distinct();
+        }
+
+        private IEnumerable<Template> GetLanguageTemplates(string templateLanguage)
+        {
+            if (IsNewNodeJsProgrammingModel(workerRuntime))
+            {
+                return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+            }
+            
+            if (IsNewPythonProgrammingModel()) 
+            { 
+                return _templates.Value.Where(t => t.Metadata.ProgrammingModel && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
         }
 
         private void ConfigureAuthorizationLevel(Template template)
@@ -329,45 +331,54 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private void ParseTriggerForHelpRequest(string[] args)
         {
-            if (!PythonHelpers.HasPySteinFile() || args.Length != 2)
+            if (args.Length != 2)
             {
                 return;
             }
 
             var inputTriggerName = args[0];
             var inputHelp = args[1];
-            if (HelpCommand.Equals(inputHelp, StringComparison.OrdinalIgnoreCase) && IsValidTriggerNameForHelp(inputTriggerName))
+            if (HelpCommand.Equals(inputHelp, StringComparison.OrdinalIgnoreCase))
             {
-                HelpForTrigger = inputTriggerName;
+                TriggerNameForHelp = inputTriggerName;
             }
         }
 
-        // TODO: Make this class async.
-        public bool PrintHelpForTrigger(string triggerName)
-        {        
+        public async Task<bool> ProcessHelpRequest(string triggerName, bool suggestCorrectTriggerNames = false)
+        {
             if (string.IsNullOrWhiteSpace(triggerName))
             {
                 return false;
             }
 
-            if (string.IsNullOrEmpty(Language))
+            var language = Language;
+            if (string.IsNullOrEmpty(language))
             {
-                UpdateLanguageAndRuntime().Wait();
+                await UpdateLanguageAndRuntime();
             }
 
-            if ((IsNewPythonProgrammingModel() || IsNewNodeJsProgrammingModel(workerRuntime)) && IsValidTriggerNameForHelp(triggerName))
+            if (suggestCorrectTriggerNames)
             {
-                ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, Language).Result));
+                if (!IsValidTriggerName(language, triggerName))
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"The trigger name '{TriggerNameForHelp}' is not valid for {language} language. "));
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("valid trigger");
+                    triggerName = SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(language));
+                }
+            }
+
+            if ((IsNewPythonProgrammingModel() || IsNewNodeJsProgrammingModel(workerRuntime)) && IsValidTriggerName(language, triggerName))
+            {
+                ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, language).Result));
                 return true;
             }
 
             return false;
         }
 
-        private bool IsValidTriggerNameForHelp(string triggerName)
+        private bool IsValidTriggerName(string language, string triggerName)
         {
-            var triggerNames = GetTriggerNames(Languages.Python).Select(x => x.Replace(" ", string.Empty)).ToList();
-            return triggerNames.Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
+            return GetTriggerNames(language).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
         }
 
         private bool IsNewPythonProgrammingModel()

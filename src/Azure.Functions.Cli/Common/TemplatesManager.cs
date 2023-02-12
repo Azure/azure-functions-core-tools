@@ -168,16 +168,7 @@ namespace Azure.Functions.Cli.Common
             var mainFilePath = Path.Combine(Environment.CurrentDirectory, PythonProgrammingModelMainFileKey);
             var mainFileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(mainFilePath);
 
-            // Verify that function doesn't exist
-            var functionDeclartion = $"@app.function_name(name=\"{functionName}\")";
-            if (mainFileContent.Contains(functionDeclartion))
-            {
-                throw new CliException($"The function with the name {functionName} already exists.");
-            }
-
             // Verify the target file doesn't exist. Delete with permission if it already exists. 
-            //fileName = fileName ?? $"{functionName}_function.py";
-
             if (!string.IsNullOrEmpty(fileName))
             {
                 var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
