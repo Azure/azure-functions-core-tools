@@ -95,18 +95,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
+            // Check if the command only ran for help. 
+            if (!string.IsNullOrEmpty(TriggerNameForHelp))
+            {
+                await ProcessHelpRequest(TriggerNameForHelp, true);
+                return;
+            }
+
             if (!ValidateInputs())
             {
                 return;
             }
 
             await UpdateLanguageAndRuntime();
-
-            // Check if the new command only ran for help. 
-            if (await ProcessHelpRequest(TriggerNameForHelp, true))
-            {
-                return;
-            }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
@@ -199,7 +200,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public async Task UpdateLanguageAndRuntime()
         {
             workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
-            if (!FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json")))
+            if (!CurrentPathHasLocalSettings())
             {
                 // we're assuming "func init" has not been run
                 await _initAction.RunAsync();
@@ -344,32 +345,46 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        public async Task<bool> ProcessHelpRequest(string triggerName, bool suggestCorrectTriggerNames = false)
+        public async Task<bool> ProcessHelpRequest(string triggerName, bool promptQuestions = false)
         {
             if (string.IsNullOrWhiteSpace(triggerName))
             {
                 return false;
             }
 
-            var language = Language;
-            if (string.IsNullOrEmpty(language))
+            var supportedLanguages = new List<string>() { Languages.Python, Languages.JavaScript, Languages.TypeScript };
+            if (string.IsNullOrEmpty(Language))
             {
-                await UpdateLanguageAndRuntime();
-            }
-
-            if (suggestCorrectTriggerNames)
-            {
-                if (!IsValidTriggerName(language, triggerName))
+                if (CurrentPathHasLocalSettings())
                 {
-                    ColoredConsole.WriteLine(ErrorColor($"The trigger name '{TriggerNameForHelp}' is not valid for {language} language. "));
-                    SelectionMenuHelper.DisplaySelectionWizardPrompt("valid trigger");
-                    triggerName = SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(language));
+                    await UpdateLanguageAndRuntime();
+                }
+                
+                if (string.IsNullOrEmpty(Language) || !supportedLanguages.Contains(Language, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    if (!promptQuestions)
+                    {
+                        return false;
+                    }
+
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(supportedLanguages);
                 }
             }
 
-            if ((IsNewPythonProgrammingModel() || IsNewNodeJsProgrammingModel(workerRuntime)) && IsValidTriggerName(language, triggerName))
+            if (promptQuestions)
             {
-                ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, language).Result));
+                if (!IsValidTriggerName(Language, triggerName))
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"The trigger name '{TriggerNameForHelp}' is not valid for {Language} language. "));
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("valid trigger");
+                    triggerName = SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(Language));
+                }
+            }
+
+            if (IsValidTriggerName(Language, triggerName))
+            {
+                ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, Language).Result));
                 return true;
             }
 
@@ -410,6 +425,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             return false;
+        }
+
+        private bool CurrentPathHasLocalSettings()
+        {
+            return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json"));
         }
     }
 }
