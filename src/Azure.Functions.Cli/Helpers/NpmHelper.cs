@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,35 +13,47 @@ namespace Azure.Functions.Cli.Helpers
 {
     public static class NpmHelper
     {
-
-        public static void Install()
+        
+        public async static Task Install()
         {
-            RunNpmCommand("install");
+            await RunNpmCommand("install", true);
         }
 
-        internal static void RunNpmCommand(string args, bool ignoreError = true, bool showProgress = true, string stdIn = null)
+        internal static async Task RunNpmCommand(string args, bool ignoreError = true, bool showProgress = true, string stdIn = null)
         {
             if (showProgress || StaticSettings.IsDebug)
             {
                 ColoredConsole.Write($"Running 'npm {args}'.");
             }
-            
-            InternalRunNpmCommand(args, ignoreError, stdIn: stdIn);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                await InternalRunCommand("cmd", $"/c npm {args}", ignoreError, stdIn: stdIn);
+            }
+            else
+            {
+                // not tested in other environment yet.
+                await InternalRunCommand("npm", args, ignoreError, stdIn: stdIn);
+            }
         }
 
-        private static void InternalRunNpmCommand(string args, bool ignoreError, string stdIn = null)
+        private static async Task<(string output, string error, int exitCode)> InternalRunCommand(string command, string args, bool ignoreError, string stdIn = null)
         {
-            // Todo: It will not work on Linux or Mac. We need to use npm.cmd on Windows and npm on Linux/Mac
-            var currentPath = Environment.CurrentDirectory;
-            var psiNpmRunDist = new ProcessStartInfo
+            var docker = new Executable(command, args);
+            var sbError = new StringBuilder();
+            var sbOutput = new StringBuilder();
+
+            var exitCode = await docker.RunAsync(l => sbOutput.AppendLine(l), e => sbError.AppendLine(e), stdIn: stdIn);
+
+            if (exitCode != 0 && !ignoreError)
             {
-                FileName = "cmd",
-                RedirectStandardInput = true,
-                WorkingDirectory = currentPath
-            };
-            var pNpmRunDist = Process.Start(psiNpmRunDist);
-            pNpmRunDist.StandardInput.WriteLine("npm install");
-            pNpmRunDist.WaitForExit();
+                throw new CliException($"Error running {docker.Command}.\n" +
+                    $"output: {sbOutput.ToString()}\n{sbError.ToString()}");
+            }
+
+            return (trim(sbOutput.ToString()), trim(sbError.ToString()), exitCode);
+
+            string trim(string str) => str.Trim(new[] { ' ', '\n' });
         }
     }
 }

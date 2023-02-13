@@ -223,6 +223,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, Csx);
             }
 
+            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.node && ResolvedProgrammingModel == Common.ProgrammingModel.V4)
+            {
+                await NpmHelper.Install();
+            }
+
             // await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
         }
 
