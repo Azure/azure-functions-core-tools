@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
 using System.Linq;
 using System.Reflection;
+using Microsoft.AspNetCore.Routing.Constraints;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -32,9 +33,9 @@ namespace Azure.Functions.Cli.Common
         private static async Task<IEnumerable<Template>> GetTemplates()
         {
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
-            string templatesJson; 
+            string templatesJson;
 
-            if(extensionBundleManager.IsExtensionBundleConfigured())
+            if (extensionBundleManager.IsExtensionBundleConfigured())
             {
                 await ExtensionBundleHelper.GetExtensionBundle();
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
@@ -59,15 +60,83 @@ namespace Azure.Functions.Cli.Common
             return FileSystemHelpers.ReadAllTextFromFile(templatesLocation);
         }
 
-        public async Task Deploy(string Name, Template template)
+        public async Task Deploy(string name, string fileName, Template template)
         {
-            var path = Path.Combine(Environment.CurrentDirectory, Name);
+            if (template.Id.EndsWith("JavaScript-4.x") || template.Id.EndsWith("TypeScript-4.x"))
+            {
+                await DeployNewNodeProgrammingModel(name, fileName, template);
+            }
+            else
+            {
+                await DeployTraditionalModel(name, template);
+            }
+
+            await InstallExtensions(template);
+        }
+
+        private async Task DeployNewNodeProgrammingModel(string functionName, string fileName, Template template)
+        {
+            var templateFiles = template.Files.Where(kv => !kv.Key.EndsWith(".dat"));
+            var fileList = new Dictionary<string, string>();
+
+            // Running the validations here. There is no change in the user data in this loop.
+            foreach (var file in templateFiles)
+            {
+                fileName = fileName ?? ReplaceFunctionNamePlaceholder(file.Key, functionName);
+                var filePath = Path.Combine(Path.Combine(Environment.CurrentDirectory, "src", "functions"), fileName);
+                AskToRemoveFileIfExists(filePath, functionName);
+                fileList.Add(filePath, ReplaceFunctionNamePlaceholder(file.Value, functionName));
+            }
+
+            foreach (var filePath in fileList.Keys)
+            {
+                RemoveFileIfExists(filePath);
+                ColoredConsole.WriteLine($"Creating a new file {filePath}");
+                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileList[filePath]);
+            }
+        }
+
+        private static void AskToRemoveFileIfExists(string filePath, string functionName, bool removeFile = false)
+        {
+            var fileExists = FileSystemHelpers.FileExists(filePath);
+            if (fileExists)
+            {
+                // Once we get the confirmation of overwriting all files then we will overwrite. 
+                var response = "n";
+                do
+                {
+                    ColoredConsole.Write($"A file with the name {Path.GetFileName(filePath)} already exists. Overwrite [y/n]? [n] ");
+                    response = Console.ReadLine();
+                } while (response != "n" && response != "y");
+                if (response == "n")
+                {
+                    throw new CliException($"The function with the name {functionName} couldn't be created.");
+                }
+            }
+
+            if (removeFile)
+            {
+                RemoveFileIfExists(filePath);
+            }
+        }
+
+        private static void RemoveFileIfExists(string filePath)
+        {
+            if (FileSystemHelpers.FileExists(filePath))
+            {
+                FileSystemHelpers.FileDelete(filePath);
+            }
+        }
+
+        private async Task DeployTraditionalModel(string name, Template template)
+        {
+            var path = Path.Combine(Environment.CurrentDirectory, name);
             if (FileSystemHelpers.DirectoryExists(path))
             {
                 var response = "n";
                 do
                 {
-                    ColoredConsole.Write($"A directory with the name {Name} already exists. Overwrite [y/n]? [n] ");
+                    ColoredConsole.Write($"A directory with the name {name} already exists. Overwrite [y/n]? [n] ");
                     response = Console.ReadLine();
                 } while (response != "n" && response != "y");
                 if (response == "n")
@@ -92,6 +161,10 @@ namespace Azure.Functions.Cli.Common
             var functionJsonPath = Path.Combine(path, "function.json");
             ColoredConsole.WriteLine($"Writing {functionJsonPath}");
             await FileSystemHelpers.WriteAllTextToFileAsync(functionJsonPath, JsonConvert.SerializeObject(template.Function, Formatting.Indented));
+        }
+
+        private async Task InstallExtensions(Template template)
+        {
             if (template.Metadata.Extensions != null)
             {
                 foreach (var extension in template.Metadata.Extensions)
@@ -104,6 +177,11 @@ namespace Azure.Functions.Cli.Common
                     await installAction.RunAsync();
                 }
             }
+        }
+
+        private string ReplaceFunctionNamePlaceholder(string str, string functionName)
+        {
+            return str?.Replace("%functionName%", functionName) ?? str;
         }
     }
 }

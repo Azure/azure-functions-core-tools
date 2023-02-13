@@ -66,6 +66,7 @@ namespace Azure.Functions.Cli.Common
         public const long DefaultMaxRequestBodySize = 104857600;
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
+        public const string HelpCommand = "help";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

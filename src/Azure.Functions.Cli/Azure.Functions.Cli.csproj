@@ -160,6 +160,12 @@
     <EmbeddedResource Include="StaticResources\getting_started_python_function.md">
       <LogicalName>$(AssemblyName).getting_started_python_function.md</LogicalName>
     </EmbeddedResource>
+	<EmbeddedResource Include="StaticResources\HttpTrigger-typescript-help.txt">
+      <LogicalName>$(AssemblyName).HttpTrigger-typescript-help.txt</LogicalName>
+    </EmbeddedResource>
+	<EmbeddedResource Include="StaticResources\HttpTrigger-javascript-help.txt">
+      <LogicalName>$(AssemblyName).HttpTrigger-javascript-help.txt</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\tools\python\packapp\__main__.py">
