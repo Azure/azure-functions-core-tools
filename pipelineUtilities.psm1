@@ -50,6 +50,12 @@ function Install-SBOMUtil
 }
 
 $DotnetSDKVersionRequirements = @{
+    
+    # .NET SDK 2.1 is required by the Authenticode tool
+    '2.1' = @{
+        MinimalPatch = '818'
+        DefaultPatch = '818'
+    }
 
     # .NET SDK 3.1 is required by the Microsoft.ManifestTool.dll tool
     '3.1' = @{
