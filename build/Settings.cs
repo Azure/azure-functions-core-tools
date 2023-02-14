@@ -26,7 +26,7 @@ namespace Build
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
-        
+
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
         public static readonly string ConstantsFile = Path.Combine(SrcProjectPath, "Common", "Constants.cs");
@@ -79,6 +79,43 @@ namespace Build
             "win7-x64"
         };
 
+        private static readonly string[] _linPowershellRuntimes = new[]
+        {
+            "linux",
+            "linux-x64",
+            "unix",
+            "linux-musl-x64"
+        };
+
+        private static readonly string[] _osxPowershellRuntimes = new[]
+        {
+            "osx",
+            "osx-x64",
+            "unix"
+        };
+
+        private static readonly string[] _osxARMPowershellRuntimes = new[]
+        {
+            "osx",
+            "osx-arm64",
+            "unix"
+        };
+
+        private static Dictionary<string, string[]> GetPowerShellRuntimes()
+        {
+            var runtimes = new Dictionary<string, string[]>
+            {
+                { "win-x86", _winPowershellRuntimes },
+                { "win-x64", _winPowershellRuntimes },
+                { "win-arm64", _winPowershellRuntimes },
+                { "linux-x64", _linPowershellRuntimes },
+                { "osx-x64", _osxPowershellRuntimes },
+                { "osx-arm64", _osxARMPowershellRuntimes }
+            };
+
+            return runtimes;
+        }
+
         public static readonly Dictionary<string, Dictionary<string, string[]>> ToolsRuntimeToPowershellRuntimes = new Dictionary<string, Dictionary<string, string[]>>
         {
             {
@@ -88,8 +125,8 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "win-arm64", _winPowershellRuntimes },
-                    { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
+                    { "linux-x64", _linPowershellRuntimes },
+                    { "osx-x64", _osxPowershellRuntimes },
                     // NOTE: PowerShell 7.0 does not support arm. First version supporting it is 7.2
                     // https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#supported-versions
                     // That being said, we might as well include "osx" and "unix" since it'll hardly affect package size and should lead to more accurate error messages
@@ -98,15 +135,11 @@ namespace Build
             },
             {
                 "7.2",
-                new Dictionary<string, string[]>
-                {
-                    { "win-x86", _winPowershellRuntimes },
-                    { "win-x64", _winPowershellRuntimes },
-                    { "win-arm64", _winPowershellRuntimes },
-                    { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
-                    { "osx-arm64", new [] { "osx", "osx-arm64", "unix" } }
-                }
+                GetPowerShellRuntimes()
+            },
+            {
+                "7.4",
+                GetPowerShellRuntimes()
             }
         };
 
