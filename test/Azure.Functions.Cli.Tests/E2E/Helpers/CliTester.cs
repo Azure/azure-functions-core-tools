@@ -75,7 +75,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             int ii = 0;
             foreach (var runConfiguration in runConfigurations)
             {
-                logStd($"Running config {{ii}}");
+                logStd($"Running config " + ii);
                 if (ii == 1 && printFileNames)
                 {
                     logStd("Running second config");
