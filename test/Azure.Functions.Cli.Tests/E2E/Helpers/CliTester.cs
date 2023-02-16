@@ -30,9 +30,9 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null, string workingDir = null, bool startHost = false) => Run(new[] { runConfiguration }, output, workingDir, startHost);
+        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null, string workingDir = null, bool startHost = false, bool printFileName = false) => Run(new[] { runConfiguration }, output, workingDir, startHost, printFileName);
 
-        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null, bool startHost = false)
+        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null, bool startHost = false, bool printFileName = false)
         {
             string workingDirectory = workingDir ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
@@ -44,10 +44,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
             string nugetConfigPath = Path.Combine(workingDirectory, "NuGet.Config");
             File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "NuGet.Config"), nugetConfigPath);
-
+            
             try
             {
-                await InternalRun(workingDirectory, runConfigurations, output, startHost);
+                await InternalRun(workingDirectory, runConfigurations, output, startHost, printFileName);
             }
             finally
             {
@@ -66,14 +66,29 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost)
+        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost, bool printFileNames)
         {
             var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
 
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
+            int ii = 0;
             foreach (var runConfiguration in runConfigurations)
             {
+                logStd($"Running config {{ii}}");
+                if (ii == 1 && printFileNames)
+                {
+                    logStd("Running second config");
+                    logStd("Printing file names");
+                    logStd("Working dir: " + workingDir);
+                    var dirInfo = new DirectoryInfo(workingDir);
+                    var files = dirInfo.GetFiles();
+                    foreach (var fileInfo in files)
+                    {
+                        logStd("FileName: " + fileInfo.Name);
+                    }
+                }
+                ii++;
                 Task hostTask = startHost ? hostExe.RunAsync(logStd, logErr) : Task.Delay(runConfiguration.CommandTimeout);
                 stdout.Clear();
                 stderr.Clear();

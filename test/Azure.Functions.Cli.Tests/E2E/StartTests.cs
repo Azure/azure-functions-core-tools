@@ -148,7 +148,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                     }
                 },
-            }, _output, startHost: true);
+            }, _output, startHost: true, printFileName: true);
         }
 
         [Fact]
@@ -194,7 +194,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                     }
                 },
-            }, _output, startHost: true);
+            }, _output, startHost: true, printFileName: true);
         }
 
         [Fact]
@@ -240,7 +240,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                     }
                 },
-            }, _output, startHost: true);
+            }, _output, startHost: true, printFileName: true);
         }
 
         [Fact]
