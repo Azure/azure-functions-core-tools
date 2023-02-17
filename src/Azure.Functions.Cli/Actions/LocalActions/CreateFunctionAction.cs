@@ -320,7 +320,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private void PerformPostDeployTasks(string functionName, string language)
         {
-            if (language == Constants.Languages.TypeScript)
+            if (language == Constants.Languages.TypeScript && !IsNewNodeJsProgrammingModel(workerRuntime))
             {
                 // Update typescript function.json
                 var funcJsonFile = Path.Combine(Environment.CurrentDirectory, functionName, Constants.FunctionJsonFileName);
