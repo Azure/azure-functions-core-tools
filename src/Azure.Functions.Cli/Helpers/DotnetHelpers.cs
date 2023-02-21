@@ -28,6 +28,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime)
         {
+            Console.WriteLine("Khuram test: In DeployDotnetProject");
             await TemplateOperation(async () =>
             {
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)

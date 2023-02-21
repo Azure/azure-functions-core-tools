@@ -131,6 +131,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public override async Task RunAsync()
         {
+            Console.WriteLine("Khuram test: In InitAction.RunAsync");
             if (SourceControl != SourceControl.Git)
             {
                 throw new Exception("Only Git is supported right now for vsc");
