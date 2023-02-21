@@ -106,6 +106,9 @@
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\node-v4-templates.json">
+      <LogicalName>$(AssemblyName).node-v4-templates.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\vscode.extensions.json">
       <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>
     </EmbeddedResource>

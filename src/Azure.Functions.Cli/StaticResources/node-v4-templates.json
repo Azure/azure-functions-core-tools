@@ -1,0 +1,424 @@
+﻿[
+  {
+    "id": "BlobTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: '%path%',\r\n    connection: '%connection%',\r\n    handler: (blob, context) => {\r\n        context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "storageBlobTrigger",
+      "description": "$BlobTrigger_description",
+      "name": "Azure Blob Storage trigger",
+      "language": "JavaScript",
+      "triggerType": "blobTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "blob",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "connection",
+        "path"
+      ]
+    }
+  },
+  {
+    "id": "BlobTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(blob: Buffer, context: InvocationContext): Promise<void> {\r\n    context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n}\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: '%path%',\r\n    connection: '%connection%',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "storageBlobTrigger",
+      "description": "$BlobTrigger_description",
+      "name": "Azure Blob Storage trigger",
+      "language": "TypeScript",
+      "triggerType": "blobTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "blob",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "connection",
+        "path"
+      ]
+    }
+  },
+  {
+    "id": "CosmosDBTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.cosmosDB('%functionName%', {\r\n    connectionStringSetting: '%connectionStringSetting%',\r\n    databaseName: '%databaseName%',\r\n    collectionName: '%collectionName%',\r\n    createLeaseCollectionIfNotExists: %createLeaseCollectionIfNotExists%,\r\n    handler: (documents, context) => {\r\n        context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "cosmosDBTrigger",
+      "description": "$CosmosDBTrigger_description",
+      "name": "Azure Cosmos DB trigger",
+      "language": "JavaScript",
+      "triggerType": "cosmosDBTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "cosmosDB",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "connectionStringSetting",
+        "databaseName",
+        "collectionName",
+        "createLeaseCollectionIfNotExists"
+      ]
+    }
+  },
+  {
+    "id": "CosmosDBTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(documents: unknown[], context: InvocationContext): Promise<void> {\r\n    context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n}\r\n\r\napp.cosmosDB('%functionName%', {\r\n    connectionStringSetting: '%connectionStringSetting%',\r\n    databaseName: '%databaseName%',\r\n    collectionName: '%collectionName%',\r\n    createLeaseCollectionIfNotExists: %createLeaseCollectionIfNotExists%,\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "cosmosDBTrigger",
+      "description": "$CosmosDBTrigger_description",
+      "name": "Azure Cosmos DB trigger",
+      "language": "TypeScript",
+      "triggerType": "cosmosDBTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "cosmosDB",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "connectionStringSetting",
+        "databaseName",
+        "collectionName",
+        "createLeaseCollectionIfNotExists"
+      ]
+    }
+  },
+  {
+    "id": "EventGridTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.eventGrid('%functionName%', {\r\n    handler: (event, context) => {\r\n        context.log('Event grid function processed event:', event);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "eventGridTrigger",
+      "description": "$EventGridTrigger_description",
+      "name": "Azure Event Grid trigger",
+      "language": "JavaScript",
+      "triggerType": "eventGridTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "eventGrid",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "EventGridTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, EventGridEvent, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(event: EventGridEvent, context: InvocationContext): Promise<void> {\r\n    context.log('Event grid function processed event:', event);\r\n}\r\n\r\napp.eventGrid('%functionName%', {\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "eventGridTrigger",
+      "description": "$EventGridTrigger_description",
+      "name": "Azure Event Grid trigger",
+      "language": "TypeScript",
+      "triggerType": "eventGridTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "eventGrid",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "EventHubTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.eventHub('%functionName%', {\r\n    connection: '%connection%',\r\n    eventHubName: '%eventHubName',\r\n    cardinality: 'many',\r\n    handler: (messages, context) => {\r\n        if (Array.isArray(messages)) {\r\n            context.log(`Event hub function processed ${messages.length} messages`);\r\n            for (const message of messages) {\r\n                context.log('Event hub message:', message);\r\n            }\r\n        } else {\r\n            context.log('Event hub function processed message:', messages);\r\n        }\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "eventHubTrigger",
+      "description": "$EventHubTrigger_description",
+      "name": "Azure Event Hub trigger",
+      "language": "JavaScript",
+      "triggerType": "eventHubTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "eventHub",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "eventHubName"
+      ]
+    }
+  },
+  {
+    "id": "EventHubTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(messages: unknown | unknown[], context: InvocationContext): Promise<void> {\r\n    if (Array.isArray(messages)) {\r\n        context.log(`Event hub function processed ${messages.length} messages`);\r\n        for (const message of messages) {\r\n            context.log('Event hub message:', message);\r\n        }\r\n    } else {\r\n        context.log('Event hub function processed message:', messages);\r\n    }\r\n}\r\n\r\napp.eventHub('%functionName%', {\r\n    connection: '%connection%',\r\n    eventHubName: '%eventHubName',\r\n    cardinality: 'many',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "eventHubTrigger",
+      "description": "$EventHubTrigger_description",
+      "name": "Azure Event Hub trigger",
+      "language": "TypeScript",
+      "triggerType": "eventHubTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "eventHub",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "eventHubName"
+      ]
+    }
+  },
+  {
+    "id": "HttpTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.http('%functionName%', {\r\n    methods: ['GET', 'POST'],\r\n    authLevel: 'anonymous',\r\n    handler: async (request, context) => {\r\n        context.log(`Http function processed request for url \"${request.url}\"`);\r\n\r\n        const name = request.query.get('name') || await request.text() || 'world';\r\n\r\n        return { body: `Hello, ${name}!` };\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "httpTrigger",
+      "description": "$HttpTrigger_description",
+      "name": "HTTP trigger",
+      "language": "JavaScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "HttpTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, HttpRequest, HttpResponseInit, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {\r\n    context.log(`Http function processed request for url \"${request.url}\"`);\r\n\r\n    const name = request.query.get('name') || await request.text() || 'world';\r\n\r\n    return { body: `Hello, ${name}!` };\r\n};\r\n\r\napp.http('%functionName%', {\r\n    methods: ['GET', 'POST'],\r\n    authLevel: 'anonymous',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "httpTrigger",
+      "description": "$HttpTrigger_description",
+      "name": "HTTP trigger",
+      "language": "TypeScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "QueueTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageQueue('%functionName%', {\r\n    queueName: '%queueName%',\r\n    connection: '%connection%',\r\n    handler: (queueItem, context) => {\r\n        context.log('Storage queue function processed work item:', queueItem);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "storageQueueTrigger",
+      "description": "$QueueTrigger_description",
+      "name": "Azure Queue Storage trigger",
+      "language": "JavaScript",
+      "triggerType": "queueTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "queue",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "connection",
+        "queueName"
+      ]
+    }
+  },
+  {
+    "id": "QueueTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(queueItem: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Storage queue function processed work item:', queueItem);\r\n}\r\n\r\napp.storageQueue('%functionName%', {\r\n    queueName: '%queueName%',\r\n    connection: '%connection%',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "storageQueueTrigger",
+      "description": "$QueueTrigger_description",
+      "name": "Azure Queue Storage trigger",
+      "language": "TypeScript",
+      "triggerType": "queueTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "queue",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "connection",
+        "queueName"
+      ]
+    }
+  },
+  {
+    "id": "ServiceBusQueueTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusQueue('%functionName%', {\r\n    connection: '%connection%',\r\n    queueName: '%queueName%',\r\n    handler: (message, context) => {\r\n        context.log('Service bus queue function processed message:', message);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "serviceBusQueueTrigger",
+      "description": "$ServiceBusQueueTrigger_description",
+      "name": "Azure Service Bus Queue trigger",
+      "language": "JavaScript",
+      "triggerType": "serviceBusTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "serviceBus",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "connection",
+        "queueName"
+      ]
+    }
+  },
+  {
+    "id": "ServiceBusQueueTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus queue function processed message:', message);\r\n}\r\n\r\napp.serviceBusQueue('%functionName%', {\r\n    connection: '%connection%',\r\n    queueName: '%queueName%',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "serviceBusQueueTrigger",
+      "description": "$ServiceBusQueueTrigger_description",
+      "name": "Azure Service Bus Queue trigger",
+      "language": "TypeScript",
+      "triggerType": "serviceBusTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "serviceBus",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "connection",
+        "queueName"
+      ]
+    }
+  },
+  {
+    "id": "ServiceBusTopicTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusTopic('%functionName%', {\r\n    connection: '%connection%',\r\n    topicName: '%topicName%',\r\n    subscriptionName: '%subscriptionName%',\r\n    handler: (message, context) => {\r\n        context.log('Service bus topic function processed message:', message);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "serviceBusTopicTrigger",
+      "description": "$ServiceBusTopicTrigger_description",
+      "name": "Azure Service Bus Topic trigger",
+      "language": "JavaScript",
+      "triggerType": "serviceBusTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "serviceBus",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "connection",
+        "topicName",
+        "subscriptionName"
+      ]
+    }
+  },
+  {
+    "id": "ServiceBusTopicTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus topic function processed message:', message);\r\n}\r\n\r\napp.serviceBusTopic('%functionName%', {\r\n    connection: '%connection%',\r\n    topicName: '%topicName%',\r\n    subscriptionName: '%subscriptionName%',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "serviceBusTopicTrigger",
+      "description": "$ServiceBusTopicTrigger_description",
+      "name": "Azure Service Bus Topic trigger",
+      "language": "TypeScript",
+      "triggerType": "serviceBusTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "serviceBus",
+      "enabledInTryMode": false,
+      "userPrompt": [
+        "connection",
+        "topicName",
+        "subscriptionName"
+      ]
+    }
+  },
+  {
+    "id": "TimerTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.timer('%functionName%', {\r\n    schedule: '%schedule%',\r\n    handler: (myTimer, context) => {\r\n        context.log('Timer function processed request.');\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "timerTrigger",
+      "description": "$TimerTrigger_description",
+      "name": "Timer trigger",
+      "language": "JavaScript",
+      "triggerType": "timerTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "timer",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "schedule"
+      ]
+    }
+  },
+  {
+    "id": "TimerTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext, Timer } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(myTimer: Timer, context: InvocationContext): Promise<void> {\r\n    context.log('Timer function processed request.');\r\n}\r\n\r\napp.timer('%functionName%', {\r\n    schedule: '%schedule%',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "timerTrigger",
+      "description": "$TimerTrigger_description",
+      "name": "Timer trigger",
+      "language": "TypeScript",
+      "triggerType": "timerTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "timer",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "schedule"
+      ]
+    }
+  }
+]

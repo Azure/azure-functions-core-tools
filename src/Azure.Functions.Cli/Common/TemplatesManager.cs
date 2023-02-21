@@ -46,7 +46,9 @@ namespace Azure.Functions.Cli.Common
                 templatesJson = GetTemplatesJson();
             }
 
-            return JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
+            var templates = JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
+            templates = templates.Concat(await GetNodeV4TemplatesJson()).ToList();
+            return templates;
         }
 
         private static string GetTemplatesJson()
@@ -56,8 +58,14 @@ namespace Azure.Functions.Cli.Common
             {
                 throw new CliException($"Can't find templates location. Looked at '{templatesLocation}'");
             }
-
+            
             return FileSystemHelpers.ReadAllTextFromFile(templatesLocation);
+        }
+
+        private static async Task<IEnumerable<Template>> GetNodeV4TemplatesJson()
+        {
+            var staticTemplateJson = await StaticResources.GetValue($"node-v4-templates.json");
+            return JsonConvert.DeserializeObject<IEnumerable<Template>>(staticTemplateJson);
         }
 
         public async Task Deploy(string name, string fileName, Template template)
