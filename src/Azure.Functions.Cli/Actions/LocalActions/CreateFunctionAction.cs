@@ -80,7 +80,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            Console.WriteLine("Khuram test: In CreateFunctionAction.RunAsync");
             if (Console.IsOutputRedirected || Console.IsInputRedirected)
             {
                 if (string.IsNullOrEmpty(TemplateName) ||
