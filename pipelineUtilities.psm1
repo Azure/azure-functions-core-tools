@@ -58,8 +58,8 @@ $DotnetSDKVersionRequirements = @{
     }
 
     '5.0'  =@{
-        MinimalPatch = '413'
-        DefaultPatch = '413'
+        MinimalPatch = '408'
+        DefaultPatch = '408'
     }
 }
 
