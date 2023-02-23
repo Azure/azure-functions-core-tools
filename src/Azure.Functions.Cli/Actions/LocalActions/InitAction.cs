@@ -126,7 +126,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>('m', "model")
-                .WithDescription($"Selects the programming model for the function app. Options are {EnumerationHelper.Join(", ", ProgrammingModelHelper.GetProgrammingModels())}. Currently, only Python and Node.js support this setting")
+                .WithDescription($"Selects the programming model for the function app. Note this flag is now only applicable to Python and JavaScript/TypeScript. Options are V1 and V2 for Python; V3 and V4 for JavaScript/TypeScript. Currently, the V2 and V4 programming models are in preview.")
                 .Callback(m => ProgrammingModel = m);
 
             Parser
