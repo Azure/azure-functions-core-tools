@@ -25,21 +25,27 @@ namespace Azure.Functions.Cli.Common
                 return string.Empty;
             }
 
-            return _triggerHelp[helpKey];
+            var triggerHelp = _triggerHelp[helpKey];
+            if (language == Languages.JavaScript || language == Languages.TypeScript)
+            {
+                triggerHelp = $"{triggerHelp}{Environment.NewLine}{Environment.NewLine}Programming model v4 for Node is currently in preview. The goal of this model is to introduce a more intuitive and idiomatic way of authoring Function triggers and bindings for JavaScript and TypeScript developers. Learn more http://aka.ms/AzFuncNodeV4. ";
+            }
 
+            return triggerHelp;
         }
 
         private async Task<IDictionary<string, string>> LoadTriggerHelp()
         {
             var triggerNameList = new string[] {
-                //"BlobTrigger",
-                /*"CosmosDBTrigger",
-                "EventHubTrigger",*/
+                "BlobTrigger",
+                "CosmosDBTrigger",
+                "EventGridTrigger",
+                "EventHubTrigger",
                 "HttpTrigger",
-                /*"QueueTrigger",
+                "StorageQueueTrigger",
                 "ServiceBusQueueTrigger",
-                "ServiceBusTopicTrigger",*/
-                //"TimerTrigger"
+                "ServiceBusTopicTrigger",
+                "TimerTrigger"
             };
 
             var triggerHelpDictionary = new Dictionary<string, string>();
@@ -48,7 +54,7 @@ namespace Azure.Functions.Cli.Common
             {
                 foreach (var triggerName in triggerNameList)
                 {
-                    var triggerHelpContent = await StaticResources.GetValue($"{triggerName}-{language}-help.txt");
+                    var triggerHelpContent = await StaticResources.GetValue($"{language}-{triggerName}-help.txt");
                     triggerHelpDictionary.Add(GetTriggerHelpKey(triggerName, language), triggerHelpContent);
                 }
             }

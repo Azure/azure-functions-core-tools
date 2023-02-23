@@ -266,6 +266,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return GetLanguageTemplates(templateLanguage).Select(t => t.Metadata.Name).Distinct();
         }
 
+        private IEnumerable<string> GetTriggerTypes(string templateLanguage)
+        {
+            return GetLanguageTemplates(templateLanguage).Select(t => t.Metadata.TriggerType).Distinct();
+        }
+
         private IEnumerable<Template> GetLanguageTemplates(string templateLanguage)
         {
             if (IsNewNodeJsProgrammingModel(workerRuntime))
@@ -373,14 +378,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            if (promptQuestions && !IsValidTriggerName(Language, triggerName))
+            if (IsValidTriggerName(Language, triggerName))
+            {
+                triggerName = GetTriggerTypeFromTriggerName(Language, triggerName);
+            }
+            if (promptQuestions && !IsValidTriggerType(Language, triggerName))
             {
                 ColoredConsole.WriteLine(ErrorColor($"The trigger name '{TriggerNameForHelp}' is not valid for {Language} language. "));
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("valid trigger");
                 triggerName = SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(Language));
+                triggerName = GetTriggerTypeFromTriggerName(Language, triggerName);
             }
 
-            if (IsValidTriggerName(Language, triggerName))
+            if (IsValidTriggerType(Language, triggerName))
             {
                 ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, Language).Result));
                 return true;
@@ -392,6 +402,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private bool IsValidTriggerName(string language, string triggerName)
         {
             return GetTriggerNames(language).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private bool IsValidTriggerType(string language, string triggerName)
+        {
+            return GetTriggerTypes(language).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private string GetTriggerTypeFromTriggerName(string language, string triggerName)
+        {
+            return GetLanguageTemplates(language).First(t => t.Metadata.Name.Equals(triggerName, StringComparison.OrdinalIgnoreCase)).Metadata.TriggerType;
         }
 
         private bool IsNewPythonProgrammingModel()

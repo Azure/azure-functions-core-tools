@@ -30,11 +30,16 @@ namespace Azure.Functions.Cli.Common
         [JsonProperty("language")]
         public string Language { get; set; }
 
+        [JsonProperty("triggerType")]
+        public string TriggerType { get; set; }
+
         [JsonProperty("userPrompt")]
         public IEnumerable<string> UserPrompt { get; set; }
 
         [JsonProperty("extensions")]
         public IEnumerable<FunctionExtension> Extensions { get; set; }
+
+        
     }
 
     internal class FunctionExtension
