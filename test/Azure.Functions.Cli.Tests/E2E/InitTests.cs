@@ -101,14 +101,13 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("node", "v1")]
-        [InlineData("java", "v2")]
+        [InlineData("node", "v3")]
+        [InlineData("node", "v4")]
+        [InlineData("java", "v1")]
         [InlineData("python", "v1")]
         [InlineData("python", "v2")]
         public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
         {
-            var workerRuntimesWithV2ProgrammingModel = new[] { "python" };
-
             var files = new List<FileResult>
             {
                 new FileResult
@@ -129,35 +128,49 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Name = "function_app.py",
                 });
             }
+            else if (workerRuntime == "node" && programmingModel == "v4")
+            {
+                files.Add(new FileResult
+                {
+                    Name = "package.json",
+                    ContentContains = new[]
+                        {
+                            "\"@azure/functions\": \"^4"
+                        }
+                });
+            }
 
-            if (programmingModel != "v2" || workerRuntimesWithV2ProgrammingModel.Contains(workerRuntime))
+            return CliTester.Run(new RunConfiguration
             {
-                return CliTester.Run(new RunConfiguration
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                CheckFiles = files.ToArray(),
+                OutputContains = new[]
                 {
-                    Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
-                    CheckFiles = files.ToArray(),
-                    OutputContains = new[]
-                    {
-                        "Writing .gitignore",
-                        "Writing host.json",
-                        "Writing local.settings.json",
-                        $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                    },
-                    OutputDoesntContain = new[] { "Initialized empty Git repository" }
-                }, _output);
-            }
-            else
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                },
+                OutputDoesntContain = new[] { "Initialized empty Git repository" }
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("node", "v1")]
+        [InlineData("node", "v2")]
+        [InlineData("java", "v2")]
+        [InlineData("python", "v3")]
+        public Task init_with_worker_runtime_and_unsupported_model(string workerRuntime, string programmingModel)
+        {
+            return CliTester.Run(new RunConfiguration
             {
-                return CliTester.Run(new RunConfiguration
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                HasStandardError = true,
+                ErrorContains = new[]
                 {
-                    Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
-                    HasStandardError = true,
-                    ErrorContains = new[]
-                    {
-                        $"programming model is not supported for worker runtime {workerRuntime}. Supported programming models for worker runtime {workerRuntime} are:"
-                    }
-                }, _output);
-            }
+                    $"programming model is not supported for worker runtime {workerRuntime}. Supported programming models for worker runtime {workerRuntime} are:"
+                }
+            }, _output);
         }
 
         [Fact]
