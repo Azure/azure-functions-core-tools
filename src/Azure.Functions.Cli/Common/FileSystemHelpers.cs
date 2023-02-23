@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
+using Colors.Net;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -59,6 +60,19 @@ namespace Azure.Functions.Cli.Common
             {
                 await streamWriter.WriteAsync(content);
                 await streamWriter.FlushAsync();
+            }
+        }
+
+        public static async Task WriteFileIfNotExists(string fileName, string fileContent)
+        {
+            if (!FileExists(fileName))
+            {
+                ColoredConsole.WriteLine($"Writing {fileName}");
+                await WriteAllTextToFileAsync(fileName, fileContent);
+            }
+            else
+            {
+                ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
             }
         }
 

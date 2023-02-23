@@ -71,6 +71,8 @@ namespace Azure.Functions.Cli
         
         public static Task<string> BundleConfigPyStein => GetValue("bundleConfigPyStein.json");
 
+        public static Task<string> BundleConfigNodeV4 => GetValue("bundleConfigNodeV4.json");
+
 
         public static Task<string> CustomHandlerConfig => GetValue("customHandlerConfig.json");
 
@@ -82,9 +84,13 @@ namespace Azure.Functions.Cli
 
         public static Task<string> FuncIgnore => GetValue("funcignore");
 
-        public static Task<string> PackageJson => GetValue("package.json");
+        public static Task<string> PackageJsonJsV4 => GetValue("package-js-v4.json");
 
-        public static Task<string> JavascriptPackageJson => GetValue("javascriptPackage.json");
+        public static Task<string> PackageJsonJs => GetValue("package-js.json");
+
+        public static Task<string> PackageJsonTsV4 => GetValue("package-ts-v4.json");
+
+        public static Task<string> PackageJsonTs => GetValue("package-ts.json");
 
         public static Task<string> TsConfig => GetValue("tsconfig.json");
 

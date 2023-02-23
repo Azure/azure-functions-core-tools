@@ -1,0 +1,21 @@
+{
+  "name": "",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/src/functions/*.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "prestart": "npm run build",
+    "start": "func start",
+    "test": "echo \"No tests yet...\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0-alpha.1"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.x",
+    "@types/node": "18.x",
+    "typescript": "^4.0.0"
+  }
+}
