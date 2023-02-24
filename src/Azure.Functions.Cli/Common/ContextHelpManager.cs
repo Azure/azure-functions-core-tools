@@ -45,7 +45,9 @@ namespace Azure.Functions.Cli.Common
                 "StorageQueueTrigger",
                 "ServiceBusQueueTrigger",
                 "ServiceBusTopicTrigger",
-                "TimerTrigger"
+                "TimerTrigger",
+                "OrchestrationTrigger",
+                "EntityTrigger"
             };
 
             var triggerHelpDictionary = new Dictionary<string, string>();

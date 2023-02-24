@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (showProgress || StaticSettings.IsDebug)
             {
-                ColoredConsole.Write($"Running 'npm {args}'.");
+                ColoredConsole.Write($"Running 'npm {args}'...");
             }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -32,7 +32,6 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
-                // not tested in other environment yet.
                 await InternalRunCommand("npm", args, ignoreError, stdIn: stdIn);
             }
         }

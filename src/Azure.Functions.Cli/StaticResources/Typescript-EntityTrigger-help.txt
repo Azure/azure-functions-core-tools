@@ -1,0 +1,3 @@
+﻿Durable Functions is an extension of Azure Functions that enables you to write long-running, reliable, event-driven, and stateful logic in a serverless environment.  
+
+Entity functions define operations for reading and updating small pieces of state, known as durable entities. Unlike orchestrator functions, entity functions manage the state of an entity explicitly, rather than implicitly representing state via control flow. 

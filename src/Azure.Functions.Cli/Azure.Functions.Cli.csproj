@@ -103,6 +103,9 @@
     <EmbeddedResource Include="StaticResources\Javascript-CosmosDBTrigger-help.txt">
       <LogicalName>$(AssemblyName).javascript-CosmosDBTrigger-help.txt</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-EntityTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-EntityTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Javascript-EventGridTrigger-help.txt">
       <LogicalName>$(AssemblyName).javascript-EventGridTrigger-help.txt</LogicalName>
     </EmbeddedResource>
@@ -111,6 +114,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Javascript-HttpTrigger-help.txt">
       <LogicalName>$(AssemblyName).javascript-HttpTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-OrchestrationTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-OrchestrationTrigger-help.txt</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Javascript-ServiceBusQueueTrigger-help.txt">
       <LogicalName>$(AssemblyName).javascript-ServiceBusQueueTrigger-help.txt</LogicalName>
@@ -142,6 +148,9 @@
     <EmbeddedResource Include="StaticResources\Typescript-CosmosDBTrigger-help.txt">
       <LogicalName>$(AssemblyName).typescript-CosmosDBTrigger-help.txt</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-EntityTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-EntityTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Typescript-EventGridTrigger-help.txt">
       <LogicalName>$(AssemblyName).typescript-EventGridTrigger-help.txt</LogicalName>
     </EmbeddedResource>
@@ -150,6 +159,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Typescript-HttpTrigger-help.txt">
       <LogicalName>$(AssemblyName).typescript-HttpTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-OrchestrationTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-OrchestrationTrigger-help.txt</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Typescript-ServiceBusQueueTrigger-help.txt">
       <LogicalName>$(AssemblyName).typescript-ServiceBusQueueTrigger-help.txt</LogicalName>

@@ -535,7 +535,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (workerRuntime == Helpers.WorkerRuntime.node && programmingModel == Common.ProgrammingModel.V4)
             {
-                await NpmHelper.Install();
+                try
+                {
+                    await NpmHelper.Install();
+                }
+                catch (Exception)
+                {
+                    Console.Error.WriteLine(WarningColor("Warning: You must run \"npm install\" manually"));
+                }
             }
         }
     }

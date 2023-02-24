@@ -261,19 +261,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
         }
-        private IEnumerable<string> GetTriggerNames(string templateLanguage)
+        private IEnumerable<string> GetTriggerNames(string templateLanguage, bool forNewModelHelp = false)
         {
-            return GetLanguageTemplates(templateLanguage).Select(t => t.Metadata.Name).Distinct();
+            return GetLanguageTemplates(templateLanguage, forNewModelHelp).Select(t => t.Metadata.Name).Distinct();
+        }
+        
+        private IEnumerable<string> GetTriggerTypesForHelp(string templateLanguage)
+        {
+            return GetLanguageTemplates(templateLanguage, forNewModelHelp: true).Select(t => t.Metadata.TriggerType).Distinct();
         }
 
-        private IEnumerable<string> GetTriggerTypes(string templateLanguage)
+        private IEnumerable<Template> GetLanguageTemplates(string templateLanguage, bool forNewModelHelp = false)
         {
-            return GetLanguageTemplates(templateLanguage).Select(t => t.Metadata.TriggerType).Distinct();
-        }
-
-        private IEnumerable<Template> GetLanguageTemplates(string templateLanguage)
-        {
-            if (IsNewNodeJsProgrammingModel(workerRuntime))
+            if (IsNewNodeJsProgrammingModel(workerRuntime) || (forNewModelHelp && (Language == Languages.TypeScript || Language == Languages.JavaScript)))
             {
                 return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
@@ -378,19 +378,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            if (IsValidTriggerName(Language, triggerName))
+            if (IsValidTriggerNameForHelp(Language, triggerName))
             {
-                triggerName = GetTriggerTypeFromTriggerName(Language, triggerName);
+                triggerName = GetTriggerTypeFromTriggerNameForHelp(Language, triggerName);
             }
-            if (promptQuestions && !IsValidTriggerType(Language, triggerName))
+            if (promptQuestions && !IsValidTriggerTypeForHelp(Language, triggerName))
             {
                 ColoredConsole.WriteLine(ErrorColor($"The trigger name '{TriggerNameForHelp}' is not valid for {Language} language. "));
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("valid trigger");
-                triggerName = SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(Language));
-                triggerName = GetTriggerTypeFromTriggerName(Language, triggerName);
+                triggerName = SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(Language, forNewModelHelp: true));
+                triggerName = GetTriggerTypeFromTriggerNameForHelp(Language, triggerName);
             }
 
-            if (IsValidTriggerType(Language, triggerName))
+            if (IsValidTriggerTypeForHelp(Language, triggerName))
             {
                 ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, Language).Result));
                 return true;
@@ -399,19 +399,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return false;
         }
 
-        private bool IsValidTriggerName(string language, string triggerName)
+        private bool IsValidTriggerNameForHelp(string language, string triggerName)
         {
-            return GetTriggerNames(language).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
+            return GetTriggerNames(language, forNewModelHelp: true).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
         }
 
-        private bool IsValidTriggerType(string language, string triggerName)
+        private bool IsValidTriggerTypeForHelp(string language, string triggerName)
         {
-            return GetTriggerTypes(language).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
+            return GetTriggerTypesForHelp(language).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
         }
 
-        private string GetTriggerTypeFromTriggerName(string language, string triggerName)
+        private string GetTriggerTypeFromTriggerNameForHelp(string language, string triggerName)
         {
-            return GetLanguageTemplates(language).First(t => t.Metadata.Name.Equals(triggerName, StringComparison.OrdinalIgnoreCase)).Metadata.TriggerType;
+            return GetLanguageTemplates(language, forNewModelHelp: true).First(t => t.Metadata.Name.Equals(triggerName, StringComparison.OrdinalIgnoreCase)).Metadata.TriggerType;
         }
 
         private bool IsNewPythonProgrammingModel()

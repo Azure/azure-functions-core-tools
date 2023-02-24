@@ -3,7 +3,7 @@
     "id": "BlobTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: '%path%',\r\n    connection: '%connection%',\r\n    handler: (blob, context) => {\r\n        context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n    }\r\n});\r\n"
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: 'samples-workitems/{name}',\r\n    connection: '',\r\n    handler: (blob, context) => {\r\n        context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n    }\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "storageBlobTrigger",
@@ -27,7 +27,7 @@
     "id": "BlobTrigger-TypeScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(blob: Buffer, context: InvocationContext): Promise<void> {\r\n    context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n}\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: '%path%',\r\n    connection: '%connection%',\r\n    handler: %functionName%\r\n});\r\n"
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(blob: Buffer, context: InvocationContext): Promise<void> {\r\n    context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n}\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: 'samples-workitems/{name}',\r\n    connection: '',\r\n    handler: %functionName%\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "storageBlobTrigger",
@@ -51,7 +51,7 @@
     "id": "CosmosDBTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.cosmosDB('%functionName%', {\r\n    connectionStringSetting: '%connectionStringSetting%',\r\n    databaseName: '%databaseName%',\r\n    collectionName: '%collectionName%',\r\n    createLeaseCollectionIfNotExists: %createLeaseCollectionIfNotExists%,\r\n    handler: (documents, context) => {\r\n        context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n    }\r\n});\r\n"
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.cosmosDB('%functionName%', {\r\n    connectionStringSetting: '',\r\n    databaseName: '',\r\n    collectionName: '',\r\n    createLeaseCollectionIfNotExists: true,\r\n    handler: (documents, context) => {\r\n        context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n    }\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "cosmosDBTrigger",
@@ -77,7 +77,7 @@
     "id": "CosmosDBTrigger-TypeScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(documents: unknown[], context: InvocationContext): Promise<void> {\r\n    context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n}\r\n\r\napp.cosmosDB('%functionName%', {\r\n    connectionStringSetting: '%connectionStringSetting%',\r\n    databaseName: '%databaseName%',\r\n    collectionName: '%collectionName%',\r\n    createLeaseCollectionIfNotExists: %createLeaseCollectionIfNotExists%,\r\n    handler: %functionName%\r\n});\r\n"
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(documents: unknown[], context: InvocationContext): Promise<void> {\r\n    context.log(`Cosmos DB function processed ${documents.length} documents`);\r\n}\r\n\r\napp.cosmosDB('%functionName%', {\r\n    connectionStringSetting: '',\r\n    databaseName: '',\r\n    collectionName: '',\r\n    createLeaseCollectionIfNotExists: true,\r\n    handler: %functionName%\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "cosmosDBTrigger",
@@ -97,6 +97,90 @@
         "collectionName",
         "createLeaseCollectionIfNotExists"
       ]
+    }
+  },
+  {
+    "id": "DurableFunctionsEntity-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, HttpResponse } = require('@azure/functions');\r\nconst df = require('durable-functions');\r\n\r\nconst entityName = '%functionName%';\r\n\r\ndf.app.entity(entityName, (context) => {\r\n    const currentValue = context.df.getState(() => 0);\r\n    switch (context.df.operationName) {\r\n        case 'add':\r\n            const amount = context.df.getInput();\r\n            context.df.setState(currentValue + amount);\r\n            break;\r\n        case 'reset':\r\n            context.df.setState(0);\r\n            break;\r\n        case 'get':\r\n            context.df.return(currentValue);\r\n            break;\r\n    }\r\n});\r\n\r\napp.http('%functionName%HttpStart', {\r\n    route: `${entityName}/{id}`,\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: async (req, context) => {\r\n        const id = req.params.id;\r\n        const entityId = new df.EntityId(entityName, id);\r\n        const client = df.getClient(context);\r\n\r\n        if (req.method === 'POST') {\r\n            // increment value\r\n            await client.signalEntity(entityId, 'add', 1);\r\n        } else {\r\n            // read current state of entity\r\n            const stateResponse = await client.readEntityState(entityId);\r\n            return new HttpResponse({\r\n                jsonBody: stateResponse.entityState,\r\n            });\r\n        }\r\n    },\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "counter",
+      "description": "$DurableFunctionsEntity_description",
+      "name": "Durable Functions entity",
+      "language": "JavaScript",
+      "triggerType": "entityTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_durableFunctions"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "DurableFunctionsEntity-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, HttpHandler, HttpRequest, HttpResponse, InvocationContext } from '@azure/functions';\r\nimport * as df from 'durable-functions';\r\nimport { EntityContext, EntityHandler } from 'durable-functions';\r\n\r\nconst entityName = '%functionName%';\r\n\r\nconst %functionName%: EntityHandler<number> = (context: EntityContext<number>) => {\r\n    const currentValue: number = context.df.getState(() => 0);\r\n    switch (context.df.operationName) {\r\n        case 'add':\r\n            const amount: number = context.df.getInput();\r\n            context.df.setState(currentValue + amount);\r\n            break;\r\n        case 'reset':\r\n            context.df.setState(0);\r\n            break;\r\n        case 'get':\r\n            context.df.return(currentValue);\r\n            break;\r\n    }\r\n};\r\ndf.app.entity(entityName, %functionName%);\r\n\r\nconst %functionName%HttpStart: HttpHandler = async (req: HttpRequest, context: InvocationContext): Promise<HttpResponse> => {\r\n    const id: string = req.params.id;\r\n    const entityId = new df.EntityId(entityName, id);\r\n    const client = df.getClient(context);\r\n\r\n    if (req.method === 'POST') {\r\n        // increment value\r\n        await client.signalEntity(entityId, 'add', 1);\r\n    } else {\r\n        // read current state of entity\r\n        const stateResponse = await client.readEntityState(entityId);\r\n        return new HttpResponse({\r\n            jsonBody: stateResponse.entityState,\r\n        });\r\n    }\r\n};\r\napp.http('%functionName%HttpStart', {\r\n    route: `${entityName}/{id}`,\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: %functionName%HttpStart,\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "counter",
+      "description": "$DurableFunctionsEntity_description",
+      "name": "Durable Functions entity",
+      "language": "TypeScript",
+      "triggerType": "entityTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_durableFunctions"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "DurableFunctionsOrchestrator-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\nconst df = require('durable-functions');\r\n\r\nconst activityName = '%functionName%';\r\n\r\ndf.app.orchestration('%functionName%Orchestrator', function* (context) {\r\n    const outputs = [];\r\n    outputs.push(yield context.df.callActivity(activityName, 'Tokyo'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Seattle'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Cairo'));\r\n\r\n    return outputs;\r\n});\r\n\r\ndf.app.activity(activityName, {\r\n    handler: (input) => {\r\n        return `Hello, ${input}`;\r\n    },\r\n});\r\n\r\napp.http('%functionName%HttpStart', {\r\n    route: 'orchestrators/{orchestratorName}',\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: async (request, context) => {\r\n        const client = df.getClient(context);\r\n        const body = await request.text();\r\n        const instanceId = await client.startNew(request.params.orchestratorName, { input: body });\r\n\r\n        context.log(`Started orchestration with ID = '${instanceId}'.`);\r\n\r\n        return client.createCheckStatusResponse(request, instanceId);\r\n    },\r\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "durableHello",
+      "description": "$DurableFunctionsOrchestrator_description",
+      "name": "Durable Functions orchestrator",
+      "language": "JavaScript",
+      "triggerType": "orchestrationTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_durableFunctions"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "DurableFunctionsOrchestrator-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, HttpHandler, HttpRequest, HttpResponse, InvocationContext } from '@azure/functions';\r\nimport * as df from 'durable-functions';\r\nimport { ActivityHandler, OrchestrationContext, OrchestrationHandler } from 'durable-functions';\r\n\r\nconst activityName = '%functionName%';\r\n\r\nconst %functionName%Orchestrator: OrchestrationHandler = function* (context: OrchestrationContext) {\r\n    const outputs = [];\r\n    outputs.push(yield context.df.callActivity(activityName, 'Tokyo'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Seattle'));\r\n    outputs.push(yield context.df.callActivity(activityName, 'Cairo'));\r\n\r\n    return outputs;\r\n};\r\ndf.app.orchestration('%functionName%Orchestrator', %functionName%Orchestrator);\r\n\r\nconst %functionName%: ActivityHandler = (input: string): string => {\r\n    return `Hello, ${input}`;\r\n};\r\ndf.app.activity(activityName, { handler: %functionName% });\r\n\r\nconst %functionName%HttpStart: HttpHandler = async (request: HttpRequest, context: InvocationContext): Promise<HttpResponse> => {\r\n    const client = df.getClient(context);\r\n    const body: unknown = await request.text();\r\n    const instanceId: string = await client.startNew(request.params.orchestratorName, { input: body });\r\n\r\n    context.log(`Started orchestration with ID = '${instanceId}'.`);\r\n\r\n    return client.createCheckStatusResponse(request, instanceId);\r\n};\r\n\r\napp.http('%functionName%HttpStart', {\r\n    route: 'orchestrators/{orchestratorName}',\r\n    extraInputs: [df.input.durableClient()],\r\n    handler: %functionName%HttpStart,\r\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "durableHello",
+      "description": "$DurableFunctionsOrchestrator_description",
+      "name": "Durable Functions orchestrator",
+      "language": "TypeScript",
+      "triggerType": "orchestrationTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_durableFunctions"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
     }
   },
   {
@@ -145,7 +229,7 @@
     "id": "EventHubTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.eventHub('%functionName%', {\r\n    connection: '%connection%',\r\n    eventHubName: '%eventHubName',\r\n    cardinality: 'many',\r\n    handler: (messages, context) => {\r\n        if (Array.isArray(messages)) {\r\n            context.log(`Event hub function processed ${messages.length} messages`);\r\n            for (const message of messages) {\r\n                context.log('Event hub message:', message);\r\n            }\r\n        } else {\r\n            context.log('Event hub function processed message:', messages);\r\n        }\r\n    }\r\n});\r\n"
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.eventHub('%functionName%', {\r\n    connection: '',\r\n    eventHubName: 'samples-workitems',\r\n    cardinality: 'many',\r\n    handler: (messages, context) => {\r\n        if (Array.isArray(messages)) {\r\n            context.log(`Event hub function processed ${messages.length} messages`);\r\n            for (const message of messages) {\r\n                context.log('Event hub message:', message);\r\n            }\r\n        } else {\r\n            context.log('Event hub function processed message:', messages);\r\n        }\r\n    }\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "eventHubTrigger",
@@ -168,7 +252,7 @@
     "id": "EventHubTrigger-TypeScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(messages: unknown | unknown[], context: InvocationContext): Promise<void> {\r\n    if (Array.isArray(messages)) {\r\n        context.log(`Event hub function processed ${messages.length} messages`);\r\n        for (const message of messages) {\r\n            context.log('Event hub message:', message);\r\n        }\r\n    } else {\r\n        context.log('Event hub function processed message:', messages);\r\n    }\r\n}\r\n\r\napp.eventHub('%functionName%', {\r\n    connection: '%connection%',\r\n    eventHubName: '%eventHubName',\r\n    cardinality: 'many',\r\n    handler: %functionName%\r\n});\r\n"
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(messages: unknown | unknown[], context: InvocationContext): Promise<void> {\r\n    if (Array.isArray(messages)) {\r\n        context.log(`Event hub function processed ${messages.length} messages`);\r\n        for (const message of messages) {\r\n            context.log('Event hub message:', message);\r\n        }\r\n    } else {\r\n        context.log('Event hub function processed message:', messages);\r\n    }\r\n}\r\n\r\napp.eventHub('%functionName%', {\r\n    connection: '%connection%',\r\n    eventHubName: 'samples-workitems',\r\n    cardinality: 'many',\r\n    handler: %functionName%\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "eventHubTrigger",
@@ -233,7 +317,7 @@
     "id": "QueueTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageQueue('%functionName%', {\r\n    queueName: '%queueName%',\r\n    connection: '%connection%',\r\n    handler: (queueItem, context) => {\r\n        context.log('Storage queue function processed work item:', queueItem);\r\n    }\r\n});\r\n"
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageQueue('%functionName%', {\r\n    queueName: 'js-queue-items',\r\n    connection: '',\r\n    handler: (queueItem, context) => {\r\n        context.log('Storage queue function processed work item:', queueItem);\r\n    }\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "storageQueueTrigger",
@@ -257,7 +341,7 @@
     "id": "QueueTrigger-TypeScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(queueItem: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Storage queue function processed work item:', queueItem);\r\n}\r\n\r\napp.storageQueue('%functionName%', {\r\n    queueName: '%queueName%',\r\n    connection: '%connection%',\r\n    handler: %functionName%\r\n});\r\n"
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(queueItem: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Storage queue function processed work item:', queueItem);\r\n}\r\n\r\napp.storageQueue('%functionName%', {\r\n    queueName: 'js-queue-items',\r\n    connection: '',\r\n    handler: %functionName%\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "storageQueueTrigger",
@@ -281,7 +365,7 @@
     "id": "ServiceBusQueueTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusQueue('%functionName%', {\r\n    connection: '%connection%',\r\n    queueName: '%queueName%',\r\n    handler: (message, context) => {\r\n        context.log('Service bus queue function processed message:', message);\r\n    }\r\n});\r\n"
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusQueue('%functionName%', {\r\n    connection: '',\r\n    queueName: 'myinputqueue',\r\n    handler: (message, context) => {\r\n        context.log('Service bus queue function processed message:', message);\r\n    }\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "serviceBusQueueTrigger",
@@ -305,7 +389,7 @@
     "id": "ServiceBusQueueTrigger-TypeScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus queue function processed message:', message);\r\n}\r\n\r\napp.serviceBusQueue('%functionName%', {\r\n    connection: '%connection%',\r\n    queueName: '%queueName%',\r\n    handler: %functionName%\r\n});\r\n"
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus queue function processed message:', message);\r\n}\r\n\r\napp.serviceBusQueue('%functionName%', {\r\n    connection: '',\r\n    queueName: 'myinputqueue',\r\n    handler: %functionName%\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "serviceBusQueueTrigger",
@@ -329,7 +413,7 @@
     "id": "ServiceBusTopicTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusTopic('%functionName%', {\r\n    connection: '%connection%',\r\n    topicName: '%topicName%',\r\n    subscriptionName: '%subscriptionName%',\r\n    handler: (message, context) => {\r\n        context.log('Service bus topic function processed message:', message);\r\n    }\r\n});\r\n"
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.serviceBusTopic('%functionName%', {\r\n    connection: '',\r\n    topicName: 'mytopic',\r\n    subscriptionName: 'mysubscription',\r\n    handler: (message, context) => {\r\n        context.log('Service bus topic function processed message:', message);\r\n    }\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "serviceBusTopicTrigger",
@@ -354,7 +438,7 @@
     "id": "ServiceBusTopicTrigger-TypeScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus topic function processed message:', message);\r\n}\r\n\r\napp.serviceBusTopic('%functionName%', {\r\n    connection: '%connection%',\r\n    topicName: '%topicName%',\r\n    subscriptionName: '%subscriptionName%',\r\n    handler: %functionName%\r\n});\r\n"
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(message: unknown, context: InvocationContext): Promise<void> {\r\n    context.log('Service bus topic function processed message:', message);\r\n}\r\n\r\napp.serviceBusTopic('%functionName%', {\r\n    connection: '',\r\n    topicName: 'mytopic',\r\n    subscriptionName: 'mysubscription',\r\n    handler: %functionName%\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "serviceBusTopicTrigger",
@@ -379,7 +463,7 @@
     "id": "TimerTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.timer('%functionName%', {\r\n    schedule: '%schedule%',\r\n    handler: (myTimer, context) => {\r\n        context.log('Timer function processed request.');\r\n    }\r\n});\r\n"
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.timer('%functionName%', {\r\n    schedule: '0 */5 * * * *',\r\n    handler: (myTimer, context) => {\r\n        context.log('Timer function processed request.');\r\n    }\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "timerTrigger",
@@ -402,7 +486,7 @@
     "id": "TimerTrigger-TypeScript-4.x",
     "runtime": "2",
     "files": {
-      "%functionName%.ts": "import { app, InvocationContext, Timer } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(myTimer: Timer, context: InvocationContext): Promise<void> {\r\n    context.log('Timer function processed request.');\r\n}\r\n\r\napp.timer('%functionName%', {\r\n    schedule: '%schedule%',\r\n    handler: %functionName%\r\n});\r\n"
+      "%functionName%.ts": "import { app, InvocationContext, Timer } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(myTimer: Timer, context: InvocationContext): Promise<void> {\r\n    context.log('Timer function processed request.');\r\n}\r\n\r\napp.timer('%functionName%', {\r\n    schedule: '0 */5 * * * *',\r\n    handler: %functionName%\r\n});\r\n"
     },
     "metadata": {
       "defaultFunctionName": "timerTrigger",
