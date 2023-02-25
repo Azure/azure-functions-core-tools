@@ -160,7 +160,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         throw new CliException($"The {template.Metadata.Name} template has extensions. {Constants.Errors.ExtensionsNeedDotnet}");
                     }
 
-                    if (AuthorizationLevel.HasValue)
+                    if (!IsNewNodeJsProgrammingModel(workerRuntime) && AuthorizationLevel.HasValue)
                     {
                         ConfigureAuthorizationLevel(template);
                     }

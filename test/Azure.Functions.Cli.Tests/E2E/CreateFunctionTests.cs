@@ -142,6 +142,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task create_template_function_using_alias_v4()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node -m V4",
+                    "new --language js --template \"http trigger\" --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "\\src\\functions\\testfunc.js",
+                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
         public async Task create_function_custom()
         {
             await CliTester.Run(new RunConfiguration
@@ -170,6 +188,24 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
+                    "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_template_function_js_no_space_name_v4()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node -m V4",
+                    "new --language js --template httptrigger --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
                 }
             }, _output);
@@ -224,6 +260,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task create_typescript_template_v4()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node --language typescript -m V4",
+                    "new --template \"http trigger\" --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "\\src\\functions\\testfunc.ts",
+                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
         public async Task create_typescript_template_blob()
         {
             await CliTester.Run(new RunConfiguration
@@ -252,6 +306,39 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
+                    "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_typescript_template_blob_v4()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node --language typescript -m V4",
+                    "new --template \"azure Blob Storage trigger\" --name testfunc"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("src", "functions", "testfunc.ts"),
+                        ContentContains = new []
+                        {
+                            "(blob: Buffer, context: InvocationContext)",
+                        },
+                        ContentNotContains = new []
+                        {
+                            "const { app }",
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "\\src\\functions\\testfunc.ts",
                     "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
                 }
             }, _output);
