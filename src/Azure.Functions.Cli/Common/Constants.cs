@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Common
         public const string PySteinFunctionAppPy = "function_app.py";
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
+        public const string PackageJsonFileName = "package.json";
         public const string ProxiesJsonFileName = "proxies.json";
         public const string ExtensionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
@@ -65,6 +66,7 @@ namespace Azure.Functions.Cli.Common
         public const long DefaultMaxRequestBodySize = 104857600;
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
+        public const string HelpCommand = "help";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

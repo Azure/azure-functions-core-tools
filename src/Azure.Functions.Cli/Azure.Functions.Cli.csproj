@@ -40,6 +40,9 @@
     <EmbeddedResource Include="StaticResources\bundleConfigPyStein.json">
       <LogicalName>$(AssemblyName).bundleConfigPyStein.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\bundleConfigNodeV4.json">
+      <LogicalName>$(AssemblyName).bundleConfigNodeV4.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
@@ -94,6 +97,39 @@
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-BlobTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-BlobTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-CosmosDBTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-CosmosDBTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-EntityTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-EntityTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-EventGridTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-EventGridTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-EventHubTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-EventHubTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-HttpTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-HttpTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-OrchestrationTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-OrchestrationTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-ServiceBusQueueTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-ServiceBusQueueTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-ServiceBusTopicTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-ServiceBusTopicTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-StorageQueueTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-StorageQueueTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Javascript-TimerTrigger-help.txt">
+      <LogicalName>$(AssemblyName).javascript-TimerTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\managedDependenciesConfig.json">
       <LogicalName>$(AssemblyName).managedDependenciesConfig.json</LogicalName>
     </EmbeddedResource>
@@ -102,6 +138,42 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\node-v4-templates.json">
+      <LogicalName>$(AssemblyName).node-v4-templates.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-BlobTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-BlobTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-CosmosDBTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-CosmosDBTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-EntityTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-EntityTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-EventGridTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-EventGridTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-EventHubTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-EventHubTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-HttpTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-HttpTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-OrchestrationTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-OrchestrationTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-ServiceBusQueueTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-ServiceBusQueueTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-ServiceBusTopicTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-ServiceBusTopicTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-StorageQueueTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-StorageQueueTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Typescript-TimerTrigger-help.txt">
+      <LogicalName>$(AssemblyName).typescript-TimerTrigger-help.txt</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\vscode.extensions.json">
       <LogicalName>$(AssemblyName).vscode.extensions.json</LogicalName>
@@ -112,11 +184,17 @@
     <EmbeddedResource Include="StaticResources\profile.ps1">
       <LogicalName>$(AssemblyName).profile.ps1</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\package.json">
-      <LogicalName>$(AssemblyName).package.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\package-js-v4.json">
+      <LogicalName>$(AssemblyName).package-js-v4.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\javascriptPackage.json">
-      <LogicalName>$(AssemblyName).javascriptPackage.json</LogicalName>
+    <EmbeddedResource Include="StaticResources\package-js.json">
+      <LogicalName>$(AssemblyName).package-js.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\package-ts-v4.json">
+      <LogicalName>$(AssemblyName).package-ts-v4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\package-ts.json">
+      <LogicalName>$(AssemblyName).package-ts.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\tsconfig.json">
       <LogicalName>$(AssemblyName).tsconfig.json</LogicalName>

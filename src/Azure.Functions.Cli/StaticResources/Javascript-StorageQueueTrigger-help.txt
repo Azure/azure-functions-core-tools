@@ -1,0 +1,1 @@
+﻿The queue storage trigger runs a function as messages are added to Azure Queue storage. 

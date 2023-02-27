@@ -8,6 +8,6 @@ namespace Azure.Functions.Cli.Interfaces
     {
         Task<IEnumerable<Template>> Templates { get; }
 
-        Task Deploy(string Name, Template template);
+        Task Deploy(string name, string fileName, Template template);
     }
 }
