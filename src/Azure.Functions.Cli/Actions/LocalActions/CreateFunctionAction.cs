@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>('r', "route")
                 .WithDescription("Route")
-                .Callback(f => FileName = f);
+                .Callback(f => Route = f);
 
             Parser
                 .Setup<AuthorizationLevel?>('a', "authlevel")
@@ -524,6 +524,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     if (actionName.Equals(GetFunctionNameAction, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(FunctionName))
                     {
                         response = FunctionName;
+                    }
+
+                    // Use the route if it is already provided by user
+                    if (actionName.Equals(GetHttpTriggerRouteAction, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Route))
+                    {
+                        response = Route;
                     }
 
                     while (!ValidateResponse(userPrompt, response))

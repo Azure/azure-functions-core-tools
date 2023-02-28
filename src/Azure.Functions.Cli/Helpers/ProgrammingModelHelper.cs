@@ -39,6 +39,10 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.V3;
                 }
+                else if (workerRuntime == WorkerRuntime.python)
+                {
+                    GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.V2;
+                }
                 else
                 {
                     GlobalCoreToolsSettings.CurrentProgrammingModel = ProgrammingModel.V1;
