@@ -1,0 +1,244 @@
+﻿[
+  {
+    "name": "httpTrigger-route",
+    "type": "string",
+    "label": "$httpTrigger_route_label",
+    "help": "$httpTrigger_route_help"
+  },
+  {
+    "name": "trigger-functionName",
+    "type": "string",
+    "label": "Provide a function name",
+    "help": "Name of the function you want to",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z][a-zA-Z0-9]{0,127}$",
+        "errorText": "[variables('parameterName')]"
+      }
+    ]
+  },
+  {
+    "name": "httpTrigger-authLevel",
+    "value": "enum",
+    "defaultValue": "function",
+    "enum": [
+      {
+        "value": "function",
+        "display": "Function"
+      },
+      {
+        "value": "anonymous",
+        "display": "Anonymous"
+      },
+      {
+        "value": "admin",
+        "display": "Admin"
+      }
+    ],
+    "label": "$httpTrigger_authLevel_label",
+    "help": "$httpTrigger_authLevel_help"
+  },
+  {
+    "name": "timerTrigger-schedule",
+    "value": "string",
+    "defaultValue": "0 * * * * *",
+    "label": "$timerTrigger_schedule_label",
+    "help": "$timerTrigger_schedule_help",
+    "validators": [
+      {
+        "expression": "^(\\*|((([1-5]\\d)|\\d)(\\-(([1-5]\\d)|\\d)(\\/\\d+)?)?)(,((([1-5]\\d)|\\d)(\\-(([1-5]\\d)|\\d)(\\/\\d+)?)?))*)(\\/\\d+)? (\\*|((([1-5]\\d)|\\d)(\\-(([1-5]\\d)|\\d)(\\/\\d+)?)?)(,((([1-5]\\d)|\\d)(\\-(([1-5]\\d)|\\d)(\\/\\d+)?)?))*)(\\/\\d+)? (\\*|(((1\\d)|(2[0-3])|\\d)(\\-((1\\d)|(2[0-3])|\\d)(\\/\\d+)?)?)(,(((1\\d)|(2[0-3])|\\d)(\\-((1\\d)|(2[0-3])|\\d)(\\/\\d+)?)?))*)(\\/\\d+)? (\\*|((([1-2]\\d)|(3[0-1])|[1-9])(\\-(([1-2]\\d)|(3[0-1])|[1-9])(\\/\\d+)?)?)(,((([1-2]\\d)|(3[0-1])|[1-9])(\\-(([1-2]\\d)|(3[0-1])|[1-9])(\\/\\d+)?)?))*)(\\/\\d+)? (\\*|(([A-Za-z]+|(1[0-2])|[1-9])(\\-([A-Za-z]+|(1[0-2])|[1-9])(\\/\\d+)?)?)(,(([A-Za-z]+|(1[0-2])|[1-9])(\\-([A-Za-z]+|(1[0-2])|[1-9])(\\/\\d+)?)?))*)(\\/\\d+)? (\\*|(([A-Za-z]+|[0-6])(\\-([A-Za-z]+|[0-6])(\\/\\d+)?)?)(,(([A-Za-z]+|[0-6])(\\-([A-Za-z]+|[0-6])(\\/\\d+)?)?))*)(\\/\\d+)?$",
+        "errorText": "$timerTrigger_schedule_errorText"
+      }
+    ]
+  },
+  {
+    "name": "queueTrigger-queueName",
+    "value": "string",
+    "defaultValue": "myqueue",
+    "label": "$queueTrigger_queueName_label",
+    "help": "$queueTrigger_queueName_help",
+    "validators": [
+      {
+        "expression": "^[0-9a-z][a-z0-9-]{1,61}[0-9a-z]$|^[{][a-zA-Z0-9]{1,126}[}]$|^[%][a-zA-Z0-9]{1,126}[%]$",
+        "errorText": "$queueTrigger_queueName_errorText"
+      }
+    ]
+  },
+  {
+    "name": "queueTrigger-connection",
+    "value": "string",
+    "resource": "Storage",
+    "label": "$variables_storageConnStringLabel",
+    "help": "$variables_appSettingsHelp"
+  },
+  {
+    "name": "blobTrigger-path",
+    "value": "string",
+    "defaultValue": "mycontainer",
+    "label": "$blobTrigger_path_label",
+    "help": "$blobTrigger_path_help",
+    "validators": [
+      {
+        "expression": "(((^[a-z0-9](?:[a-z0-9]|(?:\\-(?!\\-))){1,61}[a-z0-9])|(^[{][a-zA-Z0-9]{1,126}[}])|(^[%][a-zA-Z0-9]{1,126}[%]))[\\/](\\S){0,1023}[^\\/]$)|(((^[a-z0-9](?:[a-z0-9]|(?:\\-(?!\\-))){1,61}[a-z0-9]$)|(^[{][a-zA-Z0-9]{1,126}[}]$)|(^[%][a-zA-Z0-9]{1,126}[%]$)))",
+        "errorText": "$blobTrigger_path_errorText"
+      }
+    ]
+  },
+  {
+    "name": "blobTrigger-connection",
+    "value": "string",
+    "label": "$blobTrigger_path_label",
+    "help": "$blobTrigger_path_help"
+  },
+  {
+    "name": "cosmosDBTrigger-connectionStringSetting",
+    "value": "string",
+    "resource": "DocumentDB",
+    "label": "$cosmosDBIn_connection_label",
+    "help": "$cosmosDBIn_connection_help",
+    "placeholder": "$variables_selectConnection"
+  },
+  {
+    "name": "cosmosDBTrigger-databaseName",
+    "value": "string",
+    "defaultValue": "",
+    "label": "$cosmosDBIn_databaseName_label",
+    "help": "$cosmosDBIn_databaseName_help"
+  },
+  {
+    "name": "cosmosDBTrigger-collectionName",
+    "value": "string",
+    "defaultValue": "",
+    "label": "$cosmosDBIn_collectionName_label",
+    "help": "$cosmosDBIn_collectionName_help"
+  },
+  {
+    "name": "cosmosDBTrigger-leaseCollectionName",
+    "value": "string",
+    "label": "$cosmosDBIn_leaseCollectionName_label",
+    "help": "$cosmosDBIn_leaseCollectionName_help"
+  },
+  {
+    "name": "cosmosDBTrigger-createLeaseCollectionIfNotExists",
+    "value": "boolean",
+    "defaultValue": true,
+    "label": "$cosmosDBIn_createIfNotExists_label",
+    "help": "$cosmosDBIn_createIfNotExists_help"
+  },
+  {
+    "name": "eventHubTrigger-connection",
+    "value": "string",
+    "resource": "EventHub",
+    "label": "$eventHubTrigger_connection_label",
+    "help": "$eventHubTrigger_connection_help",
+    "placeholder": "$variables_selectConnection"
+  },
+  {
+    "name": "eventHubTrigger-eventHubName",
+    "value": "string",
+    "defaultValue": "myeventhub",
+    "label": "$eventHubOut_path_label",
+    "help": "$eventHubTrigger_path_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}[a-zA-Z0-9]$|^[{][a-zA-Z0-9]{1,126}[}]$|^[%][a-zA-Z0-9]{1,126}[%]$",
+        "errorText": "$eventHubTrigger_path_errorText"
+      }
+    ]
+  },
+  {
+    "name": "eventHubTrigger-consumerGroup",
+    "value": "string",
+    "defaultValue": "$Default",
+    "label": "$eventHubTrigger_consumerGroup_label",
+    "help": "$eventHubTrigger_consumerGroup_help",
+    "validators": [
+      {
+        "expression": "(^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}[a-zA-Z0-9]$)|^\\$Default$|^[{][a-zA-Z0-9]{1,126}[}]$|^[%][a-zA-Z0-9]{1,126}[%]$",
+        "errorText": "$eventHubTrigger_consumerGroup_errorText"
+      }
+    ]
+  },
+  {
+    "name": "eventHubTrigger-cardinality",
+    "value": "enum",
+    "defaultValue": "many",
+    "enum": [
+      {
+        "value": "one",
+        "display": "One"
+      },
+      {
+        "value": "many",
+        "display": "Many"
+      }
+    ],
+    "label": "$eventHubTrigger_cardinality_label",
+    "help": "$eventHubTrigger_cardinality_help"
+  },
+  {
+    "name": "eventHubTrigger-dataType",
+    "value": "enum",
+    "enum": [
+      {
+        "value": "string",
+        "display": "String"
+      },
+      {
+        "value": "binary",
+        "display": "Binary"
+      },
+      {
+        "value": "stream",
+        "display": "Stream"
+      }
+    ]
+  },
+  {
+    "name": "serviceBusTrigger-connection",
+    "value": "string",
+    "resource": "ServiceBus",
+    "label": "$serviceBusTrigger_connection_label",
+    "help": "$serviceBusTrigger_connection_help",
+    "placeholder": "[variables('selectConnection')]"
+  },
+  {
+    "name": "serviceBusTrigger-queueName",
+    "value": "string",
+    "defaultValue": "mysbqueue",
+    "label": "$serviceBusTrigger_queueName_label",
+    "help": "$serviceBusTrigger_queueName_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}([a-zA-Z0-9]$|[a-zA-Z0-9][\\/]\\$DeadLetterQueue$)|^[{][a-zA-Z0-9]{1,126}([}]$|[}][\\/]\\$DeadLetterQueue$)|^[%][a-zA-Z0-9]{1,126}([%]$|[%][\\/]\\$DeadLetterQueue$)",
+        "errorText": "$serviceBusTrigger_queueName_errorText"
+      }
+    ]
+  },
+  {
+    "name": "serviceBusTrigger-topicName",
+    "value": "string",
+    "defaultValue": "mysbtopic",
+    "label": "$serviceBusTrigger_topicName_label",
+    "help": "$serviceBusTrigger_topicName_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}[a-zA-Z0-9]$|^[{][a-zA-Z0-9]{1,126}[}]$|^[%][a-zA-Z0-9]{1,126}[%]$",
+        "errorText": "$serviceBusTrigger_topicName_errorText"
+      }
+    ]
+  },
+  {
+    "name": "serviceBusTrigger-subscriptionName",
+    "value": "string",
+    "defaultValue": "mysubscription",
+    "label": "$serviceBusTrigger_subscriptionName_label",
+    "help": "$serviceBusTrigger_subscriptionName_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}([a-zA-Z0-9]$|[a-zA-Z0-9][\\/]\\$DeadLetterQueue$)|^[{][a-zA-Z0-9]{1,126}([}]$|[}][\\/]\\$DeadLetterQueue$)|^[%][a-zA-Z0-9]{1,126}([%]$|[%][\\/]\\$DeadLetterQueue$)",
+        "errorText": "$serviceBusTrigger_subscriptionName_errorText"
+      }
+    ]
+  }
+]

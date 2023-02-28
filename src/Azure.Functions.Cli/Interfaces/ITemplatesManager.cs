@@ -7,7 +7,10 @@ namespace Azure.Functions.Cli.Interfaces
     interface ITemplatesManager
     {
         Task<IEnumerable<Template>> Templates { get; }
+        Task<IEnumerable<NewTemplate>> NewTemplates { get; }
+        Task<IEnumerable<UserPrompt>> UserPrompts { get; }
 
         Task Deploy(string name, string fileName, Template template);
+        Task Deploy(string fileName, TemplateJob job, NewTemplate template, IDictionary<string, string> variables);
     }
 }

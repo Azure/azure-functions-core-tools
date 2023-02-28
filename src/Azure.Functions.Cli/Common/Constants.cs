@@ -67,6 +67,14 @@ namespace Azure.Functions.Cli.Common
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
         public const string HelpCommand = "help";
+        public const string GetFunctionNameAction = "getFunctionName";
+        public const string UserPromptBooleanType = "boolean";
+        public const string UserPromptEnumType = "enum";
+        public const string UserInputActionType = "UserInput";
+        public const string ShowMarkdownPreviewActionType = "ShowMarkdownPreview";
+        public const string FunctionBodyTargetFileName = "FUNCTION_BODY_TARGET_FILE_NAME";
+        public const string PythonProgrammingModelFunctionBodyFileKey = "function_body.py";
+        public const string UserPromptFileName = "NewTemplate-userPrompts.json";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

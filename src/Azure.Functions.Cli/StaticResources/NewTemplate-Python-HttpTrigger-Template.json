@@ -1,0 +1,108 @@
+﻿{
+  "author": "Naren Soni",
+  "name": "HTTP trigger",
+  "description": "$HttpTrigger_description",
+  "programmingModel": "v2",
+  "language": "python",
+  "jobs": [
+    {
+      "name": "Create New Project with HttpTrigger function",
+      "input": {
+        "userCommand": "createNewApp",
+        "assignTo": "$(APP_FILENAME)"
+      },
+      "actions": [
+        "getAuthValue",
+        "getFunctionName",
+        "readFileContent_FunctionApp",
+        "replaceTokensInText_FunctionApp",
+        "writeFile_FunctionApp",
+        "showMarkdownPreview"
+      ]
+    },
+    {
+      "name": "Add httpTrigger function to an existing file",
+      "input": {
+        "userCommand": "appendToFile",
+        "assignTo": "$(SELECTED_FILENAME)"
+      },
+      "actions": [
+        "getFunctionName",
+        "getRouteValue",
+        "readFileContent_FunctionBody",
+        "replaceTokensInText_FunctionBody",
+        "appendFileContent_FunctionApp",
+        "showMarkdownPreview"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "name": "getAuthValue",
+      "type": "UserInput",
+      "assignTo": "$(AUTHLEVEL_VALUE)",
+      "paramId": "httpTrigger-authLevel",
+      "defaultValue": "function"
+    },
+    {
+      "name": "getRouteValue",
+      "type": "UserInput",
+      "assignTo": "$(ROUTE_VALUE)",
+      "paramId": "httpTrigger-route",
+      "defaultValue": "hello"
+    },
+    {
+      "name": "getFunctionName",
+      "type": "UserInput",
+      "assignTo": "$(FUNCTION_NAME_INPUT)",
+      "paramId": "trigger-functionName",
+      "defaultValue": "HttpTrigger"
+    },
+    {
+      "name": "readFileContent_FunctionApp",
+      "type": "ReadFromFile",
+      "assignTo": "$(FUNCTION_APP)",
+      "filePath": "function_app.py"
+    },
+    {
+      "name": "replaceTokensInText_FunctionApp",
+      "type": "ReplaceTokensInText",
+      "source": "$(FUNCTION_APP)",
+      "assignTo": "$(FUNCTION_APP)"
+    },
+    {
+      "name": "writeFile_FunctionApp",
+      "type": "WriteToFile",
+      "source": "$(FUNCTION_APP)",
+      "filePath": "$(APP_FILENAME)",
+      "continueOnError": false,
+      "errorText": "Unable to create the function app"
+    },
+    {
+      "name": "readFileContent_FunctionBody",
+      "type": "ReadFromFile",
+      "assignTo": "$(FUNCTION_BODY)",
+      "filePath": "function_body.py"
+    },
+    {
+      "name": "replaceTokensInText_FunctionBody",
+      "type": "ReplaceTokensInText",
+      "source": "$(FUNCTION_BODY)",
+      "assignTo": "$(FUNCTION_BODY)"
+    },
+    {
+      "name": "appendFileContent_FunctionApp",
+      "type": "AppendToFile",
+      "createIfNotExists": false,
+      "source": "$(FUNCTION_BODY)",
+      "filePath": "$(SELECTED_FILENAME)",
+      "continueOnError": false,
+      "errorText": "Unable to create httpTrigger function"
+    },
+    {
+      "name": "ShowMarkdownPreview",
+      "type": "ShowMarkdownPreview",
+      "filePath": "http_trigger_template.md"
+    }
+  ]
+}
