@@ -155,7 +155,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -207,8 +208,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
-                }
-            }, _output);
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
+        }, _output);
         }
 
         [Fact]
@@ -273,7 +275,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "\\src\\functions\\testfunc.ts",
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -340,7 +343,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "\\src\\functions\\testfunc.ts",
                     "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
