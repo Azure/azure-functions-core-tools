@@ -47,7 +47,11 @@ namespace Azure.Functions.Cli.Common
             }
 
             var templates = JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
-            templates = templates.Concat(await GetNodeV4TemplatesJson()).ToList();
+            var extensionBundleMajorVersion = (await extensionBundleManager.GetExtensionBundleDetails()).Version[0];
+            if (extensionBundleMajorVersion == '2' || extensionBundleMajorVersion == '3')
+            {
+                templates = templates.Concat(await GetNodeV4TemplatesJson()).ToList();
+            }
             return templates;
         }
 

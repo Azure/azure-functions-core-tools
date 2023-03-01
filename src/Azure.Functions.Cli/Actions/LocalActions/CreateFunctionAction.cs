@@ -277,6 +277,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
+            else if (workerRuntime == WorkerRuntime.node)
+            {
+                // Ensuring that we only show v3 templates for node when the user has not opted into the new model
+                return _templates.Value.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+            }
 
             return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
         }
@@ -430,7 +435,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(Constants.PackageJsonFileName);
                         var packageJson = JsonConvert.DeserializeObject<JToken>(packageJsonData);
                         var funcPackageVersion = packageJson["dependencies"]["@azure/functions"];
-                        if (new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
+                        if (funcPackageVersion != null && new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
                         {
                             return true;
                         }
