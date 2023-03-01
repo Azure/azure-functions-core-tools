@@ -637,8 +637,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init \"anapp\" --worker-runtime python",
-                    "init \"anapp\" --worker-runtime python"
+                    "init \"anapp\" --worker-runtime python -m v1",
+                    "init \"anapp\" --worker-runtime python -m v1"
                 },
                 OutputContains = new[]
                 {
@@ -658,13 +658,41 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public Task init_python_app_generates_requirements_txt()
+        public Task init_python_app_twice_new_programming_model()
         {
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime python"
+                    "init \"anapp\" --worker-runtime python",
+                    "init \"anapp\" --worker-runtime python"
+                },
+                OutputContains = new[]
+                {
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    "requirements.txt already exists. Skipped!",
+                    ".gitignore already exists. Skipped!",
+                    "host.json already exists. Skipped!",
+                    "local.settings.json already exists. Skipped!",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
+                }
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("-m V1")]
+        [InlineData("-m V2")]
+        [InlineData("")]
+        public Task init_python_app_generates_requirements_txt(string modelParameter)
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime python {modelParameter}"
                 },
                 OutputContains = new[]
                 {
@@ -692,7 +720,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime python"
+                    "init . --worker-runtime python -m V1"
                 },
                 OutputContains = new[]
                 {
