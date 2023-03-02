@@ -8,6 +8,10 @@ namespace Azure.Functions.Cli.Interfaces
 {
     public interface IContextHelpManager
     {
-        public Task<string> GetTriggerHelp(string triggerName, string language);
+        string GetTriggerHelp(string triggerName, string language);
+        Task LoadTriggerHelp(string language, List<string> triggerNames);
+        bool IsValidTriggerNameForHelp(string triggerName);
+        bool IsValidTriggerTypeForHelp(string triggerName);
+        string GetTriggerTypeFromTriggerNameForHelp(string triggerName);
     }
 }
