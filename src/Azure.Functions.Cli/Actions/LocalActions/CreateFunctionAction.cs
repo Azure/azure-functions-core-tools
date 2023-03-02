@@ -265,11 +265,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             return GetLanguageTemplates(templateLanguage, forNewModelHelp).Select(t => t.Metadata.Name).Distinct();
         }
-        
-        private IEnumerable<string> GetTriggerTypesForHelp(string templateLanguage)
-        {
-            return GetLanguageTemplates(templateLanguage, forNewModelHelp: true).Select(t => t.Metadata.TriggerType).Distinct();
-        }
 
         private IEnumerable<Template> GetLanguageTemplates(string templateLanguage, bool forNewModelHelp = false)
         {
@@ -383,40 +378,27 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            if (IsValidTriggerNameForHelp(Language, triggerName))
+            var triggerNames = GetTriggerNames(Language, forNewModelHelp: true);
+            await _contextHelpManager.LoadTriggerHelp(Language, triggerNames.ToList());
+            if (_contextHelpManager.IsValidTriggerNameForHelp(triggerName))
             {
-                triggerName = GetTriggerTypeFromTriggerNameForHelp(Language, triggerName);
+                triggerName = _contextHelpManager.GetTriggerTypeFromTriggerNameForHelp(triggerName);
             }
-            if (promptQuestions && !IsValidTriggerTypeForHelp(Language, triggerName))
+            if (promptQuestions && !_contextHelpManager.IsValidTriggerTypeForHelp(triggerName))
             {
                 ColoredConsole.WriteLine(ErrorColor($"The trigger name '{TriggerNameForHelp}' is not valid for {Language} language. "));
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("valid trigger");
-                triggerName = SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(Language, forNewModelHelp: true));
-                triggerName = GetTriggerTypeFromTriggerNameForHelp(Language, triggerName);
+                triggerName = SelectionMenuHelper.DisplaySelectionWizard(triggerNames);
+                triggerName = _contextHelpManager.GetTriggerTypeFromTriggerNameForHelp(triggerName);
             }
 
-            if (IsValidTriggerTypeForHelp(Language, triggerName))
+            if (_contextHelpManager.IsValidTriggerTypeForHelp(triggerName))
             {
-                ColoredConsole.Write(AdditionalInfoColor(_contextHelpManager.GetTriggerHelp(triggerName, Language).Result));
+                ColoredConsole.Write(AdditionalInfoColor($"{Environment.NewLine}{_contextHelpManager.GetTriggerHelp(triggerName, Language)}"));
                 return true;
             }
 
             return false;
-        }
-
-        private bool IsValidTriggerNameForHelp(string language, string triggerName)
-        {
-            return GetTriggerNames(language, forNewModelHelp: true).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private bool IsValidTriggerTypeForHelp(string language, string triggerName)
-        {
-            return GetTriggerTypesForHelp(language).Any(x => x.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private string GetTriggerTypeFromTriggerNameForHelp(string language, string triggerName)
-        {
-            return GetLanguageTemplates(language, forNewModelHelp: true).First(t => t.Metadata.Name.Equals(triggerName, StringComparison.OrdinalIgnoreCase)).Metadata.TriggerType;
         }
 
         private bool IsNewPythonProgrammingModel()
