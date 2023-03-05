@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Azure.Functions.Cli.Common.Constants;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -25,17 +26,23 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
+        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "", string targetLanguage = "")
         {
             await TemplateOperation(async () =>
             {
-                var frameworkString = string.IsNullOrEmpty(targetFramework)
+                var frameworkString = string.IsNullOrEmpty(targetFramework) || targetLanguage is Languages.FSharp or Languages.FSharpIsolated
                     ? string.Empty
                     : $"--Framework \"{targetFramework}\"";
+                var languageString = targetLanguage is Languages.FSharp or Languages.FSharpIsolated
+                    ? $"--language \"{Languages.FSharp}\""
+                    : string.Empty;
+                var azureFunctionsVersionString = targetLanguage is Languages.FSharp
+                    ? string.Empty
+                    : "--AzureFunctionsVersion v4";
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var exe = new Executable("dotnet", $"new func {frameworkString} {languageString} {azureFunctionsVersionString} --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
