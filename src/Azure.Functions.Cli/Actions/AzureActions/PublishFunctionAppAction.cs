@@ -278,9 +278,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (!functionApp.AzureAppSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic)
+            if (!functionApp.AzureAppSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic && functionApp.IsLinux)
             {
-                throw new CliException($"'{FunctionAppName}' app is missing AzureWebJobsStorage app setting. That setting is required for publishing consumption linux apps.");
+                throw new CliException($"Unable to automatically deploy using the Azure Functions Core Tools. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/zipdeploy");
             }
 
             await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
