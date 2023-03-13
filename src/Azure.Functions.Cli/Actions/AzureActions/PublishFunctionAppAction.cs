@@ -280,7 +280,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             if (!functionApp.AzureAppSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic && functionApp.IsLinux)
             {
-                throw new CliException($"Unable to automatically deploy using the Azure Functions Core Tools. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/zipdeploy");
+                throw new CliException($"Azure Functions Core Tools does not support this deployment path. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/deployfromurl");
             }
 
             await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
