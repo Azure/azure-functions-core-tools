@@ -343,6 +343,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public override async Task RunAsync()
         {
+            var versions = await VersionHelper.GetLatestVersionAsync();
             await PreRunConditions();
 
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
