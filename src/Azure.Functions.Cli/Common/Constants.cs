@@ -67,6 +67,9 @@ namespace Azure.Functions.Cli.Common
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
         public const string HelpCommand = "help";
+        public const string FunctionAppDeploymentToContainerAppsMessage = "Deploying function app to Container Apps...";
+        public const string FunctionAppDeploymentToContainerAppsStatusMessage = "Checking status of function app deployment to Container Apps...";
+        public const string FunctionAppDeploymentToContainerAppsFailedMessage = "Deploy function app request to Container Apps was not successful.";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
