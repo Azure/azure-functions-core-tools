@@ -98,17 +98,5 @@ namespace Azure.Functions.Cli.ContainerApps.Models
             var allAppSettings = appSettings.Select(kvp => new ContainerAppsFunctionAppSettings { Name = kvp.Key, Value = kvp.Value }).ToList();
             return new ContainerAppsFunctionPayload(name, location, managedEnvironmentId, linuxFxVersion, allAppSettings, connectionStrings);
         }
-
-        // todo: This is for test only. Remove it later.
-        public static ContainerAppsFunctionPayload CreateInstanceForTesting()
-        {
-            return CreateInstance(
-                "khuramcentauriapp3",
-                "East Asia (Stage)",
-                "/subscriptions/2819c8c8-a774-4ac9-bf91-8bb8f1f47ece/resourceGroups/KhuramCentauri/providers/Microsoft.App/managedEnvironments/khuramenvironment",
-                "DOCKER|azurefunctionstest.azurecr.io/azure-functions/dotnet7-quickstart-demo:1.0",
-                "DefaultEndpointsProtocol=https;AccountName=queuetriggerstoragetest;AccountKey=dpWfm8Pri+svoktQisZYaY8AQ0P5dw3cyImw3GlhZZ+3KoWDhg+pmqMPYkeurj7guDYC3Wv1rlXAh0R9Fjj/IQ==;EndpointSuffix=core.windows.net", 
-                "dotnet-isolated");
-        }
     }
 }
