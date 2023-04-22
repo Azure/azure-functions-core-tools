@@ -28,9 +28,9 @@
     },
     "dependencies": {
         "chalk": "3.0.0",
+        "extract-zip": "^2.0.1",
         "https-proxy-agent": "5.0.0",
         "progress": "2.0.3",
-        "rimraf": "3.0.2",
-        "unzipper": "0.10.10"
+        "rimraf": "3.0.2"
     }
 }
