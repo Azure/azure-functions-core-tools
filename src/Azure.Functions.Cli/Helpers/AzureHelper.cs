@@ -106,6 +106,19 @@ namespace Azure.Functions.Cli.Helpers
                 ?? throw new CliException("Error finding the Azure Resource information.");
         }
 
+        internal static async Task<bool> IsBasicAuthAllowedForSCM(Site functionApp, string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/basicPublishingCredentialsPolicies/scm?api-version={ArmUriTemplates.BasicAuthCheckApiVersion}");
+            
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadAsStringAsync();
+            var basicAuthResponse = JsonConvert.DeserializeObject<BasicAuthCheckResponse>(result);
+
+            return basicAuthResponse.Properties.Allow;
+        }
+
         internal static ArmResourceId ParseResourceId(string resourceId)
         {
             if (string.IsNullOrEmpty(resourceId))
