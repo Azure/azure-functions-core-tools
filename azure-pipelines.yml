@@ -77,7 +77,7 @@ jobs:
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
     inputs:
-      azureSubscription: $(E2ETestServiceConnectionName)
+      azureSubscription: $(Functions Build Infra(ca01ee66-e03f-4d4f-abd8-ea53e5d4f226))
       scriptType: ps
       scriptLocation: inlineScript
       inlineScript: |
