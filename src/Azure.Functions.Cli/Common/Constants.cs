@@ -70,6 +70,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionAppDeploymentToContainerAppsMessage = "Deploying function app to Container Apps...";
         public const string FunctionAppDeploymentToContainerAppsStatusMessage = "Checking status of function app deployment to Container Apps...";
         public const string FunctionAppDeploymentToContainerAppsFailedMessage = "Deploy function app request to Container Apps was not successful.";
+        public const string FunctionAppFailedToDeployOnContainerAppsMessage = "Failed to deploy function app to Container Apps.";
         public const string LocalSettingsJsonFileName = "local.settings.json";
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);

@@ -12,6 +12,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ContainerApps.Models;
 using Azure.Functions.Cli.Extensions;
 using Colors.Net;
+using Microsoft.Azure.AppService.Middleware;
 using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Http.Logging;
@@ -51,7 +52,7 @@ namespace Azure.Functions.Cli.Helpers
             throw new ArmResourceNotFoundException(errorMsg);
         }
 
-        private static async Task<Site> TryGetFunctionAppFromArg(string name, IEnumerable<string> subscriptions, string accessToken, string managementURL, string slot = null, Func<Site, string, string, Task<Site>> loadFunction = null)
+        private static async Task<Site> TryGetFunctionAppFromArg(string name, IEnumerable<string> subscriptions, string accessToken, string managementURL, string slot = null, Func<Site, string, string, Task<Site>> loadFunctionAppFunc = null)
         {
             var resourceType = "Microsoft.Web/sites";
             var resourceName = name;
@@ -66,9 +67,12 @@ namespace Azure.Functions.Cli.Helpers
             {
                 string siteId = await GetResourceIDFromArg(subscriptions, query, accessToken, managementURL);
                 var app = new Site(siteId);
-                if (loadFunction != null)
+
+                // The implementation of the load function is different for certain function apps like function apps based on Container Apps. 
+                // If the implementation is not provided in the param then default one is used.
+                if (loadFunctionAppFunc != null)
                 {
-                    await loadFunction(app, accessToken, managementURL);
+                    await loadFunctionAppFunc(app, accessToken, managementURL);
                 }
                 else
                 {
@@ -350,8 +354,8 @@ namespace Azure.Functions.Cli.Helpers
             var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armSite = await ArmHttpAsync<ArmWrapper<ArmWebsite>>(HttpMethod.Get, url, accessToken);
 
-            site.HostName = armSite.properties.enabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
-            site.ScmUri = armSite.properties.enabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
+            site.HostName = armSite.properties.enabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
+            site.ScmUri = armSite.properties.enabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
             site.Location = armSite.location;
             site.Kind = armSite.kind;
             site.Sku = armSite.properties.sku;
@@ -480,20 +484,19 @@ namespace Azure.Functions.Cli.Helpers
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, payload);
             if (!response.IsSuccessStatusCode)
             {
+                string errorMessage;
                 try
                 {
-                    var content = response.Content.ReadAsStringAsync().Result;
+                    var content = await response.Content.ReadAsStringAsync();
                     var errorResponse = JsonConvert.DeserializeObject<ContainerAppsFunctionDeployResponse>(content);
-                    throw new CliException($"The function app deployment to Container Apps failed. {(!string.IsNullOrWhiteSpace(errorResponse?.Message)? $"Error: {errorResponse.Message}" : string.Empty )}");
-                }
-                catch (CliException)
-                {
-                    throw;
+                    errorMessage = $"{Constants.FunctionAppFailedToDeployOnContainerAppsMessage} {(!string.IsNullOrWhiteSpace(errorResponse?.Message)? $"Error: {errorResponse.Message}" : string.Empty )}";
                 }
                 catch (Exception)
                 {
-                    throw new CliException("The function app deployment to Container Apps failed.");
+                    errorMessage = Constants.FunctionAppFailedToDeployOnContainerAppsMessage;
                 }
+
+                throw new CliException(errorMessage);
             }
             
             var statusUrlHeader = response.Headers.GetValues("location").FirstOrDefault();

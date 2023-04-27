@@ -16,7 +16,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.ContainerServiceActions
 {
-    [Action(Name = "deploy", Context = Context.AzureContainerApps, HelpText = "")]
+    [Action(Name = "deploy", Context = Context.AzureContainerApps, HelpText = "Deploy function app to Azure Container Apps")]
     class AzureContainerAppsDeployAction : BaseAzureAction
     {
         private readonly CreateFunctionAction _createFunctionAction;
