@@ -43,7 +43,7 @@ namespace Azure.Functions.Cli
         Kubernetes,
 
         [Description("Commands for working with Container Service and Azure Functions")]
-        ContainerService,
+        AzureContainerApps,
     }
 
     internal static class ContextEnumExtensions

@@ -478,8 +478,24 @@ namespace Azure.Functions.Cli.Helpers
             var url = new Uri($"{managementURL}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/sites/{payload.Name}?api-version={ArmUriTemplates.FunctionAppOnContainerAppsApiVersion}");
             ColoredConsole.WriteLine(Constants.FunctionAppDeploymentToContainerAppsMessage);
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, payload);
-            var content = response.Content.ToString();
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var content = response.Content.ReadAsStringAsync().Result;
+                    var errorResponse = JsonConvert.DeserializeObject<ContainerAppsFunctionDeployResponse>(content);
+                    throw new CliException($"The function app deployment to Container Apps failed. {(!string.IsNullOrWhiteSpace(errorResponse?.Message)? $"Error: {errorResponse.Message}" : string.Empty )}");
+                }
+                catch (CliException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    throw new CliException("The function app deployment to Container Apps failed.");
+                }
+            }
+            
             var statusUrlHeader = response.Headers.GetValues("location").FirstOrDefault();
             if (string.IsNullOrEmpty(statusUrlHeader))
             {
@@ -573,7 +589,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public static async Task<string> GetManagedEnvironmentID(string accessToken, string managementURL, string subscriptionId, string resourceGroup, string name)
+        public static async Task<(string, string)> GetManagedEnvironmentInfo(string accessToken, string managementURL, string subscriptionId, string resourceGroup, string name)
         {
             var url = new Uri($"{managementURL}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.App/managedEnvironments/{name}?api-version={ArmUriTemplates.ManagedEnvironmentApiVersion}");
             var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
@@ -582,11 +598,11 @@ namespace Azure.Functions.Cli.Helpers
             if (response.IsSuccessStatusCode)
             {
                 var managedEnvironment = JsonConvert.DeserializeObject<ManagedEnvironementGetResponse>(content);
-                return managedEnvironment?.Id;
+                return (managedEnvironment?.Id, managedEnvironment?.Location);
             }
             else
             {
-                return null;
+                return (null, null);
             }
         }
     }

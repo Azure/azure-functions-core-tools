@@ -87,13 +87,24 @@ namespace Azure.Functions.Cli.ContainerApps.Models
             };
         }
 
-        public static ContainerAppsFunctionPayload CreateInstance(string name, string location, string managedEnvironmentId, string linuxFxVersion, string storageConnection, string runtime, Dictionary<string, string> appSettings = null, List<ContainerAppsFunctionConnectionStrings> connectionStrings = null)
+        public static ContainerAppsFunctionPayload CreateInstance(string name, string location, string managedEnvironmentId, string linuxFxVersion, string storageConnection, string runtime, string registry, string registryUsername, string registryPassword, Dictionary<string, string> appSettings = null, List<ContainerAppsFunctionConnectionStrings> connectionStrings = null)
         {
             appSettings ??= new Dictionary<string, string>();
             connectionStrings ??= new List<ContainerAppsFunctionConnectionStrings>();
 
             appSettings["AzureWebJobsStorage"] = storageConnection;
             appSettings["FUNCTIONS_WORKER_RUNTIME"] = runtime;
+
+            if (!string.IsNullOrEmpty(registry))
+            {
+                appSettings["DOCKER_REGISTRY_SERVER_URL"] = registry;
+            }
+
+            if (!string.IsNullOrEmpty(registryUsername))
+            {
+                appSettings["DOCKER_REGISTRY_SERVER_USERNAME"] = registryUsername;
+                appSettings["DOCKER_REGISTRY_SERVER_PASSWORD"] = registryPassword;
+            }
 
             var allAppSettings = appSettings.Select(kvp => new ContainerAppsFunctionAppSettings { Name = kvp.Key, Value = kvp.Value }).ToList();
             return new ContainerAppsFunctionPayload(name, location, managedEnvironmentId, linuxFxVersion, allAppSettings, connectionStrings);
