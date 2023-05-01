@@ -10,6 +10,7 @@ using Azure.Functions.Cli.ExtensionBundle;
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Routing.Constraints;
+using Microsoft.CodeAnalysis;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -82,13 +83,12 @@ namespace Azure.Functions.Cli.Common
             await InstallExtensions(template);
         }
 
-        public async Task Deploy(string fileName, TemplateJob job, NewTemplate template, IDictionary<string, string> variables)
+        public async Task Deploy(TemplateJob job, NewTemplate template, IDictionary<string, string> variables)
         {
-            variables.Add(Constants.FunctionBodyTargetFileName, fileName);
             foreach (var actionName in job.Actions)
             {
                 var action = template.Actions.First(x => x.Name.Equals(actionName, StringComparison.OrdinalIgnoreCase));
-                if (action.ActionType.Equals(Constants.UserInputActionType, StringComparison.OrdinalIgnoreCase) || action.ActionType.Equals(Constants.ShowMarkdownPreviewActionType, StringComparison.OrdinalIgnoreCase))
+                if (action.ActionType.Equals(Constants.ShowMarkdownPreviewActionType, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -119,7 +119,7 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        private static void AskToRemoveFileIfExists(string filePath, string functionName, bool removeFile = false)
+        private static void AskToRemoveFileIfExists(string filePath, string functionName = null, bool removeFile = false)
         {
             var fileExists = FileSystemHelpers.FileExists(filePath);
             if (fileExists)
@@ -133,7 +133,13 @@ namespace Azure.Functions.Cli.Common
                 } while (response != "n" && response != "y");
                 if (response == "n")
                 {
-                    throw new CliException($"The function with the name {functionName} couldn't be created.");
+                    var message = "The function couldn't be created.";
+                    if (!string.IsNullOrEmpty(functionName))
+                    {
+                        message = $"The function with the name {functionName} couldn't be created.";
+                    }
+
+                    throw new CliException(message);
                 }
             }
 
@@ -214,8 +220,14 @@ namespace Azure.Functions.Cli.Common
         {
             get
             {
-                return GetNewTemplates();
+                return GetStaticV2Templates();
             }
+        }
+
+        private static async Task<IEnumerable<NewTemplate>> GetStaticV2Templates()
+        {
+            var staticTemplateJson = await StaticResources.GetValue($"templatesv2.json");
+            return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(staticTemplateJson);
         }
 
         private async Task<IEnumerable<NewTemplate>> GetNewTemplates()
@@ -276,17 +288,17 @@ namespace Azure.Functions.Cli.Common
 
         private async Task RunTemplateActionAction(NewTemplate template, TemplateAction action, IDictionary<string, string> variables)
         {
-            if (action.ActionType == "ReadFromFile")
+            if (action.ActionType == "GetTemplateFileContent")
             {
-                RunReadFromFileTemplateAction(template, action, variables);
-                return;
-            }
-            else if (action.ActionType == "ReplaceTokensInText")
-            {
-                ReplaceTokensInText(template, action, variables);
+                GetTemplateFileContent(template, action, variables);
                 return;
             }
             else if (action.ActionType == "AppendToFile")
+            {
+                await WriteFunctionBody(template, action, variables, isAppend: true);
+                return;
+            }
+            else if (action.ActionType == "WriteToFile")
             {
                 await WriteFunctionBody(template, action, variables);
                 return;
@@ -295,7 +307,7 @@ namespace Azure.Functions.Cli.Common
             throw new CliException($"Template Failure. Action type '{action.ActionType}' is not supported.");
         }
 
-        private void RunReadFromFileTemplateAction(NewTemplate template, TemplateAction action, IDictionary<string, string> variables)
+        private void GetTemplateFileContent(NewTemplate template, TemplateAction action, IDictionary<string, string> variables)
         {
             if (!template.Files.ContainsKey(action.FilePath))
             {
@@ -306,7 +318,47 @@ namespace Azure.Functions.Cli.Common
             variables.Add(action.AssignTo, fileContent);
         }
 
-        private void ReplaceTokensInText(NewTemplate template, TemplateAction action, IDictionary<string, string> variables)
+        private async Task WriteFunctionBody(NewTemplate template, TemplateAction action, IDictionary<string, string> variables, bool isAppend = false)
+        {
+            if (!variables.ContainsKey(action.Source))
+            {
+                throw new CliException($"Template Failure. Source '{action.Source}' value is not found.");
+            }
+
+            var fileName = variables[action.FilePath];
+            if (string.IsNullOrEmpty(fileName))
+            {
+                fileName = Constants.PySteinFunctionAppPy;
+            }
+
+            var sourceContent = variables[action.Source];
+            if (action.ReplaceTokens)
+            {
+                sourceContent = ReplaceTokensInSource(action, variables);
+            }
+
+            var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
+            if (!FileSystemHelpers.FileExists(filePath))
+            {
+                ColoredConsole.WriteLine($"Creating a new file {filePath}");
+                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, sourceContent);
+            }
+            else
+            {
+                if (isAppend)
+                {
+                    AskToRemoveFileIfExists(filePath);
+                }
+                
+                var fileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(filePath);
+                ColoredConsole.WriteLine($"Appending to {filePath}");
+                fileContent = $"{fileContent}{Environment.NewLine}{Environment.NewLine}{sourceContent}";
+                // Update the file. 
+                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileContent);
+            }
+        }
+
+        private string ReplaceTokensInSource(TemplateAction action, IDictionary<string, string> variables)
         {
             if (!variables.ContainsKey(action.Source))
             {
@@ -323,34 +375,7 @@ namespace Azure.Functions.Cli.Common
                 sourceContent = sourceContent.Replace(variable.Key, variable.Value);
             }
 
-            variables[action.AssignTo] = sourceContent;
-        }
-
-        private async Task WriteFunctionBody(NewTemplate template, TemplateAction action, IDictionary<string, string> variables)
-        {
-            if (!variables.ContainsKey(action.Source))
-            {
-                throw new CliException($"Template Failure. Source '{action.Source}' value is not found.");
-            }
-
-            var fileName = variables[Constants.FunctionBodyTargetFileName];
-
-            if (!string.IsNullOrEmpty(fileName))
-            {
-                var filePath = Path.Combine(Environment.CurrentDirectory, fileName);
-                AskToRemoveFileIfExists(filePath, variables.First(x => x.Key.Contains("FUNCTION_NAME_INPUT")).Value, removeFile: true);
-                ColoredConsole.WriteLine($"Creating a new file {filePath}");
-                await FileSystemHelpers.WriteAllTextToFileAsync(filePath, variables[action.Source]);
-            }
-            else
-            {
-                var mainFilePath = Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy);
-                var mainFileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(mainFilePath);
-                ColoredConsole.WriteLine($"Appending to {mainFilePath}");
-                mainFileContent = $"{mainFileContent}{Environment.NewLine}{Environment.NewLine}{variables[action.Source]}";
-                // Update the file. 
-                await FileSystemHelpers.WriteAllTextToFileAsync(mainFilePath, mainFileContent);
-            }
+            return sourceContent;
         }
     }
 }

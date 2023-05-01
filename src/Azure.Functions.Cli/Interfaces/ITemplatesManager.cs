@@ -11,6 +11,6 @@ namespace Azure.Functions.Cli.Interfaces
         Task<IEnumerable<UserPrompt>> UserPrompts { get; }
 
         Task Deploy(string name, string fileName, Template template);
-        Task Deploy(string fileName, TemplateJob job, NewTemplate template, IDictionary<string, string> variables);
+        Task Deploy(TemplateJob job, NewTemplate template, IDictionary<string, string> variables);
     }
 }

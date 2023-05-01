@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using ImTools;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -27,6 +28,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
         private readonly IContextHelpManager _contextHelpManager;
+        private readonly IUserInputHandler _userInputHandler;
 
         private readonly InitAction _initAction;
         public WorkerRuntime workerRuntime;
@@ -42,9 +44,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         Lazy<IEnumerable<Template>> _templates;
         Lazy<IEnumerable<NewTemplate>> _newTemplates;
-        Lazy<IEnumerable<UserPrompt>> _userPrompts;
-        IDictionary<string, string> _newTemplateLabelMap;
-
 
         public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
         {
@@ -52,10 +51,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _secretsManager = secretsManager;
             _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
+            _userInputHandler = new UserInputHandler(_templatesManager);
             _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
             _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
-            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
-            _newTemplateLabelMap = CreateLabelMap();
+            
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -136,12 +135,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
                 var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
-                var templateJob = template.Jobs.Single(x => x.Input.UserCommand.Equals("appendToFile", StringComparison.OrdinalIgnoreCase));
-                var actionNames = templateJob.Actions;
-                var actions = template.Actions.Where(x => actionNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+                var templateJob = template.Jobs.Single(x => x.Type.Equals("appendToFile", StringComparison.OrdinalIgnoreCase));
                 var variables = new Dictionary<string, string>();
-                RunUserInputActions(actionNames, actions, variables);
-                await _templatesManager.Deploy(FileName, templateJob, template, variables);
+                _userInputHandler.RunUserInputActions(FunctionName, FileName, templateJob.Inputs, variables);
+                var actions = template.Actions.Where(x => templateJob.Actions.Contains(x.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+                await _templatesManager.Deploy(templateJob, template, variables);
             }
             else
             {
@@ -481,126 +479,137 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json"));
         }
 
-        // New Template
-        private void RunUserInputActions(IList<string> actionNames, IList<TemplateAction> actions, IDictionary<string, string> variables)
+        
+        public interface IUserInputHandler
         {
-            foreach (var actionName in actionNames)
+            void RunUserInputActions(IDictionary<string, string> providedValues, IList<TemplateJobInput> inputs, IDictionary<string, string> variables)
+        }
+        
+        public class UserInputHandler : IUserInputHandler
+        {
+            Lazy<IEnumerable<UserPrompt>> _userPrompts;
+            IDictionary<string, string> _newTemplateLabelMap;
+            private ITemplatesManager _templatesManager;
+
+            public UserInputHandler(ITemplatesManager templatesManager)
             {
-                var action = actions.First(x => actionName.Equals(x.Name, StringComparison.OrdinalIgnoreCase));
-                if (action.ActionType != UserInputActionType)
+                _templatesManager = templatesManager;
+                _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
+                _newTemplateLabelMap = CreateLabelMap();
+            }
+
+            public void RunUserInputActions(IDictionary<string, string> providedValues, IList<TemplateJobInput> inputs, IDictionary<string, string> variables)
+            {
+                foreach (var theInput in inputs)
                 {
-                    continue;
-                }
-
-                var userPrompt = _userPrompts.Value.First(x => x.Name == action.ParamId);
-                var defaultValue = action.DefaultValue ?? userPrompt.DefaultValue;
-                string response = string.Empty;
-                if (userPrompt.Value == UserPromptEnumType || userPrompt.Value == UserPromptBooleanType)
-                {
-                    var values = new List<string>() { true.ToString(), false.ToString() };
-                    if (userPrompt.Value == UserPromptEnumType)
+                    var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, theInput.ParamId, StringComparison.OrdinalIgnoreCase));
+                    var defaultValue = theInput.DefaultValue ?? userPrompt.DefaultValue;
+                    string response = string.Empty;
+                    if (userPrompt.Value == UserPromptEnumType || userPrompt.Value == UserPromptBooleanType)
                     {
-                        values = userPrompt.EnumList.Select(x => x.Display).ToList();
-                    }
-
-                    while (!ValidateResponse(userPrompt, response))
-                    {
-                        SelectionMenuHelper.DisplaySelectionWizardPrompt(LabelMap(userPrompt.Label));
-                        response = SelectionMenuHelper.DisplaySelectionWizard(values);
-
-                        if (string.IsNullOrEmpty(response) && !string.IsNullOrEmpty(defaultValue))
+                        var values = new List<string>() { true.ToString(), false.ToString() };
+                        if (userPrompt.Value == UserPromptEnumType)
                         {
-                            response = defaultValue;
+                            values = userPrompt.EnumList.Select(x => x.Display).ToList();
                         }
-                        else if (userPrompt.Value == UserPromptEnumType)
-                        {
-                            response = userPrompt.EnumList.Single(x => x.Display == response).Value;
-                        }
-                    }
-                }
-                else
-                {
-                    // Use the function name if it is already provided by user
-                    if (actionName.Equals(GetFunctionNameAction, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(FunctionName))
-                    {
-                        response = FunctionName;
-                    }
 
-                    // Use the route if it is already provided by user
-                    if (actionName.Equals(GetHttpTriggerRouteAction, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Route))
-                    {
-                        response = Route;
-                    }
-
-                    while (!ValidateResponse(userPrompt, response))
-                    {
-                        PrintInputLabel(userPrompt, defaultValue);
-                        response = Console.ReadLine();
-                        if (string.IsNullOrEmpty(response) && !string.IsNullOrEmpty(defaultValue))
+                        while (!ValidateResponse(userPrompt, response))
                         {
-                            response = defaultValue;
+                            SelectionMenuHelper.DisplaySelectionWizardPrompt(LabelMap(userPrompt.Label));
+                            response = SelectionMenuHelper.DisplaySelectionWizard(values);
+
+                            if (string.IsNullOrEmpty(response) && !string.IsNullOrEmpty(defaultValue))
+                            {
+                                response = defaultValue;
+                            }
+                            else if (userPrompt.Value == UserPromptEnumType)
+                            {
+                                response = userPrompt.EnumList.Single(x => x.Display == response).Value;
+                            }
                         }
                     }
+                    else
+                    {
+                        // Use the function name if it is already provided by user
+                        if (providedValues.ContainsKey(theInput.ParamId) && !string.IsNullOrEmpty(providedValues[theInput.ParamId]))
+                        {
+                            response = providedValues[theInput.ParamId];
+                        }
+
+                        while (!ValidateResponse(userPrompt, response))
+                        {
+                            PrintInputLabel(userPrompt, defaultValue);
+                            response = Console.ReadLine();
+                            if (string.IsNullOrEmpty(response) && defaultValue != null)
+                            {
+                                response = defaultValue;
+                            }
+                        }
+                    }
+
+                    var variableName = theInput.AssignTo;
+                    variables.Add(variableName, response);
+
+                    if (theInput.ParamId.Equals(GetFunctionNameParamId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        functionName = response;
+                    }
+                    else if (theInput.ParamId.Equals(GetFileNameParamId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        fileName = response;
+                    }
                 }
+            }
 
-                var variableName = action.AssignTo;
-                variables.Add(variableName, response);
-
-                if (actionName.Equals(GetFunctionNameAction, StringComparison.OrdinalIgnoreCase))
+            private void PrintInputLabel(UserPrompt userPrompt, string defaultValue)
+            {
+                var label = LabelMap(userPrompt.Label);
+                ColoredConsole.Write($"{label}: ");
+                if (!string.IsNullOrEmpty(defaultValue))
                 {
-                    FunctionName = response;
+                    ColoredConsole.Write($"[{defaultValue}] ");
                 }
             }
-        }
 
-        private void PrintInputLabel(UserPrompt userPrompt, string defaultValue)
-        {
-            var label = LabelMap(userPrompt.Label);
-            ColoredConsole.Write($"{label}: ");
-            if (!string.IsNullOrEmpty(defaultValue))
+            private bool ValidateResponse(UserPrompt userPrompt, string response)
             {
-                ColoredConsole.Write($"[{defaultValue}] ");
-            }
-        }
+                if (string.IsNullOrEmpty(response))
+                {
+                    return false;
+                }
 
-        private bool ValidateResponse(UserPrompt userPrompt, string response)
-        {
-            if (string.IsNullOrEmpty(response))
-            {
-                return false;
-            }
+                var validator = userPrompt.Validators?.FirstOrDefault();
+                if (validator == null)
+                {
+                    return true;
+                }
 
-            var validator = userPrompt.Validators?.FirstOrDefault();
-            if (validator == null)
-            {
-                return true;
-            }
+                var validationRegex = new Regex(validator.Expression);
+                var isValid = validationRegex.IsMatch(response);
 
-            var validationRegex = new Regex(validator.Expression);
-            var isValid = validationRegex.IsMatch(response);
+                if (!isValid)
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"{this.LabelMap(userPrompt.Label)} is not valid."));
+                }
 
-            if (!isValid)
-            {
-                ColoredConsole.WriteLine(ErrorColor($"{this.LabelMap(userPrompt.Label)} is not valid."));
+                return isValid;
             }
 
-            return isValid;
-        }
+            private string LabelMap(string label)
+            {
+                if (!_newTemplateLabelMap.ContainsKey(label))
+                    return label;
 
-        private string LabelMap(string label)
-        {
-            if (!_newTemplateLabelMap.ContainsKey(label))
-                return label;
+                return _newTemplateLabelMap[label];
+            }
 
-            return _newTemplateLabelMap[label];
-        }
-
-        private static IDictionary<string, string> CreateLabelMap()
-        {
-            return new Dictionary<string, string>
+            private static IDictionary<string, string> CreateLabelMap()
+            {
+                return new Dictionary<string, string>
             {
                 { "$httpTrigger_route_label", "Route" },
-                { "Provide a function name", "Function Name" },
+                { "$trigger_functionName_label", "Function Name" },
+                { "$app_selected_filename_label", "File Name" },
                 { "$httpTrigger_authLevel_label", "Auth Level" },
                 { "$queueTrigger_queueName_label", "Queue Name" },
                 { "$variables_storageConnStringLabel", "Storage Connection String" },
@@ -617,10 +626,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 { "$serviceBusTrigger_queueName_label", "Service Bus Queue Name" },
                 { "$serviceBusTrigger_topicName_label", "Service Bus Topic Name" },
                 { "$serviceBusTrigger_subscriptionName_label", "Service Bus Subscripton Name" },
-                {"$timerTrigger_schedule_label", "Schedule" }
+                {"$timerTrigger_schedule_label", "Schedule" },
             };
+            }
         }
-
-
     }
 }

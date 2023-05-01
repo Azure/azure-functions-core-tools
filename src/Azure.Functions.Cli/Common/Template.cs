@@ -87,8 +87,11 @@ namespace Azure.Functions.Cli.Common
         [JsonProperty("name")]
         public string Name { get; set; }
 
-        [JsonProperty("input")]
-        public TemplateJobInput Input { get; set; }
+        [JsonProperty("type")]
+        public string Type { get; set; }
+
+        [JsonProperty("inputs")]
+        public List<TemplateJobInput> Inputs { get; set; }
 
         [JsonProperty("actions")]
         public List<string> Actions { get; set; }
@@ -96,11 +99,18 @@ namespace Azure.Functions.Cli.Common
 
     internal class TemplateJobInput
     {
-        [JsonProperty("userCommand")]
-        public string UserCommand { get; set; }
-
         [JsonProperty("assignTo")]
         public string AssignTo { get; set; }
+
+        [JsonProperty("paramId")]
+        public string ParamId { get; set; }
+
+        [JsonProperty("defaultValue")]
+        public string DefaultValue { get; set; }
+
+        [JsonProperty("required")]
+        public bool IsRequired { get; set; }
+
     }
 
     internal class TemplateAction
@@ -111,6 +121,21 @@ namespace Azure.Functions.Cli.Common
         [JsonProperty("type")]
         public string ActionType { get; set; }
 
+        [JsonProperty("source")]
+        public string Source { get; set; }
+
+        [JsonProperty("filePath")]
+        public string FilePath { get; set; }
+
+        [JsonProperty("continueOnError")]
+        public bool? ContinueOnError { get; set; }
+
+        [JsonProperty("errorText")]
+        public string ErrorText { get; set; }
+
+        [JsonProperty("replaceTokens")]
+        public bool ReplaceTokens { get; set; }
+
         [JsonProperty("assignTo")]
         public string AssignTo { get; set; }
 
@@ -120,20 +145,8 @@ namespace Azure.Functions.Cli.Common
         [JsonProperty("defaultValue")]
         public string DefaultValue { get; set; }
 
-        [JsonProperty("source")]
-        public string Source { get; set; }
-
-        [JsonProperty("filePath")]
-        public string FilePath { get; set; }
-
         [JsonProperty("createIfNotExists")]
         public bool? CreateIfNotExists { get; set; }
-
-        [JsonProperty("continueOnError")]
-        public bool? ContinueOnError { get; set; }
-
-        [JsonProperty("errorText")]
-        public string ErrorText { get; set; }
 
         public bool ActionPerformed { get; set; }
     }
@@ -146,6 +159,9 @@ namespace Azure.Functions.Cli.Common
 
     internal class UserPrompt
     {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+        
         [JsonProperty("name")]
         public string Name { get; set; }
 

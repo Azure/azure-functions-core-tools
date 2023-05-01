@@ -34,6 +34,9 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="StaticResources\templatesv2.json" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
@@ -168,6 +171,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Python-TimerTrigger-help.txt">
       <LogicalName>$(AssemblyName).python-TimerTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\templatesv2.json">
+      <LogicalName>$(AssemblyName).templatesv2.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Typescript-BlobTrigger-help.txt">
       <LogicalName>$(AssemblyName).typescript-BlobTrigger-help.txt</LogicalName>

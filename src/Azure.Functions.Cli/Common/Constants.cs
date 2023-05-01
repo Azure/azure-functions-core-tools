@@ -67,8 +67,8 @@ namespace Azure.Functions.Cli.Common
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
         public const string HelpCommand = "help";
-        public const string GetFunctionNameAction = "getFunctionName";
-        public const string GetHttpTriggerRouteAction = "getRouteValue";
+        public const string GetFunctionNameParamId = "trigger-functionName";
+        public const string GetFileNameParamId = "app-selectedFileName";
         public const string UserPromptBooleanType = "boolean";
         public const string UserPromptEnumType = "enum";
         public const string UserInputActionType = "UserInput";

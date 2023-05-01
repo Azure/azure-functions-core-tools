@@ -1,0 +1,601 @@
+[
+  {
+    "author": "Gavin Aguiar",
+    "name": "EventHub trigger",
+    "description": "$EventHubTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with EventHubTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventHubTrigger"
+          },
+          {
+            "assignTo": "$(EVENTHUB_NAME_INPUT)",
+            "paramId": "eventhubTrigger-eventhubName",
+            "required": true,
+            "defaultValue": "myeventhub"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "eventhubTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add EventHubTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-selectedFileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventHubTrigger"
+          },
+          {
+            "assignTo": "$(EVENTHUB_NAME_INPUT)",
+            "paramId": "eventhubTrigger-eventhubName",
+            "required": true,
+            "defaultValue": "myeventhub"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "eventhubTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-fileName",
+            "defaultValue": "blueprint.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventHubTrigger"
+          },
+          {
+            "assignTo": "$(EVENTHUB_NAME_INPUT)",
+            "paramId": "eventhubTrigger-eventhubName",
+            "required": true,
+            "defaultValue": "myeventhub"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "eventhubTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add EventHubTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-existingFileName",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventHubTrigger"
+          },
+          {
+            "assignTo": "$(EVENTHUB_NAME_INPUT)",
+            "paramId": "eventhubTrigger-eventhubName",
+            "required": true,
+            "defaultValue": "myeventhub"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "eventhubTrigger-connection",
+            "required": true,
+            "defaultValue": ""
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(APP_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create eventhub trigger function",
+        "replaceTokens": true
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "eventhub_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "EventHubTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nfrom azure.functions import Blueprint\r\n\r\n$(BLUEPRINT_FILENAME) = Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).event_hub_message_trigger(arg_name=\"azeventhub\", event_hub_name=\"$(EVENTHUB_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azeventhub: EventHubEvent):\r\n    logging.info('Python EventHub trigger processed an event: %s',\r\n                azeventhub.get_body().decode('utf-8'))\r\n",
+      "eventhub_trigger_template.md": "Azure Functions: Event Hub Trigger in Python\r\nEvent Hub Trigger\r\nThe Event Hub function trigger can be used to respond to an event sent to an event hub event stream. You must have read access to the underlying event hub to set up the trigger. When the function is triggered, the message passed to the function is typed as a string.\r\n\r\nUsing the Template\r\nFollowing is an example code snippet for Event Hub Trigger using the Python programming model V2 (currently in Preview).\r\n\r\nimport logging\r\n\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"EventHubTrigger1\")\r\n@app.event_hub_message_trigger(arg_name=\"myhub\", event_hub_name=\"samples-workitems\",\r\n                               connection=\"\") \r\ndef test_function(myhub: func.EventHubEvent):\r\n    logging.info('Python EventHub trigger processed an event: %s',\r\n                myhub.get_body().decode('utf-8'))\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\nThe function application is defined and named app.\r\nConfirm that the parameters within the trigger reflect values that correspond with your storage account.\r\nThe name of the file must be function_app.py.\r\nNote that Event Hub output bindings are also supported in Azure Functions. To learn more, see Azure Event Hubs trigger and bindings for Azure Functions\r\n\r\nProgramming Model V2 (Preview)\r\nThe new programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks.\r\n\r\nThe improved programming model requires fewer files than the default model, and specifically eliminates the need for a configuration file (function.json). Instead, triggers and bindings are represented in the function_app.py file as decorators. Moreover, functions can be logically organized with support for multiple functions to be stored in the same file. Functions within the same function application can also be stored in different files, and be referenced as blueprints.\r\n\r\nTo learn more about using the new Python programming model for Azure Functions, see the Azure Functions Python developer guide. Note that in addition to the documentation, hints are available in code editors that support type checking with PYI files.\r\n\r\nTo learn more about the new programming model for Azure Functions in Python, see Programming Models in Azure Functions.",
+      "function_app.py": "from azure.functions import FunctionApp, EventHubEvent\r\nimport logging\r\n\r\napp = FunctionApp()\r\n\r\n@app.event_hub_message_trigger(arg_name=\"azeventhub\", event_hub_name=\"$(EVENTHUB_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azeventhub: EventHubEvent):\r\n    logging.info('Python EventHub trigger processed an event: %s',\r\n                azeventhub.get_body().decode('utf-8'))\r\n",
+      "function_body.py": "\r\n@app.event_hub_message_trigger(arg_name=\"azeventhub\", event_hub_name=\"$(EVENTHUB_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azeventhub: EventHubEvent):\r\n    logging.info('Python EventHub trigger processed an event: %s',\r\n                azeventhub.get_body().decode('utf-8'))\r\n"
+    }
+  },
+  {
+    "author": "Naren Soni",
+    "name": "HTTP trigger",
+    "description": "$HttpTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with HttpTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "HttpTrigger"
+          },
+          {
+            "assignTo": "$(AUTHLEVEL_INPUT)",
+            "paramId": "httpTrigger-authLevel",
+            "required": true,
+            "defaultValue": "function"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add httpTrigger function to an existing file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(SELECTED_FILEPATH)",
+            "paramId": "app-selectedFileName"
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "defaultValue": "HttpTrigger"
+          },
+          {
+            "assignTo": "$(AUTHLEVEL_INPUT)",
+            "paramId": "httpTrigger-authLevel",
+            "defaultValue": "function"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-fileName",
+            "defaultValue": "blueprint.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(AUTHLEVEL_INPUT)",
+            "paramId": "httpTrigger-authLevel",
+            "required": true,
+            "defaultValue": "function"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add EventHubTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-existingFileName",
+            "defaultValue": "blueprint.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(AUTHLEVEL_INPUT)",
+            "paramId": "httpTrigger-authLevel",
+            "required": true,
+            "defaultValue": "function"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY_CONTENT)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY_CONTENT)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create httpTrigger function",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "http_trigger_template.md"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "HttpTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nfrom azure.functions import Blueprint\r\n\r\n$(BLUEPRINT_FILENAME) = Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).route(route=\"$(BLUEPRINT_FILENAME)\")\r\ndef $(BLUEPRINT_FILENAME)(req: func.HttpRequest) -> func.HttpResponse:\r\n    logging.info('Python HTTP trigger function processed a request.')\r\n\r\n    name = req.params.get('name')\r\n    if not name:\r\n        try:\r\n            req_body = req.get_json()\r\n        except ValueError:\r\n            pass\r\n        else:\r\n            name = req_body.get('name')\r\n\r\n    if name:\r\n        return func.HttpResponse(f\"Hello, {name}. This HTTP triggered function executed successfully.\")\r\n    else:\r\n        return func.HttpResponse(\r\n             \"This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.\",\r\n             status_code=200\r\n        )",
+      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp(http_auth_level=func.AuthLevel.$(AUTHLEVEL_INPUT))\r\n\r\n@app.route(route=\"$(FUNCTION_NAME_INPUT)\")\r\ndef $(FUNCTION_NAME_INPUT)(req: func.HttpRequest) -> func.HttpResponse:\r\n    logging.info('Python HTTP trigger function processed a request.')\r\n\r\n    name = req.params.get('name')\r\n    if not name:\r\n        try:\r\n            req_body = req.get_json()\r\n        except ValueError:\r\n            pass\r\n        else:\r\n            name = req_body.get('name')\r\n\r\n    if name:\r\n        return func.HttpResponse(f\"Hello, {name}. This HTTP triggered function executed successfully.\")\r\n    else:\r\n        return func.HttpResponse(\r\n             \"This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.\",\r\n             status_code=200\r\n        )",
+      "function_body.py": "@app.route(route=\"$(FUNCTION_NAME_INPUT)\")\r\ndef $(FUNCTION_NAME_INPUT)(req: func.HttpRequest) -> func.HttpResponse:\r\n    logging.info('Python HTTP trigger function processed a request.')\r\n\r\n    name = req.params.get('name')\r\n    if not name:\r\n        try:\r\n            req_body = req.get_json()\r\n        except ValueError:\r\n            pass\r\n        else:\r\n            name = req_body.get('name')\r\n\r\n    if name:\r\n        return func.HttpResponse(f\"Hello, {name}. This HTTP triggered function executed successfully.\")\r\n    else:\r\n        return func.HttpResponse(\r\n             \"This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.\",\r\n             status_code=200\r\n        )",
+      "http_trigger_template.md": "# Azure Functions: HTTP Trigger in Python\r\n\r\n## HTTP Trigger\r\n\r\nThe HTTP trigger lets you invoke a function with an HTTP request. You can use an HTTP trigger to build serverless APIs and respond to webhooks.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for HTTP Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp(auth_level=func.AuthLevel.ANONYMOUS)\r\n\r\n@app.function_name(name=\"HttpTrigger1\")\r\n@app.route(route=\"hello\")\r\ndef test_function(req: func.HttpRequest) -> func.HttpResponse:\r\n     logging.info('Python HTTP trigger function processed a request.')\r\n\r\n     name = req.params.get('name')\r\n     if not name:\r\n        try:\r\n            req_body = req.get_json()\r\n        except ValueError:\r\n            pass\r\n        else:\r\n            name = req_body.get('name')\r\n\r\n     if name:\r\n        return func.HttpResponse(f\"Hello, {name}. This HTTP triggered function executed successfully.\")\r\n     else:\r\n        return func.HttpResponse(\r\n             \"This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.\",\r\n             status_code=200\r\n        )\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n  \r\nNote that HTTP output bindings are also supported in Azure Functions. To learn more, see [Azure Functions HTTP triggers and bindings overview](https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-http-webhook?tabs=in-process%2Cfunctionsv2&pivots=programming-language-python)\r\n\r\n## Programming Model V2 (Preview)\r\n\r\nThe new programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nThe improved programming model requires fewer files than the default model, and specifically eliminates the need for a configuration file (`function.json`). Instead, triggers and bindings are represented in the `function_app.py` file as decorators. Moreover, functions can be logically organized with support for multiple functions to be stored in the same file. Functions within the same function application can also be stored in different files, and be referenced as blueprints.\r\n\r\nTo learn more about using the new Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.\r\n\r\nTo learn more about the new programming model for Azure Functions in Python, see [Programming Models in Azure Functions](https://aka.ms/functions-programming-models)."
+    }
+  },
+  {
+    "author": "kashimiz",
+    "name": "Timer Trigger",
+    "description": "$TimerTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with Timer Function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-FileName"
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "defaultValue": "TimerTrigger"
+          },
+          {
+            "assignTo": "$(SCHEDULE_INPUT)",
+            "paramId": "timerTrigger-schedule",
+            "defaultValue": "0 */5 * * * *"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Append Timer Function to File",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(SELECTED_FILEPATH)",
+            "paramId": "app-selectedFileName"
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "defaultValue": "TimerTrigger"
+          },
+          {
+            "assignTo": "$(SCHEDULE_INPUT)",
+            "paramId": "timerTrigger-schedule",
+            "defaultValue": "0 */5 * * * *"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-fileName",
+            "defaultValue": "blueprint.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "defaultValue": "TimerTrigger"
+          },
+          {
+            "assignTo": "$(SCHEDULE_INPUT)",
+            "paramId": "timerTrigger-schedule",
+            "defaultValue": "0 */5 * * * *"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add EventHubTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-existingFileName",
+            "defaultValue": "blueprint.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "defaultValue": "TimerTrigger"
+          },
+          {
+            "assignTo": "$(SCHEDULE_INPUT)",
+            "paramId": "timerTrigger-schedule",
+            "defaultValue": "0 */5 * * * *"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(TIMER_FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(TIMER_FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create httpTrigger function",
+        "replaceTokens": true
+      },
+      {
+        "name": "replaceText_FunctionBody",
+        "type": "ReplaceTokensInText",
+        "assignTo": "$(TIMER_FUNCTION_BODY)",
+        "source": "$(TIMER_FUNCTION_BODY)"
+      },
+      {
+        "name": "showMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "timer_trigger_template.md"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "filePath": "$(APP_FILENAME)",
+        "source": "$(FUNCTION_APP)",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "TimerTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nfrom azure.functions import Blueprint\r\n\r\n$(BLUEPRINT_FILENAME) = Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).timer_trigger(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)",
+      "function_app.py": "import datetime\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)",
+      "function_body.py": "@app.timer_trigger(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    \r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran')",
+      "timer_trigger_template.md": "# Azure Functions: Timer Trigger in Python\r\n\r\n## Timer Trigger\r\n\r\nA timer trigger lets you run a function on a schedule.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Timer Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport datetime\r\n\r\nimport logging\r\n\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"mytimer\")\r\n@app.schedule(schedule=\"0 */5 * * * *\", arg_name=\"mytimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef test_function(mytimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if mytimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n\r\n## Programming Model V2 (Preview)\r\n\r\nThe new programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nThe improved programming model requires fewer files than the default model, and specifically eliminates the need for a configuration file (`function.json`). Instead, triggers and bindings are represented in the `function_app.py` file as decorators. Moreover, functions can be logically organized with support for multiple functions to be stored in the same file. Functions within the same function application can also be stored in different files, and be referenced as blueprints.\r\n\r\nTo learn more about using the new Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.\r\n\r\nTo learn more about the new programming model for Azure Functions in Python, see [Programming Models in Azure Functions](https://aka.ms/functions-programming-models)."
+    }
+  }
+]

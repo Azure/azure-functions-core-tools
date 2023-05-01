@@ -1,15 +1,16 @@
 ﻿[
   {
+    "id": "httpTrigger-route",
     "name": "httpTrigger-route",
-    "type": "string",
     "label": "$httpTrigger_route_label",
     "help": "$httpTrigger_route_help"
   },
   {
+    "id": "trigger-functionName",
     "name": "trigger-functionName",
-    "type": "string",
-    "label": "Provide a function name",
-    "help": "Name of the function you want to",
+    "value": "string",
+    "label": "$trigger_functionName_label",
+    "help": "$trigger_functionName_help",
     "validators": [
       {
         "expression": "^[a-zA-Z][a-zA-Z0-9]{0,127}$",
@@ -18,6 +19,7 @@
     ]
   },
   {
+    "id": "httpTrigger-authLevel",
     "name": "httpTrigger-authLevel",
     "value": "enum",
     "defaultValue": "function",
@@ -39,6 +41,7 @@
     "help": "$httpTrigger_authLevel_help"
   },
   {
+    "id": "timerTrigger-schedule",
     "name": "timerTrigger-schedule",
     "value": "string",
     "defaultValue": "0 * * * * *",
@@ -52,6 +55,7 @@
     ]
   },
   {
+    "id": "queueTrigger-queueName",
     "name": "queueTrigger-queueName",
     "value": "string",
     "defaultValue": "myqueue",
@@ -65,6 +69,7 @@
     ]
   },
   {
+    "id": "queueTrigger-connection",
     "name": "queueTrigger-connection",
     "value": "string",
     "resource": "Storage",
@@ -72,6 +77,7 @@
     "help": "$variables_appSettingsHelp"
   },
   {
+    "id": "blobTrigger-path",
     "name": "blobTrigger-path",
     "value": "string",
     "defaultValue": "mycontainer",
@@ -85,12 +91,14 @@
     ]
   },
   {
+    "id": "blobTrigger-connection",
     "name": "blobTrigger-connection",
     "value": "string",
     "label": "$blobTrigger_path_label",
     "help": "$blobTrigger_path_help"
   },
   {
+    "id": "cosmosDBTrigger-connectionStringSetting",
     "name": "cosmosDBTrigger-connectionStringSetting",
     "value": "string",
     "resource": "DocumentDB",
@@ -99,6 +107,7 @@
     "placeholder": "$variables_selectConnection"
   },
   {
+    "id": "cosmosDBTrigger-databaseName",
     "name": "cosmosDBTrigger-databaseName",
     "value": "string",
     "defaultValue": "",
@@ -106,6 +115,7 @@
     "help": "$cosmosDBIn_databaseName_help"
   },
   {
+    "id": "cosmosDBTrigger-collectionName",
     "name": "cosmosDBTrigger-collectionName",
     "value": "string",
     "defaultValue": "",
@@ -113,12 +123,14 @@
     "help": "$cosmosDBIn_collectionName_help"
   },
   {
+    "id": "cosmosDBTrigger-leaseCollectionName",
     "name": "cosmosDBTrigger-leaseCollectionName",
     "value": "string",
     "label": "$cosmosDBIn_leaseCollectionName_label",
     "help": "$cosmosDBIn_leaseCollectionName_help"
   },
   {
+    "id": "cosmosDBTrigger-createLeaseCollectionIfNotExists",
     "name": "cosmosDBTrigger-createLeaseCollectionIfNotExists",
     "value": "boolean",
     "defaultValue": true,
@@ -126,6 +138,7 @@
     "help": "$cosmosDBIn_createIfNotExists_help"
   },
   {
+    "id": "eventHubTrigger-connection",
     "name": "eventHubTrigger-connection",
     "value": "string",
     "resource": "EventHub",
@@ -134,6 +147,7 @@
     "placeholder": "$variables_selectConnection"
   },
   {
+    "id": "eventHubTrigger-eventHubName",
     "name": "eventHubTrigger-eventHubName",
     "value": "string",
     "defaultValue": "myeventhub",
@@ -147,6 +161,7 @@
     ]
   },
   {
+    "id": "eventHubTrigger-consumerGroup",
     "name": "eventHubTrigger-consumerGroup",
     "value": "string",
     "defaultValue": "$Default",
@@ -160,6 +175,7 @@
     ]
   },
   {
+    "id": "eventHubTrigger-cardinality",
     "name": "eventHubTrigger-cardinality",
     "value": "enum",
     "defaultValue": "many",
@@ -177,8 +193,11 @@
     "help": "$eventHubTrigger_cardinality_help"
   },
   {
+    "id": "eventHubTrigger-dataType",
     "name": "eventHubTrigger-dataType",
     "value": "enum",
+    "label": "$eventHubTrigger_dataType_label",
+    "help": "$eventHubTrigger_dataType_help",
     "enum": [
       {
         "value": "string",
@@ -192,9 +211,11 @@
         "value": "stream",
         "display": "Stream"
       }
-    ]
+    ],
+    "validators": []
   },
   {
+    "id": "serviceBusTrigger-connection",
     "name": "serviceBusTrigger-connection",
     "value": "string",
     "resource": "ServiceBus",
@@ -203,6 +224,7 @@
     "placeholder": "[variables('selectConnection')]"
   },
   {
+    "id": "serviceBusTrigger-queueName",
     "name": "serviceBusTrigger-queueName",
     "value": "string",
     "defaultValue": "mysbqueue",
@@ -216,6 +238,7 @@
     ]
   },
   {
+    "id": "serviceBusTrigger-topicName",
     "name": "serviceBusTrigger-topicName",
     "value": "string",
     "defaultValue": "mysbtopic",
@@ -229,6 +252,7 @@
     ]
   },
   {
+    "id": "serviceBusTrigger-subscriptionName",
     "name": "serviceBusTrigger-subscriptionName",
     "value": "string",
     "defaultValue": "mysubscription",
@@ -238,6 +262,66 @@
       {
         "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}([a-zA-Z0-9]$|[a-zA-Z0-9][\\/]\\$DeadLetterQueue$)|^[{][a-zA-Z0-9]{1,126}([}]$|[}][\\/]\\$DeadLetterQueue$)|^[%][a-zA-Z0-9]{1,126}([%]$|[%][\\/]\\$DeadLetterQueue$)",
         "errorText": "$serviceBusTrigger_subscriptionName_errorText"
+      }
+    ]
+  },
+  {
+    "id": "app-fileName",
+    "name": "app-fileName",
+    "value": "string",
+    "resource": "Newfile",
+    "defaultValue": "function_app.py",
+    "label": "$app_filename_label",
+    "help": "$app_filename_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}([a-zA-Z0-9]$|[a-zA-Z0-9][\\/]\\$DeadLetterQueue$)|^[{][a-zA-Z0-9]{1,126}([}]$|[}][\\/]\\$DeadLetterQueue$)|^[%][a-zA-Z0-9]{1,126}([%]$|[%][\\/]\\$DeadLetterQueue$)",
+        "errorText": "$app_filename_errorText"
+      }
+    ]
+  },
+  {
+    "id": "app-selectedFileName",
+    "name": "app-selectedFileName",
+    "value": "string",
+    "resource": "Existingfile",
+    "defaultValue": "function_app.py",
+    "label": "$app_selected_filename_label",
+    "help": "$app_selected_filename_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}([a-zA-Z0-9]$|[a-zA-Z0-9][\\/]\\$DeadLetterQueue$)|^[{][a-zA-Z0-9]{1,126}([}]$|[}][\\/]\\$DeadLetterQueue$)|^[%][a-zA-Z0-9]{1,126}([%]$|[%][\\/]\\$DeadLetterQueue$)",
+        "errorText": "$app_filename_errorText"
+      }
+    ]
+  },
+  {
+    "id": "blueprint-fileName",
+    "name": "blueprint-fileName",
+    "value": "string",
+    "resource": "Newfile",
+    "defaultValue": "blueprint.py",
+    "label": "$blueprint_filename_label",
+    "help": "$blueprint_filename_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}([a-zA-Z0-9]$|[a-zA-Z0-9][\\/]\\$DeadLetterQueue$)|^[{][a-zA-Z0-9]{1,126}([}]$|[}][\\/]\\$DeadLetterQueue$)|^[%][a-zA-Z0-9]{1,126}([%]$|[%][\\/]\\$DeadLetterQueue$)",
+        "errorText": "$blueprint_fileName_errorText"
+      }
+    ]
+  },
+  {
+    "id": "blueprint-existingFileName",
+    "name": "blueprint-existingFileName",
+    "value": "string",
+    "resource": "Existingfile",
+    "defaultValue": "blueprint.py",
+    "label": "$blueprint_selected_filename_label",
+    "help": "$blueprint_selected_filename_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}([a-zA-Z0-9]$|[a-zA-Z0-9][\\/]\\$DeadLetterQueue$)|^[{][a-zA-Z0-9]{1,126}([}]$|[}][\\/]\\$DeadLetterQueue$)|^[%][a-zA-Z0-9]{1,126}([%]$|[%][\\/]\\$DeadLetterQueue$)",
+        "errorText": "$blueprint_fileName_errorText"
       }
     ]
   }
