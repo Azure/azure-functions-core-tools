@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using ImTools;
+using Microsoft.Azure.AppService.Proxy.Common.Context;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -29,7 +31,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly ISecretsManager _secretsManager;
         private readonly IContextHelpManager _contextHelpManager;
         private readonly IUserInputHandler _userInputHandler;
-
         private readonly InitAction _initAction;
         public WorkerRuntime workerRuntime;
 
@@ -39,7 +40,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public bool Csx { get; set; }
         private string TriggerNameForHelp { get; set; }
         private string FileName { get; set; }
-        private string Route { get; set; }
         public AuthorizationLevel? AuthorizationLevel { get; set; }
 
         Lazy<IEnumerable<Template>> _templates;
@@ -54,7 +54,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _userInputHandler = new UserInputHandler(_templatesManager);
             _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
             _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
-            
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -78,11 +77,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>('f', "file")
                 .WithDescription("File Name")
                 .Callback(f => FileName = f);
-
-            Parser
-                .Setup<string>('r', "route")
-                .WithDescription("Route")
-                .Callback(f => Route = f);
 
             Parser
                 .Setup<AuthorizationLevel?>('a', "authlevel")
@@ -137,7 +131,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
                 var templateJob = template.Jobs.Single(x => x.Type.Equals("appendToFile", StringComparison.OrdinalIgnoreCase));
                 var variables = new Dictionary<string, string>();
-                _userInputHandler.RunUserInputActions(FunctionName, FileName, templateJob.Inputs, variables);
+                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName }, { GetFileNameParamId, FileName } };
+
+                _userInputHandler.RunUserInputActions(providedInputs, templateJob.Inputs, variables);
+
+                if (string.IsNullOrEmpty(FunctionName))
+                {
+                    FunctionName = providedInputs[GetFunctionNameParamId];
+                }
+                else if (string.IsNullOrEmpty(FileName))
+                {
+                    FileName = providedInputs[GetFileNameParamId];
+                }
+
                 var actions = template.Actions.Where(x => templateJob.Actions.Contains(x.Name, StringComparer.OrdinalIgnoreCase)).ToList();
                 await _templatesManager.Deploy(templateJob, template, variables);
             }
@@ -477,158 +483,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private bool CurrentPathHasLocalSettings()
         {
             return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json"));
-        }
-
-        
-        public interface IUserInputHandler
-        {
-            void RunUserInputActions(IDictionary<string, string> providedValues, IList<TemplateJobInput> inputs, IDictionary<string, string> variables)
-        }
-        
-        public class UserInputHandler : IUserInputHandler
-        {
-            Lazy<IEnumerable<UserPrompt>> _userPrompts;
-            IDictionary<string, string> _newTemplateLabelMap;
-            private ITemplatesManager _templatesManager;
-
-            public UserInputHandler(ITemplatesManager templatesManager)
-            {
-                _templatesManager = templatesManager;
-                _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
-                _newTemplateLabelMap = CreateLabelMap();
-            }
-
-            public void RunUserInputActions(IDictionary<string, string> providedValues, IList<TemplateJobInput> inputs, IDictionary<string, string> variables)
-            {
-                foreach (var theInput in inputs)
-                {
-                    var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, theInput.ParamId, StringComparison.OrdinalIgnoreCase));
-                    var defaultValue = theInput.DefaultValue ?? userPrompt.DefaultValue;
-                    string response = string.Empty;
-                    if (userPrompt.Value == UserPromptEnumType || userPrompt.Value == UserPromptBooleanType)
-                    {
-                        var values = new List<string>() { true.ToString(), false.ToString() };
-                        if (userPrompt.Value == UserPromptEnumType)
-                        {
-                            values = userPrompt.EnumList.Select(x => x.Display).ToList();
-                        }
-
-                        while (!ValidateResponse(userPrompt, response))
-                        {
-                            SelectionMenuHelper.DisplaySelectionWizardPrompt(LabelMap(userPrompt.Label));
-                            response = SelectionMenuHelper.DisplaySelectionWizard(values);
-
-                            if (string.IsNullOrEmpty(response) && !string.IsNullOrEmpty(defaultValue))
-                            {
-                                response = defaultValue;
-                            }
-                            else if (userPrompt.Value == UserPromptEnumType)
-                            {
-                                response = userPrompt.EnumList.Single(x => x.Display == response).Value;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Use the function name if it is already provided by user
-                        if (providedValues.ContainsKey(theInput.ParamId) && !string.IsNullOrEmpty(providedValues[theInput.ParamId]))
-                        {
-                            response = providedValues[theInput.ParamId];
-                        }
-
-                        while (!ValidateResponse(userPrompt, response))
-                        {
-                            PrintInputLabel(userPrompt, defaultValue);
-                            response = Console.ReadLine();
-                            if (string.IsNullOrEmpty(response) && defaultValue != null)
-                            {
-                                response = defaultValue;
-                            }
-                        }
-                    }
-
-                    var variableName = theInput.AssignTo;
-                    variables.Add(variableName, response);
-
-                    if (theInput.ParamId.Equals(GetFunctionNameParamId, StringComparison.OrdinalIgnoreCase))
-                    {
-                        functionName = response;
-                    }
-                    else if (theInput.ParamId.Equals(GetFileNameParamId, StringComparison.OrdinalIgnoreCase))
-                    {
-                        fileName = response;
-                    }
-                }
-            }
-
-            private void PrintInputLabel(UserPrompt userPrompt, string defaultValue)
-            {
-                var label = LabelMap(userPrompt.Label);
-                ColoredConsole.Write($"{label}: ");
-                if (!string.IsNullOrEmpty(defaultValue))
-                {
-                    ColoredConsole.Write($"[{defaultValue}] ");
-                }
-            }
-
-            private bool ValidateResponse(UserPrompt userPrompt, string response)
-            {
-                if (string.IsNullOrEmpty(response))
-                {
-                    return false;
-                }
-
-                var validator = userPrompt.Validators?.FirstOrDefault();
-                if (validator == null)
-                {
-                    return true;
-                }
-
-                var validationRegex = new Regex(validator.Expression);
-                var isValid = validationRegex.IsMatch(response);
-
-                if (!isValid)
-                {
-                    ColoredConsole.WriteLine(ErrorColor($"{this.LabelMap(userPrompt.Label)} is not valid."));
-                }
-
-                return isValid;
-            }
-
-            private string LabelMap(string label)
-            {
-                if (!_newTemplateLabelMap.ContainsKey(label))
-                    return label;
-
-                return _newTemplateLabelMap[label];
-            }
-
-            private static IDictionary<string, string> CreateLabelMap()
-            {
-                return new Dictionary<string, string>
-            {
-                { "$httpTrigger_route_label", "Route" },
-                { "$trigger_functionName_label", "Function Name" },
-                { "$app_selected_filename_label", "File Name" },
-                { "$httpTrigger_authLevel_label", "Auth Level" },
-                { "$queueTrigger_queueName_label", "Queue Name" },
-                { "$variables_storageConnStringLabel", "Storage Connection String" },
-                { "cosmosDBTrigger-connectionStringSetting", "CosmosDB Connectiong Stirng" },
-                { "$cosmosDBIn_databaseName_label", "CosmosDB Database Name" },
-                { "$cosmosDBIn_collectionName_label", "CosmosDB Collection Name" },
-                { "$cosmosDBIn_leaseCollectionName_label", "CosmosDB Lease Collection Name" },
-                { "$cosmosDBIn_createIfNotExists_label", "Create If Not Exists" },
-                { "$eventHubTrigger_connection_label", "EventHub Connection" },
-                { "$eventHubOut_path_label", "EventHub Out Path" },
-                { "$eventHubTrigger_consumerGroup_label", "EventHub Consumer Group" },
-                { "$eventHubTrigger_cardinality_label", "EventHub Cardinality" },
-                { "$serviceBusTrigger_connection_label", "Service Bus Connection" },
-                { "$serviceBusTrigger_queueName_label", "Service Bus Queue Name" },
-                { "$serviceBusTrigger_topicName_label", "Service Bus Topic Name" },
-                { "$serviceBusTrigger_subscriptionName_label", "Service Bus Subscripton Name" },
-                {"$timerTrigger_schedule_label", "Schedule" },
-            };
-            }
         }
     }
 }

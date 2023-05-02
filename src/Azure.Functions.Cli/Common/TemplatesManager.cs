@@ -295,6 +295,7 @@ namespace Azure.Functions.Cli.Common
             }
             else if (action.ActionType == "AppendToFile")
             {
+                
                 await WriteFunctionBody(template, action, variables, isAppend: true);
                 return;
             }
@@ -345,7 +346,7 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                if (isAppend)
+                if (!isAppend)
                 {
                     AskToRemoveFileIfExists(filePath);
                 }
