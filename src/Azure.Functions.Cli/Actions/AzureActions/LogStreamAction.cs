@@ -51,11 +51,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Log stream is not currently supported in Linux Consumption Apps. " +
                     "Please use --browser to open Azure Application Insights Live Stream in the Azure portal.");
             }
-            var basicHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{functionApp.PublishingUserName}:{functionApp.PublishingPassword}"));
-
+            
             using (var client = new HttpClient())
             {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basicHeaderValue);
+                var isBasicAuthAllowed = true;
+                try
+                {
+                    isBasicAuthAllowed = await AzureHelper.IsBasicAuthAllowedForSCM(functionApp, AccessToken, ManagementURL);
+                }
+                catch (Exception)
+                {
+                    // ignore: We don't want to fail the command on basic auth check. There is extremely low likelihood of getting the exception here. 
+                }
+
+                if (isBasicAuthAllowed)
+                {
+                    var basicHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{functionApp.PublishingUserName}:{functionApp.PublishingPassword}"));
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basicHeaderValue);
+                }
+                else
+                {
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+                }
+                
                 client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
                 var response = await client.GetStreamAsync(new Uri($"https://{functionApp.ScmUri}/api/logstream/application"));
                 using (var reader = new StreamReader(response))

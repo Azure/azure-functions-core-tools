@@ -1,6 +1,6 @@
 #! /usr/bin/env node
 
-const unzipper = require('unzipper');
+const extract = require('extract-zip');
 const url = require('url');
 const HttpsProxyAgent = require('https-proxy-agent');
 const https = require('https');
@@ -40,7 +40,8 @@ if (os.platform() === 'win32') {
     throw Error('platform ' + os.platform() + ' isn\'t supported');
 }
 
-const endpoint = 'https://functionscdn.azureedge.net/public/' + version + '/Azure.Functions.Cli.' + platform + '.' + version + '.zip';
+const fileName = 'Azure.Functions.Cli.' + platform + '.' + version + '.zip';
+const endpoint = 'https://functionscdn.azureedge.net/public/' + version + '/' + fileName;
 console.log('attempting to GET %j', endpoint);
 const options = url.parse(endpoint);
 // npm config preceed system environment
@@ -67,20 +68,29 @@ if (proxy) {
 }
 
 https.get(options, response => {
+    const bar = new ProgressBar('[:bar] Downloading Azure Functions Core Tools', {
+        total: Number(response.headers['content-length']),
+        width: 18
+    });
 
-        const bar = new ProgressBar('[:bar] Downloading Azure Functions Core Tools', {
-            total: Number(response.headers['content-length']),
-            width: 18
-        });
-
-        if (response.statusCode === 200) {
-            const installPath = getPath();
-            response.on('data', data => bar.tick(data.length));
-            const unzipStream = unzipper.Extract({ path: installPath })
-                .on('close', () => {
+    if (response.statusCode === 200) {
+        const installPath = getPath();
+        const downloadPath = installPath + '/' + fileName;
+        response.on('data', data => bar.tick(data.length));
+        if (!fs.existsSync(installPath)) {
+            fs.mkdirSync(installPath);
+        }
+        const file = fs.createWriteStream(downloadPath);
+        response.pipe(file);
+        file.on('finish', function() {
+            file.close(() => {
+                extract(file.path, {
+                    dir: installPath
+                }).then(() => {
                     try {
-                        fs.closeSync(fs.openSync(`${installPath}/telemetryDefaultOn.sentinel`, 'w'))
-                        console.log(telemetryInfo)
+                        fs.closeSync(fs.openSync(`${installPath}/telemetryDefaultOn.sentinel`, 'w'));
+                        console.log(telemetryInfo);
+                        fs.unlinkSync(downloadPath);
                     }
                     catch (err) {
                         // That's alright.
@@ -90,14 +100,15 @@ https.get(options, response => {
                         fs.chmodSync(`${installPath}/gozip`, 0o755);
                     }
                 });
-            response.pipe(unzipStream);
-        } else {
-            console.error(chalk.red('Error downloading zip file from ' + endpoint));
-            console.error(chalk.red('Expected: 200, Actual: ' + response.statusCode));
-            process.exit(1);
-        }
-    })
-    .on('error', err => {
-        console.error(chalk.red(err));
+            });
+        });
+    } else {
+        console.error(chalk.red('Error downloading zip file from ' + endpoint));
+        console.error(chalk.red('Expected: 200, Actual: ' + response.statusCode));
         process.exit(1);
-    });
+    }
+})
+.on('error', err => {
+    console.error(chalk.red(err));
+    process.exit(1);
+});
