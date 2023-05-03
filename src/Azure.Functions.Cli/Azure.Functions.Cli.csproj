@@ -46,6 +46,9 @@
     <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet7Isolated">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet7Isolated</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
