@@ -117,8 +117,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
-                SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                if (string.IsNullOrWhiteSpace(TemplateName))
+                {
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
+                    TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"Template: {TemplateName}");
+                }
+                
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);

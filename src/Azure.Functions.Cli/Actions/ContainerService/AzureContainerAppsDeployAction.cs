@@ -20,18 +20,15 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
     class AzureContainerAppsDeployAction : BaseAzureAction
     {
         private readonly CreateFunctionAction _createFunctionAction;
-        // greens
-        public bool DryRun { get; private set; }
+        
         public string ImageName { get; private set; }
         public string Name { get; set; } = string.Empty;
         public string Registry { get; set; }
         public bool BuildImage { get; set; } = true;
-        public string PullSecret { get; set; } = string.Empty;
         public string ResourceGroup { get; set; }
         public string ManagedEnvironmentName { get; set; }
         public string StorageAccountConnectionString { get; set; }
         public string Location { get; set; }
-        public bool NoDocker { get; set; }
         public string RegistryUserName { get; set; }
         public string RegistryPassword { get; set; }
         public string WorkerRuntime { get; set; }
@@ -48,7 +45,6 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
             SetFlag<string>("registry", "When set, a docker build is run and the image is pushed to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
             SetFlag<string>("registry-username", "The registry username to pull the image from private registry. ", r => RegistryUserName = r);
             SetFlag<string>("registry-password", "The registry password/token to pull the image from private registry. ", r => RegistryPassword = r);
-            SetFlag<string>("pull-secret", "The secret holding a private registry credentials", s => PullSecret = s);
             SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
             SetFlag<string>("resource-group", "Resource Group", r => ResourceGroup = r, isRequired: true);
             SetFlag<string>("environment", "Managed Environment Name", e => ManagedEnvironmentName = e, isRequired: true);
@@ -157,7 +153,7 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
             else if (!string.IsNullOrEmpty(Registry))
             {
                 var version = "latest";
-                return ($"{Registry}/{Name}:{version}", true);
+                return ($"{Registry}/{Name.ToLower()}:{version}", true);
             }
 
             throw new CliArgumentsException("either --image-name or --registry is required.");
