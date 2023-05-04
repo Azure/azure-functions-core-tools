@@ -117,7 +117,7 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
             var payload = ContainerAppsFunctionPayload.CreateInstance(Name, Location,
                 managedEnvironmentId, $"DOCKER|{resolvedImageName}", StorageAccountConnectionString, workerRuntimeName, registryHost, RegistryUserName, RegistryPassword);
 
-            await AzureHelper.CreateFunctionAppOnContainerService(AccessToken, ManagementURL, Subscription, ResourceGroup, payload);
+            var hostName = await AzureHelper.CreateFunctionAppOnContainerService(AccessToken, ManagementURL, Subscription, ResourceGroup, payload);
 
             ColoredConsole.Write("Getting Function App information..");
             Arm.Models.Site functionApp = null;
@@ -129,6 +129,11 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
                     Console.Write(".");
                     await Task.Delay(10000);
                     functionApp = await AzureHelper.GetFunctionApp(payload.Name, AccessToken, ManagementURL, defaultSubscription: Subscription, loadFunction: AzureHelper.LoadFunctionAppInContainerApp);
+
+                    if (string.IsNullOrWhiteSpace(functionApp.HostName))
+                    {
+                        functionApp.HostName = hostName;
+                    }
                 }
                 catch (ArmResourceNotFoundException)
                 {
