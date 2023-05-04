@@ -1,11 +1,8 @@
 ﻿using Azure.Functions.Cli.Interfaces;
-using Microsoft.AspNetCore.Server.IIS.Core;
-using Newtonsoft.Json;
 using NuGet.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using static Azure.Functions.Cli.Common.Constants;
 

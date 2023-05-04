@@ -112,8 +112,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
-                SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                if (string.IsNullOrWhiteSpace(TemplateName))
+                {
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
+                    TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"Template: {TemplateName}");
+                }
+                
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
@@ -300,6 +308,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
+            else if (workerRuntime == WorkerRuntime.node)
+            {
+                // Ensuring that we only show v3 templates for node when the user has not opted into the new model
+                return _templates.Value.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+            }
 
             return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
         }
@@ -416,12 +429,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            IEnumerable<string> triggerNames;
-            if (Languages.Python.EqualsIgnoreCase(Language))
+            var triggerNames = GetTriggerNames(Language, forNewModelHelp: true);
+            await _contextHelpManager.LoadTriggerHelp(Language, triggerNames.ToList());
+            if (_contextHelpManager.IsValidTriggerNameForHelp(triggerName))
             {
-                triggerNames = GetTriggerNamesFromNewTemplates(Language, forNewModelHelp: true);
+                triggerName = _contextHelpManager.GetTriggerTypeFromTriggerNameForHelp(triggerName);
             }
-            else
+            if (promptQuestions && !_contextHelpManager.IsValidTriggerTypeForHelp(triggerName))
             {
                 triggerNames = GetTriggerNames(Language, forNewModelHelp: true);
             }
@@ -465,7 +479,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(Constants.PackageJsonFileName);
                         var packageJson = JsonConvert.DeserializeObject<JToken>(packageJsonData);
                         var funcPackageVersion = packageJson["dependencies"]["@azure/functions"];
-                        if (new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
+                        if (funcPackageVersion != null && new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
                         {
                             return true;
                         }

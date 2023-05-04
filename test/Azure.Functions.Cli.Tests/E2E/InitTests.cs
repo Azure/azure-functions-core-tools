@@ -151,7 +151,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
-                OutputDoesntContain = new[] { "Initialized empty Git repository" }
+                OutputDoesntContain = new[] { "Initialized empty Git repository" },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -284,7 +285,25 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:3.0-dotnet-isolated5.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4.0-dotnet-isolated6.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_with_dotnet7Isolated_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet-isolated --target-framework net7.0 --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated7.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
