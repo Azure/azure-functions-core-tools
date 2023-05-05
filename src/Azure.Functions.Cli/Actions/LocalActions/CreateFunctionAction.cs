@@ -161,7 +161,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     var filePath = Path.Combine(Environment.CurrentDirectory, FileName);
                     jobName = !FileUtility.FileExists(filePath) ? "CreateNewBlueprint" : "AppendToBlueprint";
                     variables["$(BLUEPRINT_FILENAME)"] = FileName;
-                    FunctionName = FileName[..^Path.GetExtension(FileName).Length];
+                    FileName = FileName[..^Path.GetExtension(FileName).Length];
                 }
                 else
                 {
