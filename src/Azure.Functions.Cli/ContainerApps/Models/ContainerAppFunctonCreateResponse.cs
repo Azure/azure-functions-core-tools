@@ -19,6 +19,8 @@ namespace Azure.Functions.Cli.ContainerApps.Models
 
         [JsonProperty(PropertyName = "location")]
         public string Location { get; set; }
+
+        [JsonProperty(PropertyName = "properties")]
         internal ContainerAppFunctonCreateResponseProperties Properties { get; set; }
     }
 

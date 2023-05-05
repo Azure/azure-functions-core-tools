@@ -367,8 +367,8 @@ namespace Azure.Functions.Cli.Helpers
             var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armSite = await ArmHttpAsync<ArmWrapper<ArmWebsite>>(HttpMethod.Get, url, accessToken);
 
-            site.HostName = armSite.properties.enabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
-            site.ScmUri = armSite.properties.enabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
+            site.HostName = armSite.properties.enabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
+            site.ScmUri = armSite.properties.enabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
             site.Location = armSite.location;
             site.Kind = armSite.kind;
             site.Sku = armSite.properties.sku;
@@ -490,8 +490,9 @@ namespace Azure.Functions.Cli.Helpers
                   }, 18, TimeSpan.FromSeconds(3)
             );
         }
-        public static async Task CreateFunctionAppOnContainerService(string accessToken, string managementURL, string subscriptionId, string resourceGroup, ContainerAppsFunctionPayload payload)
+        public static async Task<string> CreateFunctionAppOnContainerService(string accessToken, string managementURL, string subscriptionId, string resourceGroup, ContainerAppsFunctionPayload payload)
         {
+            string hostName = string.Empty;
             var url = new Uri($"{managementURL}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/sites/{payload.Name}?api-version={ArmUriTemplates.FunctionAppOnContainerAppsApiVersion}");
             ColoredConsole.WriteLine(Constants.FunctionAppDeploymentToContainerAppsMessage);
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, payload);
@@ -527,6 +528,9 @@ namespace Azure.Functions.Cli.Helpers
                 if (getResponse.StatusCode != System.Net.HttpStatusCode.Accepted)
                 {
                     getResponse.EnsureSuccessStatusCode();
+                    var content = await getResponse.Content.ReadAsStringAsync();
+                    var deployResponse = JsonConvert.DeserializeObject<ContainerAppFunctonCreateResponse>(content);
+                    hostName = deployResponse?.Properties?.DefaultHostName;
                     break;
                 }
 
@@ -542,6 +546,7 @@ namespace Azure.Functions.Cli.Helpers
 
             ColoredConsole.Write(Environment.NewLine);
             ColoredConsole.WriteLine($"The functon app \"{payload.Name}\" was successfully deployed.");
+            return hostName;
         }
 
         public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
