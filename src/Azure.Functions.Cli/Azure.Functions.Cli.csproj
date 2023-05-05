@@ -145,24 +145,6 @@
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\NewTemplate-Python-HttpTrigger-function_app.py">
-      <LogicalName>$(AssemblyName).NewTemplate-Python-HttpTrigger-function_app.py</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\NewTemplate-Python-HttpTrigger-function_body.py">
-      <LogicalName>$(AssemblyName).NewTemplate-Python-HttpTrigger-function_body.py</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\NewTemplate-Python-HttpTrigger-Template.json">
-      <LogicalName>$(AssemblyName).NewTemplate-Python-HttpTrigger-Template.json</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\NewTemplate-Python-TimerTrigger-function_app.py">
-      <LogicalName>$(AssemblyName).NewTemplate-Python-TimerTrigger-function_app.py</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\NewTemplate-Python-TimerTrigger-function_body.py">
-      <LogicalName>$(AssemblyName).NewTemplate-Python-TimerTrigger-function_body.py</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\NewTemplate-Python-TimerTrigger-Template.json">
-      <LogicalName>$(AssemblyName).NewTemplate-Python-TimerTrigger-Template.json</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\NewTemplate-userPrompts.json">
       <LogicalName>$(AssemblyName).NewTemplate-userPrompts.json</LogicalName>
     </EmbeddedResource> 
