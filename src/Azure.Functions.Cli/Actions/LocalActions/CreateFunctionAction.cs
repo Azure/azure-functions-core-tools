@@ -322,11 +322,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return GetLanguageTemplates(templateLanguage, forNewModelHelp).Select(t => t.Metadata.Name).Distinct();
         }
 
-        private IEnumerable<string> GetTriggerTypesForHelp(string templateLanguage)
-        {
-            return GetLanguageTemplates(templateLanguage, forNewModelHelp: true).Select(t => t.Metadata.TriggerType).Distinct();
-        }
-
         private IEnumerable<Template> GetLanguageTemplates(string templateLanguage, bool forNewModelHelp = false)
         {
             if (IsNewNodeJsProgrammingModel(workerRuntime) ||
@@ -455,13 +450,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            var triggerNames = GetTriggerNames(Language, forNewModelHelp: true);
-            await _contextHelpManager.LoadTriggerHelp(Language, triggerNames.ToList());
-            if (_contextHelpManager.IsValidTriggerNameForHelp(triggerName))
+            IEnumerable<string> triggerNames;
+            if (Languages.Python.EqualsIgnoreCase(Language))
             {
-                triggerName = _contextHelpManager.GetTriggerTypeFromTriggerNameForHelp(triggerName);
+                triggerNames = GetTriggerNamesFromNewTemplates(Language, forNewModelHelp: true);
             }
-            if (promptQuestions && !_contextHelpManager.IsValidTriggerTypeForHelp(triggerName))
+            else
             {
                 triggerNames = GetTriggerNames(Language, forNewModelHelp: true);
             }
