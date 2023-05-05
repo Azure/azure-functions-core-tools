@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -15,6 +16,7 @@ using Fclp;
 using ImTools;
 using Microsoft.Azure.AppService.Proxy.Common.Context;
 using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.Constants;
@@ -32,6 +34,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly IContextHelpManager _contextHelpManager;
         private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
+        Lazy<IEnumerable<UserPrompt>> _userPrompts;
         public WorkerRuntime workerRuntime;
 
         public string Language { get; set; }
@@ -54,6 +57,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _userInputHandler = new UserInputHandler(_templatesManager);
             _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
             _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
+            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -136,10 +140,37 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNamesFromNewTemplates(Language));
                 }
 
-                var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
-                var templateJob = template.Jobs.Single(x => x.Type.Equals("appendToFile", StringComparison.OrdinalIgnoreCase));
+                if (string.IsNullOrEmpty(FileName))
+                {
+                    var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
+                    while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
+                    {
+                        _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
+                        FileName = Console.ReadLine();
+                        if (string.IsNullOrEmpty(FileName))
+                        {
+                            FileName = PySteinFunctionAppPy;
+                        }
+                    }
+                }
+
                 var variables = new Dictionary<string, string>();
-                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName }, { GetFileNameParamId, FileName } };
+                var jobName = "appendToFile";
+                if (FileName != PySteinFunctionAppPy)
+                {
+                    var filePath = Path.Combine(Environment.CurrentDirectory, FileName);
+                    jobName = !FileUtility.FileExists(filePath) ? "CreateNewBlueprint" : "AppendToBlueprint";
+                    variables["$(BLUEPRINT_FILENAME)"] = FileName;
+                    FunctionName = FileName[..^Path.GetExtension(FileName).Length];
+                }
+                else
+                {
+                    variables["$(SELECTED_FILEPATH)"] = FileName;
+                }
+
+                var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
+                var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
+                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName } };
 
                 _userInputHandler.RunUserInputActions(providedInputs, templateJob.Inputs, variables);
 
@@ -147,12 +178,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     FunctionName = providedInputs[GetFunctionNameParamId];
                 }
-                else if (string.IsNullOrEmpty(FileName))
-                {
-                    FileName = providedInputs[GetFileNameParamId];
-                }
 
-                var actions = template.Actions.Where(x => templateJob.Actions.Contains(x.Name, StringComparer.OrdinalIgnoreCase)).ToList();
                 await _templatesManager.Deploy(templateJob, template, variables);
             }
             else

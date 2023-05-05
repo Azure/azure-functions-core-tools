@@ -11,6 +11,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Routing.Constraints;
 using Microsoft.CodeAnalysis;
+using System.IO.Abstractions;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -230,42 +231,6 @@ namespace Azure.Functions.Cli.Common
             return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(staticTemplateJson);
         }
 
-        private async Task<IEnumerable<NewTemplate>> GetNewTemplates()
-        {
-            return await GetStaticNewTemplates();
-        }
-
-        private static async Task<IEnumerable<NewTemplate>> GetStaticNewTemplates()
-        {
-            // We will add more templates
-            var templatesList = new string[] {
-                "HttpTrigger",
-                "TimerTrigger"
-            };
-
-            var templates = new List<NewTemplate>();
-            foreach (var templateName in templatesList)
-            {
-                templates.Add(await CreateStaticNewTemplate(templateName));
-            }
-            return templates;
-        }
-
-        private static async Task<NewTemplate> CreateStaticNewTemplate(string templateName)
-        {
-            var prefix = "NewTemplate-Python";
-            var templaeFileName = $"{prefix}-{templateName}-Template.json";
-            var templateContentStr = await StaticResources.GetValue(templaeFileName);
-            var template = JsonConvert.DeserializeObject<NewTemplate>(templateContentStr);
-            template.Files = new Dictionary<string, string>
-            {
-                { Constants.PySteinFunctionAppPy, await StaticResources.GetValue($"{prefix}-{templateName}-function_app.py") },
-                { Constants.PythonProgrammingModelFunctionBodyFileKey, await StaticResources.GetValue($"{prefix}-{templateName}-function_body.py") },
-            };
-
-            return template;
-        }
-
         public Task<IEnumerable<UserPrompt>> UserPrompts
         {
             get
@@ -373,7 +338,15 @@ namespace Azure.Functions.Cli.Common
                 if (variable.Key == action.Source)
                     continue;
 
-                sourceContent = sourceContent.Replace(variable.Key, variable.Value);
+                var value = variable.Value;
+                
+                // this is an special condition. Only filename without extension is replaced. 
+                if (variable.Key == "$(BLUEPRINT_FILENAME)")
+                {
+                    value = value[..^Path.GetExtension(value).Length];
+                }   
+
+                sourceContent = sourceContent.Replace(variable.Key, value);
             }
 
             return sourceContent;

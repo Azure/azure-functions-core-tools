@@ -46,12 +46,6 @@
         "type": "AppendToFile",
         "inputs": [
           {
-            "assignTo": "$(APP_FILENAME)",
-            "paramId": "app-selectedFileName",
-            "defaultValue": "function_app.py",
-            "required": true
-          },
-          {
             "assignTo": "$(FUNCTION_NAME_INPUT)",
             "paramId": "trigger-functionName",
             "required": true,
@@ -79,12 +73,6 @@
         "name": "Create New Blueprint file",
         "type": "CreateNewBlueprint",
         "inputs": [
-          {
-            "assignTo": "$(BLUEPRINT_FILENAME)",
-            "paramId": "blueprint-fileName",
-            "defaultValue": "blueprint.py",
-            "required": true
-          },
           {
             "assignTo": "$(FUNCTION_NAME_INPUT)",
             "paramId": "trigger-functionName",
@@ -115,11 +103,6 @@
         "name": "Add EventHubTrigger function to the Blueprint",
         "type": "AppendToBlueprint",
         "inputs": [
-          {
-            "assignTo": "$(BLUEPRINT_FILENAME)",
-            "paramId": "blueprint-existingFileName",
-            "required": true
-          },
           {
             "assignTo": "$(FUNCTION_NAME_INPUT)",
             "paramId": "trigger-functionName",
@@ -172,7 +155,7 @@
         "type": "AppendToFile",
         "createIfNotExists": false,
         "source": "$(FUNCTION_BODY)",
-        "filePath": "$(APP_FILENAME)",
+        "filePath": "$(SELECTED_FILEPATH)",
         "continueOnError": false,
         "errorText": "Unable to create eventhub trigger function",
         "replaceTokens": true
@@ -192,7 +175,7 @@
         "name": "writeFile_BlueprintFile",
         "type": "WriteToFile",
         "source": "$(BLUEPRINT_CONTENT)",
-        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "filePath": "$(BLUEPRINT_FILENAME)",
         "continueOnError": false,
         "errorText": "Unable to create blueprint",
         "replaceTokens": true
@@ -207,7 +190,7 @@
         "name": "appendFileContent_BlueprintBody",
         "type": "AppendToFile",
         "source": "$(BLUEPRINT_BODY_CONTENT)",
-        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "filePath": "$(BLUEPRINT_FILENAME)",
         "continueOnError": false,
         "errorText": "Unable to create the Blueprint",
         "replaceTokens": true
@@ -262,10 +245,6 @@
         "type": "AppendToFile",
         "inputs": [
           {
-            "assignTo": "$(SELECTED_FILEPATH)",
-            "paramId": "app-selectedFileName"
-          },
-          {
             "assignTo": "$(FUNCTION_NAME_INPUT)",
             "paramId": "trigger-functionName",
             "defaultValue": "HttpTrigger"
@@ -286,12 +265,6 @@
         "type": "CreateNewBlueprint",
         "inputs": [
           {
-            "assignTo": "$(BLUEPRINT_FILENAME)",
-            "paramId": "blueprint-fileName",
-            "defaultValue": "blueprint.py",
-            "required": true
-          },
-          {
             "assignTo": "$(AUTHLEVEL_INPUT)",
             "paramId": "httpTrigger-authLevel",
             "required": true,
@@ -309,12 +282,6 @@
         "name": "Add EventHubTrigger function to the Blueprint",
         "type": "AppendToBlueprint",
         "inputs": [
-          {
-            "assignTo": "$(BLUEPRINT_FILENAME)",
-            "paramId": "blueprint-existingFileName",
-            "defaultValue": "blueprint.py",
-            "required": true
-          },
           {
             "assignTo": "$(AUTHLEVEL_INPUT)",
             "paramId": "httpTrigger-authLevel",
@@ -381,7 +348,7 @@
         "name": "appendFileContent_BlueprintBody",
         "type": "AppendToFile",
         "source": "$(BLUEPRINT_BODY_CONTENT)",
-        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "filePath": "$(BLUEPRINT_FILENAME)",
         "continueOnError": false,
         "errorText": "Unable to create the Blueprint",
         "replaceTokens": true
@@ -390,7 +357,7 @@
         "name": "writeFile_BlueprintFile",
         "type": "WriteToFile",
         "source": "$(BLUEPRINT_CONTENT)",
-        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "filePath": "$(BLUEPRINT_FILENAME)",
         "continueOnError": false,
         "errorText": "Unable to create blueprint",
         "replaceTokens": true
@@ -442,10 +409,6 @@
         "type": "AppendToFile",
         "inputs": [
           {
-            "assignTo": "$(SELECTED_FILEPATH)",
-            "paramId": "app-selectedFileName"
-          },
-          {
             "assignTo": "$(FUNCTION_NAME_INPUT)",
             "paramId": "trigger-functionName",
             "defaultValue": "TimerTrigger"
@@ -466,12 +429,6 @@
         "name": "Create New Blueprint file",
         "type": "CreateNewBlueprint",
         "inputs": [
-          {
-            "assignTo": "$(BLUEPRINT_FILENAME)",
-            "paramId": "blueprint-fileName",
-            "defaultValue": "blueprint.py",
-            "required": true
-          },
           {
             "assignTo": "$(FUNCTION_NAME_INPUT)",
             "paramId": "trigger-functionName",
@@ -494,12 +451,6 @@
         "name": "Add EventHubTrigger function to the Blueprint",
         "type": "AppendToBlueprint",
         "inputs": [
-          {
-            "assignTo": "$(BLUEPRINT_FILENAME)",
-            "paramId": "blueprint-existingFileName",
-            "defaultValue": "blueprint.py",
-            "required": true
-          },
           {
             "assignTo": "$(FUNCTION_NAME_INPUT)",
             "paramId": "trigger-functionName",
@@ -574,7 +525,7 @@
         "name": "appendFileContent_BlueprintBody",
         "type": "AppendToFile",
         "source": "$(BLUEPRINT_BODY_CONTENT)",
-        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "filePath": "$(BLUEPRINT_FILENAME)",
         "continueOnError": false,
         "errorText": "Unable to create the Blueprint",
         "replaceTokens": true
@@ -583,7 +534,7 @@
         "name": "writeFile_BlueprintFile",
         "type": "WriteToFile",
         "source": "$(BLUEPRINT_CONTENT)",
-        "filePath": "$(BLUEPRINT_FILENAME).py",
+        "filePath": "$(BLUEPRINT_FILENAME)",
         "continueOnError": false,
         "errorText": "Unable to create blueprint",
         "replaceTokens": true
@@ -592,9 +543,9 @@
     "id": "TimerTrigger-Python",
     "files": {
       "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nfrom azure.functions import Blueprint\r\n\r\n$(BLUEPRINT_FILENAME) = Blueprint()",
-      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).timer_trigger(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)",
       "function_app.py": "import datetime\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)",
-      "function_body.py": "@app.timer_trigger(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    \r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran')",
+      "function_body.py": "@app.schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    \r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran')",
       "timer_trigger_template.md": "# Azure Functions: Timer Trigger in Python\r\n\r\n## Timer Trigger\r\n\r\nA timer trigger lets you run a function on a schedule.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Timer Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport datetime\r\n\r\nimport logging\r\n\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"mytimer\")\r\n@app.schedule(schedule=\"0 */5 * * * *\", arg_name=\"mytimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef test_function(mytimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if mytimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n\r\n## Programming Model V2 (Preview)\r\n\r\nThe new programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nThe improved programming model requires fewer files than the default model, and specifically eliminates the need for a configuration file (`function.json`). Instead, triggers and bindings are represented in the `function_app.py` file as decorators. Moreover, functions can be logically organized with support for multiple functions to be stored in the same file. Functions within the same function application can also be stored in different files, and be referenced as blueprints.\r\n\r\nTo learn more about using the new Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.\r\n\r\nTo learn more about the new programming model for Azure Functions in Python, see [Programming Models in Azure Functions](https://aka.ms/functions-programming-models)."
     }
   }

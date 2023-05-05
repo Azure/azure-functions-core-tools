@@ -14,6 +14,8 @@ namespace Azure.Functions.Cli.Actions
     internal interface IUserInputHandler
     {
         public void RunUserInputActions(IDictionary<string, string> providedValues, IList<TemplateJobInput> inputs, IDictionary<string, string> variables);
+        public bool ValidateResponse(UserPrompt userPrompt, string response);
+        public void PrintInputLabel(UserPrompt userPrompt, string defaultValue);
     }
     
     internal class UserInputHandler : IUserInputHandler
@@ -88,17 +90,7 @@ namespace Azure.Functions.Cli.Actions
             }
         }
 
-        private void PrintInputLabel(UserPrompt userPrompt, string defaultValue)
-        {
-            var label = LabelMap(userPrompt.Label);
-            ColoredConsole.Write($"{label}: ");
-            if (!string.IsNullOrEmpty(defaultValue))
-            {
-                ColoredConsole.Write($"[{defaultValue}] ");
-            }
-        }
-
-        private bool ValidateResponse(UserPrompt userPrompt, string response)
+        public bool ValidateResponse(UserPrompt userPrompt, string response)
         {
             if (response == null)
             {
@@ -120,6 +112,16 @@ namespace Azure.Functions.Cli.Actions
             }
 
             return isValid;
+        }
+
+        public void PrintInputLabel(UserPrompt userPrompt, string defaultValue)
+        {
+            var label = LabelMap(userPrompt.Label);
+            ColoredConsole.Write($"{label}: ");
+            if (!string.IsNullOrEmpty(defaultValue))
+            {
+                ColoredConsole.Write($"[{defaultValue}] ");
+            }
         }
 
         private string LabelMap(string label)
