@@ -398,11 +398,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (language == Constants.Languages.TypeScript)
                 {
-                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypescript);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypescriptNode18);
                 }
                 else
                 {
-                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileNode16);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileNode18);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
