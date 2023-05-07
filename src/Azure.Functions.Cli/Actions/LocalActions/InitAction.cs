@@ -143,6 +143,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FolderName = args.First();
             }
 
+            // testing
             return base.ParseArgs(args);
         }
 
