@@ -13,7 +13,7 @@
     "help": "$trigger_functionName_help",
     "validators": [
       {
-        "expression": "^[a-zA-Z][a-zA-Z0-9]{0,127}$",
+        "expression": "^[a-zA-Z][a-zA-Z0-9_]{0,126}[a-zA-Z0-9]$",
         "errorText": "[variables('parameterName')]"
       }
     ]
@@ -25,16 +25,16 @@
     "defaultValue": "function",
     "enum": [
       {
-        "value": "function",
-        "display": "Function"
+        "value": "FUNCTION",
+        "display": "FUNCTION"
       },
       {
-        "value": "anonymous",
-        "display": "Anonymous"
+        "value": "ANONYMOUS",
+        "display": "ANONYMOUS"
       },
       {
-        "value": "admin",
-        "display": "Admin"
+        "value": "ADMIN",
+        "display": "ADMIN"
       }
     ],
     "label": "$httpTrigger_authLevel_label",
