@@ -34,6 +34,9 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="StaticResources\templatesv2.json" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
@@ -142,8 +145,20 @@
     <EmbeddedResource Include="StaticResources\local.settings.json.template">
       <LogicalName>$(AssemblyName).local.settings.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\NewTemplate-userPrompts.json">
+      <LogicalName>$(AssemblyName).NewTemplate-userPrompts.json</LogicalName>
+    </EmbeddedResource> 
     <EmbeddedResource Include="StaticResources\node-v4-templates.json">
       <LogicalName>$(AssemblyName).node-v4-templates.json</LogicalName>
+    </EmbeddedResource> 
+    <EmbeddedResource Include="StaticResources\Python-HttpTrigger-help.txt">
+      <LogicalName>$(AssemblyName).python-HttpTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Python-TimerTrigger-help.txt">
+      <LogicalName>$(AssemblyName).python-TimerTrigger-help.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\templatesv2.json">
+      <LogicalName>$(AssemblyName).templatesv2.json</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Typescript-BlobTrigger-help.txt">
       <LogicalName>$(AssemblyName).typescript-BlobTrigger-help.txt</LogicalName>
