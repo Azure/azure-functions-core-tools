@@ -80,6 +80,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>('f', "file")
                 .WithDescription("File Name")
+                .SetDefault("function_app.py")
                 .Callback(f => FileName = f);
 
             Parser
@@ -140,17 +141,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNamesFromNewTemplates(Language));
                 }
 
-                if (string.IsNullOrEmpty(FileName))
+                var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
+                while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
                 {
-                    var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
-                    while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
+                    _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
+                    FileName = Console.ReadLine();
+                    if (string.IsNullOrEmpty(FileName))
                     {
-                        _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
-                        FileName = Console.ReadLine();
-                        if (string.IsNullOrEmpty(FileName))
-                        {
-                            FileName = PySteinFunctionAppPy;
-                        }
+                        FileName = PySteinFunctionAppPy;
                     }
                 }
 
