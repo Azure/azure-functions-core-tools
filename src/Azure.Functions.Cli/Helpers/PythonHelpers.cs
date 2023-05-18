@@ -165,7 +165,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. Python 3.6.x, 3.7.x, 3.8.x, 3.9.x, or 3.10.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. Python 3.6.x, 3.7.x, 3.8.x, 3.9.x, 3.10.x or 3.11.x is recommended, and used in Azure Functions.";
                 if (errorIfNoVersion) throw new CliException(message);
                 ColoredConsole.WriteLine(WarningColor(message));
                 return;
@@ -173,23 +173,23 @@ namespace Azure.Functions.Cli.Helpers
 
             ColoredConsole.WriteLine(AdditionalInfoColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
 
-            // Python 3.[6|7|8|9|10] (supported)
+            // Python 3.[6|7|8|9|10|11] (supported)
             if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
 
-            // Python 3.x (but not 3.[6|7|8|9|10]), not recommended, may fail. E.g.: 3.4, 3.5.
+            // Python 3.x (but not 3.[6|7|8|9|10|11]), not recommended, may fail. E.g.: 3.4, 3.5.
             if (pythonVersion.Major == 3)
             {
                 if (errorIfNotSupported)
-                    throw new CliException($"Python 3.6.x to 3.10.x is required for this operation. " +
-                        $"Please install Python 3.6, 3.7, 3.8, 3.9, or 3.10 and use a virtual environment to switch to Python 3.6, 3.7, 3.8, 3.9, or 3.10.");
-                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x, 3.8.x, 3.9.x, or 3.10.x is recommended, and used in Azure Functions."));
+                    throw new CliException($"Python 3.6.x to 3.11.x is required for this operation. " +
+                        $"Please install Python 3.6, 3.7, 3.8, 3.9, 3.10 or 3.11 and use a virtual environment to switch to Python 3.6, 3.7, 3.8, 3.9, 3.10 or 3.11.");
+                ColoredConsole.WriteLine(WarningColor("Python 3.6.x, 3.7.x, 3.8.x, 3.9.x, 3.10.x or 3.11.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.[6|7|8|9|10]) is required.";
+            var error = "Python 3.x (recommended version 3.[6|7|8|9|10|11]) is required.";
             if (errorIfNoVersion) throw new CliException(error);
             ColoredConsole.WriteLine(WarningColor(error));
         }
@@ -222,6 +222,7 @@ namespace Azure.Functions.Cli.Helpers
             var python38GetVersionTask = GetVersion("python3.8");
             var python39GetVersionTask = GetVersion("python3.9");
             var python310GetVersionTask = GetVersion("python3.10");
+            var python311GetVersionTask = GetVersion("python3.11");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
@@ -233,6 +234,7 @@ namespace Azure.Functions.Cli.Helpers
                 await python38GetVersionTask,
                 await python39GetVersionTask,
                 await python310GetVersionTask,
+                await python311GetVersionTask,
             };
 
             // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
@@ -553,6 +555,8 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython39;
                     case 10:
                         return StaticResources.DockerfilePython310;
+                    case 11:
+                        return StaticResources.DockerfilePython311;
                 }
             }
             return StaticResources.DockerfilePython37;
@@ -574,6 +578,8 @@ namespace Azure.Functions.Cli.Helpers
                         return Constants.DockerImages.LinuxPython39ImageAmd64;
                     case 10:
                         return Constants.DockerImages.LinuxPython310ImageAmd64;
+                    case 11:
+                        return Constants.DockerImages.LinuxPython311ImageAmd64;
                 }
             }
             return Constants.DockerImages.LinuxPython36ImageAmd64;
@@ -585,6 +591,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
+                    case 11:
                     case 10:
                     case 9:
                     case 8:
