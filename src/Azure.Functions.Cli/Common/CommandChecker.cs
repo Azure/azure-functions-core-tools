@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,9 +12,10 @@ namespace Azure.Functions.Cli.Common
         public static bool CommandValid(string fileName, string args)
             => CheckExitCode(fileName, args);
 
+        // c:\windows\system32\where.exe
         public static bool CommandExists(string command)
             => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? CheckExitCode("where", command)
+            ? CheckExitCode($"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe", command)
             : CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
 
         public static async Task<bool> PowerShellModuleExistsAsync(string powershellExecutable, string module)
