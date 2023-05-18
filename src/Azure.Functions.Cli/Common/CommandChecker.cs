@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Common
         // c:\windows\system32\where.exe
         public static bool CommandExists(string command)
             => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? CheckExitCode($"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe", command)
+            ? CheckExitCode($"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where", command)
             : CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
 
         public static async Task<bool> PowerShellModuleExistsAsync(string powershellExecutable, string module)
