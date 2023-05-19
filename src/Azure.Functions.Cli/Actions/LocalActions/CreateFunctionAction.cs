@@ -140,17 +140,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNamesFromNewTemplates(Language));
                 }
 
-                if (string.IsNullOrEmpty(FileName))
+                // Defaulting the filename to "function_app.py" if the file name is not provided. 
+                if (string.IsNullOrWhiteSpace(FileName))
                 {
-                    var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
-                    while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
+                    FileName = "function_app.py";
+                }
+
+                var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
+                while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
+                {
+                    _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
+                    FileName = Console.ReadLine();
+                    if (string.IsNullOrEmpty(FileName))
                     {
-                        _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
-                        FileName = Console.ReadLine();
-                        if (string.IsNullOrEmpty(FileName))
-                        {
-                            FileName = PySteinFunctionAppPy;
-                        }
+                        FileName = PySteinFunctionAppPy;
                     }
                 }
 
@@ -179,6 +182,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     FunctionName = providedInputs[GetFunctionNameParamId];
                 }
 
+                
                 await _templatesManager.Deploy(templateJob, template, variables);
             }
             else

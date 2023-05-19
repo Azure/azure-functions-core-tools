@@ -90,20 +90,23 @@
       }
     ]
   },
+
   {
     "id": "blobTrigger-connection",
     "name": "blobTrigger-connection",
     "value": "string",
-    "label": "$blobTrigger_path_label",
-    "help": "$blobTrigger_path_help"
+    "resource": "Blob",
+    "label": "$blobTrigger_connection_label",
+    "help": "$blobTrigger_connection_help",
+    "placeholder": "$variables_selectConnection"
   },
   {
-    "id": "cosmosDBTrigger-connectionStringSetting",
-    "name": "cosmosDBTrigger-connectionStringSetting",
+    "id": "cosmosDBTrigger-connection",
+    "name": "cosmosDBTrigger-connection",
     "value": "string",
     "resource": "DocumentDB",
-    "label": "$cosmosDBIn_connection_label",
-    "help": "$cosmosDBIn_connection_help",
+    "label": "$cosmosDB_connection_label",
+    "help": "$cosmosDB_connection_help",
     "placeholder": "$variables_selectConnection"
   },
   {
@@ -111,31 +114,31 @@
     "name": "cosmosDBTrigger-databaseName",
     "value": "string",
     "defaultValue": "",
-    "label": "$cosmosDBIn_databaseName_label",
-    "help": "$cosmosDBIn_databaseName_help"
+    "label": "$cosmosDB_databaseName_label",
+    "help": "$cosmosDB_databaseName_help"
   },
   {
-    "id": "cosmosDBTrigger-collectionName",
-    "name": "cosmosDBTrigger-collectionName",
+    "id": "cosmosDBTrigger-containerName",
+    "name": "cosmosDBTrigger-containerName",
     "value": "string",
     "defaultValue": "",
-    "label": "$cosmosDBIn_collectionName_label",
-    "help": "$cosmosDBIn_collectionName_help"
+    "label": "$cosmosDB_containerName_label",
+    "help": "$cosmosDB_containerName_help"
   },
   {
-    "id": "cosmosDBTrigger-leaseCollectionName",
-    "name": "cosmosDBTrigger-leaseCollectionName",
+    "id": "cosmosDBTrigger-leaseContainerName",
+    "name": "cosmosDBTrigger-leaseContainerName",
     "value": "string",
-    "label": "$cosmosDBIn_leaseCollectionName_label",
-    "help": "$cosmosDBIn_leaseCollectionName_help"
+    "label": "$cosmosDB_leaseContainerName_label",
+    "help": "$cosmosDB_leaseContainer_help"
   },
   {
-    "id": "cosmosDBTrigger-createLeaseCollectionIfNotExists",
-    "name": "cosmosDBTrigger-createLeaseCollectionIfNotExists",
+    "id": "cosmosDBTrigger-createLeaseContainerIfNotExists",
+    "name": "cosmosDBTrigger-createLeaseContainerIfNotExists",
     "value": "boolean",
     "defaultValue": true,
-    "label": "$cosmosDBIn_createIfNotExists_label",
-    "help": "$cosmosDBIn_createIfNotExists_help"
+    "label": "$cosmosDB_createIfNotExists_label",
+    "help": "$cosmosDB_createIfNotExists_help"
   },
   {
     "id": "eventHubTrigger-connection",
@@ -213,6 +216,20 @@
       }
     ],
     "validators": []
+  },
+  {
+    "id": "eventGridTrigger-eventGridName",
+    "name": "eventGridTrigger-eventGridName",
+    "value": "string",
+    "defaultValue": "myeventgrid",
+    "label": "$eventGrid_name_label",
+    "help": "$eventGrid_name_label_help",
+    "validators": [
+      {
+        "expression": "^[a-zA-Z0-9]$|^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,48}[a-zA-Z0-9]$|^[{][a-zA-Z0-9]{1,126}[}]$|^[%][a-zA-Z0-9]{1,126}[%]$",
+        "errorText": "$eventGrid_name_label_errorText"
+      }
+    ]
   },
   {
     "id": "serviceBusTrigger-connection",
