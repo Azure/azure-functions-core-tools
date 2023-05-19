@@ -554,7 +554,7 @@
     ],
     "id": "TimerTrigger-Python",
     "files": {
-      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nimport logging\r\nimport azure.functions as func\r\nfrom azure.functions import Blueprint\r\n\r\n$(BLUEPRINT_FILENAME) = Blueprint()",
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nimport logging\r\nimport azure.functions as func\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()",
       "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function executed')",
       "function_app.py": "import datetime\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)",
       "function_body.py": "\r\n@app.schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    \r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function executed')",
@@ -1391,6 +1391,12 @@
             "defaultValue": "servicebustopicname"
           },
           {
+            "assignTo": "$(SERVICEBUS_SUBSCRIPTION_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-subscriptionName",
+            "required": true,
+            "defaultValue": "servicebussubscriptionName"
+          },
+          {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
             "paramId": "serviceBusTrigger-connection",
             "required": true,
@@ -1418,6 +1424,12 @@
             "paramId": "serviceBusTrigger-topicName",
             "required": true,
             "defaultValue": "servicebustopicname"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_SUBSCRIPTION_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-subscriptionName",
+            "required": true,
+            "defaultValue": "servicebussubscriptionName"
           },
           {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
@@ -1448,6 +1460,12 @@
             "defaultValue": "servicebustopicname"
           },
           {
+            "assignTo": "$(SERVICEBUS_SUBSCRIPTION_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-subscriptionName",
+            "required": true,
+            "defaultValue": "servicebussubscriptionName"
+          },
+          {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
             "paramId": "serviceBusTrigger-connection",
             "required": true,
@@ -1476,6 +1494,12 @@
             "paramId": "serviceBusTrigger-topicName",
             "required": true,
             "defaultValue": "servicebustopicname"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_SUBSCRIPTION_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-subscriptionName",
+            "required": true,
+            "defaultValue": "servicebussubscriptionName"
           },
           {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
@@ -1561,9 +1585,9 @@
     "id": "ServiceBusTopicTrigger-Python",
     "files": {
       "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\nimport logging\r\nimport azure.functions as func\r\n\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()",
-      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).service_bus_topic_trigger(arg_name=\"azservicebus\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
-      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.service_bus_topic_trigger(arg_name=\"azservicebus\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
-      "function_body.py": "\r\n@app.service_bus_topic_trigger(arg_name=\"azservicebus\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).service_bus_topic_trigger(arg_name=\"azservicebus\", subscription_name=\"$(SERVICEBUS_SUBSCRIPTION_NAME_INPUT)\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.service_bus_topic_trigger(arg_name=\"azservicebus\", $(SERVICEBUS_SUBSCRIPTION_NAME_INPUT) topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "function_body.py": "\r\n@app.service_bus_topic_trigger(arg_name=\"azservicebus\", subscription_name=\"$(SERVICEBUS_SUBSCRIPTION_NAME_INPUT)\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
       "servicebustopic_trigger_template.md": "# Azure Functions: Service Bus Topic Trigger in Python\r\n\r\n## Service Bus Topic Trigger\r\n\r\nUse the Service Bus Queue trigger to respond to messages from a Service Bus topic. Starting with extension version 3.1.0, you can trigger on a session-enabled topic.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Service Bus Topic Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"ServiceBusTopicTrigger1\")\r\n@app.service_bus_topic_trigger(arg_name=\"message\", topic_name=\"mytopic\", connection=\"<CONNECTION_SETTING>\", subscription_name=\"testsub\")\r\ndef test_function(message: func.ServiceBusMessage):\r\n    message_body = message.get_body().decode(\"utf-8\")\r\n    logging.info(\"Python ServiceBus topic trigger processed message.\")\r\n    logging.info(\"Message Body: \" + message_body)\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n  \r\nNote that Service Bus output bindings are also supported in Azure Functions. To learn more, see [Azure Service Bus bindings for Azure Functions](https://aka.ms/azure-function-binding-service-bus)\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files."
     }
   },
