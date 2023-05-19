@@ -80,7 +80,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<string>('f', "file")
                 .WithDescription("File Name")
-                .SetDefault("function_app.py")
                 .Callback(f => FileName = f);
 
             Parser
@@ -139,6 +138,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
                     TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNamesFromNewTemplates(Language));
+                }
+
+                // Defaulting the filename to "function_app.py" if the file name is not provided. 
+                if (string.IsNullOrWhiteSpace(FileName))
+                {
+                    FileName = "function_app.py";
                 }
 
                 var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
