@@ -142,11 +142,11 @@ namespace Azure.Functions.Cli.Actions
                 { "$httpTrigger_authLevel_label", "Auth Level" },
                 { "$queueTrigger_queueName_label", "Queue Name" },
                 { "$variables_storageConnStringLabel", "Storage Connection String" },
-                { "cosmosDBTrigger-connectionStringSetting", "CosmosDB Connectiong Stirng" },
-                { "$cosmosDBIn_databaseName_label", "CosmosDB Database Name" },
-                { "$cosmosDBIn_collectionName_label", "CosmosDB Collection Name" },
-                { "$cosmosDBIn_leaseCollectionName_label", "CosmosDB Lease Collection Name" },
-                { "$cosmosDBIn_createIfNotExists_label", "Create If Not Exists" },
+                { "$cosmosDB_connection_label", "CosmosDB Connection String" },
+                { "$cosmosDB_databaseName_label", "CosmosDB Database Name" },
+                { "$cosmosDB_containerName_label", "CosmosDB Container Name" },
+                { "$cosmosDB_leaseContainerName_label", "CosmosDB Lease Container Name" },
+                { "$cosmosDB_createIfNotExists_label", "Create If Not Exists" },
                 { "$eventHubTrigger_connection_label", "EventHub Connection" },
                 { "$eventHubOut_path_label", "EventHub Out Path" },
                 { "$eventHubTrigger_consumerGroup_label", "EventHub Consumer Group" },
@@ -155,7 +155,10 @@ namespace Azure.Functions.Cli.Actions
                 { "$serviceBusTrigger_queueName_label", "Service Bus Queue Name" },
                 { "$serviceBusTrigger_topicName_label", "Service Bus Topic Name" },
                 { "$serviceBusTrigger_subscriptionName_label", "Service Bus Subscripton Name" },
-                {"$timerTrigger_schedule_label", "Schedule" },
+                { "$timerTrigger_schedule_label", "Schedule" },
+                { "$blobTrigger_path_label", "Container Path" },
+                { "$blobTrigger_connection_label", "Storage Account Connection String" },
+                { "$eventGrid_name_label", "EventGrid Name" },
             };
         }
     }

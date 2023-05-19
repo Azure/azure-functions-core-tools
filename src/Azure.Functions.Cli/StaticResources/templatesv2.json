@@ -26,7 +26,7 @@
             "assignTo": "$(EVENTHUB_NAME_INPUT)",
             "paramId": "eventhubTrigger-eventhubName",
             "required": true,
-            "defaultValue": "myeventhub"
+            "defaultValue": "eventhubname"
           },
           {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
@@ -55,13 +55,13 @@
             "assignTo": "$(EVENTHUB_NAME_INPUT)",
             "paramId": "eventhubTrigger-eventhubName",
             "required": true,
-            "defaultValue": "myeventhub"
+            "defaultValue": "eventhubname"
           },
           {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
             "paramId": "eventhubTrigger-connection",
             "required": true,
-            "defaultValue": ""
+            "defaultValue": "EventHubConnectionString"
           }
         ],
         "actions": [
@@ -83,13 +83,13 @@
             "assignTo": "$(EVENTHUB_NAME_INPUT)",
             "paramId": "eventhubTrigger-eventhubName",
             "required": true,
-            "defaultValue": "myeventhub"
+            "defaultValue": "eventhubname"
           },
           {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
             "paramId": "eventhubTrigger-connection",
             "required": true,
-            "defaultValue": ""
+            "defaultValue": "EventHubConnectionString"
           }
         ],
         "actions": [
@@ -113,13 +113,13 @@
             "assignTo": "$(EVENTHUB_NAME_INPUT)",
             "paramId": "eventhubTrigger-eventhubName",
             "required": true,
-            "defaultValue": "myeventhub"
+            "defaultValue": "eventhubname"
           },
           {
             "assignTo": "$(CONNECTION_STRING_INPUT)",
             "paramId": "eventhubTrigger-connection",
             "required": true,
-            "defaultValue": ""
+            "defaultValue": "EventHubConnectionString"
           }
         ],
         "actions": [
@@ -231,7 +231,7 @@
             "assignTo": "$(AUTHLEVEL_INPUT)",
             "paramId": "httpTrigger-authLevel",
             "required": true,
-            "defaultValue": "function"
+            "defaultValue": "FUNCTION"
           }
         ],
         "actions": [
@@ -252,7 +252,7 @@
           {
             "assignTo": "$(AUTHLEVEL_INPUT)",
             "paramId": "httpTrigger-authLevel",
-            "defaultValue": "function"
+            "defaultValue": "FUNCTION"
           }
         ],
         "actions": [
@@ -274,7 +274,7 @@
             "assignTo": "$(AUTHLEVEL_INPUT)",
             "paramId": "httpTrigger-authLevel",
             "required": true,
-            "defaultValue": "function"
+            "defaultValue": "FUNCTION"
           }
         ],
         "actions": [
@@ -298,7 +298,7 @@
             "assignTo": "$(AUTHLEVEL_INPUT)",
             "paramId": "httpTrigger-authLevel",
             "required": true,
-            "defaultValue": "function"
+            "defaultValue": "FUNCTION"
           }
         ],
         "actions": [
@@ -559,6 +559,1242 @@
       "function_app.py": "import datetime\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)",
       "function_body.py": "\r\n@app.schedule(schedule=\"$(SCHEDULE_INPUT)\", arg_name=\"myTimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef $(FUNCTION_NAME_INPUT)(myTimer: func.TimerRequest) -> None:\r\n    \r\n    if myTimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function executed')",
       "timer_trigger_template.md": "# Azure Functions: Timer Trigger in Python\r\n\r\n## Timer Trigger\r\n\r\nA timer trigger lets you run a function on a schedule.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Timer Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport datetime\r\n\r\nimport logging\r\n\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"mytimer\")\r\n@app.schedule(schedule=\"0 */5 * * * *\", arg_name=\"mytimer\", run_on_startup=True,\r\n              use_monitor=False) \r\ndef test_function(mytimer: func.TimerRequest) -> None:\r\n    utc_timestamp = datetime.datetime.utcnow().replace(\r\n        tzinfo=datetime.timezone.utc).isoformat()\r\n\r\n    if mytimer.past_due:\r\n        logging.info('The timer is past due!')\r\n\r\n    logging.info('Python timer trigger function ran at %s', utc_timestamp)\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n\r\n## Programming Model V2 (Preview)\r\n\r\nThe new programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nThe improved programming model requires fewer files than the default model, and specifically eliminates the need for a configuration file (`function.json`). Instead, triggers and bindings are represented in the `function_app.py` file as decorators. Moreover, functions can be logically organized with support for multiple functions to be stored in the same file. Functions within the same function application can also be stored in different files, and be referenced as blueprints.\r\n\r\nTo learn more about using the new Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.\r\n\r\nTo learn more about the new programming model for Azure Functions in Python, see [Programming Models in Azure Functions](https://aka.ms/functions-programming-models)."
+    }
+  },
+  {
+    "author": "Varad Meru (@vrdmr)",
+    "name": "Blob trigger",
+    "description": "$BlobTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with BlobTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "blob_trigger"
+          },
+          {
+            "assignTo": "$(PATH_TO_BLOB_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "blobname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": "BlobStorageConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add BlobTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "BlobTrigger"
+          },
+          {
+            "assignTo": "$(PATH_TO_BLOB_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "blobname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": "BlobStorageConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "BlobTrigger"
+          },
+          {
+            "assignTo": "$(PATH_TO_BLOB_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "blobname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": "BlobStorageConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add BlobTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "BlobTrigger"
+          },
+          {
+            "assignTo": "$(PATH_TO_BLOB_INPUT)",
+            "paramId": "blobTrigger-path",
+            "required": true,
+            "defaultValue": "blobname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "blobTrigger-connection",
+            "required": true,
+            "defaultValue": "BlobStorageConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "replaceTokens": true,
+        "errorText": "Unable to create blob trigger function"
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "blob_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "BlobTrigger-Python",
+    "files": {
+      "blob_trigger_template.md": "# Azure Functions: Blob Trigger in Python\r\n\r\n## Blob Trigger\r\n\r\nThe Blob storage trigger starts a function when a new or updated blob is detected. The blob contents are provided as input to the function. The Azure Blob storage trigger requires a general-purpose storage account. Storage V2 accounts with hierarchical namespaces are also supported.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Blob Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"BlobTrigger1\")\r\n@app.blob_trigger(arg_name=\"myblob\", path=\"samples-workitems/{name}\",\r\n                  connection=\"BlobStorageConnection\")\r\ndef test_function(myblob: func.InputStream):\r\n   logging.info(\"Python blob trigger function processed blob \\n\"\r\n                f\"Name: {myblob.name}\\n\"\r\n                f\"Blob Size: {myblob.length} bytes\")\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n  \r\nNote that Blob input and output bindings are also supported in Azure Functions. To learn more, see [Azure Blob storage bindings overview](https://aka.ms/azure-function-binding-storage-blob)\r\n\r\n## Programming Model V2\r\n\r\nThe new programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks.\r\n\r\nThe improved programming model requires fewer files than the default model, and specifically eliminates the need for a configuration file (`function.json`). Instead, triggers and bindings are represented in the `function_app.py` file as decorators. Moreover, functions can be logically organized with support for multiple functions to be stored in the same file. Functions within the same function application can also be stored in different files, and be referenced as blueprints.\r\n\r\nTo learn more about using the new Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.\r\n\r\nTo learn more about the new programming model for Azure Functions in Python, see [Programming Models in Azure Functions](https://aka.ms/functions-programming-models).\r\n",
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nimport azure.functions as func\r\nimport logging\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).blob_trigger(arg_name=\"myblob\", path=\"$(PATH_TO_BLOB_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(myblob: func.InputStream):\r\n    logging.info(f\"Python blob trigger function processed blob\"\r\n                f\"Name: {myblob.name}\"\r\n                f\"Blob Size: {myblob.length} bytes\")",
+      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.blob_trigger(arg_name=\"myblob\", path=\"$(PATH_TO_BLOB_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(myblob: func.InputStream):\r\n    logging.info(f\"Python blob trigger function processed blob\"\r\n                f\"Name: {myblob.name}\"\r\n                f\"Blob Size: {myblob.length} bytes\")\r\n",
+      "function_body.py": "\r\n@app.blob_trigger(arg_name=\"myblob\", path=\"$(PATH_TO_BLOB_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(myblob: func.InputStream):\r\n    logging.info(f\"Python blob trigger function processed blob\"\r\n                f\"Name: {myblob.name}\"\r\n                f\"Blob Size: {myblob.length} bytes\")\r\n"
+    }
+  },
+  {
+    "author": "Prashant Thummar",
+    "name": "EventGrid trigger",
+    "description": "$EventGridTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with EventGridTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventGridTrigger"
+          },
+          {
+            "assignTo": "$(EVENTGRID_NAME_INPUT)",
+            "paramId": "eventGridTrigger-eventGridName",
+            "required": true,
+            "defaultValue": "eventgridname"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add EventGridTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventGridTrigger"
+          },
+          {
+            "assignTo": "$(EVENTGRID_NAME_INPUT)",
+            "paramId": "eventGridTrigger-eventGridName",
+            "required": true,
+            "defaultValue": "eventgridname"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventGridTrigger"
+          },
+          {
+            "assignTo": "$(EVENTGRID_NAME_INPUT)",
+            "paramId": "eventGridTrigger-eventGridName",
+            "required": true,
+            "defaultValue": "eventgridname"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add EventGridTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "EventGridTrigger"
+          },
+          {
+            "assignTo": "$(EVENTGRID_NAME_INPUT)",
+            "paramId": "eventGridTrigger-eventGridName",
+            "required": true,
+            "defaultValue": "eventgridname"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY_CONTENT)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY_CONTENT)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create eventgrid trigger function",
+        "replaceTokens": true
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "eventgrid_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "EventGridTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\nimport logging\r\nimport azure.functions as func\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()\r\n",
+      "blueprint_body.py": "@$(BLUEPRINT_FILENAME).event_grid_trigger(arg_name=\"azeventgrid\")\r\ndef $(FUNCTION_NAME_INPUT)(azeventgrid: func.EventGridEvent):\r\n    logging.info('Python EventGrid trigger processed an event')\r\n\r\n\r\n\r\n",
+      "eventgrid_trigger_template.md": "# Azure Functions: Event Grid Trigger in Python\r\n\r\n## Event Grid Trigger\r\n\r\nThe Event Grid function trigger can be used to respond to an event sent by an Event Grid source. You must have an event subscription to the source to receive events. When the function is triggered, it converts the event data into a JSON string which is then logged using the Python logging module.\r\n\r\n## Using the Template\r\nFollowing is an example code snippet for Event Grid Trigger using the Python programming model V2 (currently in Preview).\r\n```python\r\nimport azure.functions as func\r\nimport logging\r\nimport json\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"eventgridtrigger\")\r\n@app.event_grid_trigger(arg_name=\"event\")\r\ndef test_function(event: func.EventGridEvent):\r\n\r\n    result = json.dumps({\r\n        'id': event.id,\r\n        'data': event.get_json(),\r\n        'topic': event.topic,\r\n        'subject': event.subject,\r\n        'event_type': event.event_type,\r\n    })\r\n\r\n    logging.info('Python EventGrid trigger processed an event: %s', result)\r\n```\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n\r\n## Programming Model V2 (Preview)\r\n\r\nThe new programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nThe improved programming model requires fewer files than the default model, and specifically eliminates the need for a configuration file (`function.json`). Instead, triggers and bindings are represented in the `function_app.py` file as decorators. Moreover, functions can be logically organized with support for multiple functions to be stored in the same file. Functions within the same function application can also be stored in different files, and be referenced as blueprints.\r\n\r\nTo learn more about using the new Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.\r\n\r\nTo learn more about the new programming model for Azure Functions in Python, see [Programming Models in Azure Functions](https://aka.ms/functions-programming-models).\r\n",
+      "function_app.py": "import logging\r\nimport azure.functions as func\r\n\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.event_grid_trigger(arg_name=\"azeventgrid\")\r\ndef $(FUNCTION_NAME_INPUT)(azeventgrid: func.EventGridEvent):\r\n    logging.info('Python EventGrid trigger processed an event')\r\n\r\n",
+      "function_body.py": "@app.event_grid_trigger(arg_name=\"azeventgrid\")\r\ndef $(FUNCTION_NAME_INPUT)(azeventgrid: func.EventGridEvent):\r\n    logging.info('Python EventGrid trigger processed an event')\r\n"
+    }
+  },
+  {
+    "author": "Gavin Aguiar",
+    "name": "Queue trigger",
+    "description": "$QueueTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with QueueTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "queue_trigger"
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "queueTrigger-queueName",
+            "required": true,
+            "defaultValue": "myqueue"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "queueTrigger-connection",
+            "required": true,
+            "defaultValue": "QueueConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add QueueTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "queue_trigger"
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "queueTrigger-queueName",
+            "required": true,
+            "defaultValue": "myqueue"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "queueTrigger-connection",
+            "required": true,
+            "defaultValue": "QueueConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "queue_trigger"
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "queueTrigger-queueName",
+            "required": true,
+            "defaultValue": "myqueue"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "queueTrigger-connection",
+            "required": true,
+            "defaultValue": "QueueConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add QueueTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "queue_trigger"
+          },
+          {
+            "assignTo": "$(QUEUE_NAME_INPUT)",
+            "paramId": "queueTrigger-queueName",
+            "required": true,
+            "defaultValue": "myqueue"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "queueTrigger-connection",
+            "required": true,
+            "defaultValue": "QueueConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create queue trigger function",
+        "replaceTokens": true
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "queue_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "QueueTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\n\r\nimport azure.functions as func\r\nimport logging\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).queue_trigger(arg_name=\"azqueue\", queue_name=\"$(QUEUE_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azqueue: func.QueueMessage):\r\n    logging.info('Python Queue trigger processed a message: %s',\r\n                azqueue.get_body().decode('utf-8'))\r\n",
+      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = FunctionApp()\r\n\r\n@app.event_hub_message_trigger(arg_name=\"azqueue\", queue_name=\"$(QUEUE_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azqueue: func.QueueMessage):\r\n    logging.info('Python Queue trigger processed a message: %s',\r\n                azqueue.get_body().decode('utf-8'))\r\n",
+      "function_body.py": "\r\n@app.queue_message_trigger(arg_name=\"azqueue\", queue_name=\"$(QUEUE_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azqueue: func.QueueMessage):\r\n    logging.info('Python Queue trigger processed a message: %s',\r\n                azqueue.get_body().decode('utf-8'))\r\n",
+      "queue_trigger_template.md": "# Azure Functions: Queue Trigger in Python\r\n\r\n## Queue Trigger\r\n\r\nThe queue storage trigger runs a function as messages are added to Azure Queue storage.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Queue Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"QueueTrigger1\")\r\n@app.queue_trigger(arg_name=\"msg\", queue_name=\"python-queue-items\",\r\n                   connection=\"\"AzureWebJobsStorage\"\")  \r\ndef test_function(msg: func.QueueMessage):\r\n    logging.info('Python EventHub trigger processed an event: %s',\r\n                 msg.get_body().decode('utf-8'))\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n  \r\nNote that Queue output bindings are also supported in Azure Functions. To learn more, see [Azure Queue storage trigger and bindings for Azure Functions overview](https://aka.ms/azure-function-binding-queue)\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files."
+    }
+  },
+  {
+    "author": "Gavin Aguiar",
+    "name": "ServiceBus Queue trigger",
+    "description": "$ServiceBusTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with ServiceTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_queue_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-queueName",
+            "required": true,
+            "defaultValue": "servicebusqueuename"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add ServiceBusTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_queue_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-queueName",
+            "required": true,
+            "defaultValue": "servicebusqueuename"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_queue_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-queueName",
+            "required": true,
+            "defaultValue": "servicebusqueuename"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add ServiceBusTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_queue_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-queueName",
+            "required": true,
+            "defaultValue": "servicebusqueuename"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "replaceTokens": true,
+        "errorText": "Unable to create ServiceBus trigger function"
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "servicebusqueue_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "ServiceBusQueueTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\nimport logging\r\nimport azure.functions as func\r\n\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).service_bus_queue_trigger(arg_name=\"azservicebus\", queue_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.service_bus_queue_trigger(arg_name=\"azservicebus\", queue_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "function_body.py": "\r\n@app.service_bus_queue_trigger(arg_name=\"azservicebus\", queue_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "servicebusqueue_trigger_template.md": "# Azure Functions: Service Bus Queue Trigger in Python\r\n\r\n## Service Bus Queue Trigger\r\n\r\nUse the Service Bus Queue trigger to respond to messages from a Service Bus queue. Starting with extension version 3.1.0, you can trigger on a session-enabled queue.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Service Bus Queue Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"ServiceBusQueueTrigger1\")\r\n@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"myinputqueue\", connection=\"<CONNECTION_SETTING>\")\r\ndef test_function(msg: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus queue trigger processed message: %s',\r\n                 msg.get_body().decode('utf-8'))\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n  \r\nNote that Service Bus output bindings are also supported in Azure Functions. To learn more, see [Azure Service Bus bindings for Azure Functions](https://aka.ms/azure-function-binding-service-bus)\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files."
+    }
+  },
+  {
+    "author": "Gavin Aguiar",
+    "name": "ServiceBus Topic trigger",
+    "description": "$ServiceBusTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with ServiceTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_topic_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-topicName",
+            "required": true,
+            "defaultValue": "servicebustopicname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add ServiceBusTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_topic_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-topicName",
+            "required": true,
+            "defaultValue": "servicebustopicname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_topic_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-topicName",
+            "required": true,
+            "defaultValue": "servicebustopicname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add ServiceBusTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "servicebus_topic_trigger"
+          },
+          {
+            "assignTo": "$(SERVICEBUS_NAME_INPUT)",
+            "paramId": "serviceBusTrigger-topicName",
+            "required": true,
+            "defaultValue": "servicebustopicname"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "serviceBusTrigger-connection",
+            "required": true,
+            "defaultValue": "ServiceBusConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create servicebus trigger function",
+        "replaceTokens": true
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "servicebustopic_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "ServiceBusTopicTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\nimport logging\r\nimport azure.functions as func\r\n\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).service_bus_topic_trigger(arg_name=\"azservicebus\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.service_bus_topic_trigger(arg_name=\"azservicebus\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "function_body.py": "\r\n@app.service_bus_topic_trigger(arg_name=\"azservicebus\", topic_name=\"$(SERVICEBUS_NAME_INPUT)\",\r\n                               connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azservicebus: func.ServiceBusMessage):\r\n    logging.info('Python ServiceBus trigger processed a message: %s',\r\n                azservicebus.get_body().decode('utf-8'))\r\n",
+      "servicebustopic_trigger_template.md": "# Azure Functions: Service Bus Topic Trigger in Python\r\n\r\n## Service Bus Topic Trigger\r\n\r\nUse the Service Bus Queue trigger to respond to messages from a Service Bus topic. Starting with extension version 3.1.0, you can trigger on a session-enabled topic.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Service Bus Topic Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"ServiceBusTopicTrigger1\")\r\n@app.service_bus_topic_trigger(arg_name=\"message\", topic_name=\"mytopic\", connection=\"<CONNECTION_SETTING>\", subscription_name=\"testsub\")\r\ndef test_function(message: func.ServiceBusMessage):\r\n    message_body = message.get_body().decode(\"utf-8\")\r\n    logging.info(\"Python ServiceBus topic trigger processed message.\")\r\n    logging.info(\"Message Body: \" + message_body)\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n  \r\nNote that Service Bus output bindings are also supported in Azure Functions. To learn more, see [Azure Service Bus bindings for Azure Functions](https://aka.ms/azure-function-binding-service-bus)\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files."
+    }
+  },
+  {
+    "author": "Gavin Aguiar",
+    "name": "CosmosDB trigger",
+    "description": "$CosmosDbTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with CosmosDbTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "cosmosdb_trigger"
+          },
+          {
+            "assignTo": "$(CONTAINER_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-containerName",
+            "required": true,
+            "defaultValue": "container_name"
+          },
+          {
+            "assignTo": "$(DB_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-databaseName",
+            "required": true,
+            "defaultValue": "database_name"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "cosmosDbTrigger-connection",
+            "required": true,
+            "defaultValue": "CosmosDbConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add CosmosTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "cosmosdb_trigger"
+          },
+          {
+            "assignTo": "$(CONTAINER_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-containerName",
+            "required": true,
+            "defaultValue": "container_name"
+          },
+          {
+            "assignTo": "$(DB_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-databaseName",
+            "required": true,
+            "defaultValue": "database_name"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "cosmosDbTrigger-connection",
+            "required": true,
+            "defaultValue": "CosmosDbConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "cosmosdb_trigger"
+          },
+          {
+            "assignTo": "$(CONTAINER_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-containerName",
+            "required": true,
+            "defaultValue": "container_name"
+          },
+          {
+            "assignTo": "$(DB_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-databaseName",
+            "required": true,
+            "defaultValue": "database_name"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "cosmosDbTrigger-connection",
+            "required": true,
+            "defaultValue": "CosmosDbConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add CosmosDBTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "cosmosdb_trigger"
+          },
+          {
+            "assignTo": "$(CONTAINER_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-containerName",
+            "required": true,
+            "defaultValue": "container_name"
+          },
+          {
+            "assignTo": "$(DB_NAME_INPUT)",
+            "paramId": "cosmosDbTrigger-databaseName",
+            "required": true,
+            "defaultValue": "database_name"
+          },
+          {
+            "assignTo": "$(CONNECTION_STRING_INPUT)",
+            "paramId": "cosmosDbTrigger-connection",
+            "required": true,
+            "defaultValue": "CosmosDbConnectionString"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME).py",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create eventhub trigger function",
+        "replaceTokens": true
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "cosmosdb_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true
+      }
+    ],
+    "id": "CosmosDbTriggerTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n#Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\nimport logging\r\nimport azure.functions as func\r\n\r\n\r\n$(BLUEPRINT_FILENAME) = func.Blueprint()",
+      "blueprint_body.py": "\r\n@$(BLUEPRINT_FILENAME).cosmos_db_trigger(arg_name=\"azcosmosdb\", container_name=\"$(CONTAINER_NAME_INPUT)\",\r\n                               database_name=\"$(DB_NAME_INPUT)\", connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azcosmosdb: func.DocumentList):\r\n    logging.info('Python CosmosDB triggered')\r\n",
+      "cosmosdb_trigger_template.md": "# Azure Functions: Cosmos DB in Python\r\n\r\n## Cosmos DB Trigger\r\n\r\nThe Azure Cosmos DB Trigger uses the Azure Cosmos DB Change Feed to listen for inserts and updates across partitions. The change feed publishes inserts and updates, not deletions.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Cosmos DB Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport logging\r\nimport azure.functions as func\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.function_name(name=\"CosmosDBTrigger1\")\r\n@app.cosmos_db_trigger(arg_name=\"documents\", database_name=\"<DB_NAME>\", container_name=\"<CONTAINER_NAME>\", connection=\"AzureCosmosDbConnectionString\",\r\n lease_container_name=\"leases\", create_lease_container_if_not_exists=\"true\")\r\ndef test_function(documents: func.DocumentList) -> str:\r\n    if documents:\r\n        logging.info('Document id: %s', documents[0]['id'])\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `app`.\r\n- Confirm that the parameters within the trigger reflect values that correspond with your storage account.\r\n- The name of the file must be `function_app.py`.\r\n  \r\nNote that Cosmos DB input and output bindings are also supported in Azure Functions. To learn more, see [Azure Cosmos DB storage trigger and bindings overview](https://aka.ms/azure-function-binding-cosmosdb-v2)\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.",
+      "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.cosmos_db_trigger(arg_name=\"azcosmosdb\", container_name=\"$(CONTAINER_NAME_INPUT)\",\r\n                        database_name=\"$(DB_NAME_INPUT)\", connection=\"$(CONNECTION_STRING_INPUT)\")  \r\ndef $(FUNCTION_NAME_INPUT)(azcosmosdb: func.DocumentList):\r\n    logging.info('Python CosmosDB triggered.')\r\n",
+      "function_body.py": "\r\n@app.cosmos_db_trigger(arg_name=\"azcosmosdb\", container_name=\"$(CONTAINER_NAME_INPUT)\",\r\n                        database_name=\"$(DB_NAME_INPUT)\", connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azcosmosdb: func.DocumentList):\r\n    logging.info('Python CosmosDB triggered.')\r\n"
     }
   }
 ]

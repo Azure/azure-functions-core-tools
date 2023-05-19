@@ -177,6 +177,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     FunctionName = providedInputs[GetFunctionNameParamId];
                 }
 
+                
                 await _templatesManager.Deploy(templateJob, template, variables);
             }
             else
