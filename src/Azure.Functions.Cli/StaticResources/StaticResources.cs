@@ -30,38 +30,26 @@ namespace Azure.Functions.Cli
         public static Task<string> GitIgnore => GetValue("gitignore");
 
         public static Task<string> DockerfileDotNet => GetValue("Dockerfile.dotnet");
-
         public static Task<string> DockerfileCustom => GetValue("Dockerfile.custom");
-
         public static Task<string> DockerfileCsxDotNet => GetValue("Dockerfile.csx.dotnet");
-
         public static Task<string> DockerfileDotnetIsolated => GetValue("Dockerfile.dotnetIsolated");
         public static Task<string> DockerfileDotnet7Isolated => GetValue("Dockerfile.dotnet7Isolated");
 
         public static Task<string> DockerfileJava8 => GetValue("Dockerfile.java8");
-
         public static Task<string> DockerfileJava11 => GetValue("Dockerfile.java11");
 
         public static Task<string> DockerfilePython37 => GetValue("Dockerfile.python3.7");
-        
         public static Task<string> DockerfilePython38 => GetValue("Dockerfile.python3.8");
-
         public static Task<string> DockerfilePython39 => GetValue("Dockerfile.python3.9");
-        
         public static Task<string> DockerfilePython310 => GetValue("Dockerfile.python3.10");
-
         public static Task<string> DockerfilePython311 => GetValue("Dockerfile.python3.11");
 
         public static Task<string> DockerfilePowershell7 => GetValue("Dockerfile.powershell7");
-
         public static Task<string> DockerfilePowershell72 => GetValue("Dockerfile.powershell7.2");
 
         public static Task<string> DockerfileNode14 => GetValue("Dockerfile.node14");
-
         public static Task<string> DockerfileNode16 => GetValue("Dockerfile.node16");
-
         public static Task<string> DockerfileNode18 => GetValue("Dockerfile.node18");
-
         public static Task<string> DockerfileTypescript => GetValue("Dockerfile.typescript");
 
         public static Task<string> DockerfileTypescriptNode18 => GetValue("Dockerfile.typescript.node18");
@@ -79,7 +67,6 @@ namespace Azure.Functions.Cli
         public static Task<string> BundleConfigPyStein => GetValue("bundleConfigPyStein.json");
 
         public static Task<string> BundleConfigNodeV4 => GetValue("bundleConfigNodeV4.json");
-
 
         public static Task<string> CustomHandlerConfig => GetValue("customHandlerConfig.json");
 
@@ -114,5 +101,9 @@ namespace Azure.Functions.Cli
         public static Task<string> KedaV2Template => GetValue("keda-v2.yaml");
 
         public static Task<string> ZipToSquashfsScript => GetValue("ziptofs.sh");
+
+        // OpenAI Plugin related files
+        public static Task<string> AIPluginJsonFile=> GetValue("ai-plugin.json");
+        public static Task<string> OpenAIOpenAPIYamlFile => GetValue("OpenAPI.yml");
     }
 }

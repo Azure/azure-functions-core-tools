@@ -20,6 +20,9 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsWorkerRuntime = "FUNCTIONS_WORKER_RUNTIME";
         public const string FunctionsWorkerRuntimeVersion = "FUNCTIONS_WORKER_RUNTIME_VERSION";
         public const string RequirementsTxt = "requirements.txt";
+        public const string AIPlugin = "ai-plugin.json";
+        public const string WellKnown = ".well-known";
+        public const string OpenAPIYaml = "openapi.yaml";
         public const string PythonGettingStarted = "getting_started.md";
         public const string PySteinFunctionAppPy = "function_app.py";
         public const string FunctionJsonFileName = "function.json";
@@ -119,7 +122,7 @@ namespace Azure.Functions.Cli.Common
             public const string WebJobsStorageNotFoundWithUserSecrets = "Missing value for AzureWebJobsStorage in {0} and User Secrets. This is required for all triggers other than {1}. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {2} or User Secrets.";
             public const string AppSettingNotFound = "Warning: Cannot find value named '{0}' in {1} that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5}.";
             public const string AppSettingNotFoundWithUserSecrets = "Warning: Cannot find value named '{0}' in {1} or User Secrets that matches '{2}' property set on '{3}' in '{4}'. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in {5} or User Secrets.";
-            public const string ProxiesNotSupported = $"Warning: Proxies are not supported in Azure Functions v4. Instead of '{Constants.ProxiesJsonFileName}', try Azure API Management: https://aka.ms/AAfiueq";
+            public const string ProxiesNotSupported = "";//$"Warning: Proxies are not supported in Azure Functions v4. Instead of '{Constants.ProxiesJsonFileName}', try Azure API Management: https://aka.ms/AAfiueq";
         }
 
         public static class Languages

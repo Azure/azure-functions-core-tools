@@ -55,6 +55,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public ProgrammingModel ResolvedProgrammingModel { get; set; }
 
+        public bool InitOpenAIPlugin { get; set; }
+
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
@@ -137,6 +139,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<bool>("no-docs")
                 .WithDescription("Do not create getting started documentation file. Currently supported when --worker-runtime set to python.")
                 .Callback(d => GeneratePythonDocumentation = !d);
+
+            Parser
+                .Setup<bool>("openai-plugin")
+                .WithDescription("Create OpenAI specific files useful for ChatGPT Plugins. More info at https://platform.openai.com/docs/plugins/getting-started/plugin-manifest")
+                .Callback(d => InitOpenAIPlugin = d);
 
             if (args.Any() && !args.First().StartsWith("-"))
             {
@@ -221,6 +228,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (InitDocker)
             {
                 await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx);
+            }
+
+            if (InitOpenAIPlugin)
+            {
+                await WriteOpenAIPluginFiles();
             }
 
             await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
@@ -551,6 +563,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     Console.Error.WriteLine(WarningColor("Warning: You must run \"npm install\" manually"));
                 }
             }
+        }
+
+        private static async Task WriteOpenAIPluginFiles()
+        {
+            await OpenAIHelper.CreateOpenAIOpenAPIYamlFile();
+            await OpenAIHelper.CreateOpenAIPluginJsonFile();
         }
     }
 }

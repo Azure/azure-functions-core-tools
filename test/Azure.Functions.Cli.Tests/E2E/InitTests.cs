@@ -541,6 +541,28 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_openai_plugins_only_no_project()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --openai-plugin"
+                },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "ai-plugin.json",
+
+                        ContentContains = new[] { "description_for_model" }
+                    }
+                },
+                OutputContains = new[] { "ai-plugin" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_function_app_powershell_enable_managed_dependencies_and_set_default_version()
         {
             return CliTester.Run(new RunConfiguration
