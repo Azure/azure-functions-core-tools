@@ -88,7 +88,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
         {
-            var deploymentUrl = "/deployment";
+            var deploymentUrl = "/deployments";
             if (functionApp.IsFlex)
             {
                 deploymentUrl = "api/deployments";
