@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             await _functionAppManager.WaitUntilScmSiteAvailable(linuxConsumptionPythonFunctionApp);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Skipping this test temporarily because branch uses PPE.")]
         public async void RemoteBuildPythonFunctionApp()
         {
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
