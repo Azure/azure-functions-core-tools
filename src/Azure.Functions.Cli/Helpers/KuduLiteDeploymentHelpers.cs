@@ -50,9 +50,51 @@ namespace Azure.Functions.Cli.Helpers
             return statusCode;
         }
 
+
+        public static async Task<DeployStatus> WaitForFlexDeployment(HttpClient client, Site functionApp)
+        {
+            ColoredConsole.WriteLine("Deployment in progress, please wait...");
+            DeployStatus statusCode = DeployStatus.Pending;
+            DateTime logLastUpdate = DateTime.MinValue;
+            string id = null;
+
+            while (string.IsNullOrEmpty(id))
+            {
+                id = await GetLatestDeploymentId(client, functionApp);
+                await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
+            }
+
+            while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown)
+            {
+                try
+                {
+                    statusCode = await GetDeploymentStatusById(client, functionApp, id);
+                    if (!functionApp.IsFlex)
+                    {
+                        logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
+                    }
+                }
+                catch (HttpRequestException)
+                {
+                    return DeployStatus.Unknown;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
+            }
+
+            return statusCode;
+        }
+
+
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
         {
-            var deployments = await InvokeRequest<List<DeploymentResponse>>(client, HttpMethod.Get, "/deployments");
+            var deploymentUrl = "/deployment";
+            if (functionApp.IsFlex)
+            {
+                deploymentUrl = "api/deployments";
+            }
+            
+            var deployments = await InvokeRequest<List<DeploymentResponse>>(client, HttpMethod.Get, deploymentUrl);
 
             // Automatically ordered by received time
             var latestDeployment = deployments.First();
@@ -67,7 +109,13 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<DeployStatus> GetDeploymentStatusById(HttpClient client, Site functionApp, string id)
         {
-            var deploymentInfo = await InvokeRequest<DeploymentResponse>(client, HttpMethod.Get, $"/deployments/{id}");
+            var deploymentUrl = $"/deployments/{id}";
+            if (functionApp.IsFlex)
+            {
+                deploymentUrl = $"/api/deployments/{id}";
+            }
+
+            var deploymentInfo = await InvokeRequest<DeploymentResponse>(client, HttpMethod.Get, deploymentUrl);
             DeployStatus? status = deploymentInfo.Status;
             if (status == null)
             {

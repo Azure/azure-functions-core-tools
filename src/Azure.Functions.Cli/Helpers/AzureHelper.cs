@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static string _storageApiVersion = "2018-02-01";
 
-        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null, Func<Site, string, string, Task<Site>> loadFunction = null)
+        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null, Func<Site, string, string, Task<Site>> loadFunction = null, string flexSubscription = null, string flexResourceGroup = null)
         {
             IEnumerable<string> allSubscriptionIds;
             if (defaultSubscription != null)
@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Helpers
                 allSubscriptionIds = subscriptions.Select(sub => sub.subscriptionId);
             }
 
-            var result = await TryGetFunctionAppFromArg(name, allSubscriptionIds, accessToken, managementURL, slot, loadFunction);
+            var result = await TryGetFunctionAppFromArg(name, allSubscriptionIds, accessToken, managementURL, slot, loadFunction, flexSubscription: flexSubscription, flexResourceGroup: flexResourceGroup);
             if (result != null)
             {
                 return result;
@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.Helpers
             throw new ArmResourceNotFoundException(errorMsg);
         }
 
-        private static async Task<Site> TryGetFunctionAppFromArg(string name, IEnumerable<string> subscriptions, string accessToken, string managementURL, string slot = null, Func<Site, string, string, Task<Site>> loadFunctionAppFunc = null)
+        private static async Task<Site> TryGetFunctionAppFromArg(string name, IEnumerable<string> subscriptions, string accessToken, string managementURL, string slot = null, Func<Site, string, string, Task<Site>> loadFunctionAppFunc = null, string flexSubscription = null, string flexResourceGroup = null)
         {
             var resourceType = "Microsoft.Web/sites";
             var resourceName = name;
@@ -65,7 +65,16 @@ namespace Azure.Functions.Cli.Helpers
 
             try
             {
-                string siteId = await GetResourceIDFromArg(subscriptions, query, accessToken, managementURL);
+                string siteId;
+                if (!string.IsNullOrEmpty(flexSubscription) && !string.IsNullOrEmpty(flexResourceGroup))
+                {
+                    siteId = $"/subscriptions/{flexSubscription}/resourceGroups/{flexResourceGroup}/providers/Microsoft.Web/sites/{name}";
+                }
+                else
+                {
+                    siteId = await GetResourceIDFromArg(subscriptions, query, accessToken, managementURL);
+                }
+                
                 var app = new Site(siteId);
 
                 // The implementation of the load function is different for certain function apps like function apps based on Container Apps. 
@@ -121,6 +130,7 @@ namespace Azure.Functions.Cli.Helpers
             return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
                 ?? throw new CliException("Error finding the Azure Resource information.");
         }
+
 
         internal static async Task<bool> IsBasicAuthAllowedForSCM(Site functionApp, string accessToken, string managementURL)
         {

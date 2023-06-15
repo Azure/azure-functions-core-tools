@@ -48,6 +48,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         // For .net function apps, build using "release" configuration by default. User can override using "--dotnet-cli-params" as needed.
         public string DotnetCliParameters { get; set; } = "--configuration release";
         public string DotnetFrameworkVersion { get; set; }
+        
+        public string FlexSubscription { get; set; }
+        public string FlexResourceGroup { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -105,6 +108,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
                 .Callback(p => AdditionalPackages = p);
+
+            Parser
+                .Setup<string>("flex-sub")
+                .WithDescription("Subscription to use for flex deployment")
+                .Callback(s => FlexSubscription = s);
+
+            Parser
+                .Setup<string>("flex-rg")
+                .WithDescription("Resrouce Group to use for flex deployment")
+                .Callback(r => FlexResourceGroup = r);
+
             Parser
                 .Setup<bool>("force")
                 .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
@@ -136,8 +150,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
+            if (!string.IsNullOrEmpty(FlexSubscription) && string.IsNullOrEmpty(FlexResourceGroup))
+            {
+                throw new CliException($"--flex-sub requires --flex-rg to be specified");
+            }
+            
+            if (!string.IsNullOrEmpty(FlexResourceGroup) && string.IsNullOrEmpty(FlexSubscription))
+            {
+                throw new CliException("--flex-rg requires --flex-sub to be specified");
+            }
+
             // Get function app
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription, flexSubscription: FlexSubscription, flexResourceGroup: FlexResourceGroup);
 
             if (!functionApp.IsLinux && (PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.Remote))
             {
@@ -429,7 +453,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
             // For dedicated linux apps, we do not support run from package right now
-            var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium && !functionApp.IsFlex;
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
             {
@@ -456,6 +480,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 // Consumption Linux
                 shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionApp, zipStreamFactory);
+            }
+            else if (functionApp.IsLinux && functionApp.IsFlex)
+            {
+                // Flex Linux
+                shouldSyncTriggers = await HandleFlexConsumptionPublish(functionApp, zipStreamFactory);
             }
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
@@ -496,7 +525,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await PublishZipDeploy(functionApp, zipStreamFactory);
             }
-
+            
             if (shouldSyncTriggers)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
@@ -601,6 +630,72 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
             await PerformServerSideBuild(functionApp, zipStreamFactory, pollDedicatedBuild);
         }
+
+        /// <summary>
+        /// Handler for Linux Consumption publish event
+        /// </summary>
+        /// <param name="functionApp">Function App in Azure</param>
+        /// <param name="zipFileFactory">Factory for local project zipper</param>
+        /// <returns>ShouldSyncTrigger value</returns>
+        private async Task<bool> HandleFlexConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
+        {
+            if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage))
+            {
+                throw new CliException($"Please remove {Constants.WebsiteRunFromPackage} app setting from the function app and try the deployment again.");
+            }
+
+            Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
+            var deploymentParameters = new Dictionary<string, string>();
+            
+            if (PublishBuildOption == BuildOption.Remote)
+            {
+                deploymentParameters.Add("RemoteBuild", true.ToString());
+            }
+
+            var deploymentStatus = await PerformFlexDeployment(functionApp, zipFileFactory, pollDeploymentStatusTask, deploymentParameters);
+
+            return deploymentStatus == DeployStatus.Success;
+        }
+
+        public async Task<DeployStatus> PerformFlexDeployment(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask, IDictionary<string, string> deploymentParameters)
+        {
+            var clientHandler = new HttpClientHandler();
+            clientHandler.ServerCertificateCustomValidationCallback += (sender, cert, chain, sslPolicyErrors) => true;
+
+            using (var handler = new ProgressMessageHandler(clientHandler))
+            using (var client = GetRemoteZipClient(functionApp, handler))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
+                $"api/Deploy/Zip?isAsync=true&author={Environment.MachineName}&Deployer=core_tools&{string.Join("&", deploymentParameters?.Select(kvp => $"{kvp.Key}={kvp.Value}")) ?? string.Empty}", UriKind.Relative)))
+            {
+                ColoredConsole.WriteLine("Creating archive for current directory...");
+
+                request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+
+                (var content, var length) = CreateStreamContentZip(await zipFileFactory());
+                request.Content = content;
+                HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
+                await PublishHelper.CheckResponseStatusAsync(response, "Uploading archive...");
+
+                // Streaming deployment status for Linux Server Side Build
+                DeployStatus status = await deploymentStatusPollTask(client);
+
+                if (status == DeployStatus.Success)
+                {
+                    ColoredConsole.WriteLine(VerboseColor("The deployment was succeeded!"));
+                }
+                else if (status == DeployStatus.Failed)
+                {
+                    throw new CliException("Remote build failed!");
+                }
+                else if (status == DeployStatus.Unknown)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Failed to retrieve deployment status, please visit https://{functionApp.ScmUri}/api/deployments"));
+                }
+                
+                return status;
+            }
+        }
+
 
         /// <summary>
         /// Handler for Linux Consumption publish event
@@ -1069,6 +1164,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private HttpClient GetRemoteZipClient(Site functionApp, HttpMessageHandler handler = null)
         {
             handler = handler ?? new HttpClientHandler();
+
             var client = new HttpClient(handler)
             {
                 BaseAddress = new Uri($"https://{functionApp.ScmUri}"),
