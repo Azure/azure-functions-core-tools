@@ -70,6 +70,7 @@ namespace Azure.Functions.Cli.Common
         public const string GetFunctionNameParamId = "trigger-functionName";
         public const string GetFileNameParamId = "app-selectedFileName";
         public const string GetBluePrintFileNameParamId = "blueprint-fileName";
+        public const string GetBluePrintExistingFileNameParamId = "blueprint-existingFileName";
         public const string UserPromptBooleanType = "boolean";
         public const string UserPromptEnumType = "enum";
         public const string UserInputActionType = "UserInput";

@@ -162,8 +162,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (FileName != PySteinFunctionAppPy)
                 {
                     var filePath = Path.Combine(Environment.CurrentDirectory, FileName);
-                    jobName = !FileUtility.FileExists(filePath) ? "CreateNewBlueprint" : "AppendToBlueprint";
-                    providedInputs[GetBluePrintFileNameParamId] = FileName;
+                    if (FileUtility.FileExists(filePath))
+                    {
+                        jobName = "AppendToBlueprint";
+                        providedInputs[GetBluePrintExistingFileNameParamId] = FileName;
+                    }
+                    else
+                    {
+                        jobName = "CreateNewBlueprint";
+                        providedInputs[GetBluePrintFileNameParamId] = FileName;
+                    }
                 }
                 else
                 {
