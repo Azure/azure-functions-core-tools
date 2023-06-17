@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 using (var httpClient = new HttpClient())
                 {
                     httpClient.Timeout = TimeSpan.FromMinutes(10);
-                    await extensionBundleManager.GetExtensionBundlePath(httpClient);
+                    var path = await extensionBundleManager.GetExtensionBundlePath(httpClient);
                 }
             }
             catch (Exception)
