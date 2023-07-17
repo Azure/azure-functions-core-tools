@@ -48,9 +48,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         // For .net function apps, build using "release" configuration by default. User can override using "--dotnet-cli-params" as needed.
         public string DotnetCliParameters { get; set; } = "--configuration release";
         public string DotnetFrameworkVersion { get; set; }
-        
-        public string FlexSubscription { get; set; }
-        public string FlexResourceGroup { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
@@ -110,16 +107,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(p => AdditionalPackages = p);
 
             Parser
-                .Setup<string>("flex-sub")
-                .WithDescription("Subscription to use for flex deployment")
-                .Callback(s => FlexSubscription = s);
-
-            Parser
-                .Setup<string>("flex-rg")
-                .WithDescription("Resrouce Group to use for flex deployment")
-                .Callback(r => FlexResourceGroup = r);
-
-            Parser
                 .Setup<bool>("force")
                 .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
                 .Callback(f => Force = f);
@@ -150,18 +137,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public override async Task RunAsync()
         {
-            if (!string.IsNullOrEmpty(FlexSubscription) && string.IsNullOrEmpty(FlexResourceGroup))
-            {
-                throw new CliException($"--flex-sub requires --flex-rg to be specified");
-            }
-            
-            if (!string.IsNullOrEmpty(FlexResourceGroup) && string.IsNullOrEmpty(FlexSubscription))
-            {
-                throw new CliException("--flex-rg requires --flex-sub to be specified");
-            }
-
             // Get function app
-            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription, flexSubscription: FlexSubscription, flexResourceGroup: FlexResourceGroup);
+            var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription);
 
             if (!functionApp.IsLinux && (PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.Remote))
             {
