@@ -560,12 +560,6 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             ArmArrayWrapper<FunctionInfo> functions = await GetFunctions(functionApp, accessToken, managementURL);
-            
-            if (functionApp.IsFlex)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(20));
-            }
-
             functions = await GetFunctions(functionApp, accessToken, managementURL);
 
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
