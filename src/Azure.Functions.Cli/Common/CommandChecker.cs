@@ -1,9 +1,11 @@
-﻿using System;
+﻿using Colors.Net;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -14,9 +16,25 @@ namespace Azure.Functions.Cli.Common
 
         // c:\windows\system32\where.exe
         public static bool CommandExists(string command)
-            => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? CheckExitCode($"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe", command)
-            : CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                var wherePath = $"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe";
+                if (File.Exists(wherePath))
+                {
+                    return CheckExitCode(wherePath, command);
+                }
+                else
+                {
+                    ColoredConsole.WriteLine(WarningColor($"The 'where' command executable was not found at the expected path at {Environment.SystemDirectory}."));
+                    return CheckExitCode("where", command);
+                }
+            }
+            else
+            {
+                return CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
+            }
+        }
 
         public static async Task<bool> PowerShellModuleExistsAsync(string powershellExecutable, string module)
         {
