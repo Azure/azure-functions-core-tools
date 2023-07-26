@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Helpers
     public static class PythonHelpers
     {
         private static readonly string _pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
-        private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
+        public static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
         public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
         private static WorkerLanguageVersionInfo _pythonVersionCache = null;
 
@@ -404,7 +404,7 @@ namespace Azure.Functions.Cli.Helpers
             // Only one of the remote build or build-native-deps flag can be chosen
             if (buildNativeDeps)
             {
-                if (CommandChecker.CommandExists("docker") && await DockerHelpers.VerifyDockerAccess())
+                if (CommandChecker.CommandExists("docker", out _) && await DockerHelpers.VerifyDockerAccess())
                 {
                     await RestorePythonRequirementsDocker(functionAppRoot, packagesLocation, additionalPackages);
                 }

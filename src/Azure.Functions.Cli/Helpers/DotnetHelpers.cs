@@ -17,11 +17,15 @@ namespace Azure.Functions.Cli.Helpers
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
 
-        public static void EnsureDotnet()
+        public static string EnsureDotnet()
         {
-            if (!CommandChecker.CommandExists("dotnet"))
+            if (!CommandChecker.CommandExists("dotnet", out string dotnetLocation))
             {
                 throw new CliException("dotnet sdk is required for dotnet based functions. Please install https://microsoft.com/net");
+            }
+            else
+            {
+                return dotnetLocation;
             }
         }
 
@@ -29,13 +33,14 @@ namespace Azure.Functions.Cli.Helpers
         {
             await TemplateOperation(async () =>
             {
+                var dotnetLocation = EnsureDotnet();
                 var frameworkString = string.IsNullOrEmpty(targetFramework)
                     ? string.Empty
                     : $"--Framework \"{targetFramework}\"";
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var exe = new Executable(dotnetLocation, $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
@@ -64,7 +69,8 @@ namespace Azure.Functions.Cli.Helpers
                     }
                 }
 
-                var exe = new Executable("dotnet", exeCommandArguments);
+                var dotnetLocation = EnsureDotnet();
+                var exe = new Executable(dotnetLocation, exeCommandArguments);
                 string dotnetNewErrorMessage = string.Empty;
                 var exitCode = await exe.RunAsync(o => { }, e => {
                     dotnetNewErrorMessage = string.Concat(dotnetNewErrorMessage, Environment.NewLine, e);
@@ -176,7 +182,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 FileSystemHelpers.DeleteDirectorySafe(outputPath);
             }
-            var exe = new Executable("dotnet", $"build --output {outputPath} {dotnetCliParams}");
+
+            var dotnetLocation = EnsureDotnet();
+            var exe = new Executable(dotnetLocation, $"build --output {outputPath} {dotnetCliParams}");
             var exitCode = showOutput
                 ? await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e))
                 : await exe.RunAsync();
@@ -254,25 +262,27 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task UninstallIsolatedTemplates()
         {
+            var dotnetLocation = EnsureDotnet();
             string projTemplates = $"{IsolatedTemplateBasePackId}.ProjectTemplates";
             string itemTemplates = $"{IsolatedTemplateBasePackId}.ItemTemplates";
 
-            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
+            var exe = new Executable(dotnetLocation, $"new -u \"{projTemplates}\"");
             await exe.RunAsync();
 
-            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
+            exe = new Executable(dotnetLocation, $"new -u \"{itemTemplates}\"");
             await exe.RunAsync();
         }
 
         private static async Task UninstallWebJobsTemplates()
         {
+            var dotnetLocation = EnsureDotnet();
             string projTemplates = $"{WebJobsTemplateBasePackId}.ProjectTemplates";
             string itemTemplates = $"{WebJobsTemplateBasePackId}.ItemTemplates";
 
-            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
+            var exe = new Executable(dotnetLocation, $"new -u \"{projTemplates}\"");
             await exe.RunAsync();
 
-            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
+            exe = new Executable(dotnetLocation, $"new -u \"{itemTemplates}\"");
             await exe.RunAsync();
         }
 
@@ -288,9 +298,10 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
             }
 
+            var dotnetLocation = EnsureDotnet();
             foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
             {
-                var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
+                var exe = new Executable(dotnetLocation, $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();
             }
         }

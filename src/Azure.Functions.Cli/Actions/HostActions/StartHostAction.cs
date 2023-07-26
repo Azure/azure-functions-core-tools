@@ -420,7 +420,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet", out _))
             {
                 throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
             }

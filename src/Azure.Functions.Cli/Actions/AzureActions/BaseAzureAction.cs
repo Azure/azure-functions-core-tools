@@ -164,7 +164,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task<string> RunAzCLICommand(string param)
         {
-            if (!CommandChecker.CommandExists("az"))
+            if (!CommandChecker.CommandExists("az", out string commandPath))
             {
                 throw new CliException("az CLI not found");
             }
@@ -192,10 +192,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<(bool succeeded, string token)> TryGetAzPowerShellToken()
         {
             // PowerShell Core can only use Az so we can check that it exists and that the Az module exists
-            if (CommandChecker.CommandExists(_powerShellCoreExecutable) &&
-                await CommandChecker.PowerShellModuleExistsAsync(_powerShellCoreExecutable, _azProfileModuleName))
+            if (CommandChecker.CommandExists(_powerShellCoreExecutable, out string powerShellCoreExecutablePath) &&
+                await CommandChecker.PowerShellModuleExistsAsync(powerShellCoreExecutablePath, _azProfileModuleName))
             {
-                var az = new Executable(_powerShellCoreExecutable,
+                var az = new Executable(powerShellCoreExecutablePath,
                     $"-NonInteractive -o Text -NoProfile -c {GetPowerShellAccessTokenScript(_azProfileModuleName)}");
 
                 var stdout = new StringBuilder();
@@ -215,16 +215,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Windows PowerShell can use Az or AzureRM so first we check if powershell.exe is available
-            if (CommandChecker.CommandExists(_windowsPowerShellExecutable))
+            if (CommandChecker.CommandExists(_windowsPowerShellExecutable, out string windowsPowerShellCoreExecutablePath))
             {
                 string moduleToUse;
 
                 // depending on if Az.Profile or AzureRM.Profile is available, we need to change the prefix
-                if (await CommandChecker.PowerShellModuleExistsAsync(_windowsPowerShellExecutable, _azProfileModuleName))
+                if (await CommandChecker.PowerShellModuleExistsAsync(windowsPowerShellCoreExecutablePath, _azProfileModuleName))
                 {
                     moduleToUse = _azProfileModuleName;
                 }
-                else if (await CommandChecker.PowerShellModuleExistsAsync(_windowsPowerShellExecutable, _azureRmProfileModuleName))
+                else if (await CommandChecker.PowerShellModuleExistsAsync(windowsPowerShellCoreExecutablePath, _azureRmProfileModuleName))
                 {
                     moduleToUse = _azureRmProfileModuleName;
                 }

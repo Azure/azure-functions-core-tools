@@ -1,7 +1,10 @@
-﻿using Colors.Net;
+﻿using Azure.Functions.Cli.Helpers;
+using Colors.Net;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,24 +17,31 @@ namespace Azure.Functions.Cli.Common
         public static bool CommandValid(string fileName, string args)
             => CheckExitCode(fileName, args);
 
-        // c:\windows\system32\where.exe
-        public static bool CommandExists(string command)
+        public static bool CommandExists(string command, out string commandPath)
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var wherePath = $"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe";
-                if (File.Exists(wherePath))
+                if (!File.Exists(wherePath))
                 {
+                    throw new CliException($"The 'where' command executable was not found at the expected path at {Environment.SystemDirectory}.");
+                }
+
+                if (PythonHelpers.InVirtualEnvironment)
+                {
+                    commandPath = command;
                     return CheckExitCode(wherePath, command);
                 }
                 else
                 {
-                    ColoredConsole.WriteLine(WarningColor($"The 'where' command executable was not found at the expected path at {Environment.SystemDirectory}."));
-                    return CheckExitCode("where", command);
+                    (bool isValid, string path) = CheckWindowsValidCommand(wherePath, command);
+                    commandPath = path;
+                    return isValid;
                 }
             }
             else
             {
+                commandPath = command;
                 return CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
             }
         }
@@ -61,6 +71,36 @@ namespace Azure.Functions.Cli.Common
             var process = Process.Start(processStartInfo);
             process?.WaitForExit();
             return process?.ExitCode == 0;
+        }
+
+        private static (bool, string) CheckWindowsValidCommand(string fileName, string args)
+        {
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = args,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            };
+
+            var process = Process.Start(processStartInfo);
+            process?.WaitForExit();
+            if (process?.ExitCode != 0)
+            {
+                return (false, string.Empty);
+            }
+
+            while (process.StandardOutput.Peek() >= 0)
+            {
+                var responseLine = process.StandardOutput.ReadLine();
+                if (!string.IsNullOrWhiteSpace(responseLine) && !responseLine.StartsWith(Environment.CurrentDirectory))
+                {
+                    return (true, responseLine);
+                }
+            }
+
+            return (false, string.Empty);
         }
     }
 }
