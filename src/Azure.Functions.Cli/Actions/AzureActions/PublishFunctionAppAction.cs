@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -10,6 +11,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -18,6 +20,7 @@ using Fclp;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
+using NuGet.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -443,6 +446,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 ColoredConsole.WriteLine(WarningColor("Recommend using '--build remote' to resolve project dependencies remotely on Azure"));
             }
 
+            ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption,
                 NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
@@ -524,7 +528,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             await RetryHelper.Retry(async () =>
             {
-                ColoredConsole.WriteLine("Syncing triggers...");
+                ColoredConsole.WriteLine(GetLogMessage("Syncing triggers..."));
                 HttpResponseMessage response = null;
                 // This SyncTriggers function calls the endpoint for linux syncTriggers
                 response = await AzureHelper.SyncTriggers(functionApp, AccessToken, ManagementURL);
@@ -636,37 +640,34 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task<DeployStatus> PerformFlexDeployment(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask, IDictionary<string, string> deploymentParameters)
         {
-            var clientHandler = new HttpClientHandler();
-            clientHandler.ServerCertificateCustomValidationCallback += (sender, cert, chain, sslPolicyErrors) => true;
-
-            using (var handler = new ProgressMessageHandler(clientHandler))
+            using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(functionApp, handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
                 $"api/Deploy/Zip?isAsync=true&author={Environment.MachineName}&Deployer=core_tools&{string.Join("&", deploymentParameters?.Select(kvp => $"{kvp.Key}={kvp.Value}")) ?? string.Empty}", UriKind.Relative)))
             {
-                ColoredConsole.WriteLine("Creating archive for current directory...");
+                ColoredConsole.WriteLine(GetLogMessage("Creating archive for current directory..."));
 
                 request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
 
                 (var content, var length) = CreateStreamContentZip(await zipFileFactory());
                 request.Content = content;
                 HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
-                await PublishHelper.CheckResponseStatusAsync(response, "Uploading archive...");
+                await PublishHelper.CheckResponseStatusAsync(response, GetLogMessage("Uploading archive..."));
 
                 // Streaming deployment status for Linux Server Side Build
                 DeployStatus status = await deploymentStatusPollTask(client);
 
                 if (status == DeployStatus.Success)
                 {
-                    ColoredConsole.WriteLine(VerboseColor("The deployment was succeeded!"));
+                    ColoredConsole.WriteLine(VerboseColor(GetLogMessage("The deployment was successful!")));
                 }
                 else if (status == DeployStatus.Failed)
                 {
-                    throw new CliException("Remote build failed!");
+                    throw new CliException("The deployment failed!");
                 }
                 else if (status == DeployStatus.Unknown)
                 {
-                    ColoredConsole.WriteLine(WarningColor($"Failed to retrieve deployment status, please visit https://{functionApp.ScmUri}/api/deployments"));
+                    ColoredConsole.WriteLine(WarningColor(GetLogMessage($"Failed to retrieve deployment status, please visit https://{functionApp.ScmUri}/api/deployments")));
                 }
                 
                 return status;
@@ -1180,6 +1181,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             return $"{parsedVersion.Major}.{parsedVersion.Minor}";
+        }
+
+        private string  GetLogMessage(string message)
+        {
+            return GetLogPrefix() + message;
+        }
+
+        private string GetLogPrefix()
+        {
+            return $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".ToString();
         }
 
         // For testing
