@@ -659,11 +659,32 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 if (status == DeployStatus.Success)
                 {
+                    // the deployment was successful. Waiting for 60 seconds so that Kudu finishes the sync trigger.
+                    await Task.Delay(TimeSpan.FromSeconds(60));
+
+                    // Checking the function app host status
+                    try
+                    {
+                        await AzureHelper.CheckFunctionHostStatusForFlex(functionApp, AccessToken, ManagementURL);
+                    }
+                    catch (Exception)
+                    {
+                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check app logs.");
+                    }
+                    
                     ColoredConsole.WriteLine(VerboseColor(GetLogMessage("The deployment was successful!")));
                 }
                 else if (status == DeployStatus.Failed)
                 {
-                    throw new CliException("The deployment failed!");
+                    throw new CliException("The deployment failed, Please check the printed logs.");
+                }
+                else if (status == DeployStatus.Conflict)
+                {
+                    throw new CliException("Deployment was cancelled, another deployment in progress.");
+                }
+                else if (status == DeployStatus.PartialSuccess)
+                {
+                    ColoredConsole.WriteLine(WarningColor(GetLogMessage("\"Deployment was partially successful, Please check the printed logs.")));
                 }
                 else if (status == DeployStatus.Unknown)
                 {

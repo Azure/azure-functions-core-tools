@@ -364,6 +364,52 @@ namespace Azure.Functions.Cli.Helpers
             return ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken);
         }
 
+        internal static async Task CheckFunctionHostStatusForFlex(Site functionApp, string accessToken, string managementURL,
+            HttpMessageHandler messageHandler = null)
+        {
+            var masterKey = await GetMasterKeyAsync(functionApp.SiteId, accessToken, managementURL);
+
+            if (masterKey is null)
+            {
+                throw new CliException($"The masterKey is null. hostname: {functionApp.HostName}.");
+            }
+
+            HttpMessageHandler handler = messageHandler ?? new HttpClientHandler();
+            if (StaticSettings.IsDebug)
+            {
+                handler = new LoggingHandler(handler);
+            }
+
+            var functionAppReadyClient = new HttpClient(handler);
+            const string jsonContentType = "application/json";
+            functionAppReadyClient.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+            functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
+            
+            await RetryHelper.Retry(async () =>
+            {
+                functionAppReadyClient.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
+                var uri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
+                var request = new HttpRequestMessage()
+                {
+                    RequestUri = uri,
+                    Method = HttpMethod.Get
+                };
+
+                var response = await functionAppReadyClient.SendAsync(request);
+                ColoredConsole.Write(".");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    ColoredConsole.WriteLine(" done");
+                }
+                else
+                {
+                    throw new CliException($"The host didn't return success status. Returned: {response.StatusCode}");
+                }
+
+            }, 15, TimeSpan.FromSeconds(3));
+        }
+
         public static async Task<Site> LoadSiteObjectAsync(Site site, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");

@@ -64,23 +64,47 @@ namespace Azure.Functions.Cli.Helpers
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
 
-            while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown)
+            if (functionApp.IsFlex)
             {
-                try
+                while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown && statusCode != DeployStatus.Conflict && statusCode != DeployStatus.PartialSuccess)
                 {
-                    statusCode = await GetDeploymentStatusById(client, functionApp, id);
-                    if (!functionApp.IsFlex)
+                    try
                     {
+                        statusCode = await GetDeploymentStatusById(client, functionApp, id);
+                    }
+                    catch (HttpRequestException)
+                    {
+                        return DeployStatus.Unknown;
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
+                }
+                
+                // Printing logs after the status is confirmed.
+                if (statusCode == DeployStatus.Failed || statusCode == DeployStatus.PartialSuccess)
+                {
+                    logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
+                }
+            }
+            else
+            {
+                while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown)
+                {
+                    try
+                    {
+                        statusCode = await GetDeploymentStatusById(client, functionApp, id);
                         logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
                     }
-                }
-                catch (HttpRequestException)
-                {
-                    return DeployStatus.Unknown;
-                }
+                    catch (HttpRequestException)
+                    {
+                        return DeployStatus.Unknown;
+                    }
 
-                await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
+                    await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
+                }
             }
+            
+            
 
             return statusCode;
         }
@@ -95,12 +119,27 @@ namespace Azure.Functions.Cli.Helpers
             }
             
             var deployments = await InvokeRequest<List<DeploymentResponse>>(client, HttpMethod.Get, deploymentUrl);
+            
+            if (functionApp.IsFlex)
+            {
+                if (!deployments.Any())
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(20));
+                    deployments = await InvokeRequest<List<DeploymentResponse>>(client, HttpMethod.Get, deploymentUrl);
+
+                    if (!deployments.Any())
+                    {
+                        throw new CliException("The deployment ID couldn't be found. Please try again.");
+                    }
+                }
+            }
 
             // Automatically ordered by received time
             var latestDeployment = deployments.First();
             DeployStatus? status = latestDeployment.Status;
             if (status == DeployStatus.Building || status == DeployStatus.Deploying
-                || status == DeployStatus.Success || status == DeployStatus.Failed)
+                || status == DeployStatus.Success || status == DeployStatus.Failed 
+                || status == DeployStatus.Conflict || status == DeployStatus.PartialSuccess)
             {
                 return latestDeployment.Id;
             }
