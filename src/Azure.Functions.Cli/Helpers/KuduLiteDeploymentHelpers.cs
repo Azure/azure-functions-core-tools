@@ -60,51 +60,34 @@ namespace Azure.Functions.Cli.Helpers
 
             while (string.IsNullOrEmpty(id))
             {
+                await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
                 id = await GetLatestDeploymentId(client, functionApp);
+            }
+
+            while(statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown && statusCode != DeployStatus.Conflict && statusCode != DeployStatus.PartialSuccess) 
+            {
+                try
+                {
+                    statusCode = await GetDeploymentStatusById(client, functionApp, id);
+                }
+                catch (HttpRequestException)
+                {
+                    return DeployStatus.Unknown;
+                }
+
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
 
-            if (functionApp.IsFlex)
-            {
-                while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown && statusCode != DeployStatus.Conflict && statusCode != DeployStatus.PartialSuccess)
-                {
-                    try
-                    {
-                        statusCode = await GetDeploymentStatusById(client, functionApp, id);
-                    }
-                    catch (HttpRequestException)
-                    {
-                        return DeployStatus.Unknown;
-                    }
 
-                    await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
-                }
-                
-                // Printing logs after the status is confirmed.
-                if (statusCode == DeployStatus.Failed || statusCode == DeployStatus.PartialSuccess)
-                {
-                    logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
-                }
-            }
-            else
+            // Safely printing logs after the status is confirmed.
+            try
             {
-                while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown)
-                {
-                    try
-                    {
-                        statusCode = await GetDeploymentStatusById(client, functionApp, id);
-                        logLastUpdate = await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
-                    }
-                    catch (HttpRequestException)
-                    {
-                        return DeployStatus.Unknown;
-                    }
-
-                    await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
-                }
+                await DisplayDeploymentLog(client, functionApp, id, logLastUpdate);
             }
-            
-            
+            catch (Exception)
+            {
+                // ignore the fetch log failure.
+            }
 
             return statusCode;
         }
