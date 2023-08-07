@@ -367,6 +367,7 @@ namespace Azure.Functions.Cli.Helpers
         internal static async Task CheckFunctionHostStatusForFlex(Site functionApp, string accessToken, string managementURL,
             HttpMessageHandler messageHandler = null)
         {
+            ColoredConsole.Write("Checking the app health...");
             var masterKey = await GetMasterKeyAsync(functionApp.SiteId, accessToken, managementURL);
 
             if (masterKey is null)
