@@ -660,7 +660,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (status == DeployStatus.Success)
                 {
                     // the deployment was successful. Waiting for 60 seconds so that Kudu finishes the sync trigger.
-                    await Task.Delay(TimeSpan.FromSeconds(90));
+                    await Task.Delay(TimeSpan.FromSeconds(60));
 
                     // Checking the function app host status
                     try
@@ -669,7 +669,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                     catch (Exception)
                     {
-                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check app logs.");
+                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check the app logs.");
                     }
                     
                     ColoredConsole.WriteLine(VerboseColor(GetLogMessage("The deployment was successful!")));
