@@ -462,9 +462,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Consumption Linux
                 shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionApp, zipStreamFactory);
             }
-            else if (functionApp.IsLinux && functionApp.IsFlex)
+            else if (functionApp.IsFlex)
             {
-                // Flex Linux
+                // Flex
                 shouldSyncTriggers = await HandleFlexConsumptionPublish(functionApp, zipStreamFactory);
             }
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
