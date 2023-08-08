@@ -148,7 +148,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
         {
-            string logUrl = innerUrl != null ? innerUrl.ToString() : $"/deployments/{id}/log";
+            string logUrl = innerUrl != null ? innerUrl.ToString() : (functionApp.IsFlex? $"/api/deployments/{id}/log" :  $"/deployments/{id}/log");
             StringBuilder sbLogger = innerLogger != null ? innerLogger : new StringBuilder();
 
             var deploymentLogs = await InvokeRequest<List<DeploymentLogResponse>>(client, HttpMethod.Get, logUrl);
