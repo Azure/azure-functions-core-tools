@@ -595,6 +595,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_PACKAGE");
                 appSettingsUpdated = true;
             }
+            
             appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings) || appSettingsUpdated;
             if (appSettingsUpdated)
             {
@@ -620,11 +621,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         /// <returns>ShouldSyncTrigger value</returns>
         private async Task<bool> HandleFlexConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
-            if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage))
-            {
-                throw new CliException($"Please remove {Constants.WebsiteRunFromPackage} app setting from the function app and try the deployment again.");
-            }
-
             Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
             var deploymentParameters = new Dictionary<string, string>();
             
