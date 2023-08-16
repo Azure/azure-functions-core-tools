@@ -108,7 +108,7 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
             {
                 Location = environmentLocation;
             }
-            else if (environmentLocation != "eastasia" || !Location.Contains("eastasia"))
+            else if ((environmentLocation != "eastasia" && environmentLocation != "East Asia") || !Location.Contains("eastasia"))
             {
                 throw new CliException($"Location \"{Location}\" should match with that of environment's \"{environmentLocation}\".");
             }

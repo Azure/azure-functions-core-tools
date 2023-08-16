@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("target-framework")
-                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net48\", \"net6.0\", and \"net7.0\"")
+                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net48\", \"net6.0\", and \"net7.0\", and \"net8.0\"")
                 .Callback(tf => TargetFramework = tf);
 
             Parser
@@ -388,6 +388,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (targetFramework == Common.TargetFramework.net7)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet7Isolated);
+                }
+                else if (targetFramework == Common.TargetFramework.net8)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet8Isolated);
                 }
                 else
                 {
