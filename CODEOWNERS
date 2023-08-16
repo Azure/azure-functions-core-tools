@@ -11,7 +11,7 @@
 
 
 # All of CoreTools PR should have the owners in the PR.
-* @michaelpeng36 @AnatoliB
+* @khkh-ms @amamounelsayed
 
 # Adding codeowner for Language specific files such that GitHub automatically adds language owners as a reviewers.
-src/Azure.Functions.Cli/Azure.Functions.Cli.csproj @vrdmr @Francisco-Gamino @amamounelsayed @alrod @michaelpeng36 @AnatoliB
+src/Azure.Functions.Cli/Azure.Functions.Cli.csproj @vrdmr @Francisco-Gamino @andystaples @amamounelsayed @ejizba @hossam-nasr @AnatoliB
