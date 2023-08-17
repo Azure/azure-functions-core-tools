@@ -289,11 +289,11 @@ namespace Build
 
             string templatesv2JsonPath = Path.Combine(tempDirectoryPath, "templates-v2", "templates.json");
             string userPromptsv2JsonPath = Path.Combine(tempDirectoryPath, "bindings-v2", "userPrompts.json");
-            if (File.Exists(templatesJsonPath) && File.Exists(userPromptsv2JsonPath))
+            if (File.Exists(templatesv2JsonPath) && File.Exists(userPromptsv2JsonPath))
             {
                 foreach (var runtime in Settings.TargetRuntimes)
                 {
-                    File.Copy(templatesJsonPath, Path.Combine(Settings.OutputDir, runtime, "templates-v2", "templates.json"));
+                    File.Copy(templatesv2JsonPath, Path.Combine(Settings.OutputDir, runtime, "templates-v2", "templates.json"));
                     File.Copy(userPromptsv2JsonPath, Path.Combine(Settings.OutputDir, runtime, "templates-v2", "userPrompts.json"));
                 }
             }

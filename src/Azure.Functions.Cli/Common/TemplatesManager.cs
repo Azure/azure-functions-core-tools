@@ -267,6 +267,7 @@ namespace Azure.Functions.Cli.Common
 
         public async Task<IEnumerable<NewTemplate>> GetV2Templates()
         {
+            
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             string templateJson;
             if (extensionBundleManager.IsExtensionBundleConfigured())
