@@ -76,7 +76,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (!functionApp.AzureAppSettings.ContainsKey(ApplicationInsightsIKeySetting))
             {
                 throw new CliException($"Missing {ApplicationInsightsIKeySetting} App Setting. " +
-                    $"Please make sure you have Application Insights configured with you function app.");
+                    $"Please make sure you have Application Insights configured with your function app.");
             }
 
             var iKey = functionApp.AzureAppSettings[ApplicationInsightsIKeySetting];
