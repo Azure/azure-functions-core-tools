@@ -37,12 +37,10 @@ namespace Azure.Functions.Cli.Helpers
                     releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
                 }
 
-                var currentCoreToolsRelease = releaseList.FirstOrDefault(x => x.CoreToolsReleaseNumber == Constants.CliDetailedVersion[..Constants.CliDetailedVersion.IndexOf(" ")]);
-                var latestCoreToolsRelease = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion);
+                var latestCoreToolsReleaseVersion = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsReleaseNumber;
 
-                if ( !string.IsNullOrEmpty(currentCoreToolsRelease?.CoreToolsReleaseNumber) && 
-                    !string.IsNullOrEmpty(latestCoreToolsRelease?.CoreToolsReleaseNumber) && 
-                    currentCoreToolsRelease.CoreToolsReleaseNumber != latestCoreToolsRelease.CoreToolsReleaseNumber)
+                if (!string.IsNullOrEmpty(latestCoreToolsReleaseVersion) &&
+                    Constants.CliVersion != latestCoreToolsReleaseVersion)
                 {
                     return Constants.OldCoreToolsVersionMessage;
                 }
@@ -105,8 +103,14 @@ namespace Azure.Functions.Cli.Helpers
                         return string.Empty;
                     }
 
-                    downloadLink = downloadLink.Replace("https://functionscdn.azureedge.net/public/", string.Empty);
-                    return downloadLink[..downloadLink.IndexOf('/')];
+                    Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
+
+                    if (uri.Segments.Length < 4)
+                    {
+                        return string.Empty;
+                    }
+
+                    return uri.Segments[2].Replace("/", string.Empty);
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
