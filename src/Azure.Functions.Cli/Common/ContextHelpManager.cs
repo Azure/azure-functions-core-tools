@@ -1,4 +1,5 @@
 ﻿using Azure.Functions.Cli.Interfaces;
+using NuGet.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +12,7 @@ namespace Azure.Functions.Cli.Common
     {
         private IDictionary<string, string> _triggerHelp;
         private IDictionary<string, string> _triggerNameMap;
-        private IList<string> _triggerHelpSupportedLanguages => new List<string>() { Languages.JavaScript, Languages.TypeScript};
+        private IList<string> _triggerHelpSupportedLanguages => new List<string>() { Languages.JavaScript, Languages.TypeScript, Languages.Python };
 
         public string GetTriggerHelp(string triggerName, string language)
         {
@@ -36,7 +37,7 @@ namespace Azure.Functions.Cli.Common
 
             if (!_triggerHelpSupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
             {
-                throw new CliException("Only JavaScript and TypeScript support this help command at the moment.");
+                throw new CliException("Only Python, JavaScript and TypeScript support this help command at the moment.");
             }
 
             _triggerHelp = new Dictionary<string, string>();

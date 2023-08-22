@@ -11,6 +11,8 @@ namespace Azure.Functions.Cli.Common
         Building = 1,
         Deploying = 2,
         Failed = 3,
-        Success = 4
+        Success = 4,
+        Conflict = 5,
+        PartialSuccess = 6
     }
 }

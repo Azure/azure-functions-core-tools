@@ -172,7 +172,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, Csx);
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, TargetFramework, Csx);
         }
 
         private async Task InitFunctionAppProject()
@@ -220,7 +220,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx);
             }
 
             await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
@@ -370,7 +370,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await FileSystemHelpers.WriteFileIfNotExists("local.settings.json", localSettingsJsonContent);
         }
 
-        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, bool csx)
+        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, string targetFramework, bool csx)
         {
             if (workerRuntime == Helpers.WorkerRuntime.dotnet)
             {
@@ -385,17 +385,24 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
             {
-                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+                if (targetFramework == Common.TargetFramework.net7)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet7Isolated);
+                }
+                else
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+                }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
                 if (language == Constants.Languages.TypeScript)
                 {
-                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypescript);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypescriptNode18);
                 }
                 else
                 {
-                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileNode16);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileNode18);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)

@@ -1,16 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
+using ImTools;
+using Microsoft.Azure.AppService.Proxy.Common.Context;
 using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.Constants;
@@ -26,8 +32,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
         private readonly IContextHelpManager _contextHelpManager;
-
+        private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
+        Lazy<IEnumerable<UserPrompt>> _userPrompts;
         public WorkerRuntime workerRuntime;
 
         public string Language { get; set; }
@@ -39,7 +46,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public AuthorizationLevel? AuthorizationLevel { get; set; }
 
         Lazy<IEnumerable<Template>> _templates;
-
+        Lazy<IEnumerable<NewTemplate>> _newTemplates;
 
         public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
         {
@@ -47,7 +54,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _secretsManager = secretsManager;
             _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
+            _userInputHandler = new UserInputHandler(_templatesManager);
             _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
+            _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
+            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
         }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -104,26 +114,76 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             await UpdateLanguageAndRuntime();
 
-            // Check if the programming model is PyStein
-            if (IsNewPythonProgrammingModel())
-            {
-                // TODO: Remove these messages once creating new functions in the new programming model is supported
-                ColoredConsole.WriteLine(WarningColor("When using the new Python programming model, triggers and bindings are created as decorators within the Python file itself."));
-                ColoredConsole.Write(AdditionalInfoColor("For information on how to create a new function with the new programming model, see "));
-                PythonHelpers.PrintPySteinWikiLink();
-                throw new CliException(
-                    "Function not created! 'func new' is not supported for the preview of the V2 Python programming model.");
-            }
-
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
             {
-                SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
-                TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                if (string.IsNullOrWhiteSpace(TemplateName))
+                {
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
+                    TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"Template: {TemplateName}");
+                }
+                
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
                 await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel);
+            }
+            else if (IsNewPythonProgrammingModel())
+            {
+                if (string.IsNullOrEmpty(TemplateName))
+                {
+                    SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
+                    TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNamesFromNewTemplates(Language));
+                }
+
+                // Defaulting the filename to "function_app.py" if the file name is not provided. 
+                if (string.IsNullOrWhiteSpace(FileName))
+                {
+                    FileName = "function_app.py";
+                }
+
+                var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
+                while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
+                {
+                    _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
+                    FileName = Console.ReadLine();
+                    if (string.IsNullOrEmpty(FileName))
+                    {
+                        FileName = PySteinFunctionAppPy;
+                    }
+                }
+
+                var variables = new Dictionary<string, string>();
+                var jobName = "appendToFile";
+                if (FileName != PySteinFunctionAppPy)
+                {
+                    var filePath = Path.Combine(Environment.CurrentDirectory, FileName);
+                    jobName = !FileUtility.FileExists(filePath) ? "CreateNewBlueprint" : "AppendToBlueprint";
+                    variables["$(BLUEPRINT_FILENAME)"] = FileName;
+                    FileName = FileName[..^Path.GetExtension(FileName).Length];
+                }
+                else
+                {
+                    variables["$(SELECTED_FILEPATH)"] = FileName;
+                }
+
+                var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
+                var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
+                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName } };
+
+                _userInputHandler.RunUserInputActions(providedInputs, templateJob.Inputs, variables);
+
+                if (string.IsNullOrEmpty(FunctionName))
+                {
+                    FunctionName = providedInputs[GetFunctionNameParamId];
+                }
+
+                
+                await _templatesManager.Deploy(templateJob, template, variables);
             }
             else
             {
@@ -268,7 +328,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private IEnumerable<Template> GetLanguageTemplates(string templateLanguage, bool forNewModelHelp = false)
         {
-            if (IsNewNodeJsProgrammingModel(workerRuntime) || (forNewModelHelp && (Language == Languages.TypeScript || Language == Languages.JavaScript)))
+            if (IsNewNodeJsProgrammingModel(workerRuntime) ||
+                (forNewModelHelp && (Languages.TypeScript.EqualsIgnoreCase(templateLanguage) || Languages.JavaScript.EqualsIgnoreCase(templateLanguage))))
             {
                 return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
@@ -279,6 +340,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private IEnumerable<string> GetTriggerNamesFromNewTemplates(string templateLanguage, bool forNewModelHelp = false)
+        {
+            return GetNewTemplates(templateLanguage, forNewModelHelp).Select(t => t.Name).Distinct();
+        }
+
+        private IEnumerable<NewTemplate> GetNewTemplates(string templateLanguage, bool forNewModelHelp = false)
+        {
+            if (IsNewPythonProgrammingModel() || (Languages.Python.EqualsIgnoreCase(templateLanguage) && forNewModelHelp))
+            {
+                return _newTemplates.Value.Where(t => t.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+            }
+
+            throw new CliException("The new version of templates are only supported for Python.");
         }
 
         private void ConfigureAuthorizationLevel(Template template)
@@ -358,7 +434,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return false;
             }
 
-            var supportedLanguages = new List<string>() { Languages.JavaScript, Languages.TypeScript };
+            var supportedLanguages = new List<string>() { Languages.JavaScript, Languages.TypeScript, Languages.Python };
             if (string.IsNullOrEmpty(Language))
             {
                 if (CurrentPathHasLocalSettings())
@@ -378,8 +454,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            var triggerNames = GetTriggerNames(Language, forNewModelHelp: true);
+            IEnumerable<string> triggerNames;
+            if (Languages.Python.EqualsIgnoreCase(Language))
+            {
+                triggerNames = GetTriggerNamesFromNewTemplates(Language, forNewModelHelp: true);
+            }
+            else
+            {
+                triggerNames = GetTriggerNames(Language, forNewModelHelp: true);
+            }
+
             await _contextHelpManager.LoadTriggerHelp(Language, triggerNames.ToList());
+
             if (_contextHelpManager.IsValidTriggerNameForHelp(triggerName))
             {
                 triggerName = _contextHelpManager.GetTriggerTypeFromTriggerNameForHelp(triggerName);
