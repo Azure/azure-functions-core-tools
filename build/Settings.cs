@@ -19,8 +19,8 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2288";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2288";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2727";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2727";
         public const string DotnetItemTemplatesVersion = "4.0.2185";
         public const string DotnetProjectTemplatesVersion = "4.0.2185";
         public const string TemplateJsonVersion = "3.1.1648";

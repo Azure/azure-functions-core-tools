@@ -34,9 +34,6 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
   <ItemGroup>
-    <None Remove="StaticResources\templatesv2.json" />
-  </ItemGroup>
-  <ItemGroup>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
@@ -51,6 +48,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet7Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet7Isolated</LogicalName>
+    </EmbeddedResource>
+	<EmbeddedResource Include="StaticResources\Dockerfile.dotnet8Isolated">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet8Isolated</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
