@@ -23,6 +23,7 @@ namespace Azure.Functions.Cli.Common
         public const string PythonGettingStarted = "getting_started.md";
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
+        public const string GlobalJsonFileName = "global.json";
         public const string ExtenstionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";

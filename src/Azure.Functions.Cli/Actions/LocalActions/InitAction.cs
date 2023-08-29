@@ -173,6 +173,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
+                await WriteGlobalJson();
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
             }
             else
@@ -464,6 +465,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
+        }
+
+        private static async Task WriteGlobalJson()
+        {
+            var globalJsonConfig = await StaticResources.GlobalJsonConfig;
+            await WriteFiles(Constants.GlobalJsonFileName, globalJsonConfig);
         }
 
         private static string AddWorkerVersion(string localSettingsContent, string workerVersion)

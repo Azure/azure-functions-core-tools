@@ -37,6 +37,9 @@
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\global.json">
+      <LogicalName>$(AssemblyName).global.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\customHandlerConfig.json">
       <LogicalName>$(AssemblyName).customHandlerConfig.json</LogicalName>
     </EmbeddedResource>
