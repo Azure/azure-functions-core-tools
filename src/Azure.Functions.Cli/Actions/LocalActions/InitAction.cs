@@ -175,6 +175,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 await WriteGlobalJson();
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
+                // temp code for testing
+                var projFileName = Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-") + ".csproj";
+                if (File.Exists(projFileName))
+                {
+                    var projFileNameContent = File.ReadAllText(projFileName);
+                    ColoredConsole.WriteLine($"{projFileName} Content: {projFileNameContent}");
+                }
+                else
+                {
+                    ColoredConsole.WriteLine($"{projFileName} couldn't be found");
+                }
             }
             else
             {
