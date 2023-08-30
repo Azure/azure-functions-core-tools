@@ -170,6 +170,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\", \"Host.Startup\": \"Information\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
+                        
+                        // temp code
+                        var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);
                     },
                 },
                 new RunConfiguration
@@ -216,6 +220,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
+                        // temp code
+                        var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);
                     },
                 },
                 new RunConfiguration
