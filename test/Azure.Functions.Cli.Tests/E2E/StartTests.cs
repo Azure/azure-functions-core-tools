@@ -128,6 +128,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
+
+                        // temp code
+                        var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);
                     },
                 },
                 new RunConfiguration
@@ -340,6 +344,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
+
+                        // temp code
+                        var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);
+
                     },
                 },
                 new RunConfiguration
@@ -374,6 +383,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         var hostJsonPath = Path.Combine(workingDir, "host.json");
                         File.Delete(hostJsonPath);
+
+                        // temp code
+                        var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);
 
                     },
                 },
@@ -549,6 +562,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"init . --worker-runtime {language}",
                         "new --template \"Http trigger\" --name http1",
                         "new --template \"Queue trigger\" --name queue1"
+                    },
+                    Test = async (workingDir, p) =>
+                    {
+                        var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);
                     },
                 },
                 new RunConfiguration
