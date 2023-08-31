@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime custom --no-bundle",
-                    "new --template \"Http Trigger\" --name testfunc"
+                    "new --template \"http\" --name testfunc"
                 },
                 OutputContains = new[]
                 {

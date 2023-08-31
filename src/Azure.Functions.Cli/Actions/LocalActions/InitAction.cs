@@ -380,6 +380,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
             await WriteFiles("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker));
+
+            // temp code for testing
+            var dockerFileContent = await PythonHelpers.GetDockerInitFileContent(worker);
+            ColoredConsole.WriteLine($"Docker File: { dockerFileContent}");
         }
 
         private static async Task WriteExtensionsJson()
