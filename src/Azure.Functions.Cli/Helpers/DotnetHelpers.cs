@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Helpers
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new func --AzureFunctionsVersion v3 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var exe = new Executable("dotnet", $"new func --AzureFunctionsVersion v3 --framework netcoreapp3.1 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             await TemplateOperation(async () =>
             {
-                string exeCommandArguments = $"new {templateName} --name {functionName} --namespace {namespaceStr} --language {language}";
+                string exeCommandArguments = $"new --framework netcoreapp3.1 {templateName} --name {functionName} --namespace {namespaceStr} --language {language}";
                 if (httpAuthorizationLevel != null)
                 {
                     if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))

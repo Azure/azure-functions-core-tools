@@ -130,8 +130,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
 
                         // temp code
-                        var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);
+                        /*var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);*/
                     },
                 },
                 new RunConfiguration
@@ -176,8 +176,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                         
                         // temp code
-                        var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);
+                        /*var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);*/
                     },
                 },
                 new RunConfiguration
@@ -225,8 +225,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                         // temp code
-                        var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);
+                        /*var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);*/
                     },
                 },
                 new RunConfiguration
@@ -346,8 +346,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
 
                         // temp code
-                        var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);
+                        /*var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);*/
 
                     },
                 },
@@ -385,8 +385,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         File.Delete(hostJsonPath);
 
                         // temp code
-                        var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);
+                        /*var globalPath = Path.Combine(workingDir, "global.json");
+                        File.Delete(globalPath);*/
 
                     },
                 },
@@ -563,11 +563,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "new --template \"Http trigger\" --name http1",
                         "new --template \"Queue trigger\" --name queue1"
                     },
-                    Test = async (workingDir, p) =>
+                    /*Test = async (workingDir, p) =>
                     {
                         var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);
-                    },
+                        await Task.Run(() => File.Delete(globalPath));
+                    },*/
                 },
                 new RunConfiguration
                 {
