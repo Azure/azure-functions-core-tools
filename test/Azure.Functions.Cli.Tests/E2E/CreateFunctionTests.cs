@@ -218,7 +218,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"http\" template."
+                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
                 }
             }, _output);
         }
