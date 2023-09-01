@@ -153,6 +153,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                TemplateName = GetTemplateShortName(TemplateName);
+
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
@@ -263,5 +265,24 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FileSystemHelpers.WriteAllTextToFile(funcJsonFile, JsonConvert.SerializeObject(funcObj, Formatting.Indented));
             }
         }
+
+        private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
+        {
+            "blobtrigger" => "blob",
+            "cosmosdbtrigger" => "cosmos",
+            "durablefunctionsorchestration" => "durable",
+            "eventgridtrigger" => "eventgrid",
+            "eventhubtrigger" => "eventhub",
+            "httptrigger" => "http",
+            "iothubtrigger" => "iothub",
+            "kafkatrigger" => "kafka",
+            "kafkaoutput" => "kafkao",
+            "queuetrigger" => "queue",
+            "sendgrid" => "sendgrid",
+            "servicebusqueuetrigger" => "squeue",
+            "servicebustopictrigger" => "stopic",
+            "timertrigger" => "timer",
+            _ => templateName
+        };
     }
 }
