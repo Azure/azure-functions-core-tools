@@ -217,7 +217,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Commands = new[]
                     {
                         "init . --worker-runtime node",
-                        $"new --template http --name {functionName}",
+                        $"new --template \"http trigger\" --name {functionName}",
                     },
                     Test = async (workingDir, p) =>
                     {

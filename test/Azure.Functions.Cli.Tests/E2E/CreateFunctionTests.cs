@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                    "The function \"testfunc\" was created successfully from the \"http\" template."
                 }
             }, _output);
         }
@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"HttpTrigger\" template."
+                    "The function \"testfunc\" was created successfully from the \"http\" template."
                 }
             }, _output);
         }
@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime custom --no-bundle",
-                    "new --template \"http\" --name testfunc"
+                    "new --template \"Http Trigger\" --name testfunc"
                 },
                 OutputContains = new[]
                 {
@@ -187,7 +187,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc2\" was created successfully from the \"http trigger\" template."
+                    "The function \"testfunc2\" was created successfully from the \"http\" template."
                 }
             }, _output);
         }
@@ -218,7 +218,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
-                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
+                    "The function \"testfunc\" was created successfully from the \"http\" template."
                 }
             }, _output);
         }
