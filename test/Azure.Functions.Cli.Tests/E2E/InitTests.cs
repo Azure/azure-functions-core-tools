@@ -191,10 +191,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[] { $"init . --worker-runtime python --docker" },
                 CheckFiles = new[]
                 {
+                    // minor version doesn't need to match as docker file support up to 3.9. 
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:3.0-python{worker.Major}.{worker.Minor}" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:3.0-python{worker.Major}" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }

@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template HttpTrigger --name testfunc"
+                    "new --template http --name testfunc"
                 },
                 OutputContains = new[]
                 {
@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template HttpTrigger --name testfunc --authlevel function"
+                    "new --template http --name testfunc --authlevel function"
                 },
                 OutputContains = new[]
                 {
@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init 12n.e.0w-file$ --worker-runtime dotnet",
-                    "new --prefix 12n.e.0w-file$ --template HttpTrigger --name 12@n.other-file$"
+                    "new --prefix 12n.e.0w-file$ --template http --name 12@n.other-file$"
                 },
                 CommandTimeout = new TimeSpan(0, 1, 0),
                 CheckFiles = new[]
@@ -183,7 +183,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template \"http trigger\" --name testfunc2"
+                    "new --template http --name testfunc2"
                 },
                 OutputContains = new[]
                 {

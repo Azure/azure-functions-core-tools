@@ -501,7 +501,7 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython39;
                 }
             }
-            return StaticResources.DockerfilePython36;
+            return StaticResources.DockerfilePython36; 
         }
 
         private static string GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
