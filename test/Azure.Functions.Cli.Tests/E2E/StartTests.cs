@@ -371,7 +371,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var hostJsonPath = Path.Combine(workingDir, "host.json");
                         File.Delete(hostJsonPath);
                     },
-                },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
+                }
                 new RunConfiguration
                 {
                     Commands = new[]
@@ -545,6 +546,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "new --template http --name http1",
                         "new --template queue --name queue1"
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                 },
                 new RunConfiguration
                 {
@@ -624,6 +626,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "new --template \"Http trigger\" --name http1",
                         "new --template \"Queue trigger\" --name queue1"
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                 },
                 new RunConfiguration
                 {
@@ -690,6 +693,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "new --template \"Http trigger\" --name http1",
                         "new --template \"Queue trigger\" --name queue1"
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                 },
                 new RunConfiguration
                 {
