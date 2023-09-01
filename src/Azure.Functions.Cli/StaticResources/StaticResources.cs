@@ -65,8 +65,6 @@ namespace Azure.Functions.Cli
 
         public static Task<string> ManagedDependenciesConfig => GetValue("managedDependenciesConfig.json");
 
-        public static Task<string> GlobalJsonConfig => GetValue("global.json");
-
         public static Task<string> PythonDockerBuildScript => GetValue(Constants.StaticResourcesNames.PythonDockerBuild);
 
         public static Task<string> PowerShellProfilePs1 => GetValue("profile.ps1");

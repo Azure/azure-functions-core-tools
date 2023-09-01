@@ -175,17 +175,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 // await WriteGlobalJson();
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
-                // temp code for testing
-                var projFileName = Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-") + ".csproj";
-                if (File.Exists(projFileName))
-                {
-                    var projFileNameContent = File.ReadAllText(projFileName);
-                    ColoredConsole.WriteLine($"{projFileName} Content: {projFileNameContent}");
-                }
-                else
-                {
-                    ColoredConsole.WriteLine($"{projFileName} couldn't be found");
-                }
             }
             else
             {
@@ -380,10 +369,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
             await WriteFiles("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker));
-
-            // temp code for testing
-            var dockerFileContent = await PythonHelpers.GetDockerInitFileContent(worker);
-            ColoredConsole.WriteLine($"Docker File: { dockerFileContent}");
         }
 
         private static async Task WriteExtensionsJson()
@@ -480,12 +465,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
-        }
-
-        private static async Task WriteGlobalJson()
-        {
-            var globalJsonConfig = await StaticResources.GlobalJsonConfig;
-            await WriteFiles(Constants.GlobalJsonFileName, globalJsonConfig);
         }
 
         private static string AddWorkerVersion(string localSettingsContent, string workerVersion)

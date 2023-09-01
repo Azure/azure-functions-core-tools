@@ -128,10 +128,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
-
-                        // temp code
-                        /*var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);*/
                     },
                 },
                 new RunConfiguration
@@ -174,10 +170,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\", \"Host.Startup\": \"Information\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
-                        
-                        // temp code
-                        /*var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);*/
                     },
                 },
                 new RunConfiguration
@@ -224,9 +216,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
-                        // temp code
-                        /*var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);*/
                     },
                 },
                 new RunConfiguration
@@ -344,11 +333,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
-
-                        // temp code
-                        /*var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);*/
-
                     },
                 },
                 new RunConfiguration
@@ -383,11 +367,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         var hostJsonPath = Path.Combine(workingDir, "host.json");
                         File.Delete(hostJsonPath);
-
-                        // temp code
-                        /*var globalPath = Path.Combine(workingDir, "global.json");
-                        File.Delete(globalPath);*/
-
                     },
                 },
                 new RunConfiguration
@@ -563,11 +542,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "new --template http --name http1",
                         "new --template queue --name queue1"
                     },
-                    /*Test = async (workingDir, p) =>
-                    {
-                        var globalPath = Path.Combine(workingDir, "global.json");
-                        await Task.Run(() => File.Delete(globalPath));
-                    },*/
                 },
                 new RunConfiguration
                 {
