@@ -163,7 +163,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Commands = new[]
                     {
                         "init . --worker-runtime dotnet",
-                        $"new --template Httptrigger --name {functionName}",
+                        $"new --template http --name {functionName}",
                     },
                     Test = async (workingDir, p) =>
                     {
@@ -209,7 +209,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Commands = new[]
                     {
                         "init . --worker-runtime node",
-                        $"new --template Httptrigger --name {functionName}",
+                        $"new --template \"http trigger\" --name {functionName}",
                     },
                     Test = async (workingDir, p) =>
                     {
@@ -251,7 +251,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 Commands = new[]
                 {
                     "init . --worker-runtime dotnet",
-                    "new --template Httptrigger --name HttpTrigger",
+                    "new --template http --name HttpTrigger",
                     "start --build --port 7073"
                 },
                 ExpectExit = false,
@@ -325,7 +325,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Commands = new[]
                     {
                         "init . --worker-runtime dotnet",
-                        $"new --template Httptrigger --name {functionName}",
+                        $"new --template http --name {functionName}",
 
                     },
                     Test = async (workingDir, p) =>
@@ -361,13 +361,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Commands = new[]
                     {
                         "init . --worker-runtime dotnet",
-                        $"new --template Httptrigger --name {functionName}",
+                        $"new --template http --name {functionName}",
                     },
                     Test = async (workingDir, p) =>
                     {
                         var hostJsonPath = Path.Combine(workingDir, "host.json");
                         File.Delete(hostJsonPath);
-
                     },
                 },
                 new RunConfiguration
@@ -540,8 +539,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Commands = new[]
                     {
                         $"init . --worker-runtime {language}",
-                        "new --template \"Http trigger\" --name http1",
-                        "new --template \"Queue trigger\" --name queue1"
+                        "new --template http --name http1",
+                        "new --template queue --name queue1"
                     },
                 },
                 new RunConfiguration

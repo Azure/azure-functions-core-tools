@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.Helpers
                 string exeCommandArguments = $"new {templateName} --name {functionName} --namespace {namespaceStr} --language {language}";
                 if (httpAuthorizationLevel != null)
                 {
-                    if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
+                    if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase) || templateName.Equals(Constants.HttpTriggerTemplateShortName, StringComparison.OrdinalIgnoreCase))
                     {
                         exeCommandArguments += $" --AccessRights {httpAuthorizationLevel}";
                     }

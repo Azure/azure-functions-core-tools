@@ -52,6 +52,7 @@ namespace Azure.Functions.Cli.Common
         public const string CustomHandlerPropertyName = "customHandler";
         public const string AuthLevelErrorMessage = "Unable to configure Authorization level. The selected template does not use Http Trigger";
         public const string HttpTriggerTemplateName = "HttpTrigger";
+        public const string HttpTriggerTemplateShortName = "http";
         public const string PowerShellWorkerDefaultVersion = "~7";
         public const string UserSecretsIdElementName = "UserSecretsId";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
