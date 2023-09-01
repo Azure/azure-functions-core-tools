@@ -129,6 +129,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                 },
                 new RunConfiguration
                 {
@@ -171,6 +172,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\", \"Host.Startup\": \"Information\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120)
                 },
                 new RunConfiguration
                 {
@@ -216,7 +218,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
-                    },
+                    }
                 },
                 new RunConfiguration
                 {
@@ -334,6 +336,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                 },
                 new RunConfiguration
                 {
