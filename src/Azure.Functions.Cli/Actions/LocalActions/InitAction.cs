@@ -173,7 +173,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
-                // await WriteGlobalJson();
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime);
             }
             else
