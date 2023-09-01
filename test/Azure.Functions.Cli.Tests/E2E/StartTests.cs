@@ -372,7 +372,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         File.Delete(hostJsonPath);
                     },
                     CommandTimeout = TimeSpan.FromSeconds(120),
-                }
+                },
                 new RunConfiguration
                 {
                     Commands = new[]
