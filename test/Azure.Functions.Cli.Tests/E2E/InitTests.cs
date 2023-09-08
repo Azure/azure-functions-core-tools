@@ -103,9 +103,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("node", "v3")]
         [InlineData("node", "v4")]
+        [InlineData("node", "")]
         [InlineData("java", "v1")]
         [InlineData("python", "v1")]
         [InlineData("python", "v2")]
+        [InlineData("python", "")]
         public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
         {
             var files = new List<FileResult>
@@ -121,14 +123,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             };
 
-            if (workerRuntime == "python" && programmingModel == "v2")
+            if (workerRuntime == "python" && (programmingModel == "v2" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
                     Name = "function_app.py",
                 });
             }
-            else if (workerRuntime == "node" && programmingModel == "v4")
+            else if (workerRuntime == "node" && (programmingModel == "v4" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
@@ -140,9 +142,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
             }
 
+            var programmingModelFlag = programmingModel == string.Empty ? string.Empty : $"--model {programmingModel}";
+
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} {programmingModelFlag}" },
                 CheckFiles = files.ToArray(),
                 OutputContains = new[]
                 {

@@ -53,6 +53,42 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
+                        result.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
+                    }
+                },
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_nodejs_v3()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node -m v3",
+                    "new --template \"Http trigger\" --name HttpTrigger",
+                    "start"
+                },
+                ExpectExit = false,
+                OutputContains = new[]
+                {
+                    "Functions:",
+                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
+                },
+                OutputDoesntContain = new string[]
+                {
+                        "Initializing function HTTP routes",
+                        "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
+                },
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
@@ -281,7 +317,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime node",
+                        "init . --worker-runtime node -m v3",
                         $"new --template \"Http Trigger\" --name {functionName}",
                     },
                     Test = async (workingDir, _) =>

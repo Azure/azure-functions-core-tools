@@ -233,8 +233,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
+            if (string.Equals(Language, Languages.Python, StringComparison.CurrentCultureIgnoreCase) && !IsNewPythonProgrammingModel())
+            {
+                PythonHelpers.PrintPySteinAwarenessMessage();
+            }
 
             var isNewNodeJsModel = IsNewNodeJsProgrammingModel(workerRuntime);
+            if (workerRuntime == WorkerRuntime.node && !isNewNodeJsModel)
+            {
+                NodeJSHelpers.PrintV4AwarenessMessage();
+            }
         }
 
         public bool ValidateInputs()
