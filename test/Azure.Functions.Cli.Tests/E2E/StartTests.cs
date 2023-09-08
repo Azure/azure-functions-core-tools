@@ -56,6 +56,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120),
             }, _output);
         }
 
@@ -561,6 +562,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 

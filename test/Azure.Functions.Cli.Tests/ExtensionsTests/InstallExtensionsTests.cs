@@ -39,7 +39,8 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                         Name = "extensions.csproj",
                         Exists = false
                     }
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
