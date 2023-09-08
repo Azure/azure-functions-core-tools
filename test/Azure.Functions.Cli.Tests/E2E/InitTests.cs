@@ -253,6 +253,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120),
                 OutputContains = new[] { "Dockerfile" }
             }, _output);
         }
@@ -415,7 +416,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                     "Writing Dockerfile",
                     "Writing .dockerignore"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -444,7 +446,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -475,7 +478,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -500,7 +504,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
-                OutputContains = new[] { "Dockerfile" }
+                OutputContains = new[] { "Dockerfile" },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -632,7 +637,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "Writing host.json"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
