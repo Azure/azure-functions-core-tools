@@ -9,13 +9,13 @@ namespace Azure.Functions.Cli.Helpers
     {
         public static void PrintV4ReferenceMessage()
         {
-            ColoredConsole.Write(AdditionalInfoColor("The new Node.js programming model is in public preview. Learn more at "));
+            ColoredConsole.Write(AdditionalInfoColor("The new Node.js programming model is generally available. Learn more at "));
             PrintNodeV4WikiLink();
         }
 
         public static void PrintV4AwarenessMessage()
         {
-            ColoredConsole.Write(AdditionalInfoColor("Did you know? There is a new Node.js programming model in public preview. Learn how you can try it out today at "));
+            ColoredConsole.Write(AdditionalInfoColor("Did you know? The new Node.js programming model is generally available. Learn how you can try it out today at "));
             PrintNodeV4WikiLink();
         }
 
