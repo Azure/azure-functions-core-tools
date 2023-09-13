@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
@@ -49,7 +49,7 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet7Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet7Isolated</LogicalName>
     </EmbeddedResource>
-	<EmbeddedResource Include="StaticResources\Dockerfile.dotnet8Isolated">
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet8Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet8Isolated</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
@@ -273,17 +273,17 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.21.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.23.2" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.25.3" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.12.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.6.1" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2823" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2803" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.12.1" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.8.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2850" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2890" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.2802" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.14.0" />
   </ItemGroup>
