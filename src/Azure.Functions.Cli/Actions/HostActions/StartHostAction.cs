@@ -299,12 +299,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 EnableDotNetWorkerStartup();
             }
 
+            EnableWorkerIndexing();
+
             return settings;
         }
 
         private void EnableDotNetWorkerStartup()
         {
             Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
+        }
+        
+        private void EnableWorkerIndexing()
+        {
+            Environment.SetEnvironmentVariable("FunctionsHostingConfig__WORKER_INDEXING_ENABLED", 1.ToString());
         }
 
         private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
