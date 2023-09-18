@@ -190,6 +190,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             settings.AddRange(LanguageWorkerHelper.GetWorkerConfiguration(LanguageWorkerSetting));
             _keyVaultReferencesManager.ResolveKeyVaultReferences(settings);
             UpdateEnvironmentVariables(settings);
+            EnableWorkerIndexing(settings);
 
             var defaultBuilder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder(Array.Empty<string>());
 
@@ -299,8 +300,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 EnableDotNetWorkerStartup();
             }
 
-            EnableWorkerIndexing();
-
             return settings;
         }
 
@@ -309,9 +308,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
         }
         
-        private void EnableWorkerIndexing()
+        private void EnableWorkerIndexing(IDictionary<string, string> secrets)
         {
-            Environment.SetEnvironmentVariable("FunctionsHostingConfig__WORKER_INDEXING_ENABLED", 1.ToString());
+            // Set only if the environment variable already doesn't exist and app setting doesn't have this setting.
+            if (Environment.GetEnvironmentVariable(Constants.EnableWorkerIndexEnvironmentVariableName) == null && !secrets.ContainsKey(Constants.EnableWorkerIndexEnvironmentVariableName))
+            {
+                Environment.SetEnvironmentVariable(Constants.EnableWorkerIndexEnvironmentVariableName, 1.ToString());
+            }
         }
 
         private void UpdateEnvironmentVariables(IDictionary<string, string> secrets)
