@@ -143,6 +143,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     await Task.Delay(TimeSpan.FromSeconds(15));
                     p.Kill();
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120),
             }, _output);
         }
 
@@ -438,7 +439,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                     ExpectExit = true,
                     ExitInError = true,
-                    ErrorContains = new[] { "Port 8081 is unavailable" }
+                    ErrorContains = new[] { "Port 8081 is unavailable" },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                 }, _output);
             }
             finally
