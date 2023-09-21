@@ -83,6 +83,9 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionAppDeploymentToContainerAppsFailedMessage = "Deploy function app request to Container Apps was not successful.";
         public const string FunctionAppFailedToDeployOnContainerAppsMessage = "Failed to deploy function app to Container Apps.";
         public const string LocalSettingsJsonFileName = "local.settings.json";
+        public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
+
+
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
