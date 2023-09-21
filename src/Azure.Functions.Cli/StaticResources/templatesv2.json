@@ -1820,5 +1820,626 @@
       "function_app.py": "import azure.functions as func\r\nimport logging\r\n\r\napp = func.FunctionApp()\r\n\r\n@app.cosmos_db_trigger(arg_name=\"azcosmosdb\", container_name=\"$(CONTAINER_NAME_INPUT)\",\r\n                        database_name=\"$(DB_NAME_INPUT)\", connection=\"$(CONNECTION_STRING_INPUT)\")  \r\ndef $(FUNCTION_NAME_INPUT)(azcosmosdb: func.DocumentList):\r\n    logging.info('Python CosmosDB triggered.')\r\n",
       "function_body.py": "\r\n@app.cosmos_db_trigger(arg_name=\"azcosmosdb\", container_name=\"$(CONTAINER_NAME_INPUT)\",\r\n                        database_name=\"$(DB_NAME_INPUT)\", connection=\"$(CONNECTION_STRING_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(azcosmosdb: func.DocumentList):\r\n    logging.info('Python CosmosDB triggered.')\r\n"
     }
+  },
+  {
+    "author": "Ashique",
+    "name": "Dapr Publish Output Binding",
+    "description": "$DaprPublishOutputBinding_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with DaprPublishOutputBinding function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_publish_output_binding"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add DaprPublishOutputBinding function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(SELECTED_FILEPATH)",
+            "paramId": "app-selectedFileName",
+            "defaultValue": "function_app.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_publish_output_binding"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-fileName",
+            "defaultValue": "blueprint.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_publish_output_binding"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add DaprPublishOutputBinding function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-existingFileName",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_publish_output_binding"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create Dapr Publish Output Binding function",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "dapr-publish-output_binding_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      }
+    ],
+    "id": "DaprPublishOutputBinding-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n# Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\nimport datetime\r\nimport json\r\nimport azure.functions as func\r\nimport logging\r\n\r\n\r\n$(BLUEPRINT_FILENAME) = func.DaprBlueprint()",
+      "blueprint_body.py": "@$(BLUEPRINT_FILENAME).schedule(schedule=\"*/10 * * * * *\", arg_name=\"myTimer\", run_on_startup=True)\r\n@$(BLUEPRINT_FILENAME).dapr_publish_output(arg_name=\"pubEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\ndef $(FUNCTION_NAME_INPUT)(myTimer, pubEvent: func.Out[bytes]) -> None:\r\n    logging.info('Python DaprPublish output binding function processed a request.')\r\n    payload = f\"Invoked by Timer trigger: Hello, World! The time is {datetime.datetime.now()}\"\r\n    pubEvent.set(json.dumps({\"payload\": payload}).encode('utf-8'))\r\n\r\n\r\n# Dapr topic trigger\r\n@$(BLUEPRINT_FILENAME).function_name(name=\"DaprTopicTriggerFuncApp\")\r\n@$(BLUEPRINT_FILENAME).dapr_topic_trigger(arg_name=\"subEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\ndef main(subEvent) -> None:\r\n    logging.info('Python Dapr Topic Trigger function processed a request from the Dapr Runtime.')\r\n    subEvent_json = json.loads(subEvent)\r\n    logging.info(\"Topic A received a message: \" + subEvent_json[\"data\"])",
+      "dapr-publish-output_binding_template.md": "# Azure Functions: Event Hub Trigger in Python\r\n\r\n## Dapr Output Binding\r\n\r\nWith Dapr output binding, you can invoke external resources. An optional payload and metadata can be sent with the invocation request.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Dapr Service Invocation Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport datetime\r\nimport json\r\nimport azure.functions as func\r\nimport logging\r\n\r\ndapp = func.DaprFunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\r\n\r\n@dapp.function_name(name=\"DaprPublishOutputBindingPython\")\r\n@dapp.schedule(schedule=\"*/10 * * * * *\", arg_name=\"myTimer\", run_on_startup=True)\r\n@dapp.dapr_publish_output(arg_name=\"pubEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\ndef main(myTimer, pubEvent: func.Out[bytes]) -> None:\r\n    logging.info('Python DaprPublish output binding function processed a request.')\r\n    payload = f\"Invoked by Timer trigger: Hello, World! The time is {datetime.datetime.now()}\"\r\n    pubEvent.set(json.dumps({\"payload\": payload}).encode('utf-8'))\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `dapp`.\r\n- The name of the file must be `function_app.py`.\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.",
+      "function_app.py": "import datetime\r\nimport json\r\nimport azure.functions as func\r\nimport logging\r\n\r\ndapp = func.DaprFunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\r\n\r\n@dapp.schedule(schedule=\"*/10 * * * * *\", arg_name=\"myTimer\", run_on_startup=True)\r\n@dapp.dapr_publish_output(arg_name=\"pubEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\ndef $(FUNCTION_NAME_INPUT)(myTimer, pubEvent: func.Out[bytes]) -> None:\r\n    logging.info('Python DaprPublish output binding function processed a request.')\r\n    payload = f\"Invoked by Timer trigger: Hello, World! The time is {datetime.datetime.now()}\"\r\n    pubEvent.set(json.dumps({\"payload\": payload}).encode('utf-8'))\r\n\r\n\r\n# Dapr topic trigger\r\n@dapp.function_name(name=\"DaprTopicTriggerFuncApp\")\r\n@dapp.dapr_topic_trigger(arg_name=\"subEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\ndef main(subEvent) -> None:\r\n    logging.info('Python Dapr Topic Trigger function processed a request from the Dapr Runtime.')\r\n    subEvent_json = json.loads(subEvent)\r\n    logging.info(\"Topic A received a message: \" + subEvent_json[\"data\"])",
+      "function_body.py": "@dapp.schedule(schedule=\"*/10 * * * * *\", arg_name=\"myTimer\", run_on_startup=True)\r\n@dapp.dapr_publish_output(arg_name=\"pubEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\ndef $(FUNCTION_NAME_INPUT)(myTimer, pubEvent: func.Out[bytes]) -> None:\r\n    logging.info('Python DaprPublish output binding function processed a request.')\r\n    payload = f\"Invoked by Timer trigger: Hello, World! The time is {datetime.datetime.now()}\"\r\n    pubEvent.set(json.dumps({\"payload\": payload}).encode('utf-8'))\r\n\r\n\r\n# Dapr topic trigger\r\n@dapp.function_name(name=\"DaprTopicTriggerFuncApp\")\r\n@dapp.dapr_topic_trigger(arg_name=\"subEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\ndef main(subEvent) -> None:\r\n    logging.info('Python Dapr Topic Trigger function processed a request from the Dapr Runtime.')\r\n    subEvent_json = json.loads(subEvent)\r\n    logging.info(\"Topic A received a message: \" + subEvent_json[\"data\"])"
+    }
+  },
+  {
+    "author": "Ashique",
+    "name": "Dapr Service Invocation Trigger",
+    "description": "$DaprServiceInvocation_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with DaprServiceInvocationTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_service_invocation_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add DaprServiceInvocationTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(SELECTED_FILEPATH)",
+            "paramId": "app-selectedFileName",
+            "defaultValue": "function_app.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_service_invocation_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "blueprint.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_service_invocation_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add DaprServiceInvocationTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_service_invocation_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create dapr service invocation trigger function",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "dapr_service_invocation_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      }
+    ],
+    "id": "DaprServiceInvocationTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n# Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\nimport json\r\nimport azure.functions as func\r\nimport logging\r\n\r\n\r\n$(BLUEPRINT_FILENAME) = func.DaprBlueprint()",
+      "blueprint_body.py": "@$(BLUEPRINT_FILENAME).dapr_service_invocation_trigger(arg_name=\"payload\", method_name=\"$(FUNCTION_NAME_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(payload: str) :\r\n    \"\"\"\r\n    See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n    \r\n    These tasks should be completed prior to running :\r\n         1. Install Dapr\r\n         2. Change the bundle name in host.json to \"Microsoft.Azure.Functions.ExtensionBundle.Preview\" and the version to \"[4.*, 5.0.0)\"\r\n    Run the app with below steps\r\n         1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n         2. Invoke function app by dapr cli: dapr invoke --app-id functionapp --method {yourFunctionName}  --data '{ \"data\": {\"value\": { \"orderId\": \"41\" } } }'\r\n    \"\"\"\r\n    logging.info('Azure function triggered by Dapr Service Invocation Trigger.')\r\n    logging.info(\"Dapr service invocation trigger payload: %s\", payload)\r\n\r\n@$(BLUEPRINT_FILENAME).function_name(name=\"InvokeOutputBinding\")\r\n@$(BLUEPRINT_FILENAME).route(route=\"invoke/{appId}/{methodName}\", auth_level=dapp.auth_level.ANONYMOUS)\r\n@$(BLUEPRINT_FILENAME).dapr_invoke_output(arg_name = \"payload\", app_id = \"{appId}\", method_name = \"{methodName}\", http_verb = \"post\")\r\ndef main(req: func.HttpRequest, payload: func.Out[str] ) -> str:\r\n    \"\"\"\r\n    Sample to use a Dapr Invoke Output Binding to perform a Dapr Server Invocation operation hosted in another Darp'd app.\r\n    Here this function acts like a proxy\r\n    Invoke Dapr Service invocation trigger using Windows PowerShell with below request\r\n\r\n    Invoke-RestMethod -Uri 'http://localhost:7071/api/invoke/functionapp/DaprServiceInvocationTriggerPython' -Method POST -Headers @{\r\n    'Content-Type' = 'application/json'\r\n     } -Body '{\r\n     \"data\": {\r\n          \"value\": {\r\n               \"orderId\": \"122\"\r\n               }\r\n          }\r\n     }'\r\n    \"\"\"\r\n    logging.info('Python HTTP trigger function processed a request..')\r\n    logging.info(req.params)\r\n    data = req.params.get('data')\r\n    if not data:\r\n        try:\r\n            req_body = req.get_json()\r\n        except ValueError:\r\n            pass\r\n        else:\r\n            data = req_body.get('data')\r\n\r\n    if data:\r\n        logging.info(f\"Url: {req.url}, Data: {data}\")\r\n        payload.set(json.dumps({\"body\": data}).encode('utf-8'))\r\n        return 'Successfully performed service invocation using Dapr invoke output binding.'\r\n    else:\r\n        return func.HttpResponse(\r\n            \"Please pass a data on the query string or in the request body\",\r\n            status_code=400\r\n        )",
+      "dapr_service_invocation_trigger_template.md": "# Azure Functions: Cosmos DB in Python\r\n\r\n## Dapr Service Invocation Trigger\r\n\r\nUsing service invocation, your application can reliably and securely communicate with other applications using HTTP protocols.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Dapr Service Invocation Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport json\r\nimport azure.functions as func\r\nimport logging\r\n\r\ndapp = func.DaprFunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\r\n\r\n@dapp.function_name(name=\"DaprServiceInvocationTriggerPython\")\r\n@dapp.dapr_service_invocation_trigger(arg_name=\"payload\", method_name=\"DaprServiceInvocationTriggerPython\")\r\ndef main(payload: str) :\r\n    logging.info('Azure function triggered by Dapr Service Invocation Trigger.')\r\n    logging.info(\"Dapr service invocation trigger payload: %s\", payload)\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `dapp`.\r\n- The name of the file must be `function_app.py`.\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.",
+      "function_app.py": "import json\r\nimport azure.functions as func\r\nimport logging\r\n\r\ndapp = func.DaprFunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\r\n\r\n@dapp.dapr_service_invocation_trigger(arg_name=\"payload\", method_name=\"$(FUNCTION_NAME_INPUT)\")\r\ndef $(FUNCTION_NAME_INPUT)(payload: str) :\r\n    \"\"\"\r\n    See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n    \r\n    These tasks should be completed prior to running :\r\n         1. Install Dapr\r\n         2. Change the bundle name in host.json to \"Microsoft.Azure.Functions.ExtensionBundle.Preview\" and the version to \"[4.*, 5.0.0)\"\r\n    Run the app with below steps\r\n         1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n         2. Invoke function app by dapr cli: dapr invoke --app-id functionapp --method {yourFunctionName}  --data '{ \"data\": {\"value\": { \"orderId\": \"41\" } } }'\r\n    \"\"\"\r\n    logging.info('Azure function triggered by Dapr Service Invocation Trigger.')\r\n    logging.info(\"Dapr service invocation trigger payload: %s\", payload)\r\n\r\n@dapp.function_name(name=\"InvokeOutputBinding\")\r\n@dapp.route(route=\"invoke/{appId}/{methodName}\", auth_level=dapp.auth_level.ANONYMOUS)\r\n@dapp.dapr_invoke_output(arg_name = \"payload\", app_id = \"{appId}\", method_name = \"{methodName}\", http_verb = \"post\")\r\ndef main(req: func.HttpRequest, payload: func.Out[str] ) -> str:\r\n    \"\"\"\r\n    Sample to use a Dapr Invoke Output Binding to perform a Dapr Server Invocation operation hosted in another Darp'd app.\r\n    Here this function acts like a proxy\r\n    Invoke Dapr Service invocation trigger using Windows PowerShell with below request\r\n\r\n    Invoke-RestMethod -Uri 'http://localhost:7071/api/invoke/functionapp/DaprServiceInvocationTriggerPython' -Method POST -Headers @{\r\n    'Content-Type' = 'application/json'\r\n     } -Body '{\r\n     \"data\": {\r\n          \"value\": {\r\n               \"orderId\": \"122\"\r\n               }\r\n          }\r\n     }'\r\n    \"\"\"\r\n    logging.info('Python HTTP trigger function processed a request..')\r\n    logging.info(req.params)\r\n    data = req.params.get('data')\r\n    if not data:\r\n        try:\r\n            req_body = req.get_json()\r\n        except ValueError:\r\n            pass\r\n        else:\r\n            data = req_body.get('data')\r\n\r\n    if data:\r\n        logging.info(f\"Url: {req.url}, Data: {data}\")\r\n        payload.set(json.dumps({\"body\": data}).encode('utf-8'))\r\n        return 'Successfully performed service invocation using Dapr invoke output binding.'\r\n    else:\r\n        return func.HttpResponse(\r\n            \"Please pass a data on the query string or in the request body\",\r\n            status_code=400\r\n        )",
+      "function_body.py": "@dapp.dapr_service_invocation_trigger(arg_name=\"payload\", method_name=\"$(FUNCTION_NAME_INPUT)\") \r\ndef $(FUNCTION_NAME_INPUT)(payload: str) :\r\n    \"\"\"\r\n    See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n    \r\n    These tasks should be completed prior to running :\r\n         1. Install Dapr\r\n         2. Change the bundle name in host.json to \"Microsoft.Azure.Functions.ExtensionBundle.Preview\" and the version to \"[4.*, 5.0.0)\"\r\n    Run the app with below steps\r\n         1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n         2. Invoke function app by dapr cli: dapr invoke --app-id functionapp --method {yourFunctionName}  --data '{ \"data\": {\"value\": { \"orderId\": \"41\" } } }'\r\n    \"\"\"\r\n    logging.info('Azure function triggered by Dapr Service Invocation Trigger.')\r\n    logging.info(\"Dapr service invocation trigger payload: %s\", payload)\r\n\r\n@dapp.function_name(name=\"InvokeOutputBinding\")\r\n@dapp.route(route=\"invoke/{appId}/{methodName}\", auth_level=dapp.auth_level.ANONYMOUS)\r\n@dapp.dapr_invoke_output(arg_name = \"payload\", app_id = \"{appId}\", method_name = \"{methodName}\", http_verb = \"post\")\r\ndef main(req: func.HttpRequest, payload: func.Out[str] ) -> str:\r\n    \"\"\"\r\n    Sample to use a Dapr Invoke Output Binding to perform a Dapr Server Invocation operation hosted in another Darp'd app.\r\n    Here this function acts like a proxy\r\n    Invoke Dapr Service invocation trigger using Windows PowerShell with below request\r\n\r\n    Invoke-RestMethod -Uri 'http://localhost:7071/api/invoke/functionapp/DaprServiceInvocationTriggerPython' -Method POST -Headers @{\r\n    'Content-Type' = 'application/json'\r\n     } -Body '{\r\n     \"data\": {\r\n          \"value\": {\r\n               \"orderId\": \"122\"\r\n               }\r\n          }\r\n     }'\r\n    \"\"\"\r\n    logging.info('Python HTTP trigger function processed a request..')\r\n    logging.info(req.params)\r\n    data = req.params.get('data')\r\n    if not data:\r\n        try:\r\n            req_body = req.get_json()\r\n        except ValueError:\r\n            pass\r\n        else:\r\n            data = req_body.get('data')\r\n\r\n    if data:\r\n        logging.info(f\"Url: {req.url}, Data: {data}\")\r\n        payload.set(json.dumps({\"body\": data}).encode('utf-8'))\r\n        return 'Successfully performed service invocation using Dapr invoke output binding.'\r\n    else:\r\n        return func.HttpResponse(\r\n            \"Please pass a data on the query string or in the request body\",\r\n            status_code=400\r\n        )"
+    }
+  },
+  {
+    "author": "Ashique",
+    "name": "Dapr Topic Trigger",
+    "description": "$DaprTopicTrigger_description",
+    "programmingModel": "v2",
+    "language": "python",
+    "jobs": [
+      {
+        "name": "Create New Project with DaprTopicTrigger function",
+        "type": "CreateNewApp",
+        "inputs": [
+          {
+            "assignTo": "$(APP_FILENAME)",
+            "paramId": "app-fileName",
+            "defaultValue": "function_app.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_topic_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionApp",
+          "writeFile_FunctionApp",
+          "showMarkdownPreview"
+        ]
+      },
+      {
+        "name": "Add DaprTopicTrigger function to the main file",
+        "type": "AppendToFile",
+        "inputs": [
+          {
+            "assignTo": "$(SELECTED_FILEPATH)",
+            "paramId": "app-selectedFileName",
+            "defaultValue": "function_app.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_topic_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_FunctionBody",
+          "appendFileContent_FunctionApp"
+        ]
+      },
+      {
+        "name": "Create New Blueprint file",
+        "type": "CreateNewBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-fileName",
+            "defaultValue": "blueprint.py",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_topic_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintFile",
+          "writeFile_BlueprintFile",
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      },
+      {
+        "name": "Add DaprTopicTrigger function to the Blueprint",
+        "type": "AppendToBlueprint",
+        "inputs": [
+          {
+            "assignTo": "$(BLUEPRINT_FILENAME)",
+            "paramId": "blueprint-existingFileName",
+            "required": true,
+            "condition": {
+              "name": "ClientId",
+              "values": [
+                "VSCode"
+              ],
+              "operator": "IN"
+            }
+          },
+          {
+            "assignTo": "$(FUNCTION_NAME_INPUT)",
+            "paramId": "trigger-functionName",
+            "required": true,
+            "defaultValue": "dapr_topic_trigger"
+          }
+        ],
+        "actions": [
+          "readFileContent_BlueprintBody",
+          "appendFileContent_BlueprintBody"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "name": "readFileContent_FunctionApp",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "function_app.py"
+      },
+      {
+        "name": "writeFile_FunctionApp",
+        "type": "WriteToFile",
+        "source": "$(FUNCTION_APP_CONTENT)",
+        "filePath": "$(APP_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the function app",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "readFileContent_FunctionBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(FUNCTION_BODY)",
+        "filePath": "function_body.py"
+      },
+      {
+        "name": "appendFileContent_FunctionApp",
+        "type": "AppendToFile",
+        "createIfNotExists": false,
+        "source": "$(FUNCTION_BODY)",
+        "filePath": "$(SELECTED_FILEPATH)",
+        "continueOnError": false,
+        "errorText": "Unable to create Dapr Topic Trigger function",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "ShowMarkdownPreview",
+        "type": "ShowMarkdownPreview",
+        "filePath": "dapr-topic_trigger_template.md"
+      },
+      {
+        "name": "readFileContent_BlueprintFile",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_CONTENT)",
+        "filePath": "blueprint.py"
+      },
+      {
+        "name": "writeFile_BlueprintFile",
+        "type": "WriteToFile",
+        "source": "$(BLUEPRINT_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create blueprint",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      },
+      {
+        "name": "readFileContent_BlueprintBody",
+        "type": "GetTemplateFileContent",
+        "assignTo": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "blueprint_body.py"
+      },
+      {
+        "name": "appendFileContent_BlueprintBody",
+        "type": "AppendToFile",
+        "source": "$(BLUEPRINT_BODY_CONTENT)",
+        "filePath": "$(BLUEPRINT_FILENAME)",
+        "continueOnError": false,
+        "errorText": "Unable to create the Blueprint",
+        "replaceTokens": true,
+        "FileExtension": ".py"
+      }
+    ],
+    "id": "DaprTopicTrigger-Python",
+    "files": {
+      "blueprint.py": "# Register this blueprint by adding the following line of code \r\n# to your entry point file.  \r\n# app.register_functions($(BLUEPRINT_FILENAME)) \r\n# \r\n# Please refer to https://aka.ms/azure-functions-python-blueprints\r\n\r\nimport json\r\nimport azure.functions as func\r\nimport logging\r\n\r\n\r\n$(BLUEPRINT_FILENAME) = func.DaprBlueprint()",
+      "blueprint_body.py": "@$(BLUEPRINT_FILENAME).dapr_topic_trigger(arg_name=\"subEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\n@$(BLUEPRINT_FILENAME).dapr_state_output(arg_name=\"state\", state_store=\"statestore\", key=\"order\")\r\ndef $(FUNCTION_NAME_INPUT)(subEvent, state: func.Out[str]) -> None:\r\n    \"\"\"\r\n    Sample Dapr topic trigger with dapr_state_output\r\n    See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n    \r\n    These tasks should be completed prior to running :\r\n         1. Install Dapr\r\n         2. Change the bundle name in host.json to \"Microsoft.Azure.Functions.ExtensionBundle.Preview\" and the version to \"[4.*, 5.0.0)\"\r\n    Run the app with below steps\r\n         1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n         2. Invoke function app: dapr publish --pubsub pubsub --publish-app-id functionapp --topic A --data '{\"value\": { \"orderId\": \"1234\" } }'\r\n    \"\"\"\r\n    logging.info('Python DaprTopic trigger with DaprState output binding function processed a request from the Dapr Runtime.')\r\n    subEvent_json = json.loads(subEvent)\r\n    state.set(str(subEvent_json[\"data\"]))",
+      "dapr-topic_trigger_template.md": "# Azure Functions: Event Hub Trigger in Python\r\n\r\n## Dapr Output Binding\r\n\r\nUsing `Dapr Topic Trigger`, your azure functions can react to a message published on a Topic mentioned in your function.\r\n\r\n## Using the Template\r\n\r\nFollowing is an example code snippet for Dapr Topic Trigger using the [Python programming model V2](https://aka.ms/pythonprogrammingmodel) (currently in Preview).\r\n\r\n```python\r\nimport json\r\nimport azure.functions as func\r\nimport logging\r\n\r\ndapp = func.DaprFunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\r\n\r\n@dapp.function_name(name=\"DaprTopicTriggerPython\")\r\n@dapp.dapr_topic_trigger(arg_name=\"subEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\n@dapp.dapr_state_output(arg_name=\"state\", state_store=\"statestore\", key=\"order\")\r\ndef main(subEvent, state: func.Out[str]) -> None:\r\n    logging.info('Python DaprTopic trigger with DaprState output binding function processed a request from the Dapr Runtime.')\r\n    subEvent_json = json.loads(subEvent)\r\n    state.set(str(subEvent_json[\"data\"]))\r\n```\r\n\r\nTo run the code snippet generated through the command palette, note the following:\r\n\r\n- The function application is defined and named `dapp`.\r\n- The name of the file must be `function_app.py`.\r\n\r\n## V2 Programming Model\r\n\r\nThe v2 programming model in Azure Functions Python delivers an experience that aligns with Python development principles, and subsequently with commonly used Python frameworks. \r\n\r\nTo learn more about using the Python programming model for Azure Functions, see the [Azure Functions Python developer guide](https://aka.ms/pythondeveloperguide). Note that in addition to the documentation, [hints](https://aka.ms/functions-python-hints) are available in code editors that support type checking with PYI files.",
+      "function_app.py": "import json\r\nimport azure.functions as func\r\nimport logging\r\n\r\ndapp = func.DaprFunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\r\n\r\n@dapp.dapr_topic_trigger(arg_name=\"subEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\n@dapp.dapr_state_output(arg_name=\"state\", state_store=\"statestore\", key=\"order\")\r\ndef $(FUNCTION_NAME_INPUT)(subEvent, state: func.Out[str]) -> None:\r\n    \"\"\"\r\n    Sample Dapr topic trigger with dapr_state_output\r\n    See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n    \r\n    These tasks should be completed prior to running :\r\n         1. Install Dapr\r\n         2. Change the bundle name in host.json to \"Microsoft.Azure.Functions.ExtensionBundle.Preview\" and the version to \"[4.*, 5.0.0)\"\r\n    Run the app with below steps\r\n         1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n         2. Invoke function app: dapr publish --pubsub pubsub --publish-app-id functionapp --topic A --data '{\"value\": { \"orderId\": \"1234\" } }'\r\n    \"\"\"\r\n    logging.info('Python DaprTopic trigger with DaprState output binding function processed a request from the Dapr Runtime.')\r\n    subEvent_json = json.loads(subEvent)\r\n    state.set(str(subEvent_json[\"data\"]))",
+      "function_body.py": "@dapp.dapr_topic_trigger(arg_name=\"subEvent\", pub_sub_name=\"pubsub\", topic=\"A\")\r\n@dapp.dapr_state_output(arg_name=\"state\", state_store=\"statestore\", key=\"order\")\r\ndef $(FUNCTION_NAME_INPUT)(subEvent, state: func.Out[str]) -> None:\r\n    \"\"\"\r\n    Sample Dapr topic trigger with dapr_state_output\r\n    See https://aka.ms/azure-functions-dapr for more information about using this binding\r\n    \r\n    These tasks should be completed prior to running :\r\n         1. Install Dapr\r\n         2. Change the bundle name in host.json to \"Microsoft.Azure.Functions.ExtensionBundle.Preview\" and the version to \"[4.*, 5.0.0)\"\r\n    Run the app with below steps\r\n         1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n         2. Invoke function app: dapr publish --pubsub pubsub --publish-app-id functionapp --topic A --data '{\"value\": { \"orderId\": \"1234\" } }'\r\n    \"\"\"\r\n    logging.info('Python DaprTopic trigger with DaprState output binding function processed a request from the Dapr Runtime.')\r\n    subEvent_json = json.loads(subEvent)\r\n    state.set(str(subEvent_json[\"data\"]))"
+    }
   }
 ]
