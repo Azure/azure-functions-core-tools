@@ -58,7 +58,7 @@ jobs:
     displayName: Set up environment variables
   - task: NodeTool@0
     inputs:
-      versionSpec: '14.x'
+      versionSpec: '18.x'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
