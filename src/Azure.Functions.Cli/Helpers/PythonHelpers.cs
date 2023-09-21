@@ -36,6 +36,7 @@ namespace Azure.Functions.Cli.Helpers
                 PrintPySteinAwarenessMessage();
             }
 
+
             await CreateRequirements();
             await EnsureVirtualEnvironmentIgnored();
 
@@ -52,13 +53,13 @@ namespace Azure.Functions.Cli.Helpers
 
         public static void PrintPySteinReferenceMessage()
         {
-            ColoredConsole.Write(AdditionalInfoColor("The new Python programming model is in public preview. Learn more at "));
+            ColoredConsole.Write(AdditionalInfoColor("The new Python programming model is generally available. Learn more at "));
             PrintPySteinWikiLink();
         }
 
         public static void PrintPySteinAwarenessMessage()
         {
-            ColoredConsole.Write(AdditionalInfoColor("Did you know? There is a new Python programming model in public preview. For fewer files and a decorator based approach, learn how you can try it out today at "));
+            ColoredConsole.Write(AdditionalInfoColor("Did you know? The new Python programming model is generally available. For fewer files and a decorator based approach, learn how you can try it out today at "));
             PrintPySteinWikiLink();
         }
 
@@ -66,6 +67,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             ColoredConsole.WriteLine(LinksColor("https://aka.ms/pythonprogrammingmodel"));
         }
+
 
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
         {

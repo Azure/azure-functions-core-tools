@@ -58,6 +58,7 @@ namespace Azure.Functions.Cli.Actions
 
         public async override Task RunAsync()
         {
+            var latestVersionMessageTask = VersionHelper.CheckLatestVersionAsync();
             ScriptHostHelpers.SetIsHelpRunning();
             if (!string.IsNullOrEmpty(_context) || !string.IsNullOrEmpty(_subContext))
             {
@@ -95,7 +96,25 @@ namespace Azure.Functions.Cli.Actions
             {
                 DisplayGeneralHelp();
             }
+
+            await ShowLatestVersionMessage(latestVersionMessageTask);
             return;
+        }
+
+        private static async Task ShowLatestVersionMessage(Task<string> latestVersionMessageTask)
+        {
+            try
+            {
+                var latestVersionMessage = await latestVersionMessageTask;
+                if (!string.IsNullOrEmpty(latestVersionMessage))
+                {
+                    ColoredConsole.WriteLine(WarningColor($"{latestVersionMessage}{Environment.NewLine}"));
+                }
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
         }
 
         private async Task<bool> ShowCreateActionHelp()
