@@ -23,7 +23,7 @@ namespace Build
         public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2738";
         public const string DotnetItemTemplatesVersion = "4.0.2738";
         public const string DotnetProjectTemplatesVersion = "4.0.2738";
-        public const string TemplateJsonVersion = "3.1.1648"; // todo: Update here with the ext bundle v3 template version. The one which has v2 templates including templates-v2 and bindings-v2 folder. 
+        public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
 
