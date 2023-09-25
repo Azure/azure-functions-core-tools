@@ -157,31 +157,37 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                 }
 
-                var variables = new Dictionary<string, string>();
+                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName } };
                 var jobName = "appendToFile";
                 if (FileName != PySteinFunctionAppPy)
                 {
                     var filePath = Path.Combine(Environment.CurrentDirectory, FileName);
-                    jobName = !FileUtility.FileExists(filePath) ? "CreateNewBlueprint" : "AppendToBlueprint";
-                    variables["$(BLUEPRINT_FILENAME)"] = FileName;
-                    FileName = FileName[..^Path.GetExtension(FileName).Length];
+                    if (FileUtility.FileExists(filePath))
+                    {
+                        jobName = "AppendToBlueprint";
+                        providedInputs[GetBluePrintExistingFileNameParamId] = FileName;
+                    }
+                    else
+                    {
+                        jobName = "CreateNewBlueprint";
+                        providedInputs[GetBluePrintFileNameParamId] = FileName;
+                    }
                 }
                 else
                 {
-                    variables["$(SELECTED_FILEPATH)"] = FileName;
+                    providedInputs[GetFileNameParamId] = FileName;
                 }
 
                 var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
                 var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
-                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName } };
 
+                var variables = new Dictionary<string, string>();
                 _userInputHandler.RunUserInputActions(providedInputs, templateJob.Inputs, variables);
 
                 if (string.IsNullOrEmpty(FunctionName))
                 {
                     FunctionName = providedInputs[GetFunctionNameParamId];
                 }
-
                 
                 await _templatesManager.Deploy(templateJob, template, variables);
             }

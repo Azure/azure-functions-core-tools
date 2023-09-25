@@ -86,7 +86,8 @@ namespace Azure.Functions.Cli.Actions
                 }
 
                 var variableName = theInput.AssignTo;
-                variables.Add(variableName, response);
+
+                variables[variableName] = response;
             }
         }
 
