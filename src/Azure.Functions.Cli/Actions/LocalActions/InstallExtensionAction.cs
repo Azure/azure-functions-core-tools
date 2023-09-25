@@ -96,7 +96,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            if (CommandChecker.CommandExists("dotnet"))
+            if (CommandChecker.CommandExists("dotnet", out _))
             {
                 var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
 
@@ -206,8 +206,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 args += $" --source {Source}";
             }
 
-            var addPackage = new Executable("dotnet", args);
-            await addPackage.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
+            if (CommandChecker.CommandExists("dotnet", out string dotnetCommand))
+            {
+                var addPackage = new Executable(dotnetCommand, args);
+                await addPackage.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
+            }
+            else
+            {
+                throw new CliException("DotNet is not available");
+            }
+                
         }
     }
 }

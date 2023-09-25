@@ -36,20 +36,27 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static async Task<bool> VerifyDockerAccess()
         {
-            var docker = new Executable("docker", "ps");
-            var sb = new StringBuilder();
-            var exitCode = await docker.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
-
-            if (exitCode != 0)
+            if (CommandChecker.CommandExists("docker", out string dockerCommand))
             {
-                var errorStr = sb.ToString();
-                if (errorStr.IndexOf("permission denied", StringComparison.OrdinalIgnoreCase) != -1)
+                var docker = new Executable(dockerCommand, "ps");
+                var sb = new StringBuilder();
+                var exitCode = await docker.RunAsync(l => sb.AppendLine(l), e => sb.AppendLine(e));
+
+                if (exitCode != 0)
                 {
-                    throw new CliException("Got permission denied trying to run docker. Make sure the user you are running the cli from is in docker group or is root");
+                    var errorStr = sb.ToString();
+                    if (errorStr.IndexOf("permission denied", StringComparison.OrdinalIgnoreCase) != -1)
+                    {
+                        throw new CliException("Got permission denied trying to run docker. Make sure the user you are running the cli from is in docker group or is root");
+                    }
+                    throw new CliException($"Could not connect to Docker.{Environment.NewLine}Error: {errorStr}");
                 }
-                throw new CliException($"Could not connect to Docker.{Environment.NewLine}Error: {errorStr}");
+                return true;
             }
-            return true;
+            else
+            {
+                throw new CliException("Docker is required to build for this command.");
+            }
         }
 
         internal static async Task<TriggersPayload> GetTriggersFromDockerImage(string imageName)
@@ -79,21 +86,29 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<(string output, string error, int exitCode)> InternalRunDockerCommand(string args, bool ignoreError, string stdIn = null)
         {
-            var docker = new Executable("docker", args);
-            var sbError = new StringBuilder();
-            var sbOutput = new StringBuilder();
+            if (CommandChecker.CommandExists("docker", out string dockerCommand)) {
+                
+                var docker = new Executable(dockerCommand, args);
+                var sbError = new StringBuilder();
+                var sbOutput = new StringBuilder();
 
-            var exitCode = await docker.RunAsync(l => sbOutput.AppendLine(l), e => sbError.AppendLine(e), stdIn: stdIn);
+                var exitCode = await docker.RunAsync(l => sbOutput.AppendLine(l), e => sbError.AppendLine(e), stdIn: stdIn);
 
-            if (exitCode != 0 && !ignoreError)
-            {
-                throw new CliException($"Error running {docker.Command}.\n" +
-                    $"output: {sbOutput.ToString()}\n{sbError.ToString()}");
+                if (exitCode != 0 && !ignoreError)
+                {
+                    throw new CliException($"Error running {docker.Command}.\n" +
+                        $"output: {sbOutput.ToString()}\n{sbError.ToString()}");
+                }
+
+                return (trim(sbOutput.ToString()), trim(sbError.ToString()), exitCode);
+
+                string trim(string str) => str.Trim(new[] { ' ', '\n' });
             }
-
-            return (trim(sbOutput.ToString()), trim(sbError.ToString()), exitCode);
-
-            string trim(string str) => str.Trim(new[] { ' ', '\n' });
+            else
+            {
+                throw new CliException("Docker is required for this command.");
+            }
+            
         }
 
         internal static async Task<(string output, string error, int exitCode)> RunDockerCommand(string args, string containerId = null, bool ignoreError = false, bool showProgress = true, string stdIn = null)

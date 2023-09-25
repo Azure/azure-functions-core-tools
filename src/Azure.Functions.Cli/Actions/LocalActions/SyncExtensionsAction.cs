@@ -62,11 +62,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            if (CommandChecker.CommandExists("dotnet"))
+            if (CommandChecker.CommandExists("dotnet", out string dotnetCommand))
             {
                 var extensionsProj = await ExtensionsHelper.EnsureExtensionsProjectExistsAsync(_secretsManager, Csx, ConfigPath);
 
-                var installExtensions = new Executable("dotnet", $"build \"{extensionsProj}\" -o \"{OutputPath}\"");
+                var installExtensions = new Executable(dotnetCommand, $"build \"{extensionsProj}\" -o \"{OutputPath}\"");
                 await installExtensions.RunAsync(output => ColoredConsole.WriteLine(output), error => ColoredConsole.WriteLine(ErrorColor(error)));
             }
             else

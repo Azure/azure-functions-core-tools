@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            if (!CommandChecker.CommandExists("kubectl"))
+            if (!CommandChecker.CommandExists("kubectl", out string kubectlCommandPath))
             {
                 ColoredConsole.Error.WriteLine(ErrorColor($"kubectl is required for deploying to kubernetes and knative. Please make sure to install kubectl and try again."));
                 return;
