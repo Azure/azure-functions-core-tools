@@ -71,9 +71,13 @@ namespace Azure.Functions.Cli.Common
         public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
         public const string GetFunctionNameParamId = "trigger-functionName";
         public const string GetFileNameParamId = "app-selectedFileName";
+        public const string GetBluePrintFileNameParamId = "blueprint-fileName";
+        public const string GetBluePrintExistingFileNameParamId = "blueprint-existingFileName";
         public const string UserPromptBooleanType = "boolean";
         public const string UserPromptEnumType = "enum";
         public const string UserInputActionType = "UserInput";
+        public const string UserPromptExtensionBundleFileName = "userPrompts.json";
+        public const string TemplatesExtensionBundleFileName = "templates.json";
         public const string ShowMarkdownPreviewActionType = "ShowMarkdownPreview";
         public const string FunctionBodyTargetFileName = "FUNCTION_BODY_TARGET_FILE_NAME";
         public const string PythonProgrammingModelFunctionBodyFileKey = "function_body.py";
