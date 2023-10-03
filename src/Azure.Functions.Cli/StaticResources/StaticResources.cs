@@ -36,6 +36,8 @@ namespace Azure.Functions.Cli
         public static Task<string> DockerfileCsxDotNet => GetValue("Dockerfile.csx.dotnet");
 
         public static Task<string> DockerfileDotnetIsolated => GetValue("Dockerfile.dotnetIsolated");
+        public static Task<string> DockerfileDotnet7Isolated => GetValue("Dockerfile.dotnet7Isolated");
+        public static Task<string> DockerfileDotnet8Isolated => GetValue("Dockerfile.dotnet8Isolated");
 
         public static Task<string> DockerfileJava8 => GetValue("Dockerfile.java8");
 
@@ -49,6 +51,8 @@ namespace Azure.Functions.Cli
         
         public static Task<string> DockerfilePython310 => GetValue("Dockerfile.python3.10");
 
+        public static Task<string> DockerfilePython311 => GetValue("Dockerfile.python3.11");
+
         public static Task<string> DockerfilePowershell7 => GetValue("Dockerfile.powershell7");
 
         public static Task<string> DockerfilePowershell72 => GetValue("Dockerfile.powershell7.2");
@@ -57,7 +61,11 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileNode16 => GetValue("Dockerfile.node16");
 
+        public static Task<string> DockerfileNode18 => GetValue("Dockerfile.node18");
+
         public static Task<string> DockerfileTypescript => GetValue("Dockerfile.typescript");
+
+        public static Task<string> DockerfileTypescriptNode18 => GetValue("Dockerfile.typescript.node18");
 
         public static Task<string> DockerIgnoreFile => GetValue("dockerignore");
 

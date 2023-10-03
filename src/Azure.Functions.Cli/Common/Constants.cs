@@ -67,6 +67,29 @@ namespace Azure.Functions.Cli.Common
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
         public const string HelpCommand = "help";
+        public const string CoreToolsVersionsFeedUrl = "https://functionscdn.azureedge.net/public/cli-feed-v4.json";
+        public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
+        public const string GetFunctionNameParamId = "trigger-functionName";
+        public const string GetFileNameParamId = "app-selectedFileName";
+        public const string GetBluePrintFileNameParamId = "blueprint-fileName";
+        public const string GetBluePrintExistingFileNameParamId = "blueprint-existingFileName";
+        public const string UserPromptBooleanType = "boolean";
+        public const string UserPromptEnumType = "enum";
+        public const string UserInputActionType = "UserInput";
+        public const string UserPromptExtensionBundleFileName = "userPrompts.json";
+        public const string TemplatesExtensionBundleFileName = "templates.json";
+        public const string ShowMarkdownPreviewActionType = "ShowMarkdownPreview";
+        public const string FunctionBodyTargetFileName = "FUNCTION_BODY_TARGET_FILE_NAME";
+        public const string PythonProgrammingModelFunctionBodyFileKey = "function_body.py";
+        public const string UserPromptFileName = "NewTemplate-userPrompts.json";
+        public const string FunctionAppDeploymentToContainerAppsMessage = "Deploying function app to Container Apps...";
+        public const string FunctionAppDeploymentToContainerAppsStatusMessage = "Checking status of function app deployment to Container Apps...";
+        public const string FunctionAppDeploymentToContainerAppsFailedMessage = "Deploy function app request to Container Apps was not successful.";
+        public const string FunctionAppFailedToDeployOnContainerAppsMessage = "Failed to deploy function app to Container Apps.";
+        public const string LocalSettingsJsonFileName = "local.settings.json";
+        public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
+
+
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -151,6 +174,7 @@ namespace Azure.Functions.Cli.Common
             public const string LinuxPython38ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.8-buildenv";
             public const string LinuxPython39ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.9-buildenv";
             public const string LinuxPython310ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.10-buildenv";
+            public const string LinuxPython311ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.11-buildenv";
         }
 
         public static class StaticResourcesNames

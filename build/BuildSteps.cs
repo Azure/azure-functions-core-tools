@@ -286,6 +286,17 @@ namespace Build
                     File.Copy(templatesJsonPath, Path.Combine(Settings.OutputDir, runtime, "templates", "templates.json"));
                 }
             }
+
+            string templatesv2JsonPath = Path.Combine(tempDirectoryPath, "templates-v2", "templates.json");
+            string userPromptsv2JsonPath = Path.Combine(tempDirectoryPath, "bindings-v2", "userPrompts.json");
+            if (File.Exists(templatesv2JsonPath) && File.Exists(userPromptsv2JsonPath))
+            {
+                foreach (var runtime in Settings.TargetRuntimes)
+                {
+                    File.Copy(templatesv2JsonPath, Path.Combine(Settings.OutputDir, runtime, "templates-v2", "templates.json"));
+                    File.Copy(userPromptsv2JsonPath, Path.Combine(Settings.OutputDir, runtime, "templates-v2", "userPrompts.json"));
+                }
+            }
         }
 
         public static void Test()
@@ -360,7 +371,9 @@ namespace Build
 
             // These assemblies are currently signed, but with an invalid root cert.
             // Until that is resolved, we are explicity signing the AppService.Middleware packages
-            unSignedBinaries = unSignedBinaries.Concat(allFiles.Where(f => f.Contains("Microsoft.Azure.AppService.Middleware"))).ToList();
+            
+            unSignedBinaries = unSignedBinaries.Concat(allFiles
+                .Where(f => f.Contains("Microsoft.Azure.AppService.Middleware") || f.Contains("Microsoft.Azure.AppService.Proxy"))).ToList();
 
             // remove all entries for binaries that are actually unsigned (checked via sigcheck.exe)
             unSignedBinaries.ForEach(f => allFiles.RemoveAll(n => n.Equals(f, StringComparison.OrdinalIgnoreCase)));

@@ -103,9 +103,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("node", "v3")]
         [InlineData("node", "v4")]
+        [InlineData("node", "")]
         [InlineData("java", "v1")]
         [InlineData("python", "v1")]
         [InlineData("python", "v2")]
+        [InlineData("python", "")]
         public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
         {
             var files = new List<FileResult>
@@ -121,14 +123,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             };
 
-            if (workerRuntime == "python" && programmingModel == "v2")
+            if (workerRuntime == "python" && (programmingModel == "v2" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
                     Name = "function_app.py",
                 });
             }
-            else if (workerRuntime == "node" && programmingModel == "v4")
+            else if (workerRuntime == "node" && (programmingModel == "v4" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
@@ -140,9 +142,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
             }
 
+            var programmingModelFlag = programmingModel == string.Empty ? string.Empty : $"--model {programmingModel}";
+
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} {programmingModelFlag}" },
                 CheckFiles = files.ToArray(),
                 OutputContains = new[]
                 {
@@ -151,7 +155,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
-                OutputDoesntContain = new[] { "Initialized empty Git repository" }
+                OutputDoesntContain = new[] { "Initialized empty Git repository" },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -248,6 +253,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120),
                 OutputContains = new[] { "Dockerfile" }
             }, _output);
         }
@@ -284,7 +290,25 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:3.0-dotnet-isolated5.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4.0-dotnet-isolated6.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_with_dotnet7Isolated_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet-isolated --target-framework net7.0 --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated7.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -392,7 +416,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                     "Writing Dockerfile",
                     "Writing .dockerignore"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -421,7 +446,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -452,7 +478,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -477,7 +504,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
-                OutputContains = new[] { "Dockerfile" }
+                OutputContains = new[] { "Dockerfile" },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -609,7 +637,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "Writing host.json"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -637,8 +666,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init \"anapp\" --worker-runtime python",
-                    "init \"anapp\" --worker-runtime python"
+                    "init \"anapp\" --worker-runtime python -m v1",
+                    "init \"anapp\" --worker-runtime python -m v1"
                 },
                 OutputContains = new[]
                 {
@@ -658,13 +687,41 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public Task init_python_app_generates_requirements_txt()
+        public Task init_python_app_twice_new_programming_model()
         {
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime python"
+                    "init \"anapp\" --worker-runtime python",
+                    "init \"anapp\" --worker-runtime python"
+                },
+                OutputContains = new[]
+                {
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    "requirements.txt already exists. Skipped!",
+                    ".gitignore already exists. Skipped!",
+                    "host.json already exists. Skipped!",
+                    "local.settings.json already exists. Skipped!",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
+                }
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("-m V1")]
+        [InlineData("-m V2")]
+        [InlineData("")]
+        public Task init_python_app_generates_requirements_txt(string modelParameter)
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime python {modelParameter}"
                 },
                 OutputContains = new[]
                 {
@@ -692,7 +749,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime python"
+                    "init . --worker-runtime python -m V1"
                 },
                 OutputContains = new[]
                 {

@@ -32,7 +32,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                             "\"testKey\": \"valueValue\""
                         }
                     }
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -64,7 +65,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                                 "valueValue"
                             }
                         }
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(120)
                 },
                 new RunConfiguration
                 {
