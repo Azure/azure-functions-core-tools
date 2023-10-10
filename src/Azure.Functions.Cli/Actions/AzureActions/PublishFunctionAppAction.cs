@@ -133,7 +133,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(s => DotnetCliParameters = s);
             Parser
                 .Setup<string>("dotnet-version")
-                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET version for the function app. For example, set to '5.0' when publishing a .NET 5.0 app.")
+                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET version for the function app. For example, set to '6.0' when publishing a .NET 6 app.")
                 .Callback(s => DotnetFrameworkVersion = s);
             return base.ParseArgs(args);
         }
