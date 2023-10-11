@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public string HashFilesPattern { get; set; } = "";
         public bool BuildImage { get; set; } = true;
 
-        public IDictionary<string, string> KeySecretsAnnotations { get; private set; }
+        public IDictionary<string, string> KeysSecretAnnotations { get; private set; }
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 KeysSecretCollectionName,
                 MountFuncKeysAsContainerVolume,
                 KedaVersion,
-                KeySecretsAnnotations
+                KeysSecretAnnotations
                 );
 
             if (DryRun)
