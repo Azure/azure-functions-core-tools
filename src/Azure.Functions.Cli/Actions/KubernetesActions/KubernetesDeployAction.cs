@@ -50,6 +50,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         public string HashFilesPattern { get; set; } = "";
         public bool BuildImage { get; set; } = true;
 
+        public IDictionary<string, string> KeySecretsAnnotations { get; private set; }
+
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
@@ -93,6 +95,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<string>("config-file", "if --write-configs is true, write configs to this file (default: 'functions.yaml')", f => ConfigFile = f);
             SetFlag<string>("hash-files", "Files to hash to determine the image version", f => HashFilesPattern = f);
             SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
+            SetFlag<string>("keys-secret-annotations", "The annotations to add to the keys secret e.g. key1=val1,key2=val2", a => KeySecretsAnnotations = a.Split(',').Select(s => s.Split('=')).ToDictionary(k => k[0], v => v[1]));
 
             return base.ParseArgs(args);
         }
@@ -145,7 +148,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 MaxReplicaCount,
                 KeysSecretCollectionName,
                 MountFuncKeysAsContainerVolume,
-                KedaVersion);
+                KedaVersion,
+                KeySecretsAnnotations
+                );
 
             if (DryRun)
             {
