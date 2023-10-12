@@ -92,7 +92,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             SetFlag<bool>("write-configs", "Output the kubernetes configurations as YAML files instead of deploying", f => WriteConfigs = f);
             SetFlag<string>("config-file", "if --write-configs is true, write configs to this file (default: 'functions.yaml')", f => ConfigFile = f);
             SetFlag<string>("hash-files", "Files to hash to determine the image version", f => HashFilesPattern = f);
-            SetFlag<bool>("image-build", "If true, skip the docker build", f => BuildImage = f);
+            SetFlag<bool>("image-build", "If false, skip the docker build", f => BuildImage = f);
 
             return base.ParseArgs(args);
         }
