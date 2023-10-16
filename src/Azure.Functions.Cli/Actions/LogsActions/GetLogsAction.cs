@@ -21,6 +21,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         public string Name { get; set; } = string.Empty;
         public string Platform { get; set; } = string.Empty;
+
+        public string Namespace { get; set; } = KUBERNETES_DEFAULT_NAMESPACE;
         private Dictionary<string, Func<string, Task>> logsHandlersMap = new Dictionary<string, Func<string, Task>>();
         private const string KUBERNETES_DEFAULT_NAMESPACE = "azure-functions";
 
@@ -46,13 +48,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .WithDescription("Function name")
                 .Callback(t => Name = t).Required();
 
+            Parser
+                .Setup<string>("namespace")
+                .WithDescription("Kubernetes namespace where the function is deployed. (Default: " + KUBERNETES_DEFAULT_NAMESPACE + ")")
+                .Callback(t => Namespace = t);
+
             return base.ParseArgs(args);
         }
 
         public async Task GetKubernetesFunctionLogs(string functionName)
         {
-            string nameSpace = KUBERNETES_DEFAULT_NAMESPACE;
-            await KubectlHelper.RunKubectl($"logs -l app={functionName}-deployment -n {nameSpace}", showOutput: true);
+            await KubectlHelper.RunKubectl($"logs -l app={functionName} -n {Namespace}", showOutput: true);
         }
 
         public override async Task RunAsync()
