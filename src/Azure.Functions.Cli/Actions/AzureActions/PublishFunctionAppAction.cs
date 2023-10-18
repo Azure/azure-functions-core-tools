@@ -882,8 +882,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 if (functionApp.AzureAppSettings.ContainsKey(appSettingName))
                 {
-                    var appSettingValue = functionApp.AzureAppSettings[appSettingName];
-                    ColoredConsole.WriteLine(WarningColor($"Removing {appSettingName} app setting ({appSettingValue})"));
+                    ColoredConsole.WriteLine(WarningColor($"Removing {appSettingName} app setting."));
                     functionApp.AzureAppSettings.Remove(appSettingName);
                     isAppSettingUpdated = true;
                 }
