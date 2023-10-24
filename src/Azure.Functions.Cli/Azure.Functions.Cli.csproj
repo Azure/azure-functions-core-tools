@@ -265,7 +265,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.2" />
-    <PackageReference Include="Azure.Identity" Version="1.10.0" />
+    <PackageReference Include="Azure.Identity" Version="1.5.0" />
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.2.0" />
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />
@@ -273,19 +273,19 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.21.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.27.5" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.25.3" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.13.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.8.1" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2973" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2974" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.2975" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.20.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.12.1" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.8.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2850" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2890" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.2802" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.14.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
