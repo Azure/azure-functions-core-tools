@@ -504,5 +504,67 @@
         "schedule"
       ]
     }
+  },
+  {
+    "id": "DaprPublishOutputBinding-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, output, trigger } = require('@azure\/functions');\r\n\r\n\/**\r\n * Sample Dapr Publish Output Binding\r\n * See https:\/\/aka.ms\/azure-function-dapr-publish-output-binding for more information about using this binding\r\n *\r\n * These tasks should be completed prior to running :\r\n *      1. Install Dapr\r\n * Run the app with below steps\r\n *      1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n *      2. Function will be invoked by Timer trigger and publish messages to message bus.\r\n *\/\r\nconst daprPublishOuput = output.generic({\r\n    type: \"daprPublish\",\r\n    name: \"pubEvent\",\r\n    pubsubname: \"pubsub\",\r\n    topic: \"A\"\r\n});\r\n\r\napp.timer('%functionName%', {\r\n    schedule: '*\/10 * * * * *',\r\n    return: daprPublishOuput,\r\n    handler: (myTimer, context) => {\r\n        context.log('JavaScript DaprPublish output binding function processed a request.');\r\n        const message = \"Invoked by Timer trigger: \" + `Hello, World! The time is ${new Date().toISOString()}`;\r\n\r\n        return { payload: message };\r\n    }\r\n});\r\n\r\napp.generic('DaprTopicTriggerNodeV4', {\r\n    trigger: trigger.generic({\r\n        type: \"daprTopicTrigger\",\r\n        pubsubname: \"pubsub\",\r\n        topic: \"A\",\r\n        name: \"subEvent\"\r\n    }),\r\n    handler: async (request, context) => {\r\n        context.log(\"JavaScript Dapr Topic Trigger function processed a request from the Dapr Runtime.\");\r\n        context.log(context.triggerMetadata.subEvent.data);\r\n    }\r\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "daprPublishOutputBinding",
+      "description": "$DaprPublishOutputBinding_description",
+      "name": "Dapr Publish Output Binding",
+      "language": "JavaScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "DaprServiceInvocationTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, output, trigger } = require('@azure\/functions');\r\n\r\n\/**\r\n * Sample Dapr Service Invocation Trigger\r\n * See https:\/\/aka.ms\/azure-functions-dapr for more information about using this binding\r\n *\r\n * These tasks should be completed prior to running :\r\n *      1. Install Dapr\r\n * Run the app with below steps\r\n *      1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n *      2. Invoke the function app using one of the following options:\r\n *              a) Using the Dapr CLI: dapr invoke --app-id functionapp --method {yourFunctionName}  --data '{ \"data\": {\"value\": { \"orderId\": \"3215\" } } }'\r\n \r\n                b) Utilizing a Dapr Invoke Output Binding:\r\n \r\n                    Invoke-RestMethod -Uri 'http:\/\/localhost:7071\/api\/invoke\/functionapp\/{yourFunctionName}' -Method POST -Headers @{\r\n                    'Content-Type' = 'application\/json'\r\n                    } -Body '{\r\n                    \"data\": {\r\n                        \"value\": {\r\n                            \"orderId\": \"122\"\r\n                            }\r\n                        }\r\n                    }'\r\n *\/\r\napp.generic('%functionName%', {\r\n    trigger: trigger.generic({\r\n        type: 'daprServiceInvocationTrigger',\r\n        name: \"payload\"\r\n    }),\r\n    handler: async (request, context) => {\r\n        context.log(\"Azure function triggered by Dapr Service Invocation Trigger.\");\r\n        context.log(`Dapr service invocation trigger payload: ${JSON.stringify(context.triggerMetadata.payload)}`);\r\n    }\r\n});\r\n\r\nconst daprInvokeOuput = output.generic({\r\n    type: \"daprInvoke\",\r\n    appId: \"{appId}\",\r\n    methodName: \"{methodName}\",\r\n    httpVerb: \"post\"\r\n});\r\n\r\napp.http('InvokeOutputBinding', {\r\n    methods: ['GET', 'POST'],\r\n    authLevel: 'anonymous',\r\n    route: \"invoke\/{appId}\/{methodName}\",\r\n    return: daprInvokeOuput,\r\n    handler: async (request, context) => {\r\n        context.log(`JavaScript HTTP trigger function processed a request.`);\r\n        const payload = request.query.get('name') || await request.text();\r\n\r\n        return { body: payload };\r\n    }\r\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "daprServiceInvocationTrigger",
+      "description": "$DaprServiceInvocationTrigger_description",
+      "name": "Dapr Service Invocation Trigger",
+      "language": "JavaScript",
+      "triggerType": "daprServiceInvocationTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "DaprTopicTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, output, trigger } = require('@azure\/functions');\r\n\r\n\/**\r\n * Sample Dapr Service Invocation Trigger\r\n * See https:\/\/aka.ms\/azure-functions-dapr for more information about using this binding\r\n *\r\n * These tasks should be completed prior to running :\r\n *      1. Install Dapr\r\n * Run the app with below steps\r\n *      1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n *      2. Invoke function app: dapr publish --pubsub pubsub --publish-app-id functionapp --topic A --data '{\"value\": { \"orderId\": \"42\" } }'\r\n *\/\r\nconst daprStateOuput = output.generic({\r\n    type: \"daprState\",\r\n    stateStore: \"statestore\",\r\n    direction: \"out\",\r\n    key: \"product\"\r\n});\r\n\r\napp.generic('%functionName%', {\r\n    trigger: trigger.generic({\r\n        type: \"daprTopicTrigger\",\r\n        pubsubname: \"pubsub\",\r\n        topic: \"A\",\r\n        name: \"subEvent\"\r\n    }),\r\n    return: daprStateOuput,\r\n    handler: async (request, context) => {\r\n        context.log(\"JavaScript DaprTopic trigger with DaprState output binding function processed a request.\");\r\n        context.log(context.triggerMetadata.subEvent.data);\r\n\r\n        return context.triggerMetadata.subEvent.data;\r\n    }\r\n});"
+    },
+    "metadata": {
+      "defaultFunctionName": "daprTopicTrigger",
+      "description": "$DaprTopicTrigger_description",
+      "name": "Dapr Topic Trigger",
+      "language": "JavaScript",
+      "triggerType": "daprTopicTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "userPrompt": []
+    }
   }
 ]
