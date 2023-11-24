@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(f => FileName = f);
 
             Parser
-                .Setup<AuthorizationLevel?>('a', "authlevel")
+                .Setup<String?>('a', "authlevel")
                 .WithDescription("Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools")
                 .Callback(a => AuthorizationLevel = a);
 
