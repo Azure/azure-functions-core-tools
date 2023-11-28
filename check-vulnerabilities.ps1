@@ -1,4 +1,4 @@
-$projectDirectory = ".\src\Azure.Functions.Cli"
+$projectPath = ".\src\Azure.Functions.Cli"
 $projectFileName = ".\Azure.Functions.Cli.csproj"
 $logFilePath = "..\..\build.log"
 if (-not (Test-Path $projectPath))
@@ -6,7 +6,7 @@ if (-not (Test-Path $projectPath))
     throw "Project path '$projectPath' does not exist."
 }
 
-cd $projectDirectory
+cd $projectPath
 dotnet restore $projectFileName
 $cmd = "list", "package", "--include-transitive", "--vulnerable"
 Write-Host "dotnet $cmd"
