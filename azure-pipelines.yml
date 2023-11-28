@@ -89,6 +89,9 @@ jobs:
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
   - pwsh: |
+      .\check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
+  - pwsh: |
       .\build.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
