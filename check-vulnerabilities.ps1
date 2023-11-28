@@ -1,11 +1,14 @@
-$projectPath = ".\src\Azure.Functions.Cli\Azure.Functions.Cli.csproj"
-$logFilePath = ".\build.log"
+dotnet --version
+
+$projectPath = ".\src\Azure.Functions.Cli"
+$logFilePath = "..\..\build.log"
 if (-not (Test-Path $projectPath))
 {
     throw "Project path '$projectPath' does not exist."
 }
 
-$cmd = "list", $projectPath, "package", "--include-transitive", "--vulnerable"
+cd ".\src\Azure.Functions.Cli"
+$cmd = "list", "package", "--include-transitive", "--vulnerable"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object build.log
 
