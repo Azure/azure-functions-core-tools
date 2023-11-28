@@ -74,6 +74,9 @@ jobs:
     inputs:
       versionSpec:
     displayName: Install Nuget tool
+  - pwsh: |
+      .\check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
     inputs:
