@@ -11,6 +11,9 @@ dotnet $cmd | Tee-Object build.log
 
 $result = Get-content $logFilePath | select-string "has no vulnerable packages given the current sources"
 
+var $theResultContent = Get-content $logFilePath
+Write-Host "Result: $theResultContent"
+
 $logFileExists = Test-Path $logFilePath -PathType Leaf
 if ($logFileExists)
 {
