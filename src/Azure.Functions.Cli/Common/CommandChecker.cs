@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Common
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                var wherePath = $"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe";
+                var wherePath = GetWindowsWherePath();
                 if (File.Exists(wherePath))
                 {
                     return CheckExitCode(wherePath, command);
@@ -61,6 +61,11 @@ namespace Azure.Functions.Cli.Common
             var process = Process.Start(processStartInfo);
             process?.WaitForExit();
             return process?.ExitCode == 0;
+        }
+        
+        public static string GetWindowsWherePath()
+        {
+            return $"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe";
         }
     }
 }

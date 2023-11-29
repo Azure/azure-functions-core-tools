@@ -1,10 +1,14 @@
 ﻿using Azure.Functions.Cli.Common;
+using Colors.Net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -13,11 +17,26 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class VersionHelper
     {
+        public static async Task<string> RunAsync(Task<bool> isRunningOlderVersion = null)
+        {
+            isRunningOlderVersion ??= IsRunningAnOlderVersion();
+
+            var isOlderVersion = await isRunningOlderVersion;
+
+            var multipleInstallsWarning = await GetMultipleInstallationMessage(isOlderVersion);
+
+            if (!string.IsNullOrEmpty(multipleInstallsWarning))
+            {
+                return multipleInstallsWarning;
+            }
+
+            return isOlderVersion ? Constants.OldCoreToolsVersionMessage : string.Empty;
+        }
 
         // Check that current core tools is the latest version. 
         // To ensure that it doesn't block other tasks. The HTTP Request timeout is only 1 second. 
         // We simply ingnore the exception if for any reason the check fails. 
-        public static async Task<string> CheckLatestVersionAsync()
+        public static async Task<bool> IsRunningAnOlderVersion()
         {
             try
             {
@@ -42,15 +61,66 @@ namespace Azure.Functions.Cli.Helpers
                 if (!string.IsNullOrEmpty(latestCoreToolsReleaseVersion) &&
                     Constants.CliVersion != latestCoreToolsReleaseVersion)
                 {
-                    return Constants.OldCoreToolsVersionMessage;
+                    return true;
                 }
 
-                return string.Empty;
+                return false;
             }
             catch (Exception)
             {
-                return string.Empty;
+                // ignore exception and no warning when the check fails.
+                return false;
             }
+        }
+
+        private static async Task<string> GetMultipleInstallationMessage(bool isRunningOldVersion)
+        {
+            try
+            {
+                var command = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? new Executable("where.exe", "func.exe", workingDirectory: Environment.SystemDirectory)
+                : new Executable("where", "func");
+
+                var stdout = new List<string>();
+                var exitCode = await command.RunAsync(o => stdout.Add(o));
+                if (exitCode == 0)
+                {
+                    var funcPathList = stdout.Where(x => x != null).Select(x => x.Trim(' ', '\n', '\r', '"')).ToList();
+                    if (funcPathList.Count > 1)
+                    {
+                        var sb = new StringBuilder();
+                        sb.AppendLine("Multiple Azure Functions Core Tools installations found:");
+                        foreach (var path in funcPathList)
+                        {
+                            sb.AppendLine(path);
+                        }
+
+                        sb.AppendLine();
+
+                        var fileInfo = new FileInfo(Assembly.GetExecutingAssembly().Location);
+                        if (isRunningOldVersion)
+                        {
+                            sb.AppendLine($"You are currently using an old Core Tools version of {Constants.CliVersion} which is installed at {fileInfo.Directory}. Please upgrade to the latest version.");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"You are currently using Core Tools version {Constants.CliVersion} which is installed at {fileInfo.Directory}.");
+                        }
+                        
+                        return sb.ToString();
+                    }
+                }
+                else
+                {
+                    return string.Empty;
+                }
+            }
+            catch (Exception)
+            {
+                // ignore the error. We don't want to throw exception becasue of version check. 
+            }
+
+            return string.Empty;
         }
 
         private class CliFeed
