@@ -97,8 +97,6 @@ namespace Azure.Functions.Cli.Actions
                 DisplayGeneralHelp();
             }
 
-            // var isOldVersion = await latestVersionMessageTask; //await Constants.OldCoreToolsVersionMessage
-
             await RunVersionCheckTask(latestVersionMessageTask);
             return;
         }
