@@ -7,7 +7,6 @@ if (-not (Test-Path $projectPath))
 }
 
 cd $projectPath
-dotnet restore $projectFileName
 $cmd = "list", "package", "--include-transitive", "--vulnerable"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath
@@ -19,6 +18,8 @@ if ($logFileExists)
 {
   Remove-Item $logFilePath
 }
+
+cd ../..
 
 if (!$result)
 {
