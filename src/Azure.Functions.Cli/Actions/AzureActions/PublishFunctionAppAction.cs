@@ -120,7 +120,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Parser
                 .Setup<bool>("no-build")
                 .WithDescription("Skip building and fetching dependencies for the function project.")
-                .Callback(f => NoBuild = f); 
+                .Callback(f => NoBuild = f);
             // Note about usage:
             // The value of 'dotnet-cli-params' option should either use a leading space character or escape the double quotes explicitly.
             // Ex 1: --dotnet-cli-params " --configuration debug"
@@ -143,9 +143,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Get function app
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription);
 
-            if (!functionApp.IsLinux && (PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.Remote))
+            if (!functionApp.IsLinux && PublishBuildOption == BuildOption.Container)
             {
                 throw new CliException($"--build {PublishBuildOption} is not supported for Windows Function Apps.");
+            }
+
+            if (!functionApp.IsLinux && functionApp.IsElasticPremium && PublishBuildOption == BuildOption.Remote)
+            {
+                throw new CliException($"--build {PublishBuildOption} is not supported for Windows Elastic Premium Function Apps.");
             }
 
             // Get the GitIgnoreParser from the functionApp root
@@ -478,6 +483,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 shouldSyncTriggers = false;
                 await HandleLinuxDedicatedPublish(functionApp, zipStreamFactory);
             }
+            else if (!functionApp.IsLinux && PublishBuildOption == BuildOption.Remote)
+            {
+                await HandleWindowsRemoteBuildPublish(functionApp, zipStreamFactory);
+            }
             else if (RunFromPackageDeploy)
             {
                 // Windows default
@@ -506,7 +515,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 await PublishZipDeploy(functionApp, zipStreamFactory);
             }
-            
+
             if (shouldSyncTriggers && !functionApp.IsFlex)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
@@ -546,6 +555,42 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException(errorMessage);
                 }
             }, retryCount: 5);
+        }
+
+        private async Task HandleWindowsRemoteBuildPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        {
+            // Sync the correct Application Settings required for remote build
+            var appSettingsUpdated = false;
+            if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage))
+            {
+                functionApp.AzureAppSettings.Remove(Constants.WebsiteRunFromPackage);
+                appSettingsUpdated = true;
+            }
+
+            appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(new Dictionary<string, string>() { { Constants.ScmDoBuildDuringDeployment, "true" } }) || appSettingsUpdated;
+            if (appSettingsUpdated)
+            {
+                ColoredConsole.WriteLine("Updating Application Settings for Remote build...");
+                var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+                if (!result.IsSuccessful)
+                {
+                    throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
+                }
+                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
+                    shouldNotHaveSettings: new Dictionary<string, string> { { Constants.WebsiteRunFromPackage, "1" } }, timeOutSeconds: 300);
+                await Task.Delay(TimeSpan.FromSeconds(15));
+            }
+
+            var isFunctionAppDedicatedWindows = !functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            if (isFunctionAppDedicatedWindows)
+            {
+                Task<DeployStatus> pollWindowsBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
+                await PerformServerSideBuild(functionApp, zipStreamFactory, pollWindowsBuild);
+            }
+            else
+            {
+                await PublishZipDeploy(functionApp, zipStreamFactory);
+            }
         }
 
         private async Task<bool> HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
@@ -595,7 +640,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_PACKAGE");
                 appSettingsUpdated = true;
             }
-            
+
             appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings) || appSettingsUpdated;
             if (appSettingsUpdated)
             {
@@ -623,7 +668,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
             var deploymentParameters = new Dictionary<string, string>();
-            
+
             if (PublishBuildOption == BuildOption.Remote)
             {
                 deploymentParameters.Add("RemoteBuild", true.ToString());
@@ -667,7 +712,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         throw new CliException("Deployment was successful but the app appears to be unhealthy, please check the app logs.");
                     }
-                    
+
                     ColoredConsole.WriteLine(VerboseColor(GetLogMessage("The deployment was successful!")));
                 }
                 else if (status == DeployStatus.Failed)
@@ -686,7 +731,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     ColoredConsole.WriteLine(WarningColor(GetLogMessage($"Failed to retrieve deployment status, please visit https://{functionApp.ScmUri}/api/deployments")));
                 }
-                
+
                 return status;
             }
         }
@@ -1199,7 +1244,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return $"{parsedVersion.Major}.{parsedVersion.Minor}";
         }
 
-        private string  GetLogMessage(string message)
+        private string GetLogMessage(string message)
         {
             return GetLogPrefix() + message;
         }
