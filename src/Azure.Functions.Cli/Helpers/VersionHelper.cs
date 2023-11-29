@@ -17,11 +17,11 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class VersionHelper
     {
-        public static async Task<string> RunAsync(Task<(bool, string)> isRunningOlderVersion = null)
+        public static async Task<string> RunAsync(Task<bool> isRunningOlderVersion = null)
         {
             isRunningOlderVersion ??= IsRunningAnOlderVersion();
 
-            (var isOlderVersion, var olderVersionWarning) = await isRunningOlderVersion;
+            var isOlderVersion = await isRunningOlderVersion;
 
             var multipleInstallsWarning = await HaveMultipleInstallations(isOlderVersion);
 
@@ -30,13 +30,13 @@ namespace Azure.Functions.Cli.Helpers
                 return multipleInstallsWarning;
             }
 
-            return olderVersionWarning;
+            return isOlderVersion ? Constants.OldCoreToolsVersionMessage : string.Empty;
         }
 
         // Check that current core tools is the latest version. 
         // To ensure that it doesn't block other tasks. The HTTP Request timeout is only 1 second. 
         // We simply ingnore the exception if for any reason the check fails. 
-        public static async Task<(bool,string)> IsRunningAnOlderVersion()
+        public static async Task<bool> IsRunningAnOlderVersion()
         {
             try
             {
@@ -61,15 +61,15 @@ namespace Azure.Functions.Cli.Helpers
                 if (!string.IsNullOrEmpty(latestCoreToolsReleaseVersion) &&
                     Constants.CliVersion != latestCoreToolsReleaseVersion)
                 {
-                    return (true, Constants.OldCoreToolsVersionMessage);
+                    return true;
                 }
 
-                return (false, string.Empty);
+                return false;
             }
             catch (Exception)
             {
                 // ignore exception and no warning when the check fails.
-                return (false, string.Empty);
+                return false;
             }
         }
 

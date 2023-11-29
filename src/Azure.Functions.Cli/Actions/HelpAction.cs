@@ -97,11 +97,13 @@ namespace Azure.Functions.Cli.Actions
                 DisplayGeneralHelp();
             }
 
+            // var isOldVersion = await latestVersionMessageTask; //await Constants.OldCoreToolsVersionMessage
+
             await RunVersionCheckTask(latestVersionMessageTask);
             return;
         }
 
-        private static async Task RunVersionCheckTask(Task<(bool, string)> versionCheckTask)
+        private static async Task RunVersionCheckTask(Task<bool> versionCheckTask)
         {
             try
             {
