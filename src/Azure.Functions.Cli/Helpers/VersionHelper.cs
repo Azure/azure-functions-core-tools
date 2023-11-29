@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var isOlderVersion = await isRunningOlderVersion;
 
-            var multipleInstallsWarning = await HaveMultipleInstallations(isOlderVersion);
+            var multipleInstallsWarning = await GetMultipleInstallationMessage(isOlderVersion);
 
             if (!string.IsNullOrEmpty(multipleInstallsWarning))
             {
@@ -73,7 +73,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<string> HaveMultipleInstallations(bool isRunningOldVersion)
+        private static async Task<string> GetMultipleInstallationMessage(bool isRunningOldVersion)
         {
             try
             {
