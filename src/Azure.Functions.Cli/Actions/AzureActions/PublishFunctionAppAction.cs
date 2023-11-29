@@ -567,7 +567,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 appSettingsUpdated = true;
             }
 
-            appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(new Dictionary<string, string>() { { "SCM_DO_BUILD_DURING_DEPLOYMEN", "true" } }) || appSettingsUpdated;
+            appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(new Dictionary<string, string>() { { "SCM_DO_BUILD_DURING_DEPLOYMENT", "true" } }) || appSettingsUpdated;
             if (appSettingsUpdated)
             {
                 ColoredConsole.WriteLine("Updating Application Settings for Remote build...");
