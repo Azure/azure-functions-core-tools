@@ -561,13 +561,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             // Sync the correct Application Settings required for remote build
             var appSettingsUpdated = false;
-            if (functionApp.AzureAppSettings.ContainsKey("WEBSITE_RUN_FROM_PACKAGE"))
+            if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage))
             {
-                functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_PACKAGE");
+                functionApp.AzureAppSettings.Remove(Constants.WebsiteRunFromPackage);
                 appSettingsUpdated = true;
             }
 
-            appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(new Dictionary<string, string>() { { "SCM_DO_BUILD_DURING_DEPLOYMENT", "true" } }) || appSettingsUpdated;
+            appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(new Dictionary<string, string>() { { Constants.ScmDoBuildDuringDeployment, "true" } }) || appSettingsUpdated;
             if (appSettingsUpdated)
             {
                 ColoredConsole.WriteLine("Updating Application Settings for Remote build...");
@@ -577,7 +577,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
                 }
                 await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
-                    shouldNotHaveSettings: new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } }, timeOutSeconds: 300);
+                    shouldNotHaveSettings: new Dictionary<string, string> { { Constants.WebsiteRunFromPackage, "1" } }, timeOutSeconds: 300);
                 await Task.Delay(TimeSpan.FromSeconds(15));
             }
 

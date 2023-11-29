@@ -44,6 +44,7 @@ namespace Azure.Functions.Cli.Common
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
         public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
         public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
+        public const string ScmDoBuildDuringDeployment = "SCM_DO_BUILD_DURING_DEPLOYMENT";
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
