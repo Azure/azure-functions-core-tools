@@ -174,6 +174,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         _requiredNetFrameworkVersion = "7.0";
                     }
+                    else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _requiredNetFrameworkVersion = "8.0";
+                    }
                 }
                 // We do not change the default targetFramework if no .csproj file is found
             }
