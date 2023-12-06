@@ -161,7 +161,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Determine the appropriate default targetFramework
-            // NOTE: .NET 7.0 is only supported on dotnet-isolated
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
             if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
