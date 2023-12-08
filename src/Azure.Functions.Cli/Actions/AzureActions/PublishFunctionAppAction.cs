@@ -165,14 +165,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
             if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
+                
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
                 {
+                    // Get Stacks
+                    var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
+
                     var projectRoot = ProjectHelpers.GetProject(projectFilePath);
                     var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
-                    if (targetFramework.Equals("net7.0", StringComparison.InvariantCultureIgnoreCase))
+                    var majorDotnetVersion = GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
+                    var dotnetIsolatedStackKey = $"{Constants.Dotnet}{majorDotnetVersion}isolated";
+                    var runtimeSettings = stacks?.Languages.First(x => x.Name.Equals(Constants.Dotnet, StringComparison.InvariantCultureIgnoreCase))
+                        ?.Properties.MajorVersions?.FirstOrDefault(x => x.Value == dotnetIsolatedStackKey)
+                        ?.MinorVersions.LastOrDefault()?.StackSettings?.WindowsRuntimeSettings;
+
+                    if (runtimeSettings != null && (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false))
                     {
-                        _requiredNetFrameworkVersion = "7.0";
+                        _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found
@@ -1268,6 +1278,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
                  AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
+        }
+
+        private int? GetMajorDotnetVersionFromDotnetVersionInProject(string dotnetVersionFromConfig)
+        {
+            var versionStr = dotnetVersionFromConfig?.ToLower().Replace("net", string.Empty);
+            if (double.TryParse(versionStr, out double version))
+            {
+                return (int)version;
+            }
+
+            return null;
         }
     }
 }

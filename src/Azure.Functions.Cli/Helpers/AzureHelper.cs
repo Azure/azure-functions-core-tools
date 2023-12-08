@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ContainerApps.Models;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Microsoft.Azure.AppService.Middleware;
 using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
@@ -673,6 +674,22 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 return (null, null);
+            }
+        }
+
+        public static async Task<FunctionsStacks> GetFunctionsStacks(string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}/providers/Microsoft.Web/functionAppStacks?api-version={ArmUriTemplates.FunctionsStacksApiVersion}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<FunctionsStacks>(content);
+            }
+            else
+            {
+                return null;
             }
         }
     }

@@ -13,6 +13,7 @@ namespace Azure.Functions.Cli.Arm
         public const string FunctionAppOnContainerAppsApiVersion = "2022-09-01";
         public const string ManagedEnvironmentApiVersion = "2022-10-01";
         public const string BasicAuthCheckApiVersion = "2022-03-01";
+        public const string FunctionsStacksApiVersion = "2022-03-01";
 
         public const string ArgUri = "providers/Microsoft.ResourceGraph/resources";
 
