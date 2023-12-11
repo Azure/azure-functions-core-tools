@@ -130,7 +130,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel);
+
+                // TODO: somehow get target framework / .NET framework version here
+
+                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel, "net8");
             }
             else if (IsNewPythonProgrammingModel())
             {

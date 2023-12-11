@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
+        private const string IsolatedTemplateNetFxBasePackId = "Microsoft.Azure.Functions.Worker.NetFx";
 
         public static void EnsureDotnet()
         {
@@ -27,11 +28,12 @@ namespace Azure.Functions.Cli.Helpers
 
         public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
+            var frameworkString = string.IsNullOrEmpty(targetFramework)
+                  ? string.Empty
+                  : $"--Framework \"{targetFramework}\"";
+
             await TemplateOperation(async () =>
             {
-                var frameworkString = string.IsNullOrEmpty(targetFramework)
-                    ? string.Empty
-                    : $"--Framework \"{targetFramework}\"";
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
@@ -41,10 +43,10 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException("Error creating project template");
                 }
-            }, workerRuntime);
+            }, workerRuntime, frameworkString);
         }
 
-        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
+        public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null, string targetFramework = "net8")
         {
             ColoredConsole.WriteLine($"{Environment.NewLine}Creating dotnet function...");
             await TemplateOperation(async () =>
@@ -77,10 +79,10 @@ namespace Azure.Functions.Cli.Helpers
                     {
                         ColoredConsole.Error.WriteLine(ErrorColor(dotnetNewErrorMessage));
                     }
-                        
+
                     throw new CliException("Error creating function.");
                 }
-            }, workerRuntime);
+            }, workerRuntime, targetFramework);
         }
 
         private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
@@ -219,13 +221,20 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
+        private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime, string frameworkString)
         {
             EnsureDotnet();
 
             if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
-                return IsolatedTemplateOperation(action);
+                if (string.Equals(frameworkString, "net48", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    return IsolatedNetFxTemplateOperation(action);
+                }
+                else
+                {
+                    return IsolatedTemplateOperation(action);
+                }
             }
             else
             {
@@ -238,6 +247,7 @@ namespace Azure.Functions.Cli.Helpers
             try
             {
                 await UninstallWebJobsTemplates();
+                await UninstallIsolatedNetFxTemplates();
                 await InstallIsolatedTemplates();
                 await action();
             }
@@ -247,11 +257,27 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        private static async Task IsolatedNetFxTemplateOperation(Func<Task> action)
+        {
+            try
+            {
+                await UninstallWebJobsTemplates();
+                await UninstallIsolatedTemplates();
+                await InstallIsolatedNetFxTemplates();
+                await action();
+            }
+            finally
+            {
+                await UninstallIsolatedNetFxTemplates();
+            }
+        }
+
         private static async Task WebJobsTemplateOperation(Func<Task> action)
         {
             try
             {
                 await UninstallIsolatedTemplates();
+                await UninstallIsolatedNetFxTemplates();
                 await InstallWebJobsTemplates();
                 await action();
             }
@@ -285,9 +311,24 @@ namespace Azure.Functions.Cli.Helpers
             await exe.RunAsync();
         }
 
+        private static async Task UninstallIsolatedNetFxTemplates()
+        {
+            string projTemplates = $"{IsolatedTemplateBasePackId}.ProjectTemplates";
+            string itemTemplatesNetFx = $"{IsolatedTemplateNetFxBasePackId}.ItemTemplates";
+
+            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
+            await exe.RunAsync();
+
+            exe = new Executable("dotnet", $"new -u \"{itemTemplatesNetFx}\"");
+            await exe.RunAsync();
+        }
+
         private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "templates");
 
         private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $"net-isolated"));
+
+        // TODO: Find correct path to install this
+        private static Task InstallIsolatedNetFxTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $""));
 
         private static async Task DotnetTemplatesAction(string action, string templateDirectory)
         {
