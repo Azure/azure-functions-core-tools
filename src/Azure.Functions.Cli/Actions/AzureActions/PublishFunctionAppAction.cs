@@ -9,18 +9,19 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
+using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.ResourceManager;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 using Colors.Net;
 using Fclp;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using NuGet.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -290,7 +291,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (!functionApp.AzureAppSettings.ContainsKey("AzureWebJobsStorage") && functionApp.IsDynamic && functionApp.IsLinux)
+            if (!functionApp.AzureAppSettings.ContainsKey(Constants.AzureWebJobsStorage) &&
+                !functionApp.AzureAppSettings.ContainsKey(Constants.AzureWebJobsStorageAccountName) &&
+                functionApp.IsDynamic &&
+                functionApp.IsLinux)
             {
                 throw new CliException($"Azure Functions Core Tools does not support this deployment path. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/deployfromurl");
             }
@@ -475,16 +479,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Flex
                 shouldSyncTriggers = await HandleFlexConsumptionPublish(functionApp, zipStreamFactory);
             }
-            else if (functionApp.IsLinux && functionApp.IsElasticPremium)
+            else if (isFunctionAppDedicatedLinux || (functionApp.IsLinux && functionApp.IsElasticPremium))
             {
-                // Elastic Premium Linux
-                shouldSyncTriggers = await HandleElasticPremiumLinuxPublish(functionApp, zipStreamFactory);
-            }
-            else if (isFunctionAppDedicatedLinux)
-            {
-                // Dedicated Linux
-                shouldSyncTriggers = false;
-                await HandleLinuxDedicatedPublish(functionApp, zipStreamFactory);
+                // Elastic Premium / Dedicated Linux
+                await HandleLinuxElasticOrDedicatedPublish(functionApp, zipStreamFactory);
+                shouldSyncTriggers = !isFunctionAppDedicatedLinux && PublishBuildOption != BuildOption.Remote;
             }
             else if (!functionApp.IsLinux && PublishBuildOption == BuildOption.Remote)
             {
@@ -596,23 +595,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-        private async Task<bool> HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
-        {
-            // Local build
-            if (PublishBuildOption != BuildOption.Remote)
-            {
-                string fileName = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
-                await EnsureNoKuduLiteBuildSettings(functionApp);
-                await PublishRunFromPackage(functionApp, await zipStreamFactory(), fileName);
-                return true;
-            }
-
-            // Remote build
-            await PerformAppServiceRemoteBuild(zipStreamFactory, functionApp);
-            return false;
-        }
-
-        private async Task HandleLinuxDedicatedPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        private async Task HandleLinuxElasticOrDedicatedPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
         {
             // Local build
             if (PublishBuildOption != BuildOption.Remote)
@@ -779,11 +762,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             // Upload zip to blob storage
             ColoredConsole.WriteLine("Uploading package...");
-            var sas = await UploadPackageToStorage(packageStream, fileName, functionApp.AzureAppSettings);
+            var uri = await UploadPackageToStorage(packageStream, fileName, functionApp.AzureAppSettings);
             ColoredConsole.WriteLine("Upload completed successfully.");
 
             // Set app setting
-            await SetRunFromPackageAppSetting(functionApp, sas);
+            await SetRunFromPackageAppSetting(functionApp, uri);
             ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
@@ -1040,15 +1023,25 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 const string containerName = "function-releases";
 
-                CloudBlobContainer blobContainer = null;
-
+                BlobContainerClient blobContainerClient = null;
                 try
                 {
-                    var storageConnection = appSettings["AzureWebJobsStorage"];
-                    var storageAccount = CloudStorageAccount.Parse(storageConnection);
-                    var blobClient = storageAccount.CreateCloudBlobClient();
-                    blobContainer = blobClient.GetContainerReference(containerName);
-                    await blobContainer.CreateIfNotExistsAsync();
+                    if (appSettings.TryGetValue(Constants.AzureWebJobsStorageAccountName, out var accountName))
+                    {
+                        var storageAccount = await ArmClient.FindStorageAccount(accountName);
+                        blobContainerClient = new BlobContainerClient(new UriBuilder(storageAccount.Properties.PrimaryEndpoints.Blob) { Path = containerName }.Uri,
+                            new Storage.StorageSharedKeyCredential(accountName, storageAccount.Key.Value));
+                    }
+                    else if (appSettings.TryGetValue(Constants.AzureWebJobsStorage, out var connectionString))
+                    {
+                        blobContainerClient = new BlobContainerClient(connectionString, containerName);
+                    }
+                    else
+                    {
+                        throw new CliException($"Missing {Constants.AzureWebJobsStorage} / {Constants.AzureWebJobsStorage} configuration values");
+                    }
+
+                    await blobContainerClient.CreateIfNotExistsAsync();
                 }
                 catch (Exception ex)
                 {
@@ -1056,35 +1049,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
                     }
-                    throw new CliException($"Error creating a Blob container reference. Please make sure your connection string in \"AzureWebJobsStorage\" is valid");
+
+                    throw new CliException($"Error creating a blob container client. Please make sure the account name in \"{Constants.AzureWebJobsStorageAccountName}\" or the connection string in \"{Constants.AzureWebJobsStorage}\" is valid.");
                 }
 
-                var blob = blobContainer.GetBlockBlobReference(blobName);
-                using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(package.Length)}", package.Length))
-                {
-                    await blob.UploadFromStreamAsync(package,
-                        AccessCondition.GenerateEmptyCondition(),
-                        new BlobRequestOptions(),
-                        new OperationContext(),
-                        progress,
-                        new CancellationToken());
-                }
+                var blob = blobContainerClient.GetBlobClient(blobName);
+                using var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(package.Length)}", package.Length);
+                var blobInfo = await blob.UploadAsync(package, new BlobUploadOptions { ProgressHandler = progress });
 
-                var cloudMd5 = blob.Properties.ContentMD5;
+                var cloudMd5 = Convert.ToBase64String(blobInfo.Value.ContentHash);
 
                 if (!cloudMd5.Equals(packageMD5))
                 {
                     throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
                 }
 
-                var sasConstraints = new SharedAccessBlobPolicy();
-                sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
-                sasConstraints.SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddYears(10);
-                sasConstraints.Permissions = SharedAccessBlobPermissions.Read;
+                var sasConstraints = new BlobSasBuilder
+                {
+                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
+                    ExpiresOn = DateTimeOffset.UtcNow.AddYears(10),
+                };
+                sasConstraints.SetPermissions(BlobAccountSasPermissions.Read);
 
-                var blobToken = blob.GetSharedAccessSignature(sasConstraints);
-
-                return blob.Uri + blobToken;
+                return blob.GenerateSasUri(sasConstraints).ToString();
             }, 3, TimeSpan.FromSeconds(1), displayError: true);
         }
 

@@ -32,6 +32,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsExtensionVersion = "FUNCTIONS_EXTENSION_VERSION";
         public const string StorageEmulatorConnectionString = "UseDevelopmentStorage=true";
         public const string AzureWebJobsStorage = "AzureWebJobsStorage";
+        public const string AzureWebJobsStorageAccountName = "AzureWebJobsStorage__accountName";
         public const string AzureWebJobsFeatureFlags = "AzureWebJobsFeatureFlags";
         public const string PackageReferenceElementName = "PackageReference";
         public const string LinuxFxVersion = "linuxFxVersion";

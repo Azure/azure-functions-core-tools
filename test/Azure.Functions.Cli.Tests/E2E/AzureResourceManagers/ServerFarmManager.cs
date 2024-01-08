@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             FunctionAppOs os = GetOsFromResourceLabel(name);
             string resourceGroup = GetResourceGroupName(os);
             Uri uri = new Uri($"{ManagementURL}subscriptions/{SubscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/serverfarms/{name}?api-version=2019-08-01");
-            return await ArmClient.HttpInvoke("GET", uri, AccessToken);
+            return await CliArmClient.HttpInvoke("GET", uri, AccessToken);
         }
 
         public async Task Create(
@@ -35,7 +35,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
                 properties = sku.GetServerFarmProperties(os),
                 sku = sku.GetServerFarmSku(os)
             };
-            var response = await ArmClient.HttpInvoke("PUT", uri, AccessToken, payload);
+            var response = await CliArmClient.HttpInvoke("PUT", uri, AccessToken, payload);
             if (response.IsSuccessStatusCode)
             {
                 AddToResources(name, os);
@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             string resourceGroup = GetResourceGroupName(os);
             Uri uri = new Uri($"{ManagementURL}subscriptions/{SubscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/serverfarms/{name}?api-version=2019-08-01");
 
-            var response = await ArmClient.HttpInvoke("DELETE", uri, AccessToken);
+            var response = await CliArmClient.HttpInvoke("DELETE", uri, AccessToken);
             if (response.IsSuccessStatusCode)
             {
                 RemoveFromResources(name, os);

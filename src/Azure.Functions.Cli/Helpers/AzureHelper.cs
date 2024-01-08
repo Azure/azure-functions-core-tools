@@ -112,7 +112,7 @@ namespace Azure.Functions.Cli.Helpers
                 query
             };
 
-            var response = await ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken, objectPayload: bodyObject);
+            var response = await CliArmClient.HttpInvoke(HttpMethod.Post, url, accessToken, objectPayload: bodyObject);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadAsStringAsync();
@@ -128,7 +128,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             var url = new Uri($"{managementURL}{functionApp.SiteId}/basicPublishingCredentialsPolicies/scm?api-version={ArmUriTemplates.BasicAuthCheckApiVersion}");
             
-            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var response = await CliArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadAsStringAsync();
@@ -361,7 +361,7 @@ namespace Azure.Functions.Cli.Helpers
         public static Task<HttpResponseMessage> SyncTriggers(Site functionApp, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{functionApp.SiteId}/host/default/sync?api-version={ArmUriTemplates.WebsitesApiVersion}");
-            return ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken);
+            return CliArmClient.HttpInvoke(HttpMethod.Post, url, accessToken);
         }
 
         internal static async Task CheckFunctionHostStatusForFlex(Site functionApp, string accessToken, string managementURL,
@@ -427,7 +427,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task<T> ArmHttpAsync<T>(HttpMethod method, Uri uri, string accessToken, object payload = null)
         {
-            var response = await ArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
+            var response = await CliArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
             response.EnsureSuccessStatusCode();
 
             return await response.Content.ReadAsAsync<T>();
@@ -435,14 +435,14 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task ArmHttpAsync(HttpMethod method, Uri uri, string accessToken, object payload = null)
         {
-            var response = await ArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
+            var response = await CliArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
             response.EnsureSuccessStatusCode();
         }
 
         public static async Task<HttpResult<string, string>> UpdateWebSettings(Site site, Dictionary<string, string> webSettings, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}/config/web?api-version={ArmUriTemplates.WebsitesApiVersion}");
-            var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = webSettings });
+            var response = await CliArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = webSettings });
             if (response.IsSuccessStatusCode)
             {
                 // Simply reading it as a string because we do not care about the result content particularly
@@ -463,7 +463,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");
-            var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAppSettings });
+            var response = await CliArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAppSettings });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadAsAsync<ArmWrapper<Dictionary<string, string>>>();
@@ -544,7 +544,7 @@ namespace Azure.Functions.Cli.Helpers
             string hostName = string.Empty;
             var url = new Uri($"{managementURL}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/sites/{payload.Name}?api-version={ArmUriTemplates.FunctionAppOnContainerAppsApiVersion}");
             ColoredConsole.WriteLine(Constants.FunctionAppDeploymentToContainerAppsMessage);
-            var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, payload);
+            var response = await CliArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, payload);
             if (!response.IsSuccessStatusCode)
             {
                 string errorMessage;
@@ -573,7 +573,7 @@ namespace Azure.Functions.Cli.Helpers
             int maxRetries = 12; // 12 * 5 seconds = 1 minute
             for (int retry = 1; retry <= maxRetries; retry++)
             {
-                var getResponse = await ArmClient.HttpInvoke(HttpMethod.Get, statusUrl, accessToken, payload);
+                var getResponse = await CliArmClient.HttpInvoke(HttpMethod.Get, statusUrl, accessToken, payload);
                 if (getResponse.StatusCode != System.Net.HttpStatusCode.Accepted)
                 {
                     getResponse.EnsureSuccessStatusCode();
@@ -662,7 +662,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<(string, string)> GetManagedEnvironmentInfo(string accessToken, string managementURL, string subscriptionId, string resourceGroup, string name)
         {
             var url = new Uri($"{managementURL}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.App/managedEnvironments/{name}?api-version={ArmUriTemplates.ManagedEnvironmentApiVersion}");
-            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var response = await CliArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
             var content = await response.Content.ReadAsStringAsync();
 
             if (response.IsSuccessStatusCode)

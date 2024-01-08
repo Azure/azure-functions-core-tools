@@ -1,5 +1,4 @@
 ﻿using Colors.Net;
-using Microsoft.WindowsAzure.Storage.Core.Util;
 using System;
 
 namespace Azure.Functions.Cli.Common
@@ -71,7 +70,7 @@ namespace Azure.Functions.Cli.Common
         }
     }
 
-    class StorageProgressBar : SimpleProgressBar, IProgress<StorageProgress>
+    class StorageProgressBar : SimpleProgressBar, IProgress<long>
     {
         private readonly long size;
 
@@ -80,9 +79,9 @@ namespace Azure.Functions.Cli.Common
             this.size = size;
         }
 
-        public void Report(StorageProgress value)
+        void IProgress<long>.Report(long value)
         {
-            Report((int)(value.BytesTransferred * 100 / size));
+            Report((int)(value * 100 / size));
         }
     }
 }

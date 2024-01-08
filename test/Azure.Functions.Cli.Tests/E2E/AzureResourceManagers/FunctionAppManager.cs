@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             FunctionAppOs os = GetOsFromResourceLabel(name);
             string resourceGroup = GetResourceGroupName(os);
             Uri uri = new Uri($"{ManagementURL}subscriptions/{SubscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/sites/{name}?api-version=2018-11-01");
-            return await ArmClient.HttpInvoke("GET", uri, AccessToken);
+            return await CliArmClient.HttpInvoke("GET", uri, AccessToken);
         }
 
         public async Task Create(
@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
                 }
             };
 
-            var response = await ArmClient.HttpInvoke("PUT", uri, AccessToken, payload);
+            var response = await CliArmClient.HttpInvoke("PUT", uri, AccessToken, payload);
             if (response.IsSuccessStatusCode)
             {
                 AddToResources(name, os);
@@ -77,7 +77,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             string resourceGroup = GetResourceGroupName(os);
 
             Uri uri = new Uri($"{ManagementURL}/subscriptions/{SubscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/sites/{name}?api-version=2018-11-01");
-            var response = await ArmClient.HttpInvoke("DELETE", uri, AccessToken);
+            var response = await CliArmClient.HttpInvoke("DELETE", uri, AccessToken);
             if (response.IsSuccessStatusCode)
             {
                 RemoveFromResources(name, os);
@@ -100,7 +100,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
                 query = $"where type =~ \'Microsoft.Web/sites\' and name =~ \'{name}\'"
             };
 
-            var response = await ArmClient.HttpInvoke(HttpMethod.Post, url, AccessToken, payload);
+            var response = await CliArmClient.HttpInvoke(HttpMethod.Post, url, AccessToken, payload);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadAsStringAsync();
@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             Uri uri = new Uri($"https://{name}.scm.azurewebsites.net");
             await RetryHelper.Retry(async () =>
             {
-                HttpResponseMessage response = await ArmClient.HttpInvoke("GET", uri, AccessToken);
+                HttpResponseMessage response = await CliArmClient.HttpInvoke("GET", uri, AccessToken);
                 response.EnsureSuccessStatusCode();
             }, retryCount: numOfRetries, retryDelay: TimeSpan.FromSeconds(retryIntervalSec));
         }

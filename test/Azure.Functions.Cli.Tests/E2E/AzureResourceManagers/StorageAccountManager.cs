@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             FunctionAppOs os = GetOsFromResourceLabel(name);
             string resourceGroup = GetResourceGroupName(os);
             Uri uri = new Uri($"{ManagementURL}subscriptions/{SubscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Storage/storageAccounts/{name}?api-version=2019-06-01");
-            return await ArmClient.HttpInvoke("GET", uri, AccessToken);
+            return await CliArmClient.HttpInvoke("GET", uri, AccessToken);
         }
 
         public async Task<ListKeysResponse> ListKeys(
@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             FunctionAppOs os = GetOsFromResourceLabel(name);
             string resourceGroup = GetResourceGroupName(os);
             Uri uri = new Uri($"{ManagementURL}subscriptions/{SubscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Storage/storageAccounts/{name}/listkeys?api-version=2019-06-01");
-            var response = await ArmClient.HttpInvoke("POST", uri, AccessToken);
+            var response = await CliArmClient.HttpInvoke("POST", uri, AccessToken);
             if (response.IsSuccessStatusCode)
             {
                 string json = await response.Content.ReadAsStringAsync();
@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
                     name = "Standard_LRS"
                 }
             };
-            var response = await ArmClient.HttpInvoke("PUT", uri, AccessToken, payload);
+            var response = await CliArmClient.HttpInvoke("PUT", uri, AccessToken, payload);
             if (response.IsSuccessStatusCode)
             {
                 AddToResources(name, os);
@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli.Tests.E2E.AzureResourceManagers
             FunctionAppOs os = GetOsFromResourceLabel(name);
             string resourceGroup = GetResourceGroupName(os);
             Uri uri = new Uri($"{ManagementURL}subscriptions/{SubscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Storage/storageAccounts/{name}?api-version=2019-06-01");
-            var response = await ArmClient.HttpInvoke("DELETE", uri, AccessToken);
+            var response = await CliArmClient.HttpInvoke("DELETE", uri, AccessToken);
             if (response.IsSuccessStatusCode)
             {
                 RemoveFromResources(name, os);

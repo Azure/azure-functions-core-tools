@@ -27,14 +27,14 @@ namespace Azure.Functions.Cli.Helpers.Tests
                 mockHttp.When(HttpMethod.Post, mockUrl)
                         .Respond("application/json", $"{{'{key}': '{value}'}}");
 
-                ArmClient.SetTestHandler(mockHttp);
+                CliArmClient.SetTestHandler(mockHttp);
 
                 var result = await AzureHelper.GetFunctionKey(functionName, appId, accessToken, managementUrl);
                 result.Should().Be(value);
             }
             finally
             {
-                ArmClient.SetTestHandler(null);
+                CliArmClient.SetTestHandler(null);
             }
         }
     }

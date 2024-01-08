@@ -11,12 +11,12 @@ using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Arm
 {
-    public static class ArmClient
+    public static class CliArmClient
     {
         private static readonly Random _random;
         private static HttpMessageHandler _testHandler = null;
 
-        static ArmClient()
+        static CliArmClient()
         {
             _random = new Random();
         }
