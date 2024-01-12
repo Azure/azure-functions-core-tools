@@ -15,8 +15,10 @@ using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
+using Microsoft.Build.Framework;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -165,24 +167,26 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
             if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
-                
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
                 {
-                    // Get Stacks
-                    var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
-
                     var projectRoot = ProjectHelpers.GetProject(projectFilePath);
                     var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
-                    var majorDotnetVersion = GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
-                    var dotnetIsolatedStackKey = $"{Constants.Dotnet}{majorDotnetVersion}isolated";
-                    var runtimeSettings = stacks?.Languages.First(x => x.Name.Equals(Constants.Dotnet, StringComparison.InvariantCultureIgnoreCase))
-                        ?.Properties.MajorVersions?.FirstOrDefault(x => x.Value == dotnetIsolatedStackKey)
-                        ?.MinorVersions.LastOrDefault()?.StackSettings?.WindowsRuntimeSettings;
 
-                    if (runtimeSettings != null && (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false))
+                    var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
+                    
+                    if (majorDotnetVersion != null)
                     {
-                        _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
+                        // Get Stacks
+                        var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
+                        var runtimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
+
+                        ShowEolMessage(stacks, runtimeSettings, majorDotnetVersion.Value);
+
+                        if (runtimeSettings != null && (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false))
+                        {
+                            _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
+                        }
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found
@@ -1280,15 +1284,33 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                  AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
         }
 
-        private int? GetMajorDotnetVersionFromDotnetVersionInProject(string dotnetVersionFromConfig)
+        private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)
         {
-            var versionStr = dotnetVersionFromConfig?.ToLower().Replace("net", string.Empty);
-            if (double.TryParse(versionStr, out double version))
+            try
             {
-                return (int)version;
+                if (currentRuntimeSettings.IsDeprecated == true)
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetAfterEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
+                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetEarlyEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
             }
-
-            return null;
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the deployment.
+            }
         }
     }
 }

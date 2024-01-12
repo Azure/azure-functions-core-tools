@@ -115,5 +115,7 @@ namespace Azure.Functions.Cli
         public static Task<string> KedaV2Template => GetValue("keda-v2.yaml");
 
         public static Task<string> ZipToSquashfsScript => GetValue("ziptofs.sh");
+
+        public static Task<string> StacksJson => GetValue("stacks.json");
     }
 }
