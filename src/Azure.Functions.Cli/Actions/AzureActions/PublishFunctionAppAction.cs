@@ -1038,7 +1038,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                     else
                     {
-                        throw new CliException($"Missing {Constants.AzureWebJobsStorage} / {Constants.AzureWebJobsStorage} configuration values");
+                        throw new CliException($"Missing {Constants.AzureWebJobsStorageAccountName} / {Constants.AzureWebJobsStorage} configuration values");
                     }
 
                     await blobContainerClient.CreateIfNotExistsAsync();
