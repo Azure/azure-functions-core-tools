@@ -116,7 +116,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("target-framework")
-                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net48\", \"net6.0\", \"net7.0\", and \"net8.0\"")
+                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"")
                 .Callback(tf => TargetFramework = tf);
 
             Parser
@@ -331,13 +331,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (string.IsNullOrEmpty(TargetFramework))
                 {
-                    // Default to .NET 6 if the target framework is not specified
+                    // Default to .NET 8 if the target framework is not specified
                     // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
-                    TargetFramework = Common.TargetFramework.net6;
+                    TargetFramework = Common.TargetFramework.net8;
                 }
                 if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
                 {
-                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net48\", \"net6.0\", and \"net7.0\"");
+                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"");
                 }
             }
             else if (!string.IsNullOrEmpty(TargetFramework))
