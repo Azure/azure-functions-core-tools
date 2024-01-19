@@ -105,7 +105,7 @@
     "name": "cosmosDBTrigger-connection",
     "value": "string",
     "resource": "DocumentDB",
-    "label": "$cosmosDB_connection_label",
+    "label": "$cosmosDBIn_connection_label",
     "help": "$cosmosDB_connection_help",
     "placeholder": "$variables_selectConnection"
   },
@@ -114,7 +114,7 @@
     "name": "cosmosDBTrigger-databaseName",
     "value": "string",
     "defaultValue": "",
-    "label": "$cosmosDB_databaseName_label",
+    "label": "$cosmosDBIn_databaseName_label",
     "help": "$cosmosDB_databaseName_help"
   },
   {
@@ -122,14 +122,14 @@
     "name": "cosmosDBTrigger-containerName",
     "value": "string",
     "defaultValue": "",
-    "label": "$cosmosDB_containerName_label",
+    "label": "$cosmosDBIn_containerName_label",
     "help": "$cosmosDB_containerName_help"
   },
   {
     "id": "cosmosDBTrigger-leaseContainerName",
     "name": "cosmosDBTrigger-leaseContainerName",
     "value": "string",
-    "label": "$cosmosDB_leaseContainerName_label",
+    "label": "$cosmosDBIn_leaseContainerName_label",
     "help": "$cosmosDB_leaseContainer_help"
   },
   {
@@ -137,7 +137,7 @@
     "name": "cosmosDBTrigger-createLeaseContainerIfNotExists",
     "value": "boolean",
     "defaultValue": true,
-    "label": "$cosmosDB_createIfNotExists_label",
+    "label": "$cosmosDBIn_createContainerIfNotExists_label",
     "help": "$cosmosDB_createIfNotExists_help"
   },
   {
