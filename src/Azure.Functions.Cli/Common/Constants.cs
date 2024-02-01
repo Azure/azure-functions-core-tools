@@ -71,6 +71,7 @@ namespace Azure.Functions.Cli.Common
         public const string CoreToolsVersionsFeedUrl = "https://functionscdn.azureedge.net/public/cli-feed-v4.json";
         public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
         public const string GetFunctionNameParamId = "trigger-functionName";
+        public const string HttpTriggerAuthLevelParamId = "httpTrigger-authLevel";
         public const string GetFileNameParamId = "app-selectedFileName";
         public const string GetBluePrintFileNameParamId = "blueprint-fileName";
         public const string GetBluePrintExistingFileNameParamId = "blueprint-existingFileName";
