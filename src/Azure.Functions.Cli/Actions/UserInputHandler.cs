@@ -38,6 +38,12 @@ namespace Azure.Functions.Cli.Actions
                 var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, theInput.ParamId, StringComparison.OrdinalIgnoreCase));
                 var defaultValue = theInput.DefaultValue ?? userPrompt.DefaultValue;
                 string response = null;
+
+                if (providedValues.ContainsKey(theInput.ParamId) && !string.IsNullOrEmpty(providedValues[theInput.ParamId]))
+                {
+                    response = providedValues[theInput.ParamId];
+                }
+
                 if (userPrompt.Value == Constants.UserPromptEnumType || userPrompt.Value == UserPromptBooleanType)
                 {
                     var values = new List<string>() { true.ToString(), false.ToString() };
@@ -63,12 +69,6 @@ namespace Azure.Functions.Cli.Actions
                 }
                 else
                 {
-                    // Use the function name if it is already provided by user
-                    if (providedValues.ContainsKey(theInput.ParamId) && !string.IsNullOrEmpty(providedValues[theInput.ParamId]))
-                    {
-                        response = providedValues[theInput.ParamId];
-                    }
-
                     while (!ValidateResponse(userPrompt, response))
                     {
                         PrintInputLabel(userPrompt, defaultValue);
