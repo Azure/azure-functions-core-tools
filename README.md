@@ -123,6 +123,13 @@ brew link --overwrite azure-functions-core-tools@3
 
 #### 1. Set up package feed
 
+##### Ubuntu 22.04
+
+```bash
+wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+```
+
 ##### Ubuntu 20.04
 
 ```bash
