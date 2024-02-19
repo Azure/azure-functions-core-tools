@@ -85,7 +85,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Parser
                 .Setup<int>('p', "port")
                 .WithDescription($"Local port to listen on. Default: {DefaultPort}")
-                .SetDefault(hostSettings.LocalHttpPort == default(int) ? DefaultPort : hostSettings.LocalHttpPort)
+                .SetDefault(hostSettings.LocalHttpPort == default(int) ? NetworkHelpers.GetNextAvailablePort(DefaultPort) : hostSettings.LocalHttpPort)
                 .Callback(p => Port = p);
 
             Parser
