@@ -5,6 +5,7 @@ using System.IO;
 using System.Security;
 using Microsoft.Win32;
 using Microsoft.DotNet.PlatformAbstractions;
+using System;
 
 namespace Azure.Functions.Cli.Telemetry
 {
@@ -17,27 +18,39 @@ namespace Azure.Functions.Cli.Telemetry
                 case Platform.Windows:
                     try
                     {
-                        using (RegistryKey subkey
-                            = Registry.LocalMachine.OpenSubKey("System\\CurrentControlSet\\Control"))
-                        {
-                            return subkey?.GetValue("ContainerType") != null
-                                ? Cli.Telemetry.DockerContainer.True
-                                : Cli.Telemetry.DockerContainer.False;
-                        }
+#pragma warning disable CA1416 // Validate platform compatibility - This is a windows only code path.
+                        
+                        using var subkey = Registry.LocalMachine.OpenSubKey("System\\CurrentControlSet\\Control");
+                        
+                        return subkey?.GetValue("ContainerType") != null
+                            ? DockerContainer.True
+                            : DockerContainer.False;
+                        
+#pragma warning restore CA1416 // Validate platform compatibility
                     }
                     catch (SecurityException)
                     {
-                        return Cli.Telemetry.DockerContainer.Unknown;
+                        return DockerContainer.Unknown;
                     }
                 case Platform.Linux:
-                    return ReadProcToDetectDockerInLinux()
-                        ? Cli.Telemetry.DockerContainer.True
-                        : Cli.Telemetry.DockerContainer.False;
+                    try
+                    {
+                        return ReadProcToDetectDockerInLinux()
+                            ? DockerContainer.True
+                            : DockerContainer.False;
+                    }
+                    catch (Exception ex) when (ex is IOException || ex.InnerException is IOException)
+                    {
+                        // In some environments (restricted docker container, shared hosting etc.),
+                        // procfs is not accessible and we get UnauthorizedAccessException while the
+                        // inner exception is set to IOException. In this case, it is unknown.
+                        return DockerContainer.Unknown;
+                    }
                 case Platform.Unknown:
-                    return Cli.Telemetry.DockerContainer.Unknown;
+                    return DockerContainer.Unknown;
                 case Platform.Darwin:
                 default:
-                    return Cli.Telemetry.DockerContainer.False;
+                    return DockerContainer.False;
             }
         }
 
