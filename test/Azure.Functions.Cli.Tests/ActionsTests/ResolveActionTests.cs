@@ -22,6 +22,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("azure functionapp enable-git-repo appName", typeof(DeprecatedAzureActions))]
         [InlineData("azure functionapp fetch-app-settings appName", typeof(FetchAppSettingsAction))]
         [InlineData("azure functionapp fetch appName", typeof(FetchAppSettingsAction))]
+        [InlineData("azure functionapp publish app-name -g resource-group", typeof(FetchAppSettingsAction))]
         [InlineData("azure get-publish-username", typeof(DeprecatedAzureActions))]
         [InlineData("azure account list", typeof(DeprecatedAzureActions))]
         [InlineData("azure subscriptions list", typeof(DeprecatedAzureActions))]
@@ -81,6 +82,20 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             }
         }
 
+        [Theory]
+        [InlineData("azure functionapp publish -g resource-group app-name-not-the-first-arg")]
+        public void ThrowErrorOnIncorrectCommandLine(string args)
+        {
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
+            FileSystemHelpers.Instance = fileSystem;
+
+            var container = InitializeContainerForTests();
+            var app = new ConsoleApp(args.Split(' ').ToArray(), typeof(Program).Assembly, container);
+
+            Assert.Throws<CliArgumentsException>(app.Parse);
+        }
+        
         private IContainer InitializeContainerForTests()
         {
             var builder = new ContainerBuilder();
