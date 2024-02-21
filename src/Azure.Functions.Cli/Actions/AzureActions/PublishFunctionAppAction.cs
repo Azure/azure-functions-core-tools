@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -167,8 +166,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
                 {
-                    var projectRoot = ProjectHelpers.GetProject(projectFilePath);
-                    var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
+                    var targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath));
                     if (targetFramework.Equals("net7.0", StringComparison.InvariantCultureIgnoreCase))
                     {
                         _requiredNetFrameworkVersion = "7.0";
@@ -176,6 +174,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
                     {
                         _requiredNetFrameworkVersion = "8.0";
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine(WarningColor(
+                            $"Can not interpret target framework '{targetFramework}', assuming framework '{_requiredNetFrameworkVersion}'"));
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found

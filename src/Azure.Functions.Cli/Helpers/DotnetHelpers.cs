@@ -12,6 +12,8 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
+    using System.Text;
+
     public static class DotnetHelpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
@@ -25,6 +27,28 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        /// <summary>
+        /// Function that determines TargetFramework of a project even when it's defined outside of the .csproj file,
+        /// e.g. in Directory.Build.props
+        /// </summary>
+        /// <param name="projectDirectory">Directory containing the .csproj file</param>
+        /// <returns>Target framework, e.g. net8.0</returns>
+        /// <exception cref="CliException"></exception>
+        public static async Task<string> DetermineTargetFramework(string projectDirectory)
+        {
+            EnsureDotnet();
+            var exe = new Executable("dotnet", "build -getproperty:TargetFramework", workingDirectory: projectDirectory);
+            StringBuilder output = new();
+
+            var exitCode = await exe.RunAsync(o => output.Append(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+            if (exitCode != 0)
+            {
+                throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
+            }
+
+            return output.ToString();  // May return
+        }
+        
         public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
             await TemplateOperation(async () =>
