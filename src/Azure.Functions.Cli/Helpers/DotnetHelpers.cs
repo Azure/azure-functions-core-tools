@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
             }
 
-            return output.ToString();  // May return
+            return output.ToString();
         }
         
         public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
