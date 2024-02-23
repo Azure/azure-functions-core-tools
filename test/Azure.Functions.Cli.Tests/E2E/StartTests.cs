@@ -93,6 +93,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120),
             }, _output);
         }
 
@@ -306,6 +307,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120),
             }, _output);
         }
 
@@ -502,7 +504,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     OutputDoesntContain = new string[]
                     {
                         "Skipping 'emptySetting' from local settings as it's already defined in current environment variables."
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                 }
             }, _output);
         }
@@ -632,6 +635,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "Using for user secrets file configuration."
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                     Test = async (workingDir, p) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
@@ -705,6 +709,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "start --functions http1 --csharp",
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(120),
                     ExpectExit = true,
                     ExitInError = true,
                     ErrorContains = new[] { "Missing value for AzureWebJobsStorage in local.settings.json and User Secrets. This is required for all triggers other than httptrigger, kafkatrigger. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets." },
