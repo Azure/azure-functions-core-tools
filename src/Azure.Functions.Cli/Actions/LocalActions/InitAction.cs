@@ -59,8 +59,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public ProgrammingModel ResolvedProgrammingModel { get; set; }
 
-        // Default to .NET 6 if the target framework is not specified
-        private const string DefaultTargetFramework = Common.TargetFramework.net6;
+        // Default to .NET 8 if the target framework is not specified
+        private const string DefaultTargetFramework = Common.TargetFramework.net8;
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -341,7 +341,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     // Default to .NET 8 if the target framework is not specified
                     // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
-                    TargetFramework = Common.TargetFramework.net8;
+                    TargetFramework = DefaultTargetFramework;
                 }
                 if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
                 {
