@@ -163,7 +163,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Determine the appropriate default targetFramework
-            // NOTE: .NET 7.0 is only supported on dotnet-isolated
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
             if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
@@ -187,6 +186,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         {
                             _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
                         }
+                    }
+                    else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _requiredNetFrameworkVersion = "8.0";
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found

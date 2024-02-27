@@ -157,7 +157,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                 }
 
-                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName } };
+                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName }, { HttpTriggerAuthLevelParamId, AuthorizationLevel?.ToString() } };
                 var jobName = "appendToFile";
                 if (FileName != PySteinFunctionAppPy)
                 {
@@ -179,6 +179,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
 
                 var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
+
                 var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
 
                 var variables = new Dictionary<string, string>();
