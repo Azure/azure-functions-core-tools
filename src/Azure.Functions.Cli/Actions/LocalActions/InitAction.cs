@@ -585,7 +585,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (currentRuntimeSettings == null)
                     return;
 
-                if (currentRuntimeSettings.IsDeprecated == true)
+                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
                 {
                     var warningMessage = EolMessages.GetAfterEolCreateMessageDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
                     ColoredConsole.WriteLine(WarningColor(warningMessage));

@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 currentMajorVersion++;
                 runtimeSettings = GetRuntimeSettings(stacks, currentMajorVersion, out isLTS);
-            } while (runtimeSettings != null && (!isLTS && runtimeSettings.IsDeprecated != true));
+            } while (runtimeSettings != null && (!isLTS && runtimeSettings.IsDeprecated != true && runtimeSettings.IsDeprecatedForRuntime != true));
 
             return currentMajorVersion;
         }
