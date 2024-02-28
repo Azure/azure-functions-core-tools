@@ -15,8 +15,10 @@ using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
+using Microsoft.Build.Framework;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -169,9 +171,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     var projectRoot = ProjectHelpers.GetProject(projectFilePath);
                     var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
-                    if (targetFramework.Equals("net7.0", StringComparison.InvariantCultureIgnoreCase))
+
+                    var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
+                    
+                    if (majorDotnetVersion != null)
                     {
-                        _requiredNetFrameworkVersion = "7.0";
+                        // Get Stacks
+                        var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
+                        var runtimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
+
+                        ShowEolMessage(stacks, runtimeSettings, majorDotnetVersion.Value);
+
+                        // This is for future proofing with stacks API for future dotnet versions.
+                        if (runtimeSettings != null && 
+                            (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false) && 
+                            (runtimeSettings.IsDeprecatedForRuntime == null || runtimeSettings.IsDeprecatedForRuntime == false))
+                        {
+                            _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
+                        }
                     }
                     else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
                     {
@@ -1271,6 +1288,35 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
                  AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
+        }
+
+        private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)
+        {
+            try
+            {
+                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetAfterEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
+                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetEarlyEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the deployment.
+            }
         }
     }
 }
