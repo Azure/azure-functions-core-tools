@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -76,6 +77,18 @@ namespace Azure.Functions.Cli.StacksApi
         public LinuxRuntimeSettings LinuxRuntimeSettings { get; set; }
     }
 
+    public class SupportedFunctionsExtensionVersionsInfo
+    {
+        [JsonProperty("version")]
+        public string Version { get; set; }
+
+        [JsonProperty("isDeprecated")]
+        public bool IsDeprecated { get; set; }
+
+        [JsonProperty("isDefault")]
+        public bool IsDefault { get; set; }
+    }
+
     public class WindowsRuntimeSettings
     {
         [JsonProperty("runtimeVersion")]
@@ -106,7 +119,9 @@ namespace Azure.Functions.Cli.StacksApi
         public bool? IsEarlyAccess { get; set; }
 
         [JsonProperty("endOfLifeDate")]
-        public DateTime? EndOfLifeDate { get; set; }
+        public string EndOfLifeDateStr { get; set; }
+
+        public DateTime? EndOfLifeDate => string.IsNullOrWhiteSpace(EndOfLifeDateStr) ? null : DateTime.ParseExact(EndOfLifeDateStr, "ddd MMM dd yyyy HH:mm:ss 'GMT'K '(Coordinated Universal Time)'", CultureInfo.InvariantCulture);
 
         [JsonProperty("isDefault")]
         public bool? IsDefault { get; set; }
@@ -119,6 +134,12 @@ namespace Azure.Functions.Cli.StacksApi
 
         [JsonProperty("isAutoUpdate")]
         public bool? IsAutoUpdate { get; set; }
+
+        [JsonProperty("supportedFunctionsExtensionVersionsInfo")]
+        public List<SupportedFunctionsExtensionVersionsInfo> SupportedFunctionsExtensionVersionsInfo { get; set; }
+
+        public bool? IsDeprecatedForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDeprecated;
+        public bool? IsDefaultForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDefault;
     }
 
     public class LinuxRuntimeSettings
@@ -150,8 +171,16 @@ namespace Azure.Functions.Cli.StacksApi
         [JsonProperty("supportedFunctionsExtensionVersions")]
         public List<string> SupportedFunctionsExtensionVersions { get; set; }
 
+        [JsonProperty("supportedFunctionsExtensionVersionsInfo")]
+        public List<SupportedFunctionsExtensionVersionsInfo> SupportedFunctionsExtensionVersionsInfo { get; set; }
+
+        public bool? IsDeprecatedForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDeprecated;
+        public bool? IsDefaultForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDefault;
+
         [JsonProperty("endOfLifeDate")]
-        public DateTime EndOfLifeDate { get; set; }
+        public string EndOfLifeDateStr { get; set; }
+
+        public DateTime? EndOfLifeDate => string.IsNullOrWhiteSpace(EndOfLifeDateStr)? null : DateTime.ParseExact(EndOfLifeDateStr, "ddd MMM dd yyyy HH:mm:ss 'GMT'K '(Coordinated Universal Time)'", CultureInfo.InvariantCulture);
 
         [JsonProperty("isDefault")]
         public bool? IsDefault { get; set; }

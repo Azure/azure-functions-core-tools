@@ -182,6 +182,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                         ShowEolMessage(stacks, runtimeSettings, majorDotnetVersion.Value);
 
+                        // This is for future proofing with stacks API for future dotnet versions.
                         if (runtimeSettings != null && (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false))
                         {
                             _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";

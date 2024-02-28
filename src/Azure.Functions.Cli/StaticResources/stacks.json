@@ -10,43 +10,17 @@
         "preferredOs": "windows",
         "majorVersions": [
           {
-            "displayText": ".NET Framework 4.8",
-            "value": "dotnetframework48",
-            "minorVersions": [
-              {
-                "displayText": ".NET Framework 4.8",
-                "value": "4.8",
-                "stackSettings": {
-                  "windowsRuntimeSettings": {
-                    "runtimeVersion": "v4.0",
-                    "remoteDebuggingSupported": false,
-                    "appInsightsSettings": { "isSupported": true },
-                    "gitHubActionSettings": {
-                      "isSupported": true,
-                      "supportedVersion": "4.8.x"
-                    },
-                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated" },
-                    "siteConfigPropertiesDictionary": {
-                      "use32BitWorkerProcess": true,
-                      "netFrameworkVersion": "v4.0"
-                    },
-                    "supportedFunctionsExtensionVersions": [ "~4" ]
-                  }
-                }
-              }
-            ]
-          },
-          {
             "displayText": ".NET 8 Isolated",
             "value": "dotnet8isolated",
             "minorVersions": [
               {
                 "displayText": ".NET 8 Isolated",
-                "value": "8 (LTS) Isolated",
+                "value": "8 (LTS), isolated worker model",
                 "stackSettings": {
                   "windowsRuntimeSettings": {
                     "runtimeVersion": "v8.0",
                     "isHidden": false,
+                    "isDefault": true,
                     "remoteDebuggingSupported": false,
                     "appInsightsSettings": { "isSupported": true },
                     "gitHubActionSettings": {
@@ -62,12 +36,19 @@
                       "netFrameworkVersion": "v8.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2026-11-10T00:00:00Z",
-                    "isEarlyAccess": true
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Nov 10 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "DOTNET-ISOLATED|8.0",
                     "isHidden": false,
+                    "isDefault": true,
                     "remoteDebuggingSupported": false,
                     "appInsightsSettings": { "isSupported": true },
                     "gitHubActionSettings": {
@@ -83,7 +64,14 @@
                       "linuxFxVersion": "DOTNET-ISOLATED|8.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2026-11-10T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Nov 10 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -95,7 +83,7 @@
             "minorVersions": [
               {
                 "displayText": ".NET 7 Isolated",
-                "value": "7 (STS) Isolated",
+                "value": "7 (STS), isolated worker model",
                 "stackSettings": {
                   "windowsRuntimeSettings": {
                     "runtimeVersion": "v7.0",
@@ -114,7 +102,14 @@
                       "netFrameworkVersion": "v7.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-05-14T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue May 14 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "DOTNET-ISOLATED|7.0",
@@ -133,53 +128,14 @@
                       "linuxFxVersion": "DOTNET-ISOLATED|7.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-05-14T00:00:00Z"
-                  }
-                }
-              }
-            ]
-          },
-          {
-            "displayText": ".NET 6",
-            "value": "dotnet6",
-            "minorVersions": [
-              {
-                "displayText": ".NET 6 (LTS)",
-                "value": "6 (LTS)",
-                "stackSettings": {
-                  "windowsRuntimeSettings": {
-                    "runtimeVersion": "v6.0",
-                    "isDefault": true,
-                    "remoteDebuggingSupported": false,
-                    "appInsightsSettings": { "isSupported": true },
-                    "gitHubActionSettings": {
-                      "isSupported": true,
-                      "supportedVersion": "6.0.x"
-                    },
-                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet" },
-                    "siteConfigPropertiesDictionary": {
-                      "use32BitWorkerProcess": true,
-                      "netFrameworkVersion": "v6.0"
-                    },
-                    "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-11-12T00:00:00Z"
-                  },
-                  "linuxRuntimeSettings": {
-                    "runtimeVersion": "DOTNET|6.0",
-                    "isDefault": true,
-                    "remoteDebuggingSupported": false,
-                    "appInsightsSettings": { "isSupported": true },
-                    "gitHubActionSettings": {
-                      "isSupported": true,
-                      "supportedVersion": "6.0.x"
-                    },
-                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet" },
-                    "siteConfigPropertiesDictionary": {
-                      "use32BitWorkerProcess": true,
-                      "linuxFxVersion": "DOTNET|6.0"
-                    },
-                    "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-11-12T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue May 14 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -191,7 +147,7 @@
             "minorVersions": [
               {
                 "displayText": ".NET 6 (LTS) Isolated",
-                "value": "6 (LTS) Isolated",
+                "value": "6 (LTS), isolated worker model",
                 "stackSettings": {
                   "windowsRuntimeSettings": {
                     "runtimeVersion": "v6.0",
@@ -210,7 +166,14 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-11-12T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Nov 12 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "DOTNET-ISOLATED|6.0",
@@ -229,7 +192,106 @@
                       "linuxFxVersion": "DOTNET-ISOLATED|6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-11-12T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Nov 12 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "displayText": ".NET Framework 4.8",
+            "value": "dotnetframework48",
+            "minorVersions": [
+              {
+                "displayText": ".NET Framework 4.8",
+                "value": ".NET Framework 4.8, isolated worker model",
+                "stackSettings": {
+                  "windowsRuntimeSettings": {
+                    "runtimeVersion": "v4.0",
+                    "remoteDebuggingSupported": false,
+                    "appInsightsSettings": { "isSupported": true },
+                    "gitHubActionSettings": {
+                      "isSupported": true,
+                      "supportedVersion": "4.8.x"
+                    },
+                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated" },
+                    "siteConfigPropertiesDictionary": {
+                      "use32BitWorkerProcess": true,
+                      "netFrameworkVersion": "v4.0"
+                    },
+                    "supportedFunctionsExtensionVersions": [ "~4" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "displayText": ".NET 6 In-process",
+            "value": "dotnet6",
+            "minorVersions": [
+              {
+                "displayText": ".NET 6 (LTS) In-process",
+                "value": "6 (LTS), in-process model",
+                "stackSettings": {
+                  "windowsRuntimeSettings": {
+                    "runtimeVersion": "v6.0",
+                    "remoteDebuggingSupported": false,
+                    "appInsightsSettings": { "isSupported": true },
+                    "gitHubActionSettings": {
+                      "isSupported": true,
+                      "supportedVersion": "6.0.x"
+                    },
+                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet" },
+                    "siteConfigPropertiesDictionary": {
+                      "use32BitWorkerProcess": true,
+                      "netFrameworkVersion": "v6.0"
+                    },
+                    "supportedFunctionsExtensionVersions": [ "~4" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Nov 12 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
+                  },
+                  "linuxRuntimeSettings": {
+                    "runtimeVersion": "DOTNET|6.0",
+                    "remoteDebuggingSupported": false,
+                    "appInsightsSettings": { "isSupported": true },
+                    "gitHubActionSettings": {
+                      "isSupported": true,
+                      "supportedVersion": "6.0.x"
+                    },
+                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet" },
+                    "siteConfigPropertiesDictionary": {
+                      "use32BitWorkerProcess": true,
+                      "linuxFxVersion": "DOTNET|6.0"
+                    },
+                    "supportedFunctionsExtensionVersions": [ "~4" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Nov 12 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -255,7 +317,14 @@
                     "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated" },
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
                     "supportedFunctionsExtensionVersions": [ "~3" ],
-                    "endOfLifeDate": "2022-05-08T00:00:00Z",
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sun May 08 2022 00:00:00 GMT+0000 (Coordinated Universal Time)",
                     "isDeprecated": true
                   },
                   "linuxRuntimeSettings": {
@@ -273,7 +342,14 @@
                       "linuxFxVersion": "DOTNET-ISOLATED|5.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~3" ],
-                    "endOfLifeDate": "2022-05-08T00:00:00Z",
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sun May 08 2022 00:00:00 GMT+0000 (Coordinated Universal Time)",
                     "isDeprecated": true
                   }
                 }
@@ -299,7 +375,14 @@
                     "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet" },
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
                     "supportedFunctionsExtensionVersions": [ "~3" ],
-                    "endOfLifeDate": "2022-12-03T00:00:00Z",
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sat Dec 03 2022 00:00:00 GMT+0000 (Coordinated Universal Time)",
                     "isDeprecated": true
                   },
                   "linuxRuntimeSettings": {
@@ -316,7 +399,14 @@
                       "linuxFxVersion": "dotnet|3.1"
                     },
                     "supportedFunctionsExtensionVersions": [ "~3" ],
-                    "endOfLifeDate": "2022-12-03T00:00:00Z",
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sat Dec 03 2022 00:00:00 GMT+0000 (Coordinated Universal Time)",
                     "isDeprecated": true
                   }
                 }
@@ -341,7 +431,14 @@
                     },
                     "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "dotnet" },
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
-                    "supportedFunctionsExtensionVersions": [ "~2" ]
+                    "supportedFunctionsExtensionVersions": [ "~2" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ]
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "dotnet|2.2",
@@ -356,7 +453,14 @@
                       "use32BitWorkerProcess": false,
                       "linuxFxVersion": "dotnet|2.2"
                     },
-                    "supportedFunctionsExtensionVersions": [ "~2" ]
+                    "supportedFunctionsExtensionVersions": [ "~2" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ]
                   }
                 }
               }
@@ -377,7 +481,14 @@
                     "gitHubActionSettings": { "isSupported": false },
                     "appSettingsDictionary": {},
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
-                    "supportedFunctionsExtensionVersions": [ "~1" ]
+                    "supportedFunctionsExtensionVersions": [ "~1" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~1",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ]
                   }
                 }
               }
@@ -421,7 +532,14 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2026-05-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sat May 30 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Node|20",
@@ -438,7 +556,14 @@
                       "linuxFxVersion": "Node|20"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2026-05-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sat May 30 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -470,7 +595,14 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2025-04-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Wed Apr 30 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Node|18",
@@ -487,7 +619,14 @@
                       "linuxFxVersion": "Node|18"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2025-04-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Wed Apr 30 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -519,7 +658,14 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-06-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sun Jun 30 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Node|16",
@@ -536,7 +682,14 @@
                       "linuxFxVersion": "Node|16"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-06-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sun Jun 30 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -567,7 +720,19 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2023-04-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Sun Apr 30 2023 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Node|14",
@@ -583,7 +748,19 @@
                       "linuxFxVersion": "Node|14"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2023-04-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Sun Apr 30 2023 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -612,7 +789,14 @@
                     },
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
                     "supportedFunctionsExtensionVersions": [ "~3" ],
-                    "endOfLifeDate": "2022-12-13T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Dec 13 2022 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Node|12",
@@ -629,7 +813,14 @@
                       "linuxFxVersion": "Node|12"
                     },
                     "supportedFunctionsExtensionVersions": [ "~3" ],
-                    "endOfLifeDate": "2022-12-13T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Dec 13 2022 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -658,7 +849,19 @@
                     },
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
                     "supportedFunctionsExtensionVersions": [ "~2", "~3" ],
-                    "endOfLifeDate": "2021-04-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Apr 30 2021 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Node|10",
@@ -675,7 +878,19 @@
                       "linuxFxVersion": "Node|10"
                     },
                     "supportedFunctionsExtensionVersions": [ "~2", "~3" ],
-                    "endOfLifeDate": "2021-04-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Apr 30 2021 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -703,7 +918,14 @@
                     },
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
                     "supportedFunctionsExtensionVersions": [ "~2" ],
-                    "endOfLifeDate": "2019-12-31T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Dec 31 2019 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -725,7 +947,14 @@
                     "appSettingsDictionary": { "WEBSITE_NODE_DEFAULT_VERSION": "~6" },
                     "siteConfigPropertiesDictionary": { "use32BitWorkerProcess": true },
                     "supportedFunctionsExtensionVersions": [ "~1" ],
-                    "endOfLifeDate": "2019-04-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~1",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Apr 30 2019 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -768,7 +997,14 @@
                       "linuxFxVersion": "Python|3.11"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2027-10-31T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sun Oct 31 2027 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               },
@@ -793,7 +1029,14 @@
                       "linuxFxVersion": "Python|3.10"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2026-10-31T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sat Oct 31 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               },
@@ -817,7 +1060,19 @@
                       "linuxFxVersion": "Python|3.9"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2025-10-31T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Oct 31 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               },
@@ -839,7 +1094,19 @@
                       "linuxFxVersion": "Python|3.8"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2024-10-31T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Thu Oct 31 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               },
@@ -861,7 +1128,24 @@
                       "linuxFxVersion": "Python|3.7"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3", "~2" ],
-                    "endOfLifeDate": "2023-06-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      },
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Jun 30 2023 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               },
@@ -884,7 +1168,19 @@
                       "linuxFxVersion": "Python|3.6"
                     },
                     "supportedFunctionsExtensionVersions": [ "~2", "~3" ],
-                    "endOfLifeDate": "2022-09-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Sep 30 2022 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -902,6 +1198,73 @@
         "value": "java",
         "preferredOs": "windows",
         "majorVersions": [
+          {
+            "displayText": "Java 21",
+            "value": "21",
+            "minorVersions": [
+              {
+                "displayText": "Java 21",
+                "value": "21.0",
+                "stackSettings": {
+                  "windowsRuntimeSettings": {
+                    "runtimeVersion": "21",
+                    "isPreview": true,
+                    "isHidden": true,
+                    "isAutoUpdate": true,
+                    "isDefault": false,
+                    "remoteDebuggingSupported": false,
+                    "appInsightsSettings": { "isSupported": true },
+                    "gitHubActionSettings": {
+                      "isSupported": true,
+                      "supportedVersion": "21"
+                    },
+                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "java" },
+                    "siteConfigPropertiesDictionary": {
+                      "use32BitWorkerProcess": true,
+                      "javaVersion": "21",
+                      "netFrameworkVersion": "v6.0"
+                    },
+                    "supportedFunctionsExtensionVersions": [ "~4" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Mon Sep 01 2031 00:00:00 GMT+0000 (Coordinated Universal Time)"
+                  },
+                  "linuxRuntimeSettings": {
+                    "runtimeVersion": "Java|21",
+                    "isPreview": true,
+                    "isHidden": false,
+                    "isAutoUpdate": true,
+                    "isDefault": false,
+                    "remoteDebuggingSupported": false,
+                    "appInsightsSettings": { "isSupported": true },
+                    "gitHubActionSettings": {
+                      "isSupported": true,
+                      "supportedVersion": "21"
+                    },
+                    "appSettingsDictionary": { "FUNCTIONS_WORKER_RUNTIME": "java" },
+                    "siteConfigPropertiesDictionary": {
+                      "use32BitWorkerProcess": false,
+                      "linuxFxVersion": "Java|21"
+                    },
+                    "supportedFunctionsExtensionVersions": [ "~4" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Mon Sep 01 2031 00:00:00 GMT+0000 (Coordinated Universal Time)"
+                  }
+                }
+              }
+            ]
+          },
           {
             "displayText": "Java 17",
             "value": "17",
@@ -929,7 +1292,14 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2031-09-01T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Mon Sep 01 2031 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Java|17",
@@ -949,7 +1319,14 @@
                       "linuxFxVersion": "Java|17"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2031-09-01T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Mon Sep 01 2031 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -979,7 +1356,19 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2026-09-01T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Sep 01 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Java|11",
@@ -996,7 +1385,19 @@
                       "linuxFxVersion": "Java|11"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2026-09-01T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Tue Sep 01 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -1027,7 +1428,24 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3", "~2" ],
-                    "endOfLifeDate": "2025-03-01T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      },
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Sat Mar 01 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "Java|8",
@@ -1045,7 +1463,19 @@
                       "linuxFxVersion": "Java|8"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2025-03-01T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Sat Mar 01 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -1085,7 +1515,14 @@
                       "powerShellVersion": "7.4",
                       "netFrameworkVersion": "v8.0"
                     },
-                    "supportedFunctionsExtensionVersions": [ "~4" ]
+                    "supportedFunctionsExtensionVersions": [ "~4" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ]
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "PowerShell|7.4",
@@ -1100,7 +1537,14 @@
                       "use32BitWorkerProcess": false,
                       "linuxFxVersion": "PowerShell|7.4"
                     },
-                    "supportedFunctionsExtensionVersions": [ "~4" ]
+                    "supportedFunctionsExtensionVersions": [ "~4" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ]
                   }
                 }
               },
@@ -1123,7 +1567,14 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-11-08T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Nov 08 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "PowerShell|7.2",
@@ -1139,7 +1590,14 @@
                       "linuxFxVersion": "PowerShell|7.2"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2024-11-08T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Nov 08 2024 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               },
@@ -1160,7 +1618,19 @@
                       "netFrameworkVersion": "v6.0"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4", "~3" ],
-                    "endOfLifeDate": "2022-12-03T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Sat Dec 03 2022 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "PowerShell|7",
@@ -1176,7 +1646,14 @@
                       "linuxFxVersion": "PowerShell|7"
                     },
                     "supportedFunctionsExtensionVersions": [ "~4" ],
-                    "endOfLifeDate": "2022-12-03T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      }
+                    ],
+                    "endOfLifeDate": "Sat Dec 03 2022 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -1202,7 +1679,19 @@
                     },
                     "isDeprecated": true,
                     "supportedFunctionsExtensionVersions": [ "~2", "~3" ],
-                    "endOfLifeDate": "2022-09-30T00:00:00Z"
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ],
+                    "endOfLifeDate": "Fri Sep 30 2022 00:00:00 GMT+0000 (Coordinated Universal Time)"
                   }
                 }
               }
@@ -1238,7 +1727,24 @@
                       "use32BitWorkerProcess": true,
                       "netFrameworkVersion": "v6.0"
                     },
-                    "supportedFunctionsExtensionVersions": [ "~4", "~3", "~2" ]
+                    "supportedFunctionsExtensionVersions": [ "~4", "~3", "~2" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      },
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ]
                   },
                   "linuxRuntimeSettings": {
                     "runtimeVersion": "",
@@ -1251,7 +1757,24 @@
                       "use32BitWorkerProcess": false,
                       "linuxFxVersion": ""
                     },
-                    "supportedFunctionsExtensionVersions": [ "~4", "~3", "~2" ]
+                    "supportedFunctionsExtensionVersions": [ "~4", "~3", "~2" ],
+                    "supportedFunctionsExtensionVersionsInfo": [
+                      {
+                        "version": "~4",
+                        "isDeprecated": false,
+                        "isDefault": true
+                      },
+                      {
+                        "version": "~3",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      },
+                      {
+                        "version": "~2",
+                        "isDeprecated": true,
+                        "isDefault": false
+                      }
+                    ]
                   }
                 }
               }
