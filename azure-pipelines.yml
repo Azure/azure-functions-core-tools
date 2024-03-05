@@ -338,7 +338,7 @@ jobs:
         echo "-- echo "${DEB_PACKAGE}" --"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
-    - task: EsrpCodeSigning@3
+  - task: EsrpCodeSigning@3
     displayName: Sign
     inputs:
       ConnectedServiceName: 'ESRP Service'
