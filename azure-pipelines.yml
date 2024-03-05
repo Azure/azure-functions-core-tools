@@ -304,3 +304,37 @@ jobs:
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
     displayName: 'Upload Core Tools build to the storage account for Integration Tests'
     condition: and(eq(variables['isLinuxPackageBuild'], 'false'), eq(variables.IsIntegrationBuild, 'true'))
+
+- job: Default
+  timeoutInMinutes: "90"
+  pool:
+    vmImage: 'ubuntu-latest'
+
+  variables:
+    devops_buildNumber: "4.0.5530"
+  steps:
+  # Bash v3
+  # Run a Bash script on macOS, Linux, or Windows.
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
+      script: |
+        # Write your Bash commands here
+        echo 'Hello world'
+        echo "cd publish-scripts"
+        cd publish-scripts
+        echo "-- python3 -m venv publish-env --"
+        python3 -m venv publish-env
+        echo "-- source publish-env/bin/activate --"
+        source publish-env/bin/activate
+        echo "-- pip install -r requirements.txt --"
+        pip install -r requirements.txt
+        echo "-- apt-get install fakeroot --"
+        apt-get install fakeroot
+        echo "-- python driver.py "4.0.5530" --"
+        python driver.py "4.0.5530"
+        echo "-- export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)" --"
+        export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
+        echo "-- echo "${DEB_PACKAGE}" --"
+        echo "${DEB_PACKAGE}"
+      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
