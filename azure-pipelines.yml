@@ -14,7 +14,7 @@ trigger:
 
 jobs:
 - job: Default
-  condition: ne(variables['LinuxPackageBuildTag'], '')
+  condition: eq(variables['LinuxPackageBuildTag'], '')
   timeoutInMinutes: "90"
   pool:
     name: '1ES-Hosted-AzFunc'
@@ -307,6 +307,7 @@ jobs:
     condition: and(eq(variables['isLinuxPackageBuild'], 'false'), eq(variables.IsIntegrationBuild, 'true'))
 
 - job: LinuxPackage
+  condition: ne(variables['LinuxPackageBuildTag'], '')
   timeoutInMinutes: "90"
   pool:
     vmImage: 'ubuntu-latest'
