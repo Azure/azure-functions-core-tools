@@ -338,3 +338,23 @@ jobs:
         echo "-- echo "${DEB_PACKAGE}" --"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+    - task: EsrpCodeSigning@3
+    displayName: Sign
+    inputs:
+      ConnectedServiceName: 'ESRP Service'
+      FolderPath: '/home/vsts/work/1/s/publish-scripts/artifact/'
+      Pattern: '*.deb'
+      signConfigType: 'inlineSignParams'
+      inlineOperation: |
+        [
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "signtool.exe",
+            "toolVersion": "1.0"
+          }
+        ]
+      SessionTimeout: '60'
+      MaxConcurrency: '50'
+      MaxRetryAttempts: '5'
