@@ -14,7 +14,7 @@ trigger:
 
 jobs:
 - job: Default
-  condition: ne(variables['LinuxPackageBuildTag'], "")
+  condition: ne(variables['LinuxPackageBuildTag'], '')
   timeoutInMinutes: "90"
   pool:
     name: '1ES-Hosted-AzFunc'
