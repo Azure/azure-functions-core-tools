@@ -305,7 +305,7 @@ jobs:
     displayName: 'Upload Core Tools build to the storage account for Integration Tests'
     condition: and(eq(variables['isLinuxPackageBuild'], 'false'), eq(variables.IsIntegrationBuild, 'true'))
 
-- job: Default
+- job: LinuxPackage
   timeoutInMinutes: "90"
   pool:
     vmImage: 'ubuntu-latest'
