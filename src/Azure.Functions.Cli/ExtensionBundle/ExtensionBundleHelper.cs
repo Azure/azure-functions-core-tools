@@ -1,5 +1,6 @@
 ﻿using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
@@ -32,7 +33,9 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 extensionBundleOption.DownloadPath = GetBundleDownloadPath(extensionBundleOption.Id);
                 extensionBundleOption.EnsureLatest = true;
             }
-            return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance);
+
+            var configOptions = new FunctionsHostingConfigOptions();
+            return new ExtensionBundleManager(extensionBundleOption, SystemEnvironment.Instance, NullLoggerFactory.Instance, configOptions);
         }
 
         public static ExtensionBundleContentProvider GetExtensionBundleContentProvider()
