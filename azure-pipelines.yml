@@ -315,6 +315,12 @@ jobs:
   variables:
     devops_buildNumber: "4.0.5530"
   steps:
+  - pwsh: |
+      echo $env:IntegrationTestsStorageAccountName
+    env:
+      IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
+      IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
+    displayName: 'Upload Core Tools Linux Package to the storage'
   # Bash v3
   # Run a Bash script on macOS, Linux, or Windows.
   - task: Bash@3
@@ -360,3 +366,9 @@ jobs:
       SessionTimeout: '60'
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
+  - pwsh: |
+      echo $env:IntegrationTestsStorageAccountName
+    env:
+      IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
+      IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
+    displayName: 'Upload Core Tools Linux Package to the storage'
