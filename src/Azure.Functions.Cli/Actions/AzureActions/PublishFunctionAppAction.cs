@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
-        private static string _requiredNetFrameworkVersion = "6.0";
+        private static string _requiredNetFrameworkVersion = "8.0";
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
@@ -321,10 +321,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
                 // Check if remote LinuxFxVersion exists and is different from local version
                 var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
-                if (!PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor))
+
+                if ((!functionApp.IsFlex && !PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor)) ||
+                    (functionApp.IsFlex && !PythonHelpers.IsFlexRuntimeVersionMatched(functionApp.FunctionAppConfig?.runtime?.name, functionApp.FunctionAppConfig?.runtime?.version, localVersion.Major, localVersion.Minor)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
-                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{functionApp.LinuxFxVersion}'."));
+                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{(functionApp.IsFlex? functionApp.FunctionAppConfig.runtime.version: functionApp.LinuxFxVersion)}'."));
                 }
             }
 
@@ -686,6 +688,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         /// <returns>ShouldSyncTrigger value</returns>
         private async Task<bool> HandleFlexConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
+            // Get the WorkerRuntime
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+
+            if (workerRuntime == WorkerRuntime.dotnetIsolated && _requiredNetFrameworkVersion != "8.0")
+            {
+                throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton only supports .NET 8. Please upgrade your app to .NET 8 and try the deployment again.");
+            }
+
             Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
             var deploymentParameters = new Dictionary<string, string>();
 
@@ -704,7 +714,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(functionApp, handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
-                $"api/Deploy/Zip?isAsync=true&author={Environment.MachineName}&Deployer=core_tools&{string.Join("&", deploymentParameters?.Select(kvp => $"{kvp.Key}={kvp.Value}")) ?? string.Empty}", UriKind.Relative)))
+                $"api/publish?isAsync=true&author={Environment.MachineName}&Deployer=core_tools&{string.Join("&", deploymentParameters?.Select(kvp => $"{kvp.Key}={kvp.Value}")) ?? string.Empty}", UriKind.Relative)))
             {
                 ColoredConsole.WriteLine(GetLogMessage("Creating archive for current directory..."));
 

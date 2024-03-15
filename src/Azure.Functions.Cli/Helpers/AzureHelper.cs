@@ -423,6 +423,7 @@ namespace Azure.Functions.Cli.Helpers
             site.Kind = armSite.kind;
             site.Sku = armSite.properties.sku;
             site.SiteName = armSite.name;
+            site.FunctionAppConfig = armSite.properties.functionAppConfig;
             return site;
         }
 
