@@ -34,9 +34,9 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
   <ItemGroup>
-    <None Remove="StaticResources\templatesv2.json" />
-  </ItemGroup>
-  <ItemGroup>
+    <EmbeddedResource Include="StaticResources\stacks.json">
+      <LogicalName>$(AssemblyName).stacks.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\bundleConfig.json">
       <LogicalName>$(AssemblyName).bundleConfig.json</LogicalName>
     </EmbeddedResource>
@@ -51,6 +51,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet7Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet7Isolated</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet8Isolated">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet8Isolated</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
@@ -265,27 +268,30 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.2" />
-    <PackageReference Include="Azure.Identity" Version="1.5.0" />
+    <PackageReference Include="Azure.Identity" Version="1.10.2" />
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.2.0" />
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />
     <PackageReference Include="DotNetZip" Version="1.13.3" />
-    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.21.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.21.1" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.31.1" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="6.35.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.35.0" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.11.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.6.1" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2733" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.2719" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.2669" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.14.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.13.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.9.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.2973" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.3070" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.3085" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.24.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">

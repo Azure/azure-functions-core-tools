@@ -19,10 +19,10 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2288";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2288";
-        public const string DotnetItemTemplatesVersion = "4.0.2185";
-        public const string DotnetProjectTemplatesVersion = "4.0.2185";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2848";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2848";
+        public const string DotnetItemTemplatesVersion = "4.0.2848";
+        public const string DotnetProjectTemplatesVersion = "4.0.2848";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
@@ -79,6 +79,14 @@ namespace Build
             "win7-x64"
         };
 
+        private static readonly string[] _winPowershellRuntimesNet8 = new[]
+        {
+            "win-x86",
+            "win",
+            "win-arm64",
+            "win-x64"
+        };
+
         private static readonly string[] _linPowershellRuntimes = new[]
         {
             "linux",
@@ -101,13 +109,27 @@ namespace Build
             "unix"
         };
 
-        private static Dictionary<string, string[]> GetPowerShellRuntimes()
+        private static Dictionary<string, string[]> GetPowerShell72Runtimes()
         {
             var runtimes = new Dictionary<string, string[]>
             {
                 { "win-x86", _winPowershellRuntimes },
                 { "win-x64", _winPowershellRuntimes },
                 { "win-arm64", _winPowershellRuntimes },
+                { "linux-x64", _linPowershellRuntimes },
+                { "osx-x64", _osxPowershellRuntimes },
+                { "osx-arm64", _osxARMPowershellRuntimes }
+            };
+
+            return runtimes;
+        }
+        private static Dictionary<string, string[]> GetPowerShell74Runtimes()
+        {
+            var runtimes = new Dictionary<string, string[]>
+            {
+                { "win-x86", _winPowershellRuntimesNet8 },
+                { "win-x64", _winPowershellRuntimesNet8 },
+                { "win-arm64", _winPowershellRuntimesNet8 },
                 { "linux-x64", _linPowershellRuntimes },
                 { "osx-x64", _osxPowershellRuntimes },
                 { "osx-arm64", _osxARMPowershellRuntimes }
@@ -135,11 +157,11 @@ namespace Build
             },
             {
                 "7.2",
-                GetPowerShellRuntimes()
+                GetPowerShell72Runtimes()
             },
             {
                 "7.4",
-                GetPowerShellRuntimes()
+                GetPowerShell74Runtimes()
             }
         };
 

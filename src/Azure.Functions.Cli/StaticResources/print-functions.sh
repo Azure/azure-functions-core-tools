@@ -18,13 +18,18 @@ echo ','
 
 echo '"functionsJson": {'
 
-for d in */; do
-    d=$(echo $d | tr -d '/')
-    if [ -f "${d}/function.json" ]; then
-        echo "\"${d}\": "
-        cat "${d}/function.json"
-        echo ','
-    fi
-done
+if [ -f "functions.metadata" ]; then
+    sed -nzE 's/^\[(.+\n {4}"name": "([^"]+)".+)\]$/"\2": \1/p' functions.metadata
+else
+    for d in */; do
+        d=$(echo $d | tr -d '/')
+        if [ -f "${d}/function.json" ]; then
+            echo "\"${d}\": "
+            cat "${d}/function.json"
+            echo ','
+        fi
+    done
+fi
+
 echo '}'
 echo '}'

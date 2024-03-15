@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ContainerApps.Models;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Microsoft.Azure.AppService.Middleware;
 using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
@@ -66,6 +67,7 @@ namespace Azure.Functions.Cli.Helpers
             try
             {
                 string siteId = await GetResourceIDFromArg(subscriptions, query, accessToken, managementURL);
+
                 var app = new Site(siteId);
 
                 // The implementation of the load function is different for certain function apps like function apps based on Container Apps. 
@@ -121,6 +123,7 @@ namespace Azure.Functions.Cli.Helpers
             return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
                 ?? throw new CliException("Error finding the Azure Resource information.");
         }
+
 
         internal static async Task<bool> IsBasicAuthAllowedForSCM(Site functionApp, string accessToken, string managementURL)
         {
@@ -362,6 +365,53 @@ namespace Azure.Functions.Cli.Helpers
             return ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken);
         }
 
+        internal static async Task CheckFunctionHostStatusForFlex(Site functionApp, string accessToken, string managementURL,
+            HttpMessageHandler messageHandler = null)
+        {
+            ColoredConsole.Write("Checking the app health...");
+            var masterKey = await GetMasterKeyAsync(functionApp.SiteId, accessToken, managementURL);
+
+            if (masterKey is null)
+            {
+                throw new CliException($"The masterKey is null. hostname: {functionApp.HostName}.");
+            }
+
+            HttpMessageHandler handler = messageHandler ?? new HttpClientHandler();
+            if (StaticSettings.IsDebug)
+            {
+                handler = new LoggingHandler(handler);
+            }
+
+            var functionAppReadyClient = new HttpClient(handler);
+            const string jsonContentType = "application/json";
+            functionAppReadyClient.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+            functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
+            
+            await RetryHelper.Retry(async () =>
+            {
+                functionAppReadyClient.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
+                var uri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
+                var request = new HttpRequestMessage()
+                {
+                    RequestUri = uri,
+                    Method = HttpMethod.Get
+                };
+
+                var response = await functionAppReadyClient.SendAsync(request);
+                ColoredConsole.Write(".");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    ColoredConsole.WriteLine(" done");
+                }
+                else
+                {
+                    throw new CliException($"The host didn't return success status. Returned: {response.StatusCode}");
+                }
+
+            }, 15, TimeSpan.FromSeconds(3));
+        }
+
         public static async Task<Site> LoadSiteObjectAsync(Site site, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
@@ -558,10 +608,10 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             ArmArrayWrapper<FunctionInfo> functions = await GetFunctions(functionApp, accessToken, managementURL);
-
             functions = await GetFunctions(functionApp, accessToken, managementURL);
 
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
+            
             if (functionApp.IsKubeApp && !functions.value.Any())
             {
                 ColoredConsole.WriteLine(WarningColor(
@@ -624,6 +674,22 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 return (null, null);
+            }
+        }
+
+        public static async Task<FunctionsStacks> GetFunctionsStacks(string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}/providers/Microsoft.Web/functionAppStacks?api-version={ArmUriTemplates.FunctionsStacksApiVersion}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<FunctionsStacks>(content);
+            }
+            else
+            {
+                return null;
             }
         }
     }

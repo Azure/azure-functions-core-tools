@@ -58,7 +58,7 @@ jobs:
     displayName: Set up environment variables
   - task: NodeTool@0
     inputs:
-      versionSpec: '14.x'
+      versionSpec: '18.x'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
@@ -98,6 +98,9 @@ jobs:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Executing build script'
+  - pwsh: |
+      .\check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
   - task: EsrpCodeSigning@1
     displayName: 'Authenticode signing'
     inputs:

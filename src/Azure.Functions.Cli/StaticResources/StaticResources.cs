@@ -37,6 +37,7 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileDotnetIsolated => GetValue("Dockerfile.dotnetIsolated");
         public static Task<string> DockerfileDotnet7Isolated => GetValue("Dockerfile.dotnet7Isolated");
+        public static Task<string> DockerfileDotnet8Isolated => GetValue("Dockerfile.dotnet8Isolated");
 
         public static Task<string> DockerfileJava8 => GetValue("Dockerfile.java8");
 
@@ -114,5 +115,7 @@ namespace Azure.Functions.Cli
         public static Task<string> KedaV2Template => GetValue("keda-v2.yaml");
 
         public static Task<string> ZipToSquashfsScript => GetValue("ziptofs.sh");
+
+        public static Task<string> StacksJson => GetValue("stacks.json");
     }
 }

@@ -199,5 +199,10 @@ namespace Azure.Functions.Cli.Helpers
         {
             return worker == WorkerRuntime.dotnet || worker ==  WorkerRuntime.dotnetIsolated;
         }
+
+        public static bool IsDotnetIsolated(WorkerRuntime worker)
+        {
+            return worker ==  WorkerRuntime.dotnetIsolated;
+        }
     }
 }

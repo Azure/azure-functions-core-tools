@@ -44,6 +44,7 @@ namespace Azure.Functions.Cli.Common
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
         public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
         public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
+        public const string ScmDoBuildDuringDeployment = "SCM_DO_BUILD_DURING_DEPLOYMENT";
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
@@ -67,11 +68,18 @@ namespace Azure.Functions.Cli.Common
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
         public const string HelpCommand = "help";
+        public const string CoreToolsVersionsFeedUrl = "https://functionscdn.azureedge.net/public/cli-feed-v4.json";
+        public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
         public const string GetFunctionNameParamId = "trigger-functionName";
+        public const string HttpTriggerAuthLevelParamId = "httpTrigger-authLevel";
         public const string GetFileNameParamId = "app-selectedFileName";
+        public const string GetBluePrintFileNameParamId = "blueprint-fileName";
+        public const string GetBluePrintExistingFileNameParamId = "blueprint-existingFileName";
         public const string UserPromptBooleanType = "boolean";
         public const string UserPromptEnumType = "enum";
         public const string UserInputActionType = "UserInput";
+        public const string UserPromptExtensionBundleFileName = "userPrompts.json";
+        public const string TemplatesExtensionBundleFileName = "templates.json";
         public const string ShowMarkdownPreviewActionType = "ShowMarkdownPreview";
         public const string FunctionBodyTargetFileName = "FUNCTION_BODY_TARGET_FILE_NAME";
         public const string PythonProgrammingModelFunctionBodyFileKey = "function_body.py";
@@ -81,6 +89,10 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionAppDeploymentToContainerAppsFailedMessage = "Deploy function app request to Container Apps was not successful.";
         public const string FunctionAppFailedToDeployOnContainerAppsMessage = "Failed to deploy function app to Container Apps.";
         public const string LocalSettingsJsonFileName = "local.settings.json";
+        public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
+        public const string Dotnet = "dotnet";
+
+
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 

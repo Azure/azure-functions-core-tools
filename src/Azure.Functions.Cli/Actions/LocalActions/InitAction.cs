@@ -9,9 +9,12 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
+using DurableTask.Core;
 using Dynamitey;
 using Fclp;
+using Microsoft.Azure.AppService.Proxy.Common.Constants;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -21,6 +24,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "init", HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
     internal class InitAction : BaseAction
     {
+
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
 
         public bool InitSourceControl { get; set; }
@@ -56,6 +60,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string ResolvedLanguage { get; set; }
 
         public ProgrammingModel ResolvedProgrammingModel { get; set; }
+
+        // Default to .NET 8 if the target framework is not specified
+        private const string DefaultTargetFramework = Common.TargetFramework.net8;
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -118,7 +125,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("target-framework")
-                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net48\", \"net6.0\", and \"net7.0\"")
+                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"")
                 .Callback(tf => TargetFramework = tf);
 
             Parser
@@ -208,6 +215,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             ValidateTargetFramework();
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
+                await ShowEolMessage();
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime, TargetFramework);
             }
             else
@@ -345,13 +353,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (string.IsNullOrEmpty(TargetFramework))
                 {
-                    // Default to .NET 6 if the target framework is not specified
+                    // Default to .NET 8 if the target framework is not specified
                     // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
-                    TargetFramework = Common.TargetFramework.net6;
+                    TargetFramework = DefaultTargetFramework;
                 }
                 if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
                 {
-                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net48\", \"net6.0\", and \"net7.0\"");
+                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"");
                 }
             }
             else if (!string.IsNullOrEmpty(TargetFramework))
@@ -402,6 +410,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (targetFramework == Common.TargetFramework.net7)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet7Isolated);
+                }
+                else if (targetFramework == Common.TargetFramework.net8)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet8Isolated);
                 }
                 else
                 {
@@ -564,6 +576,43 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     Console.Error.WriteLine(WarningColor("Warning: You must run \"npm install\" manually"));
                 }
+            }
+        }
+
+        private async Task ShowEolMessage()
+        {
+            try
+            {
+                if (!WorkerRuntimeLanguageHelper.IsDotnetIsolated(ResolvedWorkerRuntime) || TargetFramework == DefaultTargetFramework)
+                    return;
+                
+                var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(TargetFramework);
+
+                if (majorDotnetVersion == null)
+                    return;
+
+                var stacksContent = await StaticResources.StacksJson;
+                var stacks = JsonConvert.DeserializeObject<FunctionsStacks>(stacksContent);
+
+                var currentRuntimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
+
+                if (currentRuntimeSettings == null)
+                    return;
+
+                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                {
+                    var warningMessage = EolMessages.GetAfterEolCreateMessageDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                {
+                    var warningMessage = EolMessages.GetEarlyEolCreateMessageForDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+            }
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the init command.
             }
         }
     }

@@ -38,6 +38,12 @@ namespace Azure.Functions.Cli.Actions
                 var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, theInput.ParamId, StringComparison.OrdinalIgnoreCase));
                 var defaultValue = theInput.DefaultValue ?? userPrompt.DefaultValue;
                 string response = null;
+
+                if (providedValues.ContainsKey(theInput.ParamId) && !string.IsNullOrEmpty(providedValues[theInput.ParamId]))
+                {
+                    response = providedValues[theInput.ParamId];
+                }
+
                 if (userPrompt.Value == Constants.UserPromptEnumType || userPrompt.Value == UserPromptBooleanType)
                 {
                     var values = new List<string>() { true.ToString(), false.ToString() };
@@ -63,12 +69,6 @@ namespace Azure.Functions.Cli.Actions
                 }
                 else
                 {
-                    // Use the function name if it is already provided by user
-                    if (providedValues.ContainsKey(theInput.ParamId) && !string.IsNullOrEmpty(providedValues[theInput.ParamId]))
-                    {
-                        response = providedValues[theInput.ParamId];
-                    }
-
                     while (!ValidateResponse(userPrompt, response))
                     {
                         PrintInputLabel(userPrompt, defaultValue);
@@ -86,7 +86,8 @@ namespace Azure.Functions.Cli.Actions
                 }
 
                 var variableName = theInput.AssignTo;
-                variables.Add(variableName, response);
+
+                variables[variableName] = response;
             }
         }
 
@@ -142,11 +143,11 @@ namespace Azure.Functions.Cli.Actions
                 { "$httpTrigger_authLevel_label", "Auth Level" },
                 { "$queueTrigger_queueName_label", "Queue Name" },
                 { "$variables_storageConnStringLabel", "Storage Connection String" },
-                { "$cosmosDB_connection_label", "CosmosDB Connection String" },
-                { "$cosmosDB_databaseName_label", "CosmosDB Database Name" },
-                { "$cosmosDB_containerName_label", "CosmosDB Container Name" },
-                { "$cosmosDB_leaseContainerName_label", "CosmosDB Lease Container Name" },
-                { "$cosmosDB_createIfNotExists_label", "Create If Not Exists" },
+                { "$cosmosDBIn_connection_label", "CosmosDB Connection String" },
+                { "$cosmosDBIn_databaseName_label", "CosmosDB Database Name" },
+                { "$cosmosDBIn_containerName_label", "CosmosDB Container Name" },
+                { "$cosmosDBIn_leaseContainerName_label", "CosmosDB Lease Container Name" },
+                { "$cosmosDBIn_createContainerIfNotExists_label", "Create If Not Exists" },
                 { "$eventHubTrigger_connection_label", "EventHub Connection" },
                 { "$eventHubOut_path_label", "EventHub Out Path" },
                 { "$eventHubTrigger_consumerGroup_label", "EventHub Consumer Group" },

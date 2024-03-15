@@ -89,6 +89,7 @@ namespace Azure.Functions.Cli.Helpers
             "cosmosdbtrigger" => "cosmos",
             "durablefunctionsorchestration" => "durable",
             "eventgridtrigger" => "eventgrid",
+            "eventgridcloudeventtrigger" => "eventgridcloudevent",
             "eventhubtrigger" => "eventhub",
             "httptrigger" => "http",
             "iothubtrigger" => "iothub",
@@ -99,6 +100,9 @@ namespace Azure.Functions.Cli.Helpers
             "servicebusqueuetrigger" => "squeue",
             "servicebustopictrigger" => "stopic",
             "timertrigger" => "timer",
+            "daprpublishoutputbinding" => "daprPublishOutputBinding",
+            "daprserviceinvocationtrigger" => "daprServiceInvocationTrigger",
+            "daprtopictrigger" => "daprTopicTrigger",
             _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
         };
 
@@ -116,7 +120,10 @@ namespace Azure.Functions.Cli.Helpers
                     "ServiceBusQueueTrigger",
                     "ServiceBusTopicTrigger",
                     "EventGridTrigger",
-                    "CosmosDBTrigger"
+                    "CosmosDBTrigger",
+                    "DaprPublishOutputBinding",
+                    "DaprServiceInvocationTrigger",
+                    "DaprTopicTrigger",
                 };
             }
 
@@ -134,8 +141,12 @@ namespace Azure.Functions.Cli.Helpers
                 "ServiceBusQueueTrigger",
                 "ServiceBusTopicTrigger",
                 "EventGridTrigger",
+                "EventGridCloudEventTrigger",
                 "CosmosDBTrigger",
-                "IotHubTrigger"
+                "IotHubTrigger",
+                "DaprPublishOutputBinding",
+                "DaprServiceInvocationTrigger",
+                "DaprTopicTrigger",
             };
         }
 

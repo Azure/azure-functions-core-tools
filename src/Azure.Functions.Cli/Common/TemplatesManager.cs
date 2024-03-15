@@ -12,6 +12,8 @@ using System.Reflection;
 using Microsoft.AspNetCore.Routing.Constraints;
 using Microsoft.CodeAnalysis;
 using System.IO.Abstractions;
+using Microsoft.Azure.WebJobs.Script;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -29,6 +31,22 @@ namespace Azure.Functions.Cli.Common
             get
             {
                 return GetTemplates();
+            }
+        }
+
+        public async Task<string> GetExtensionBundleFileContent(string path)
+        {
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+            var bundlePath = await extensionBundleManager.GetExtensionBundlePath();
+            string contentFilePath = Path.Combine(bundlePath, path);
+
+            if (FileSystemHelpers.FileExists(contentFilePath))
+            {
+                return await FileSystemHelpers.ReadAllTextFromFileAsync(contentFilePath);
+            }
+            else
+            {
+                return null;
             }
         }
 
@@ -62,6 +80,28 @@ namespace Azure.Functions.Cli.Common
             }
 
             return FileSystemHelpers.ReadAllTextFromFile(templatesLocation);
+        }
+
+        private static async Task<string> GetV2TemplatesJson()
+        {
+            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "templates-v2", "templates.json");
+            if (!FileSystemHelpers.FileExists(templatesLocation))
+            {
+                throw new CliException($"Can't find v2 templates location. Looked at '{templatesLocation}'");
+            }
+
+            return await FileSystemHelpers.ReadAllTextFromFileAsync(templatesLocation);
+        }
+
+        private static async Task<string> GetV2UserPromptsJson()
+        {
+            var userPrompotsLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "templates-v2", "userPrompts.json");
+            if (!FileSystemHelpers.FileExists(userPrompotsLocation))
+            {
+                throw new CliException($"Can't find v2 user prompts location. Looked at '{userPrompotsLocation}'");
+            }
+
+            return await FileSystemHelpers.ReadAllTextFromFileAsync(userPrompotsLocation);
         }
 
         private static async Task<IEnumerable<Template>> GetNodeV4TemplatesJson()
@@ -221,34 +261,50 @@ namespace Azure.Functions.Cli.Common
         {
             get
             {
-                return GetStaticV2Templates();
+                return GetV2Templates();
             }
         }
 
-        private static async Task<IEnumerable<NewTemplate>> GetStaticV2Templates()
+        public async Task<IEnumerable<NewTemplate>> GetV2Templates()
         {
-            var staticTemplateJson = await StaticResources.GetValue($"templatesv2.json");
-            return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(staticTemplateJson);
+            
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
+            string templateJson;
+            if (extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                templateJson = await GetExtensionBundleFileContent(Path.Combine("StaticContent", "v2", "templates", Constants.TemplatesExtensionBundleFileName));
+            }
+            else
+            {
+                templateJson = await GetV2TemplatesJson();
+            }
+
+            return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(templateJson);
         }
 
         public Task<IEnumerable<UserPrompt>> UserPrompts
         {
             get
             {
-                return GetUserPrompts();
+                return GetV2UserPrompts();
             }
         }
 
-        public async Task<IEnumerable<UserPrompt>> GetUserPrompts()
+        public async Task<IEnumerable<UserPrompt>> GetV2UserPrompts()
         {
-            return await GetNewTemplateUserPrompts();
-        }
+            var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
 
-        private static async Task<IEnumerable<UserPrompt>> GetNewTemplateUserPrompts()
-        {
-            var userPromptStr = await StaticResources.GetValue(Constants.UserPromptFileName);
-            var userPromptList = JsonConvert.DeserializeObject<UserPrompt[]>(userPromptStr);
-            return userPromptList;
+            string userPromptJson;
+            if (extensionBundleManager.IsExtensionBundleConfigured())
+            {
+                userPromptJson = await GetExtensionBundleFileContent(Path.Combine("StaticContent", "v2", "bindings", Constants.UserPromptExtensionBundleFileName));
+            }
+            else
+            {
+                userPromptJson = await GetV2UserPromptsJson();
+            }
+            
+            return JsonConvert.DeserializeObject<UserPrompt[]>(userPromptJson);
         }
 
         private async Task RunTemplateActionAction(NewTemplate template, TemplateAction action, IDictionary<string, string> variables)

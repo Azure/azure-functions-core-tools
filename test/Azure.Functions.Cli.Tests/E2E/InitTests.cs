@@ -103,9 +103,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("node", "v3")]
         [InlineData("node", "v4")]
+        [InlineData("node", "")]
         [InlineData("java", "v1")]
         [InlineData("python", "v1")]
         [InlineData("python", "v2")]
+        [InlineData("python", "")]
         public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
         {
             var files = new List<FileResult>
@@ -121,14 +123,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             };
 
-            if (workerRuntime == "python" && programmingModel == "v2")
+            if (workerRuntime == "python" && (programmingModel == "v2" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
                     Name = "function_app.py",
                 });
             }
-            else if (workerRuntime == "node" && programmingModel == "v4")
+            else if (workerRuntime == "node" && (programmingModel == "v4" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
@@ -140,9 +142,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
             }
 
+            var programmingModelFlag = programmingModel == string.Empty ? string.Empty : $"--model {programmingModel}";
+
             return CliTester.Run(new RunConfiguration
             {
-                Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} {programmingModelFlag}" },
                 CheckFiles = files.ToArray(),
                 OutputContains = new[]
                 {
@@ -249,6 +253,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(120),
                 OutputContains = new[] { "Dockerfile" }
             }, _output);
         }
@@ -285,7 +290,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4.0-dotnet-isolated6.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated8.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -411,7 +416,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                     "Writing Dockerfile",
                     "Writing .dockerignore"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -440,7 +446,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -459,7 +466,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(240)
             }, _output);
         }
 
@@ -509,7 +517,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
-                OutputContains = new[] { "Dockerfile" }
+                OutputContains = new[] { "Dockerfile" },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 
@@ -641,7 +650,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "Writing host.json"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 

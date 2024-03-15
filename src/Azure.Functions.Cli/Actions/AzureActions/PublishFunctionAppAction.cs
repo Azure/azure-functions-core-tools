@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -10,14 +11,18 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
+using Microsoft.Build.Framework;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
+using NuGet.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
@@ -105,6 +110,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<string>("additional-packages")
                 .WithDescription("List of packages to install when building native dependencies. For example: \"python3-dev libevent-dev\"")
                 .Callback(p => AdditionalPackages = p);
+
             Parser
                 .Setup<bool>("force")
                 .WithDescription("Depending on the publish scenario, this will ignore pre-publish checks")
@@ -116,7 +122,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Parser
                 .Setup<bool>("no-build")
                 .WithDescription("Skip building and fetching dependencies for the function project.")
-                .Callback(f => NoBuild = f); 
+                .Callback(f => NoBuild = f);
             // Note about usage:
             // The value of 'dotnet-cli-params' option should either use a leading space character or escape the double quotes explicitly.
             // Ex 1: --dotnet-cli-params " --configuration debug"
@@ -139,9 +145,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Get function app
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription);
 
-            if (!functionApp.IsLinux && (PublishBuildOption == BuildOption.Container || PublishBuildOption == BuildOption.Remote))
+            if (!functionApp.IsLinux && PublishBuildOption == BuildOption.Container)
             {
                 throw new CliException($"--build {PublishBuildOption} is not supported for Windows Function Apps.");
+            }
+
+            if (!functionApp.IsLinux && functionApp.IsElasticPremium && PublishBuildOption == BuildOption.Remote)
+            {
+                throw new CliException($"--build {PublishBuildOption} is not supported for Windows Elastic Premium Function Apps.");
             }
 
             // Get the GitIgnoreParser from the functionApp root
@@ -152,7 +163,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
             // Determine the appropriate default targetFramework
-            // NOTE: .NET 7.0 is only supported on dotnet-isolated
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
             if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
@@ -161,9 +171,28 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     var projectRoot = ProjectHelpers.GetProject(projectFilePath);
                     var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
-                    if (targetFramework.Equals("net7.0", StringComparison.InvariantCultureIgnoreCase))
+
+                    var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
+                    
+                    if (majorDotnetVersion != null)
                     {
-                        _requiredNetFrameworkVersion = "7.0";
+                        // Get Stacks
+                        var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
+                        var runtimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
+
+                        ShowEolMessage(stacks, runtimeSettings, majorDotnetVersion.Value);
+
+                        // This is for future proofing with stacks API for future dotnet versions.
+                        if (runtimeSettings != null && 
+                            (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false) && 
+                            (runtimeSettings.IsDeprecatedForRuntime == null || runtimeSettings.IsDeprecatedForRuntime == false))
+                        {
+                            _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
+                        }
+                    }
+                    else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _requiredNetFrameworkVersion = "8.0";
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found
@@ -429,7 +458,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
             // For dedicated linux apps, we do not support run from package right now
-            var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium && !functionApp.IsFlex;
 
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
             {
@@ -442,6 +471,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 ColoredConsole.WriteLine(WarningColor("Recommend using '--build remote' to resolve project dependencies remotely on Azure"));
             }
 
+            ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption,
                 NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
@@ -457,6 +487,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Consumption Linux
                 shouldSyncTriggers = await HandleLinuxConsumptionPublish(functionApp, zipStreamFactory);
             }
+            else if (functionApp.IsFlex)
+            {
+                // Flex
+                shouldSyncTriggers = await HandleFlexConsumptionPublish(functionApp, zipStreamFactory);
+            }
             else if (functionApp.IsLinux && functionApp.IsElasticPremium)
             {
                 // Elastic Premium Linux
@@ -467,6 +502,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // Dedicated Linux
                 shouldSyncTriggers = false;
                 await HandleLinuxDedicatedPublish(functionApp, zipStreamFactory);
+            }
+            else if (!functionApp.IsLinux && PublishBuildOption == BuildOption.Remote)
+            {
+                await HandleWindowsRemoteBuildPublish(functionApp, zipStreamFactory);
             }
             else if (RunFromPackageDeploy)
             {
@@ -497,7 +536,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishZipDeploy(functionApp, zipStreamFactory);
             }
 
-            if (shouldSyncTriggers)
+            if (shouldSyncTriggers && !functionApp.IsFlex)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await SyncTriggers(functionApp);
@@ -518,7 +557,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         {
             await RetryHelper.Retry(async () =>
             {
-                ColoredConsole.WriteLine("Syncing triggers...");
+                ColoredConsole.WriteLine(GetLogMessage("Syncing triggers..."));
                 HttpResponseMessage response = null;
                 // This SyncTriggers function calls the endpoint for linux syncTriggers
                 response = await AzureHelper.SyncTriggers(functionApp, AccessToken, ManagementURL);
@@ -536,6 +575,42 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     throw new CliException(errorMessage);
                 }
             }, retryCount: 5);
+        }
+
+        private async Task HandleWindowsRemoteBuildPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
+        {
+            // Sync the correct Application Settings required for remote build
+            var appSettingsUpdated = false;
+            if (functionApp.AzureAppSettings.ContainsKey(Constants.WebsiteRunFromPackage))
+            {
+                functionApp.AzureAppSettings.Remove(Constants.WebsiteRunFromPackage);
+                appSettingsUpdated = true;
+            }
+
+            appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(new Dictionary<string, string>() { { Constants.ScmDoBuildDuringDeployment, "true" } }) || appSettingsUpdated;
+            if (appSettingsUpdated)
+            {
+                ColoredConsole.WriteLine("Updating Application Settings for Remote build...");
+                var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
+                if (!result.IsSuccessful)
+                {
+                    throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
+                }
+                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
+                    shouldNotHaveSettings: new Dictionary<string, string> { { Constants.WebsiteRunFromPackage, "1" } }, timeOutSeconds: 300);
+                await Task.Delay(TimeSpan.FromSeconds(15));
+            }
+
+            var isFunctionAppDedicatedWindows = !functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
+            if (isFunctionAppDedicatedWindows)
+            {
+                Task<DeployStatus> pollWindowsBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
+                await PerformServerSideBuild(functionApp, zipStreamFactory, pollWindowsBuild);
+            }
+            else
+            {
+                await PublishZipDeploy(functionApp, zipStreamFactory);
+            }
         }
 
         private async Task<bool> HandleElasticPremiumLinuxPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
@@ -585,6 +660,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 functionApp.AzureAppSettings.Remove("WEBSITE_RUN_FROM_PACKAGE");
                 appSettingsUpdated = true;
             }
+
             appSettingsUpdated = functionApp.AzureAppSettings.SafeLeftMerge(Constants.KuduLiteDeploymentConstants.LinuxDedicatedBuildSettings) || appSettingsUpdated;
             if (appSettingsUpdated)
             {
@@ -601,6 +677,85 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
             await PerformServerSideBuild(functionApp, zipStreamFactory, pollDedicatedBuild);
         }
+
+        /// <summary>
+        /// Handler for Linux Consumption publish event
+        /// </summary>
+        /// <param name="functionApp">Function App in Azure</param>
+        /// <param name="zipFileFactory">Factory for local project zipper</param>
+        /// <returns>ShouldSyncTrigger value</returns>
+        private async Task<bool> HandleFlexConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
+        {
+            Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
+            var deploymentParameters = new Dictionary<string, string>();
+
+            if (PublishBuildOption == BuildOption.Remote)
+            {
+                deploymentParameters.Add("RemoteBuild", true.ToString());
+            }
+
+            var deploymentStatus = await PerformFlexDeployment(functionApp, zipFileFactory, pollDeploymentStatusTask, deploymentParameters);
+
+            return deploymentStatus == DeployStatus.Success;
+        }
+
+        public async Task<DeployStatus> PerformFlexDeployment(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask, IDictionary<string, string> deploymentParameters)
+        {
+            using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
+            using (var client = GetRemoteZipClient(functionApp, handler))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
+                $"api/Deploy/Zip?isAsync=true&author={Environment.MachineName}&Deployer=core_tools&{string.Join("&", deploymentParameters?.Select(kvp => $"{kvp.Key}={kvp.Value}")) ?? string.Empty}", UriKind.Relative)))
+            {
+                ColoredConsole.WriteLine(GetLogMessage("Creating archive for current directory..."));
+
+                request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+
+                (var content, var length) = CreateStreamContentZip(await zipFileFactory());
+                request.Content = content;
+                HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
+                await PublishHelper.CheckResponseStatusAsync(response, GetLogMessage("Uploading archive..."));
+
+                // Streaming deployment status for Linux Server Side Build
+                DeployStatus status = await deploymentStatusPollTask(client);
+
+                if (status == DeployStatus.Success)
+                {
+                    // the deployment was successful. Waiting for 60 seconds so that Kudu finishes the sync trigger.
+                    await Task.Delay(TimeSpan.FromSeconds(60));
+
+                    // Checking the function app host status
+                    try
+                    {
+                        await AzureHelper.CheckFunctionHostStatusForFlex(functionApp, AccessToken, ManagementURL);
+                    }
+                    catch (Exception)
+                    {
+                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check the app logs.");
+                    }
+
+                    ColoredConsole.WriteLine(VerboseColor(GetLogMessage("The deployment was successful!")));
+                }
+                else if (status == DeployStatus.Failed)
+                {
+                    throw new CliException("The deployment failed, Please check the printed logs.");
+                }
+                else if (status == DeployStatus.Conflict)
+                {
+                    throw new CliException("Deployment was cancelled, another deployment in progress.");
+                }
+                else if (status == DeployStatus.PartialSuccess)
+                {
+                    ColoredConsole.WriteLine(WarningColor(GetLogMessage("\"Deployment was partially successful, Please check the printed logs.")));
+                }
+                else if (status == DeployStatus.Unknown)
+                {
+                    ColoredConsole.WriteLine(WarningColor(GetLogMessage($"Failed to retrieve deployment status, please visit https://{functionApp.ScmUri}/api/deployments")));
+                }
+
+                return status;
+            }
+        }
+
 
         /// <summary>
         /// Handler for Linux Consumption publish event
@@ -792,8 +947,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 if (functionApp.AzureAppSettings.ContainsKey(appSettingName))
                 {
-                    var appSettingValue = functionApp.AzureAppSettings[appSettingName];
-                    ColoredConsole.WriteLine(WarningColor($"Removing {appSettingName} app setting ({appSettingValue})"));
+                    ColoredConsole.WriteLine(WarningColor($"Removing {appSettingName} app setting."));
                     functionApp.AzureAppSettings.Remove(appSettingName);
                     isAppSettingUpdated = true;
                 }
@@ -1069,6 +1223,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private HttpClient GetRemoteZipClient(Site functionApp, HttpMessageHandler handler = null)
         {
             handler = handler ?? new HttpClientHandler();
+
             var client = new HttpClient(handler)
             {
                 BaseAddress = new Uri($"https://{functionApp.ScmUri}"),
@@ -1109,6 +1264,16 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return $"{parsedVersion.Major}.{parsedVersion.Minor}";
         }
 
+        private string GetLogMessage(string message)
+        {
+            return GetLogPrefix() + message;
+        }
+
+        private string GetLogPrefix()
+        {
+            return $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".ToString();
+        }
+
         // For testing
         internal class AzureHelperService
         {
@@ -1123,6 +1288,35 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
                  AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
+        }
+
+        private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)
+        {
+            try
+            {
+                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetAfterEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
+                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetEarlyEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the deployment.
+            }
         }
     }
 }
