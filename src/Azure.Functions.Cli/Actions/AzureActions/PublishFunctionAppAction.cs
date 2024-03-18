@@ -8,6 +8,7 @@ using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Core;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -265,7 +266,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out string workerRuntimeStr))
+            string workerRuntimeStr = null;
+            if (functionApp.IsFlex)
+            {
+                workerRuntimeStr = functionApp.FunctionAppConfig.runtime.name;
+            }
+
+            if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr) || 
+                (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr))))
             {
                 var resolution = $"You can pass --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
                 try
@@ -276,10 +284,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         if (Force)
                         {
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
-                            if (!functionApp.IsFlex)
-                                result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
-                            else
-                                await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
+                            result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                         }
                         else if (workerRuntime == WorkerRuntime.dotnetIsolated)
                         {
@@ -287,10 +292,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             // This way we temporarily update worker runtime in Azure if locally they are using dotnet-isolated.
                             // TODO: Revisit this before GA
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to 'dotnet-isolated'"));
-                            if (!functionApp.IsFlex)
-                                result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
-                            else
-                                await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
+                            result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                         }
                         else
                         {
@@ -315,7 +317,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"Azure Functions Core Tools does not support this deployment path. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/deployfromurl");
             }
 
-            await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
+            if (functionApp.IsFlex)
+            {
+                if (result.ContainsKey(Constants.FunctionsWorkerRuntime))
+                    await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), null, azureHelperService);
+            }
+            else
+            {
+                await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
+            }
 
             // Special checks for python dependencies
             if (workerRuntime == WorkerRuntime.python)
@@ -341,7 +351,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return result;
         }
 
-        public async Task UpdateRuntimeConfigForFlex(Site site, string runtimeName, string runtimeVersion = null)
+        public static async Task UpdateRuntimeConfigForFlex(Site site, string runtimeName, string runtimeVersion, AzureHelperService helperService)
         {
             if (string.IsNullOrEmpty(runtimeName))
             {
@@ -382,7 +392,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            await AzureHelper.UpdateFlexRuntime(site, runtimeName, runtimeVersion, AccessToken, ManagementURL);
+            await helperService.UpdateFlexRuntime(site, runtimeName, runtimeVersion);
         }
 
         internal static async Task UpdateFrameworkVersions(Site functionApp, WorkerRuntime workerRuntime, string requestedDotNetVersion, bool force, AzureHelperService helperService)
@@ -1198,24 +1208,28 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
-            functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
-
-            string runtimeName = null;
-            string runtimeVersion = null;
+            string flexRuntimeName = null;
+            string flexRuntimeVersion = null;
             if (functionApp.IsFlex)
             {
-                if (functionApp.AzureAppSettings.ContainsKey(Constants.FunctionsWorkerRuntime))
+                // if the additiona keys has runtime, it would mean that runtime is already updated. 
+                if (!additional.ContainsKey(Constants.FunctionsWorkerRuntime))
                 {
-                    runtimeName = functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntime];
-                    functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntime] = null;
-                }
+                    if (local.ContainsKey(Constants.FunctionsWorkerRuntime))
+                    {
+                        flexRuntimeName = local[Constants.FunctionsWorkerRuntime];
+                        local.Remove(Constants.FunctionsWorkerRuntime);
+                    }
 
-                if (functionApp.AzureAppSettings.ContainsKey(Constants.FunctionsWorkerRuntimeVersion))
-                {
-                    runtimeVersion = functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntimeVersion];
-                    functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntimeVersion] = null;
+                    if (local.ContainsKey(Constants.FunctionsWorkerRuntimeVersion))
+                    {
+                        flexRuntimeVersion = local[Constants.FunctionsWorkerRuntimeVersion];
+                        local.Remove(Constants.FunctionsWorkerRuntimeVersion);
+                    }
                 }
             }
+
+            functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
 
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
             if (!result.IsSuccessful)
@@ -1227,9 +1241,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return false;
             }
 
-            if (functionApp.IsFlex)
+            if (functionApp.IsFlex && !string.IsNullOrEmpty(flexRuntimeName))
             {
-                await UpdateRuntimeConfigForFlex(functionApp, runtimeName, runtimeVersion);
+                await UpdateRuntimeConfigForFlex(functionApp, flexRuntimeName, flexRuntimeVersion, new AzureHelperService(AccessToken, ManagementURL));
             }
 
             return true;
@@ -1369,6 +1383,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
                  AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
+
+            public virtual Task UpdateFlexRuntime(Site functionApp, string runtimeName, string runtimeVersion) =>
+                 AzureHelper.UpdateFlexRuntime(functionApp, runtimeName, runtimeVersion, _accessToken, _managementUrl);
         }
 
         private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)

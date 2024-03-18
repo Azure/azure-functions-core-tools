@@ -442,11 +442,8 @@ namespace Azure.Functions.Cli.Helpers
             runtimeConfig.name = runtimeName;
             runtimeConfig.version = runtimeValue;
 
-            string functionAppString = JsonConvert.SerializeObject(functionApp);
-
             url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.FlexApiVersion}");
-            await ArmHttpAsyncForFlex(new HttpMethod("PATCH"), url, accessToken, functionApp);
-
+            var result = await ArmHttpAsyncForFlex(new HttpMethod("PUT"), url, accessToken, functionApp);
             return true;
         }
 
