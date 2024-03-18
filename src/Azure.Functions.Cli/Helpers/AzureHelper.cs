@@ -427,6 +427,37 @@ namespace Azure.Functions.Cli.Helpers
             return site;
         }
 
+        public static async Task<bool> UpdateFlexRuntime(Site site, string runtimeName, string runtimeValue, string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var functionAppJson = await ArmHttpAsyncForFlex(HttpMethod.Get, url, accessToken);
+            dynamic functionApp = JsonConvert.DeserializeObject(functionAppJson);
+            var runtimeConfig = functionApp?.properties?.functionAppConfig?.runtime;
+
+            if (runtimeConfig == null)
+            {
+                return false;
+            }
+
+            runtimeConfig.name = runtimeName;
+            runtimeConfig.version = runtimeValue;
+
+            string functionAppString = JsonConvert.SerializeObject(functionApp);
+
+            url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.FlexApiVersion}");
+            await ArmHttpAsyncForFlex(new HttpMethod("PATCH"), url, accessToken, functionApp);
+
+            return true;
+        }
+
+        private static async Task<string> ArmHttpAsyncForFlex(HttpMethod method, Uri uri, string accessToken, object payload = null)
+        {
+            var response = await ArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadAsStringAsync();
+        }
+
         private static async Task<T> ArmHttpAsync<T>(HttpMethod method, Uri uri, string accessToken, object payload = null)
         {
             var response = await ArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
@@ -465,6 +496,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");
+
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAppSettings });
             if (response.IsSuccessStatusCode)
             {

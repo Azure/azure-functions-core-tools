@@ -9,21 +9,18 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
-using Microsoft.Build.Framework;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using NuGet.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Site = Azure.Functions.Cli.Arm.Models.Site;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -279,7 +276,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         if (Force)
                         {
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
-                            result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+                            if (!functionApp.IsFlex)
+                                result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+                            else
+                                await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
                         }
                         else if (workerRuntime == WorkerRuntime.dotnetIsolated)
                         {
@@ -287,7 +287,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             // This way we temporarily update worker runtime in Azure if locally they are using dotnet-isolated.
                             // TODO: Revisit this before GA
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to 'dotnet-isolated'"));
-                            result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+                            if (!functionApp.IsFlex)
+                                result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+                            else
+                                await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
                         }
                         else
                         {
@@ -336,6 +339,50 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             return result;
+        }
+
+        public async Task UpdateRuntimeConfigForFlex(Site site, string runtimeName, string runtimeVersion = null)
+        {
+            if (string.IsNullOrEmpty(runtimeName))
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(runtimeVersion))
+            {
+                if (runtimeName.Equals("python", StringComparison.OrdinalIgnoreCase))
+                {
+                    var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
+                    runtimeVersion = $"{localVersion.Major}.{localVersion.Minor}";
+                    if (runtimeVersion != "3.10" && runtimeVersion != "3.11")
+                    {
+                        runtimeVersion = "3.11";
+                    }
+                }
+                else if (runtimeName.Equals("dotnet-isolated", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (runtimeVersion != "8.0")
+                        runtimeVersion = "8.0";
+                }
+                else if (runtimeName.Equals("node", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (runtimeVersion != "18")
+                        runtimeVersion = "18";
+                }
+                else if (runtimeName.Equals("powershell", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (runtimeVersion != "7.2")
+                        runtimeVersion = "7.2";
+                }
+                else
+                {
+                    // return if the runtime is not supported.
+                    ColoredConsole.WriteLine(WarningColor($"Runtime is not updated. Only dotnet-isolated, node, java, and powershell is supported in core tools for Flex SKU."));
+                    return;
+                }
+            }
+
+            await AzureHelper.UpdateFlexRuntime(site, runtimeName, runtimeVersion, AccessToken, ManagementURL);
         }
 
         internal static async Task UpdateFrameworkVersions(Site functionApp, WorkerRuntime workerRuntime, string requestedDotNetVersion, bool force, AzureHelperService helperService)
@@ -1152,6 +1199,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
             functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
+
+            string runtimeName = null;
+            string runtimeVersion = null;
+            if (functionApp.IsFlex)
+            {
+                if (functionApp.AzureAppSettings.ContainsKey(Constants.FunctionsWorkerRuntime))
+                {
+                    runtimeName = functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntime];
+                    functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntime] = null;
+                }
+
+                if (functionApp.AzureAppSettings.ContainsKey(Constants.FunctionsWorkerRuntimeVersion))
+                {
+                    runtimeVersion = functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntimeVersion];
+                    functionApp.AzureAppSettings[Constants.FunctionsWorkerRuntimeVersion] = null;
+                }
+            }
+
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
             if (!result.IsSuccessful)
             {
@@ -1161,6 +1226,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     .WriteLine(ErrorColor(result.ErrorResult));
                 return false;
             }
+
+            if (functionApp.IsFlex)
+            {
+                await UpdateRuntimeConfigForFlex(functionApp, runtimeName, runtimeVersion);
+            }
+
             return true;
         }
 
