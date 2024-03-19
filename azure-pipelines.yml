@@ -340,6 +340,14 @@ jobs:
         echo "-- echo "${DEB_PACKAGE}" --"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+  - pwsh: |
+      echo $env:LinuxPackageAccountName
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPckageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPckageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+    env:
+      LinuxPackageAccountName: $(LinuxPackageAccountName)
+      LinuxPackageAccountKey: $(LinuxPackageAccountKey)
+      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+    displayName: 'Upload Core Tools Unsigned Linux Package to the storage'
   - task: EsrpCodeSigning@3
     displayName: Sign
     inputs:
@@ -362,8 +370,9 @@ jobs:
       MaxRetryAttempts: '5'
   - pwsh: |
       echo $env:LinuxPackageAccountName
-      .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:LinuxPackageAccountName -StorageAccountKey $env:LinuxPackageAccountKey -SourcePath '/home/vsts/work/1/s/publish-scripts/artifact/'
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPckageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPckageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
-    displayName: 'Upload Core Tools Linux Package to the storage'
+      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+    displayName: 'Upload Core Tools Signed Linux Package to the storage'
