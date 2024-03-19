@@ -311,9 +311,6 @@ jobs:
   timeoutInMinutes: "90"
   pool:
     vmImage: 'ubuntu-latest'
-
-  variables:
-    devops_buildNumber: "4.0.5530"
   steps:
   # Bash v3
   # Run a Bash script on macOS, Linux, or Windows.
@@ -333,13 +330,15 @@ jobs:
         pip install -r requirements.txt
         echo "-- apt-get install fakeroot --"
         apt-get install fakeroot
-        echo "-- python driver.py "4.0.5530" --"
-        python driver.py "4.0.5530"
+        echo "-- python driver.py "$linuxBuildNumber" --"
+        python driver.py "$linuxBuildNumber"
         echo "-- export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)" --"
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
         echo "-- echo "${DEB_PACKAGE}" --"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+      env:
+        linuxBuildNumber: $(LinuxPackageBuildTag)
   - pwsh: |
       echo $env:LinuxPackageAccountName
       az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
