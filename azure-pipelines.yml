@@ -337,8 +337,8 @@ jobs:
         echo "-- echo "${DEB_PACKAGE}" --"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
-      env:
-        linuxBuildNumber: $(LinuxPackageBuildTag)
+    env:
+      linuxBuildNumber: $(LinuxPackageBuildTag)      
   - pwsh: |
       echo $env:LinuxPackageAccountName
       az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
