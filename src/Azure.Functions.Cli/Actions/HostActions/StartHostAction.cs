@@ -129,7 +129,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<bool>("no-build")
-                .WithDescription("Do no build current project before running. For dotnet projects only. Default is set to false.")
+                .WithDescription("Do not build the current project before running. For dotnet projects only. Default is set to false.")
                 .SetDefault(false)
                 .Callback(b => NoBuild = b);
 
