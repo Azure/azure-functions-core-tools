@@ -320,7 +320,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if (functionApp.IsFlex)
             {
                 if (result.ContainsKey(Constants.FunctionsWorkerRuntime))
+                {
                     await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), null, azureHelperService);
+                    result.Remove(Constants.FunctionsWorkerRuntime);
+                }
             }
             else
             {
@@ -366,27 +369,35 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     runtimeVersion = $"{localVersion.Major}.{localVersion.Minor}";
                     if (runtimeVersion != "3.10" && runtimeVersion != "3.11")
                     {
-                        runtimeVersion = "3.11";
+                        runtimeVersion = "3.10";
                     }
                 }
                 else if (runtimeName.Equals("dotnet-isolated", StringComparison.OrdinalIgnoreCase))
                 {
+                    // Only .NET 8.0 is supported in flex. 
                     if (runtimeVersion != "8.0")
                         runtimeVersion = "8.0";
                 }
                 else if (runtimeName.Equals("node", StringComparison.OrdinalIgnoreCase))
                 {
+                    // Only Node 18 is supported. 
                     if (runtimeVersion != "18")
                         runtimeVersion = "18";
                 }
                 else if (runtimeName.Equals("powershell", StringComparison.OrdinalIgnoreCase))
                 {
+                    // Only Python 7.2 is supported. 
                     if (runtimeVersion != "7.2")
                         runtimeVersion = "7.2";
                 }
+                else if (runtimeName.Equals("java", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Warning: Java is not supported by core tools at the moment. 
+                    ColoredConsole.WriteLine(WarningColor($"Java is not supported in core tools at the moment. Please use az cli to update the runtime information."));
+                }
                 else
                 {
-                    // return if the runtime is not supported.
+                    // Warning: Runtime name is unknown.
                     ColoredConsole.WriteLine(WarningColor($"Runtime is not updated. Only dotnet-isolated, node, java, and powershell is supported in core tools for Flex SKU."));
                     return;
                 }
