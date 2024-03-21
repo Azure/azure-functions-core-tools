@@ -621,16 +621,14 @@ namespace Azure.Functions.Cli.Helpers
             return string.Equals(linuxFxVersion, $"PYTHON|{major}.{minor}", StringComparison.OrdinalIgnoreCase);
         }
 
-        public static bool IsFlexRuntimeVersionMatched(string flexRuntime, string flexRuntimeVersion, int? major, int? minor)
+        public static bool IsFlexPythonRuntimeVersionMatched(string flexRuntime, string flexRuntimeVersion, int? major, int? minor)
         {
-            // No linux fx version will default to python 3.6
             if (string.IsNullOrEmpty(flexRuntime) || string.IsNullOrEmpty(flexRuntimeVersion))
             {
-                // Match if version is 3.11
-                return major == 3 && minor == 11;
+                // Match if version is 3.10
+                return major == 3 && minor == 10;
             }
-            
-            // Only validate on LinuxFxVersion that follows the pattern PYTHON|<version>
+            // Only validate for python.
             else if (!flexRuntime.Equals("python", StringComparison.OrdinalIgnoreCase))
             {
                 return true;

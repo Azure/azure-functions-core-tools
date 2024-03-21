@@ -339,7 +339,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
 
                 if ((!functionApp.IsFlex && !PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor)) ||
-                    (functionApp.IsFlex && !PythonHelpers.IsFlexRuntimeVersionMatched(functionApp.FunctionAppConfig?.runtime?.name, functionApp.FunctionAppConfig?.runtime?.version, localVersion.Major, localVersion.Minor)))
+                    (functionApp.IsFlex && !PythonHelpers.IsFlexPythonRuntimeVersionMatched(functionApp.FunctionAppConfig?.runtime?.name, functionApp.FunctionAppConfig?.runtime?.version, localVersion.Major, localVersion.Minor)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
                         $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{(functionApp.IsFlex? functionApp.FunctionAppConfig.runtime.version: functionApp.LinuxFxVersion)}'."));
@@ -367,8 +367,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
                     runtimeVersion = $"{localVersion.Major}.{localVersion.Minor}";
-                    if (runtimeVersion != "3.10" && runtimeVersion != "3.11")
+                    // todo: Will include (&& runtimeVersion != "3.11") in the condition after 3.11 support is added.
+                    if (runtimeVersion != "3.10") 
                     {
+                        // todo: default will be 3.11 after 3.11 support is added. 
                         runtimeVersion = "3.10";
                     }
                 }
