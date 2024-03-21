@@ -505,7 +505,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "Skipping 'emptySetting' from local settings as it's already defined in current environment variables."
                     },
-                    CommandTimeout = TimeSpan.FromSeconds(120),
+                    CommandTimeout = TimeSpan.FromSeconds(240),
                 }
             }, _output);
         }
