@@ -37,14 +37,7 @@ jobs:
       if ($env:BuildSourceBranchName -like "release_4.0*" -or $simulateReleaseBuild)
       {
           $isReleaseBuild = $true
-      }
-
-      $isLinuxPackageBuild = $false
-      if ($env:LinuxPackageBuildTag -ne "")
-      {
-          $isLinuxPackageBuild = $true
-          $isReleaseBuild = $false
-      }      
+      }   
       
       Write-Host "Setting IsReleaseBuild to $isReleaseBuild because the branch name is $env:BuildSourceBranchName and SimulateReleaseBuild is $env:SimulateReleaseBuild"
       Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
@@ -62,11 +55,9 @@ jobs:
       
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
     displayName: 'Set IsIntegrationBuild variable'
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
     displayName: Set up environment variables
   - task: NodeTool@0
     inputs:
@@ -74,7 +65,6 @@ jobs:
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
     displayName: 'Install .NET 6.0 and 3.1'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
@@ -86,7 +76,6 @@ jobs:
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
     displayName: Install Nuget tool
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
@@ -98,11 +87,10 @@ jobs:
         # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
   - pwsh: |
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
-    condition: and(eq(variables['isLinuxPackageBuild'], 'false') ,ne(variables['skipWorkerVersionValidation'], 'true'))
+    condition: ne(variables['skipWorkerVersionValidation'], 'true')
   - pwsh: |
       .\build.ps1
     env:
@@ -113,11 +101,9 @@ jobs:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Executing build script'
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
   - pwsh: |
       .\check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
   - task: EsrpCodeSigning@1
     displayName: 'Authenticode signing'
     inputs:
@@ -271,14 +257,13 @@ jobs:
   - pwsh: |
       .\generateSha.ps1
     displayName: 'Generate sha files'
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
 
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
       testResultsFiles: '**/*.trx'
       failTaskOnFailedTests: true
-    condition: and(eq(variables['isLinuxPackageBuild'], 'false'), succeededOrFailed())
+    condition: succeededOrFailed()
   - pwsh: |
       Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
       Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
@@ -291,20 +276,18 @@ jobs:
     env:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
   - task: PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: 'drop'
       artifactType: 'pipeline'
-    condition: eq(variables['isLinuxPackageBuild'], 'false')
   - pwsh: |
       .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
     env:
       IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
     displayName: 'Upload Core Tools build to the storage account for Integration Tests'
-    condition: and(eq(variables['isLinuxPackageBuild'], 'false'), eq(variables.IsIntegrationBuild, 'true'))
+    condition: eq(variables.IsIntegrationBuild, 'true')
 
 - job: LinuxPackage
   condition: ne(variables['LinuxPackageBuildTag'], '')
@@ -318,23 +301,14 @@ jobs:
     inputs:
       targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
       script: |
-        # Write your Bash commands here
-        echo 'Hello world'
-        echo "cd publish-scripts"
         cd publish-scripts
-        echo "-- python3 -m venv publish-env --"
         python3 -m venv publish-env
-        echo "-- source publish-env/bin/activate --"
         source publish-env/bin/activate
-        echo "-- pip install -r requirements.txt --"
         pip install -r requirements.txt
-        echo "-- apt-get install fakeroot --"
         apt-get install fakeroot
-        echo "-- python driver.py "$linuxBuildNumber" --"
-        python driver.py "$linuxBuildNumber"
-        echo "-- export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)" --"
+        major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
+        python driver.py "$linuxBuildNumber" "$major_version"
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
-        echo "-- echo "${DEB_PACKAGE}" --"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
     env:

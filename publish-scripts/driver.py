@@ -8,7 +8,17 @@ from shared import constants
 
 def main(*args):
     # assume follow semantic versioning 2.0.0
+    
+    packageNamePostfix = ""
+    
+    if (len(args) >= 2):
+        packageNamePostfix = "-" + args[2]
+        
+    print(f"packageNamePostfix: {packageNamePostfix}")
+    
+    constants.PACKAGENAME = constants.PACKAGENAME + packageNamePostfix
     constants.VERSION = args[1]
+    print(f"constants.VERSION: {constants.VERSION}")
     constants.DRIVERROOTDIR = os.path.dirname(os.path.abspath(__file__))
     platformSystem = platform.system()
     if platformSystem == "Linux":
