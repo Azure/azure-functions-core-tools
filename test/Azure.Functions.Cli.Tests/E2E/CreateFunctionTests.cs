@@ -60,7 +60,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(120)
             }, _output);
         }
 

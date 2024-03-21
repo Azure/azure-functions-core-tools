@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Tests
         [Fact]
         public async Task NetFrameworkVersion_DotnetIsolated_Linux_Null()
         {
-            // If not specified, assume 5.0
+            // If not specified, assume 8.0
             var site = new Site("test")
             {
                 Kind = "linux"
@@ -82,20 +82,20 @@ namespace Azure.Functions.Cli.Tests
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
-            Assert.Equal("DOTNET-ISOLATED|6.0", setting.Value);
+            Assert.Equal("DOTNET-ISOLATED|8.0", setting.Value);
         }
 
         [Fact]
         public async Task NetFrameworkVersion_DotnetIsolated_Windows_Null()
         {
-            // If not specified, assume 6.0
+            // If not specified, assume 8.0
             var site = new Site("test");
 
             await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, null, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
-            Assert.Equal("v6.0", setting.Value);
+            Assert.Equal("v8.0", setting.Value);
         }
 
         [Fact]
@@ -106,12 +106,12 @@ namespace Azure.Functions.Cli.Tests
                 NetFrameworkVersion = "v4.0"
             };
 
-            // If not specified, assume 6.0
+            // If not supported specified, assume 8.0
             await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnet, null, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
-            Assert.Equal("v6.0", setting.Value);
+            Assert.Equal("v8.0", setting.Value);
         }
 
         [Fact]
@@ -119,7 +119,7 @@ namespace Azure.Functions.Cli.Tests
         {
             var site = new Site("test")
             {
-                NetFrameworkVersion = "v6.0"
+                NetFrameworkVersion = "v8.0"
             };
 
             await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnet, null, false, _helperService);
