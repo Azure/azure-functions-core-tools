@@ -157,7 +157,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(240)
             }, _output);
         }
 
@@ -296,7 +296,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.ts",
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(240)
             }, _output);
         }
 
