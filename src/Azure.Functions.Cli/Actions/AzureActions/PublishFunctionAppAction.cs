@@ -367,8 +367,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
                     runtimeVersion = $"{localVersion.Major}.{localVersion.Minor}";
-                    // todo: Will include (&& runtimeVersion != "3.11") in the condition after 3.11 support is added.
-                    if (runtimeVersion != "3.10") 
+                    if (runtimeVersion != "3.10" && runtimeVersion != "3.11") 
                     {
                         // todo: default will be 3.11 after 3.11 support is added. 
                         runtimeVersion = "3.10";
