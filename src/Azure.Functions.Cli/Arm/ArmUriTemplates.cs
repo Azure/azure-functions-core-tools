@@ -8,6 +8,7 @@ namespace Azure.Functions.Cli.Arm
     {
         public const string ArmApiVersion = "2018-09-01";
         public const string WebsitesApiVersion = "2015-08-01";
+        public const string FlexApiVersion = "2023-12-01";
         public const string SyncTriggersApiVersion = "2016-08-01";
         public const string ArgApiVersion = "2019-04-01";
         public const string FunctionAppOnContainerAppsApiVersion = "2022-09-01";
