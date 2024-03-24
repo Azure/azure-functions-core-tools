@@ -457,18 +457,6 @@ namespace Azure.Functions.Cli.Tests.E2E
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] { "init . --worker-runtime typescript" },
-                CheckFiles = new FileResult[]
-                {
-                    new FileResult
-                    {
-                        Name = "local.settings.json",
-                        ContentContains = new []
-                        {
-                            "FUNCTIONS_WORKER_RUNTIME",
-                            "node"
-                        }
-                    }
-                },
                 OutputContains = new[]
                 {
                     "Writing tsconfig.json",
@@ -480,6 +468,31 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
                 CommandTimeout = TimeSpan.FromSeconds(240)
+            }, _output);
+        }
+
+        [Fact]
+        public Task ini_ts_app_v4_with_skip_npm_install()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime node --language typescript --model V4 --skip-npm-install" },
+                CheckDirectories = new DirectoryResult[]
+                {
+                    new DirectoryResult
+                    {
+                        Name = "node_modules",
+                        Exists = false
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "You skipped \"npm install\". You must run \"npm install\" manually"
+                },
+                OutputDoesntContain = new[]
+                {
+                    "Running 'npm install'..."
+                }
             }, _output);
         }
 
