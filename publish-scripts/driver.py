@@ -14,12 +14,10 @@ def main(*args):
     print(f"args: {args}  {len(args)}")
     if (len(args) >= 3):
         packageNamePostfix = "-" + args[2]
-        
-    print(f"packageNamePostfix: {packageNamePostfix}")
     
     constants.PACKAGENAME = constants.PACKAGENAME + packageNamePostfix
+    print(f"constants.PACKAGENAME: {constants.PACKAGENAME}")
     constants.VERSION = args[1]
-    print(f"constants.VERSION: {constants.VERSION}")
     constants.DRIVERROOTDIR = os.path.dirname(os.path.abspath(__file__))
     platformSystem = platform.system()
     if platformSystem == "Linux":
