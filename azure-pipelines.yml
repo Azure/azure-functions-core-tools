@@ -308,6 +308,7 @@ jobs:
         apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
         python driver.py "$linuxBuildNumber" "$major_version"
+        python driver.py "$linuxBuildNumber"
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
@@ -315,7 +316,9 @@ jobs:
       linuxBuildNumber: $(LinuxPackageBuildTag)      
   - pwsh: |
       echo $env:LinuxPackageAccountName
-      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      $majorVersion = [math]::Floor([double]$versionString.Split(".")[0])
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned2 -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb -c unsigned2 -n azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
@@ -343,7 +346,9 @@ jobs:
       MaxRetryAttempts: '5'
   - pwsh: |
       echo $env:LinuxPackageAccountName
-      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      $majorVersion = [math]::Floor([double]$versionString.Split(".")[0])
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed2 -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb -c signed2 -n azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)

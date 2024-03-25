@@ -11,7 +11,8 @@ def main(*args):
     
     packageNamePostfix = ""
     
-    if (len(args) >= 2):
+    print(f"args: {args}  {len(args)}")
+    if (len(args) >= 3):
         packageNamePostfix = "-" + args[2]
         
     print(f"packageNamePostfix: {packageNamePostfix}")
