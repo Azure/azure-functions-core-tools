@@ -316,7 +316,7 @@ jobs:
       linuxBuildNumber: $(LinuxPackageBuildTag)      
   - pwsh: |
       echo $env:LinuxPackageAccountName
-      $majorVersion = [math]::Floor([double]$versionString.Split(".")[0])
+      $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
       az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned2 -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
       az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb -c unsigned2 -n azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
@@ -346,7 +346,7 @@ jobs:
       MaxRetryAttempts: '5'
   - pwsh: |
       echo $env:LinuxPackageAccountName
-      $majorVersion = [math]::Floor([double]$versionString.Split(".")[0])
+      $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
       az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed2 -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
       az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb -c signed2 -n azure-functions-core-tools-$majorVersion_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
