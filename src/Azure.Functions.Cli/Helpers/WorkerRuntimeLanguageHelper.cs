@@ -24,8 +24,8 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> availableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
-            { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.dotnetIsolated, new [] { "dotnet-isolated", "c#-isolated", "csharp-isolated", "f#-isolated", "fsharp-isolated" } },
+            { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
             { WorkerRuntime.node, new [] { "js", "javascript", "typescript", "ts" } },
             { WorkerRuntime.python, new []  { "py" } },
             { WorkerRuntime.java, new string[] { } },
@@ -76,7 +76,8 @@ namespace Azure.Functions.Cli.Helpers
         public static string AvailableWorkersRuntimeString =>
             string.Join(", ", availableWorkersRuntime.Keys
                 .Where(k => (k != WorkerRuntime.java))
-                .Select(s => s.ToString()));
+                .Select(s => s.ToString()))
+            .Replace(WorkerRuntime.dotnetIsolated.ToString(), "dotnet-isolated");
 
         public static string GetRuntimeMoniker(WorkerRuntime workerRuntime) 
         {
@@ -110,8 +111,11 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (wr)
                 {
+                    case WorkerRuntime.dotnet:
+                        workerToDisplayStrings[wr] = "dotnet (in-process model)";
+                        break;
                     case WorkerRuntime.dotnetIsolated:
-                        workerToDisplayStrings[wr] = "dotnet (isolated process)";
+                        workerToDisplayStrings[wr] = "dotnet (isolated worker model)";
                         break;
                     default:
                         workerToDisplayStrings[wr] = wr.ToString();
