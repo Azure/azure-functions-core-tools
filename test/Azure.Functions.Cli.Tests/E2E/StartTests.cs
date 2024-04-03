@@ -615,13 +615,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
                         Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {\"AzureWebJobsSecretStorageType\": \"files\"} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
                             { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-                            { Constants.FunctionsWorkerRuntime, "dotnet" },
+                            { Constants.FunctionsWorkerRuntime, language },
                             { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
