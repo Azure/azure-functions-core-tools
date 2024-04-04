@@ -28,10 +28,13 @@ jobs:
       BuildSourceBranchName: $(Build.SourceBranchName)
       SimulateReleaseBuild: $(SimulateReleaseBuild)
   - pwsh: |
-      $isIntegrationBuild = $false
+      $isIntegrationBuild = false
+      $isCodeqlBuild = true
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
-    displayName: 'Set IsIntegrationBuild variable'
+      Write-Host "##vso[task.setvariable variable=IsCodeqlBuild]$isCodeqlBuild"
+      Write-Host "IsCodeqlBuild: $isCodeqlBuild"
+    displayName: 'Set IsIntegrationBuild and IsCodeqlBuild variable'
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
     displayName: Set up environment variables
@@ -51,7 +54,7 @@ jobs:
   - task: CodeQL3000Init@0
     inputs:
       Enabled: true
-      Language: csharp
+      Language: csharp, go
 
   - pwsh: |
       .\build.ps1
@@ -61,7 +64,7 @@ jobs:
       IsReleaseBuild: false
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-      IntegrationBuildNumber: $(Build.BuildNumber)
+      IntegrationBuildNumber: 
     displayName: 'Executing build script'
   
   - pwsh: |

@@ -14,7 +14,11 @@ if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild)))
     throw "IsReleaseBuild can only be set to true or false."
 }
 
-if ($env:IntegrationBuildNumber)
+if ($env:isCodeqlBuild)
+{
+    $buildCommand = { dotnet run --ci }
+}
+elseif ($env:IntegrationBuildNumber)
 {
     if (-not ($env:IntegrationBuildNumber -like "PreRelease*-*"))
     {
