@@ -14,6 +14,11 @@ if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild)))
     throw "IsReleaseBuild can only be set to true or false."
 }
 
+if (-not([bool]::TryParse($env:IsCodeqlBuild, [ref] $isCodeqlBuild)))
+{
+    throw "IsCodeqlBuild can only be set to true or false."
+}
+
 Write-Host "isCodeqlBuild is $isCodeqlBuild and isReleaseBuild is $isReleaseBuild"
 if ($isCodeqlBuild)
 {
