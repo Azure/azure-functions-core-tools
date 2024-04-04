@@ -14,8 +14,8 @@ jobs:
     Codeql.Language: csharp
   steps:
   - pwsh: |
-      $isIntegrationBuild = false
-      $isCodeqlBuild = true
+      $isIntegrationBuild = $false
+      $isCodeqlBuild = $true
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
       Write-Host "##vso[task.setvariable variable=IsCodeqlBuild]$isCodeqlBuild"
@@ -48,7 +48,7 @@ jobs:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: false
-      IsCodeqlBuild: true
+      IsCodeqlBuild: $(isCodeqlBuild)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: 
