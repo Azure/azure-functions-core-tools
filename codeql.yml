@@ -1,5 +1,5 @@
 jobs:
-- job: Default
+- job: Build_And_Run_CodeQL_Analysis
   timeoutInMinutes: "120"
   pool:
     name: '1ES-Hosted-AzFunc'
