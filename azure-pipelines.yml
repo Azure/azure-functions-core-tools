@@ -47,7 +47,7 @@ jobs:
       SimulateReleaseBuild: $(SimulateReleaseBuild)
   - pwsh: |
       $isIntegrationBuild = $false
-      $isCodeqlBuild = $true
+      $isCodeqlBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
       {
           $isIntegrationBuild = $true

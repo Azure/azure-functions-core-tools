@@ -11,7 +11,7 @@ jobs:
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
     Codeql.Enabled: true
-    Codeql.Language: csharp
+    Codeql.Language: csharp, go
   steps:
   - pwsh: |
       $isIntegrationBuild = $false
