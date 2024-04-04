@@ -1,6 +1,6 @@
 jobs:
 - job: Default
-  timeoutInMinutes: "60"
+  timeoutInMinutes: "120"
   pool:
     name: '1ES-Hosted-AzFunc'
     demands:
