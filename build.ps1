@@ -22,7 +22,7 @@ if (-not([bool]::TryParse($env:IsCodeqlBuild, [ref] $isCodeqlBuild)))
 Write-Host "isCodeqlBuild is $isCodeqlBuild and isReleaseBuild is $isReleaseBuild"
 if ($isCodeqlBuild)
 {
-    $buildCommand = { dotnet build }
+    $buildCommand = { dotnet run --ci }
 }
 elseif ($env:IntegrationBuildNumber)
 {
