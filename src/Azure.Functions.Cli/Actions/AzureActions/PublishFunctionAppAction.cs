@@ -16,7 +16,9 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
+using Dynamitey;
 using Fclp;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -361,50 +363,59 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 return;
             }
 
+            List<FlexSku> skuList = await GetFlexSkus(site, runtimeName, helperService);
+
+            if (!skuList.Any())
+            {
+                throw new CliException($"We couldn't validate '{runtimeName}' runtime for Flex SKU in '{site.Location}'.");
+            }
+
             if (string.IsNullOrEmpty(runtimeVersion))
             {
-                if (runtimeName.Equals("python", StringComparison.OrdinalIgnoreCase))
+                var defaultSku = skuList.FirstOrDefault(s => s.IsDefault);
+                if (defaultSku == null)
                 {
-                    var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
-                    runtimeVersion = $"{localVersion.Major}.{localVersion.Minor}";
-                    if (runtimeVersion != "3.10" && runtimeVersion != "3.11") 
+                    defaultSku = skuList.FirstOrDefault();
+                }
+
+                runtimeVersion = defaultSku?.functionAppConfigProperties.Runtime.Version;
+            }
+
+            ColoredConsole.WriteLine($"Updating function app runtime setting with '{runtimeName} {runtimeVersion}'.");
+            await helperService.UpdateFlexRuntime(site, runtimeName, runtimeVersion);
+        }
+
+        private static async Task<List<FlexSku>> GetFlexSkus(Site site, string runtimeName, AzureHelperService helperService)
+        {
+            var flexStacks = await helperService.GetFlexFunctionsStacks(runtimeName, site.Location);
+            var skuList = new List<FlexSku>();
+
+            if (flexStacks == null)
+            {
+                return skuList;
+            }
+
+            var languageProperties = flexStacks.Languages.FirstOrDefault()?.LanguageProperties;
+            foreach (var majorVersion in languageProperties.MajorVersions)
+            {
+                var minorVersionSkuList = majorVersion?.MinorVersions?
+                    .Where(m => m.StackSettings?.LinuxRuntimeSettings?.Sku != null)
+                    .Select(s => { return new { skus = s.StackSettings.LinuxRuntimeSettings.Sku, isDefault = s.StackSettings.LinuxRuntimeSettings.IsDefault }; });
+
+                foreach (var minorVersionSkus in minorVersionSkuList)
+                {
+                    foreach (var sku in minorVersionSkus.skus)
                     {
-                        // todo: default will be 3.11 after 3.11 support is added. 
-                        runtimeVersion = "3.10";
+                        if (sku.SkuCode.Equals("FC1", StringComparison.OrdinalIgnoreCase))
+                        {
+                            sku.IsDefault = minorVersionSkus.isDefault;
+                            skuList.Add(sku);
+                        }
                     }
-                }
-                else if (runtimeName.Equals("dotnet-isolated", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Only .NET 8.0 is supported in flex. 
-                    if (runtimeVersion != "8.0")
-                        runtimeVersion = "8.0";
-                }
-                else if (runtimeName.Equals("node", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Only Node 18 is supported. 
-                    if (runtimeVersion != "18")
-                        runtimeVersion = "18";
-                }
-                else if (runtimeName.Equals("powershell", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Only Python 7.2 is supported. 
-                    if (runtimeVersion != "7.2")
-                        runtimeVersion = "7.2";
-                }
-                else if (runtimeName.Equals("java", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Warning: Java is not supported by core tools at the moment. 
-                    ColoredConsole.WriteLine(WarningColor($"Java is not supported in core tools at the moment. Please use az cli to update the runtime information."));
-                }
-                else
-                {
-                    // Warning: Runtime name is unknown.
-                    ColoredConsole.WriteLine(WarningColor($"Runtime is not updated. Only dotnet-isolated, node, java, and powershell is supported in core tools for Flex SKU."));
-                    return;
                 }
             }
 
-            await helperService.UpdateFlexRuntime(site, runtimeName, runtimeVersion);
+            return skuList;
         }
 
         internal static async Task UpdateFrameworkVersions(Site functionApp, WorkerRuntime workerRuntime, string requestedDotNetVersion, bool force, AzureHelperService helperService)
@@ -760,9 +771,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Get the WorkerRuntime
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
-            if (workerRuntime == WorkerRuntime.dotnetIsolated && _requiredNetFrameworkVersion != "8.0")
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
             {
-                throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton only supports .NET 8. Please upgrade your app to .NET 8 and try the deployment again.");
+                var flexSkus = await GetFlexSkus(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), new AzureHelperService(AccessToken, ManagementURL));
+                if (!flexSkus.Any(s => s.functionAppConfigProperties.Runtime.Version == _requiredNetFrameworkVersion))
+                {
+                    var versions = string.Join(", ", flexSkus.Select(s => s.functionAppConfigProperties.Runtime.Version));
+                    throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton supports .NET {versions}. Please upgrade your app to an appropriate .NET version and try the deployment again.");
+                }
             }
 
             Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
@@ -1398,6 +1414,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             public virtual Task UpdateFlexRuntime(Site functionApp, string runtimeName, string runtimeVersion) =>
                  AzureHelper.UpdateFlexRuntime(functionApp, runtimeName, runtimeVersion, _accessToken, _managementUrl);
+
+            public virtual Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string runtime, string region) =>
+                 AzureHelper.GetFlexFunctionsStacks(_accessToken, _managementUrl, runtime, region);
         }
 
         private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)
