@@ -275,6 +275,7 @@ jobs:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
   - task: PublishPipelineArtifact@1
+    condition: succeeded()
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: 'drop'
