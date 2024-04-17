@@ -316,8 +316,8 @@ jobs:
   - pwsh: |
       echo $env:LinuxPackageAccountName
       $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
-      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned2 -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c unsigned2 -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
@@ -346,8 +346,8 @@ jobs:
   - pwsh: |
       echo $env:LinuxPackageAccountName
       $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
-      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed2 -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c signed2 -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
