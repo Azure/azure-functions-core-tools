@@ -531,7 +531,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/3644")]
         [InlineData("dotnet")]
         [InlineData("dotnet-isolated")]
         public async Task start_with_user_secrets(string language)
