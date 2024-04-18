@@ -91,6 +91,6 @@ def preparePackage():
     os.chmod(os.path.join(debian, "postinst"), 0o755)
 
     os.chdir(constants.DRIVERROOTDIR)
-    output = helper.printReturnOutput(["fakeroot", "dpkg-deb", "--build",
+    output = helper.printReturnOutput(["fakeroot", "dpkg-deb", "--build", "-Zxz",
                    os.path.join(constants.BUILDFOLDER, packageFolder), os.path.join(constants.ARTIFACTFOLDER, packageFolder+".deb")])
     assert(f"building package '{constants.PACKAGENAME}'" in output)
