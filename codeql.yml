@@ -12,6 +12,7 @@ jobs:
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
     Codeql.Enabled: true
     Codeql.Language: csharp, go
+    Codeql.Cadence: 0
   steps:
   - pwsh: |
       $isIntegrationBuild = $false
@@ -41,6 +42,7 @@ jobs:
     inputs:
       Enabled: true
       Language: csharp, go
+      Cadence: 0
 
   - pwsh: |
       .\build.ps1
