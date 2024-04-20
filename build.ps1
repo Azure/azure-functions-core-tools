@@ -19,12 +19,7 @@ if (-not([bool]::TryParse($env:IsCodeqlBuild, [ref] $isCodeqlBuild)))
     throw "IsCodeqlBuild can only be set to true or false."
 }
 
-Write-Host "isCodeqlBuild is $isCodeqlBuild and isReleaseBuild is $isReleaseBuild"
-if ($isCodeqlBuild)
-{
-    $buildCommand = { dotnet run --ci }
-}
-elseif ($env:IntegrationBuildNumber)
+if ($env:IntegrationBuildNumber)
 {
     if (-not ($env:IntegrationBuildNumber -like "PreRelease*-*"))
     {
@@ -38,6 +33,11 @@ elseif ($env:IntegrationBuildNumber)
 elseif ($isReleaseBuild)
 {
     $buildCommand = { dotnet run --ci --generateSBOM }
+}
+elseif ($isCodeqlBuild)
+{
+    Write-Host "isCodeqlBuild is $isCodeqlBuild and isReleaseBuild is $isReleaseBuild"
+    $buildCommand = { dotnet run --ci --codeql }
 }
 else
 {

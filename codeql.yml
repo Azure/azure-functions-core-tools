@@ -47,11 +47,7 @@ jobs:
   - pwsh: |
       .\build.ps1
     env:
-      AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
-      BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: false
       IsCodeqlBuild: $(isCodeqlBuild)
-      DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
-      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: 
     displayName: 'Executing build script'
