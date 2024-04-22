@@ -722,5 +722,27 @@ namespace Azure.Functions.Cli.Helpers
                 return null;
             }
         }
+
+        public static async Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string accessToken, string managementURL, string runtime, string region)
+        {
+            // API only supports dotnet as runtime. The dotnet-isolated is part of the dotnet for this API.
+            if (runtime.Equals("dotnet-isolated", StringComparison.OrdinalIgnoreCase))
+            {
+                runtime = "dotnet";
+            }
+
+            var url = new Uri($"{managementURL}//providers/Microsoft.Web/locations/{region}/functionAppStacks?api-version={ArmUriTemplates.FlexFunctionsStacksApiVersion}&removeHiddenStacks=true&removeDeprecatedStacks=true&stack={runtime}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<FlexFunctionsStacks>(content);
+            }
+            else
+            {
+                return null;
+            }
+        }
     }
 }
