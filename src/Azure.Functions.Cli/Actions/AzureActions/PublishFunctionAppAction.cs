@@ -16,7 +16,6 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
-using Dynamitey;
 using Fclp;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.WindowsAzure.Storage;
