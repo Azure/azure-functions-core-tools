@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.Helpers
         private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
         {
             "blobtrigger" => "blob",
-            "eventgridblobtrigger" => "egblob",
+            "eventgridblobtrigger" => "eventgridblob",
             "cosmosdbtrigger" => "cosmos",
             "durablefunctionsorchestration" => "durable",
             "eventgridtrigger" => "eventgrid",
