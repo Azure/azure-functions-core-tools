@@ -15,7 +15,7 @@ trigger:
 jobs:
 - job: Default
   condition: eq(variables['LinuxPackageBuildTag'], '')
-  timeoutInMinutes: "90"
+  timeoutInMinutes: "180"
   pool:
     name: '1ES-Hosted-AzFunc'
     demands:
@@ -294,7 +294,7 @@ jobs:
 
 - job: LinuxPackage
   condition: ne(variables['LinuxPackageBuildTag'], '')
-  timeoutInMinutes: "90"
+  timeoutInMinutes: "120"
   pool:
     vmImage: 'ubuntu-latest'
   steps:
