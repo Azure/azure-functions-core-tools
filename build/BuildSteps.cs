@@ -667,27 +667,30 @@ namespace Build
 
         public static void AddGoZip()
         {
+            var runtimeToGoEnv = new Dictionary<string, (string GOOS, string GOARCH)>
+            {
+                { "win-x86", ("windows", "386") },
+                { "win-arm64", ("windows", "arm64") },
+                { "win-x64", ("windows", "amd64") },
+                { "linux-x64", ("linux", "amd64") },
+                { "osx-arm64", ("darwin", "arm64") },
+                { "osx-x64", ("darwin", "amd64") }
+            };
             foreach (var runtime in Settings.TargetRuntimes)
             {
-                var outputPath = Path.Combine(Settings.OutputDir, runtime, "gozip");
-                Environment.SetEnvironmentVariable("GOARCH", "amd64");
-                Environment.SetEnvironmentVariable("CGO_ENABLED", "0");
-                var goFile = Path.GetFullPath("../tools/go/gozip/main.go");
-
-                if (runtime.Contains("win"))
+                if (runtimeToGoEnv.TryGetValue(GetRuntimeId(runtime), out var goEnv))
                 {
-                    Environment.SetEnvironmentVariable("GOOS", "windows");
-                    Shell.Run("go", $"build -o {outputPath}.exe {goFile}");
+                    Environment.SetEnvironmentVariable("CGO_ENABLED", "0");
+                    Environment.SetEnvironmentVariable("GOOS", goEnv.GOOS);
+                    Environment.SetEnvironmentVariable("GOARCH", goEnv.GOARCH);
+                    var outputPath = Path.Combine(Settings.OutputDir, runtime, "gozip");
+                    var output = runtime.Contains("win") ? $"{outputPath}.exe" : outputPath;
+                    var goFile = Path.GetFullPath("../tools/go/gozip/main.go");
+                    Shell.Run("go", $"build -o {output} {goFile}");
                 }
-                else if (runtime.Contains("linux"))
+                else
                 {
-                    Environment.SetEnvironmentVariable("GOOS", "linux");
-                    Shell.Run("go", $"build -o {outputPath} {goFile}");
-                }
-                else if (runtime.Contains("osx"))
-                {
-                    Environment.SetEnvironmentVariable("GOOS", "darwin");
-                    Shell.Run("go", $"build -o {outputPath} {goFile}");
+                    throw new Exception($"Unsupported runtime: {runtime}");
                 }
             }
         }
