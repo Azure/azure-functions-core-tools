@@ -13,6 +13,11 @@ if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild)))
 {
     throw "IsReleaseBuild can only be set to true or false."
 }
+$isCodeqlBuild = $null
+if (-not([bool]::TryParse($env:IsCodeqlBuild, [ref] $isCodeqlBuild)))
+{
+    throw "IsCodeqlBuild can only be set to true or false."
+}
 
 if ($env:IntegrationBuildNumber)
 {
@@ -28,6 +33,11 @@ if ($env:IntegrationBuildNumber)
 elseif ($isReleaseBuild)
 {
     $buildCommand = { dotnet run --ci --generateSBOM }
+}
+elseif ($isCodeqlBuild)
+{
+    Write-Host "isCodeqlBuild is $isCodeqlBuild and isReleaseBuild is $isReleaseBuild"
+    $buildCommand = { dotnet run --ci --codeql }
 }
 else
 {

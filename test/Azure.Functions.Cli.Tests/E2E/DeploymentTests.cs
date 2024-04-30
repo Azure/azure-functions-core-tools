@@ -27,9 +27,10 @@ namespace Azure.Functions.Cli.Tests.E2E
             _storageAccountManager = saManager;
             _serverFarmManager = sfManager;
             _functionAppManager = faManager;
-            if (!_storageAccountManager.Contains(linuxStorageAccountName) ||
+            if ((!_storageAccountManager.Contains(linuxStorageAccountName) ||
                 !_serverFarmManager.Contains(linuxConsumptionServerFarm) ||
-                !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp))
+                !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp)) &&
+                ! EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.CodeQLBuild))
             {
                 InitializeLinuxResources().Wait();
             }
@@ -68,6 +69,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             throw new Exception($"Checking how the env variable work in DevOps. sourceBranchNameEnvVar={sourceBranchNameEnvVar}    sourceBranchEnvVar={sourceBranchEnvVar}");
 
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
+            TestConditions.SkipIfCodeQLBuildOrEnableDeploymentTestsNotDefined();
+            
             await CliTester.Run(new[] {
                 new RunConfiguration
                 {
