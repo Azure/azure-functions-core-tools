@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Tests.E2E.AzureResourceManagers;
 using Azure.Functions.Cli.Tests.E2E.AzureResourceManagers.Commons;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
@@ -61,6 +62,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async void RemoteBuildPythonFunctionApp()
         {
+            var sourceBranchNameEnvVar = EnvironmentHelper.GetEnvironmentVariableAsBool("BUILD_SOURCEBRANCHNAME");
+            var sourceBranchEnvVar = EnvironmentHelper.GetEnvironmentVariableAsBool("BUILD_SOURCEBRANCH");
+
+            throw new Exception($"Checking how the env variable work in DevOps. sourceBranchNameEnvVar={sourceBranchNameEnvVar}    sourceBranchEnvVar={sourceBranchEnvVar}");
+
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
             await CliTester.Run(new[] {
                 new RunConfiguration
