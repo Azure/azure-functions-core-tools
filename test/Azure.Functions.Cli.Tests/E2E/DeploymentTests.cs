@@ -42,7 +42,9 @@ namespace Azure.Functions.Cli.Tests.E2E
             var sourceBranchNameEnvVar = Environment.GetEnvironmentVariable("BUILD_SOURCEBRANCHNAME");
             var sourceBranchEnvVar = Environment.GetEnvironmentVariable("BUILD_SOURCEBRANCH");
             var repoUriEnvVar = Environment.GetEnvironmentVariable("BUILD_REPOSITORY_URI");
-            throw new Exception($"Checking how the env variable work in DevOps. sourceBranchNameEnvVar={sourceBranchNameEnvVar}    sourceBranchEnvVar={sourceBranchEnvVar}    repoUriEnvVar={repoUriEnvVar}");
+            var repoNameEnvVar = Environment.GetEnvironmentVariable("BUILD_REPOSITORY_NAME");
+
+            throw new Exception($"Checking how the env variable work in DevOps. sourceBranchNameEnvVar={sourceBranchNameEnvVar}    sourceBranchEnvVar={sourceBranchEnvVar}    repoUriEnvVar={repoUriEnvVar}    repoNameEnvVar={repoNameEnvVar}");
             
             // Create storage account and server farm
             await Task.WhenAll(
