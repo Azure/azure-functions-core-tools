@@ -39,8 +39,8 @@ namespace Azure.Functions.Cli.Tests.E2E
         private async Task InitializeLinuxResources()
         {
 
-            var sourceBranchNameEnvVar = EnvironmentHelper.GetEnvironmentVariableAsBool("BUILD_SOURCEBRANCHNAME");
-            var sourceBranchEnvVar = EnvironmentHelper.GetEnvironmentVariableAsBool("BUILD_SOURCEBRANCH");
+            var sourceBranchNameEnvVar = Environment.GetEnvironmentVariable("BUILD_SOURCEBRANCHNAME");
+            var sourceBranchEnvVar = Environment.GetEnvironmentVariable("BUILD_SOURCEBRANCH");
             throw new Exception($"Checking how the env variable work in DevOps. sourceBranchNameEnvVar={sourceBranchNameEnvVar}    sourceBranchEnvVar={sourceBranchEnvVar}");
             
             // Create storage account and server farm
