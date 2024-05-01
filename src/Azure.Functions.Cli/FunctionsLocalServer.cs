@@ -1,7 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
@@ -22,6 +24,7 @@ namespace Azure.Functions.Cli
         private readonly IProcessManager _processManager;
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
+        private static readonly Regex regex = new Regex("<port>");
 
         public FunctionsLocalServer(IProcessManager processManager, ISettings settings, ISecretsManager secretesManager)
         {
@@ -45,9 +48,18 @@ namespace Azure.Functions.Cli
         private async Task<Uri> DiscoverServer(bool noInteractive)
         {
             var hostSettings = _secretsManager.GetHostStartSettings();
+            
+            var hostUri = $"http://localhost:{hostSettings.LocalHttpPort}";
+
+            var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
+                s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
+            if (forwardedHttpUrl != null){
+                hostUri = regex.Replace(forwardedHttpUrl, "<port>", hostSettings.LocalHttpPort);
+            }
+
             if (hostSettings.LocalHttpPort != default(int))
             {
-                return new Uri($"http://localhost:{hostSettings.LocalHttpPort}");
+                return new Uri($"{hostUri}");
             }
 
             return await RecursiveDiscoverServer(0, noInteractive);
@@ -55,7 +67,16 @@ namespace Azure.Functions.Cli
 
         private async Task<Uri> RecursiveDiscoverServer(int iteration, bool noInteractive)
         {
-            var server = new Uri($"http://localhost:{Port + iteration}");
+            var hostUri = $"http://localhost:{Port + iteration}";
+
+            var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
+                s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
+
+            if (forwardedHttpUrl != null){
+                hostUri = regex.Replace(forwardedHttpUrl, "<port>", Port + iteration);
+            }
+
+            var server = new Uri($"{hostUri}");
 
             if (!await server.IsServerRunningAsync())
             {
