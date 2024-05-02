@@ -34,26 +34,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 InitializeLinuxResources().Wait();
             }
         }
-
-        
-        private bool IsPullRequestBuild()
-        {
-            var sourceBranchEnvVar = Environment.GetEnvironmentVariable("BUILD_SOURCEBRANCH");
-
-            if (sourceBranchEnvVar == null)
-            {
-                return false;
-            }
-
-            return  sourceBranchEnvVar.Contains("refs/pull/") && sourceBranchEnvVar.EndsWith("merge");
-        }
-
-        public bool HasAccessToken()
-        {
-            var token = Environment.GetEnvironmentVariable("AZURE_MANAGEMENT_ACCESS_TOKEN");
-            return !string.IsNullOrEmpty(token);
-        }
-
         
         private async Task InitializeLinuxResources()
         {
@@ -107,6 +87,24 @@ namespace Azure.Functions.Cli.Tests.E2E
                     CommandTimeout = TimeSpan.FromMinutes(5)
                 },
             }, _output);
+        }
+
+        private bool IsPullRequestBuild()
+        {
+            var sourceBranchEnvVar = Environment.GetEnvironmentVariable("BUILD_SOURCEBRANCH");
+
+            if (sourceBranchEnvVar == null)
+            {
+                return false;
+            }
+
+            return sourceBranchEnvVar.Contains("refs/pull/") && sourceBranchEnvVar.EndsWith("merge");
+        }
+
+        public bool HasAccessToken()
+        {
+            var token = Environment.GetEnvironmentVariable("AZURE_MANAGEMENT_ACCESS_TOKEN");
+            return !string.IsNullOrEmpty(token);
         }
     }
 }
