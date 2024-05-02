@@ -27,9 +27,10 @@ namespace Azure.Functions.Cli.Tests.E2E
             _storageAccountManager = saManager;
             _serverFarmManager = sfManager;
             _functionAppManager = faManager;
-            if (!_storageAccountManager.Contains(linuxStorageAccountName) ||
+            if ((!_storageAccountManager.Contains(linuxStorageAccountName) ||
                 !_serverFarmManager.Contains(linuxConsumptionServerFarm) ||
-                !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp))
+                !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp)) &&
+                ! EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.CodeQLBuild))
             {
                 InitializeLinuxResources().Wait();
             }
@@ -68,7 +69,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async void RemoteBuildPythonFunctionApp()
         {
-            
+            TestConditions.SkipIfCodeQLBuildOrEnableDeploymentTestsNotDefined();
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
             Skip.If(!HasAccessToken() && IsPullRequestBuild(), "Skipping test as it is a PR build from Fork. Test will run in the next stage on main branch and will catch any issue missed in the review.");
             await CliTester.Run(new[] {
