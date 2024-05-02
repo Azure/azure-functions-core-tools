@@ -35,8 +35,34 @@ namespace Azure.Functions.Cli.Tests.E2E
             }
         }
 
+        
+        private bool IsPullRequestBuild()
+        {
+            var sourceBranchEnvVar = Environment.GetEnvironmentVariable("BUILD_SOURCEBRANCH");
+
+            if (sourceBranchEnvVar == null)
+            {
+                return false;
+            }
+
+            return  sourceBranchEnvVar.Contains("refs/pull/") && sourceBranchEnvVar.EndsWith("merge");
+        }
+
+        public bool HasAccessToken()
+        {
+            var token = Environment.GetEnvironmentVariable("AZURE_MANAGEMENT_ACCESS_TOKEN");
+            return !string.IsNullOrEmpty(token);
+        }
+
+        
         private async Task InitializeLinuxResources()
         {
+            if (!HasAccessToken() && IsPullRequestBuild())
+            {
+                return;
+            }
+
+
             // Create storage account and server farm
             await Task.WhenAll(
                 _storageAccountManager.Create(linuxStorageAccountName, os: FunctionAppOs.Linux),
@@ -62,12 +88,9 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async void RemoteBuildPythonFunctionApp()
         {
-            var sourceBranchNameEnvVar = EnvironmentHelper.GetEnvironmentVariableAsBool("BUILD_SOURCEBRANCHNAME");
-            var sourceBranchEnvVar = EnvironmentHelper.GetEnvironmentVariableAsBool("BUILD_SOURCEBRANCH");
-
-            throw new Exception($"Checking how the env variable work in DevOps. sourceBranchNameEnvVar={sourceBranchNameEnvVar}    sourceBranchEnvVar={sourceBranchEnvVar}");
-
+            
             TestConditions.SkipIfEnableDeploymentTestsNotDefined();
+            Skip.If(!HasAccessToken() && IsPullRequestBuild(), "Skipping test as it is a PR build from Fork. Test will run in the next stage on main branch and will catch any issue missed in the review.");
             await CliTester.Run(new[] {
                 new RunConfiguration
                 {
