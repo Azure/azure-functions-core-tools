@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -38,6 +39,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
         private readonly ISecretsManager _secretsManager;
+        private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
         private readonly KeyVaultReferencesManager _keyVaultReferencesManager;
 
@@ -73,9 +75,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string JsonOutputFile { get; set; }
 
-        public StartHostAction(ISecretsManager secretsManager)
+        public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
         {
             _secretsManager = secretsManager;
+            _processManager = processManager;
             _keyVaultReferencesManager = new KeyVaultReferencesManager();
         }
 
@@ -307,7 +310,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
         }
-        
+
         private void EnableWorkerIndexing(IDictionary<string, string> secrets)
         {
             // Set only if the environment variable already doesn't exist and app setting doesn't have this setting.
@@ -321,7 +324,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var secret in secrets)
             {
-                if (string.IsNullOrEmpty(secret.Key)) {
+                if (string.IsNullOrEmpty(secret.Key))
+                {
                     ColoredConsole.WriteLine(WarningColor($"Skipping local setting with empty key."));
                 }
                 else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
@@ -351,6 +355,37 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
+        /// <summary>
+        /// Check local.settings.json to determine whether in-proc .NET8 is enabled.
+        /// </summary>
+        private static async Task<bool> IsInprocNet8Enabled()
+        {
+            var localSettingsJobject = await GetLocalSettingsJsonAsJObjectAsync();
+            if (localSettingsJobject != null)
+            {
+                var inprocNet8Enabled = localSettingsJobject["Values"]?[Constants.FunctionsInProcNet8Enabled]?.Value<string>();
+                return string.Equals("1", inprocNet8Enabled);
+            }
+
+            return false;
+        }
+
+        private static async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
+        {
+            var fullPath = Path.Combine(Environment.CurrentDirectory, Constants.LocalSettingsJsonFileName);
+            if (FileSystemHelpers.FileExists(fullPath))
+            {
+                var fileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(fullPath);
+                if (fileContent != null)
+                {
+                    var localSettingsJObject = JObject.Parse(fileContent);
+                    return localSettingsJObject;
+                }
+            }
+
+            return null;
+        }
+
         public override async Task RunAsync()
         {
             await PreRunConditions();
@@ -368,6 +403,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.Hosting.Lifetime", "None");
 
             Utilities.PrintVersion();
+
+            if (await IsInprocNet8Enabled())
+            {
+                await StartInproc8AsChildProcessAsync();
+            }
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
 
@@ -398,6 +438,70 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 ColoredConsole.WriteLine(AdditionalInfoColor("For detailed output, run func with --verbose flag."));
             }
             await runTask;
+        }
+
+        private Task StartInproc8AsChildProcessAsync()
+        {
+            ColoredConsole.WriteLine(VerboseColor($"Detected .NET8 in-proc application."));
+
+            var originalArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));            
+
+            // Ensure we launch the child process only once
+            if (!originalArguments.Contains("net8inproc"))
+            {
+                var tcs = new TaskCompletionSource<bool>();
+                var functionAppRootPath = GlobalCoreToolsSettings.FunctionAppRootPath;
+                var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location);
+                var inProc8FuncExecutablePath = Path.Combine(funcExecutableDirectory, "in-proc8", "func.exe");
+
+                var inprocNet8ChildProcessInfo = new ProcessStartInfo
+                {
+                    FileName = inProc8FuncExecutablePath,
+                    Arguments = $"{originalArguments} --net8inproc",
+                    WorkingDirectory = functionAppRootPath,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                Process childProcess = null;
+                try
+                {
+                    childProcess = Process.Start(inprocNet8ChildProcessInfo);
+                    childProcess.OutputDataReceived += (sender, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            ColoredConsole.WriteLine(e.Data);
+                        }
+                    };
+                    childProcess.ErrorDataReceived += (sender, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            ColoredConsole.WriteLine(ErrorColor(e.Data));
+                        }
+                    };
+                    childProcess.EnableRaisingEvents = true;
+                    childProcess.Exited += (sender, args) =>
+                    {
+                        tcs.SetResult(true);
+                    };
+                    childProcess.BeginOutputReadLine();
+                    childProcess.BeginErrorReadLine();
+                    _processManager.RegisterChildProcess(childProcess);
+                    childProcess.WaitForExit();
+                }
+                catch (Exception ex)
+                {
+                    throw new CliException($"Failed to start the child process for in-proc8. {ex.Message}");
+                }
+
+                return tcs.Task;
+            }
+
+            return Task.CompletedTask;
         }
 
         private void ValidateAndBuildHostJsonConfigurationIfFileExists(ScriptApplicationHostOptions hostOptions)

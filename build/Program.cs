@@ -31,7 +31,7 @@ namespace Build
                 .Then(Test, skip: args.Contains("--codeql"))
                 .Then(GenerateSBOMManifestForZips, skip: !args.Contains("--generateSBOM"))
                 .Then(Zip)
-                .Then(DotnetPublishForNupkg)
+                //.Then(DotnetPublishForNupkg) // DotnetPack step now does build and pack.
                 .Then(GenerateSBOMManifestForNupkg, skip: !args.Contains("--generateSBOM"))
                 .Then(DotnetPack)
                 .Then(DeleteSBOMTelemetryFolder, skip: !args.Contains("--generateSBOM"))
