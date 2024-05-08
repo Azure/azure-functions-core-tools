@@ -16,7 +16,7 @@
     <PackageReference Include="FluentAssertions" Version="5.2.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.6.2" />
     <PackageReference Include="Moq" Version="4.8.2" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NSubstitute" Version="3.1.0" />
     <PackageReference Include="Octokit" Version="0.29.0" />
     <PackageReference Include="RichardSzalay.MockHttp" Version="5.0.0" />
