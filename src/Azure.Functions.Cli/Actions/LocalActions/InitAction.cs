@@ -53,6 +53,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string ProgrammingModel { get; set; }
 
+        public bool SkipNpmInstall { get; set; } = false;
+
         public WorkerRuntime ResolvedWorkerRuntime { get; set; }
 
         public string ResolvedLanguage { get; set; }
@@ -135,6 +137,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>('m', "model")
                 .WithDescription($"Selects the programming model for the function app. Note this flag is now only applicable to Python and JavaScript/TypeScript. Options are V1 and V2 for Python; V3 and V4 for JavaScript/TypeScript. Currently, the V2 and V4 programming models are in preview.")
                 .Callback(m => ProgrammingModel = m);
+
+            Parser
+                .Setup<bool>("skip-npm-install")
+                .WithDescription("Skips the npm installation phase when using V4 programming model for NodeJS")
+                .Callback(skip => SkipNpmInstall = skip);
 
             Parser
                 .Setup<bool>("no-bundle")
@@ -231,7 +238,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx);
             }
 
-            await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
+            if (!SkipNpmInstall)
+            {
+                await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
+            }
+            else
+            {
+                ColoredConsole.Write(AdditionalInfoColor("You skipped \"npm install\". You must run \"npm install\" manually"));
+            }
         }
 
         private static (WorkerRuntime, string) ResolveWorkerRuntimeAndLanguage(string workerRuntimeString, string languageString)

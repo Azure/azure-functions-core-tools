@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Tests.E2E.AzureResourceManagers;
 using Azure.Functions.Cli.Tests.E2E.AzureResourceManagers.Commons;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
@@ -26,9 +27,10 @@ namespace Azure.Functions.Cli.Tests.E2E
             _storageAccountManager = saManager;
             _serverFarmManager = sfManager;
             _functionAppManager = faManager;
-            if (!_storageAccountManager.Contains(linuxStorageAccountName) ||
+            if ((!_storageAccountManager.Contains(linuxStorageAccountName) ||
                 !_serverFarmManager.Contains(linuxConsumptionServerFarm) ||
-                !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp))
+                !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp)) &&
+                ! EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.CodeQLBuild))
             {
                 InitializeLinuxResources().Wait();
             }
@@ -61,7 +63,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async void RemoteBuildPythonFunctionApp()
         {
-            TestConditions.SkipIfEnableDeploymentTestsNotDefined();
+            TestConditions.SkipIfCodeQLBuildOrEnableDeploymentTestsNotDefined();
             await CliTester.Run(new[] {
                 new RunConfiguration
                 {

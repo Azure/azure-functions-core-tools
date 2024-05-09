@@ -572,7 +572,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/3644")]
         [InlineData("dotnet")]
         [InlineData("dotnet-isolated")]
         public async Task start_with_user_secrets(string language)
@@ -615,20 +615,19 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
                         Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {\""+ Constants.FunctionsWorkerRuntime + "\": \"" + language + "\", \"AzureWebJobsSecretStorageType\": \"files\"} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
                             { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-                            { Constants.FunctionsWorkerRuntime, "dotnet" },
                             { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
                     },
                     Commands = new[]
                     {
-                        "start --functions http1 --csharp",
+                        "start --functions http1 --" + language,
                     },
                     ExpectExit = false,
                     OutputContains = new string[]

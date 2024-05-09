@@ -24,5 +24,12 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             Skip.If(!EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.EnableDeploymentTests),
                 reason: $"{E2ETestConstants.EnableDeploymentTests} is not set to true");
         }
+
+        public static void SkipIfCodeQLBuildOrEnableDeploymentTestsNotDefined()
+        {
+            Skip.If(!EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.CodeQLBuild) || 
+                    !EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.EnableDeploymentTests),
+                reason: $"{E2ETestConstants.CodeQLBuild} is set to false and/or {E2ETestConstants.EnableDeploymentTests} is not set to true ");
+        }
     }
 }
