@@ -182,7 +182,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (template == null)
                 {
-                    throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\". Please run \"func new\" to see the list of supported templates.");
+                    throw new CliException($"Can't find template \"{TemplateName}\" for \"{Language}\". Please run \"func new\" to see the list of supported templates.");
                 }
 
                 var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
