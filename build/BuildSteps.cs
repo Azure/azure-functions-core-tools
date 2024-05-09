@@ -101,9 +101,10 @@ namespace Build
             Shell.Run("dotnet", $"pack {Settings.SrcProjectPath} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
+                                $"/p:TargetFramework=net6.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release --no-build");
+                                $"-o {outputPath} -c Release ");
         }
 
         public static void DotnetPublishForZips()
@@ -116,7 +117,7 @@ namespace Build
                                     $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                     $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                     (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                    $"-o {outputPath} -c Release " +
+                                    $"-o {outputPath} -c Release -f net6.0" +
                                     (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
 
                 if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
@@ -124,7 +125,7 @@ namespace Build
                     RemoveLanguageWorkers(outputPath);
                 }
             }
-
+  
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
                 _integrationManifest.CommitId = Settings.CommitId;
@@ -397,8 +398,12 @@ namespace Build
                 Directory.CreateDirectory(targetDir);
                 FileHelpers.RecursiveCopy(sourceDir, targetDir);
 
-                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
-                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
+                var toSignPathsForIncproc8 = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, "in-proc8", el));
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForIncproc8);
+
+                var toSignThirdPartyPathsForInproc8 = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir,"in-proc8", el));
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInproc8);
+
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
                                     .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
 
@@ -576,9 +581,10 @@ namespace Build
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
+                                $"/p:TargetFramework=net6.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release");
+                                $"-c Release -f net6.0");
         }
 
         public static void GenerateSBOMManifestForNupkg()

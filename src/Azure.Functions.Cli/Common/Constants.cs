@@ -91,7 +91,7 @@ namespace Azure.Functions.Cli.Common
         public const string LocalSettingsJsonFileName = "local.settings.json";
         public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
         public const string Dotnet = "dotnet";
-
+        public const string FunctionsInProcNet8Enabled = "FUNCTIONS_INPROC_NET8_ENABLED";
 
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);

@@ -362,7 +362,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"");
                 }
             }
-            else if (!string.IsNullOrEmpty(TargetFramework))
+            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet && !string.IsNullOrEmpty(TargetFramework))
             {
                 throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated");
             }

@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
@@ -276,13 +276,13 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.34.1" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.834.1" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.60.3" />
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="6.35.0" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.1.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.35.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
@@ -299,4 +299,18 @@
       <Output TaskParameter="Include" ItemName="PublishReadyToRunExclude" />
     </CreateItem>
   </Target>
+  <!-- Build/Publish for net8.0 TFM as well-->
+  <Target Name="BuildInProcNet8" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0'">
+    <PropertyGroup>
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True" />
+  </Target>
+  <Target Name="PublishInProcNet8" AfterTargets="Publish" Condition="'$(TargetFramework)'=='net6.0'">
+    <PropertyGroup>
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True" />
+  </Target>
+
 </Project>
