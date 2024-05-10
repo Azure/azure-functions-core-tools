@@ -397,6 +397,8 @@ namespace Build
 
         public static void TestPreSignedArtifacts()
         {
+            var filterExtensionsSignSet = new HashSet<string>(Settings.SignInfo.FilterExtensionsSign);
+
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
                 if (supportedRuntime.StartsWith("osx"))
@@ -410,24 +412,30 @@ namespace Build
                 Directory.CreateDirectory(targetDir);
                 FileHelpers.RecursiveCopy(sourceDir, targetDir);
 
-                var toSignPathsForIncproc8 = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, "in-proc8", el));
-                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForIncproc8);
+                var inProc8Directory = Path.Combine(targetDir, "in-proc8");
+                var inProc8DirectoryExists = Directory.Exists(inProc8Directory);
 
-                var toSignThirdPartyPathsForInproc8 = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, "in-proc8", el));
-                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInproc8);
+                var toSignPathsForInProc8 = inProc8DirectoryExists
+                    ? Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(inProc8Directory, el))
+                    : Enumerable.Empty<string>();
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForInProc8);
+
+                var toSignThirdPartyPathsForInProc8 = inProc8DirectoryExists
+                    ? Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(inProc8Directory, el))
+                    : Enumerable.Empty<string>();
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInProc8);
 
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
-                                    .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                                    .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))).ToList();
 
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
-                                        .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))));
+                                        .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
                 unSignedFiles.ForEach(filePath => File.Delete(filePath));
 
                 var unSignedPackages = GetUnsignedBinaries(targetDir);
                 if (unSignedPackages.Count() != 0)
                 {
-
                     var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
                     ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
                     throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
