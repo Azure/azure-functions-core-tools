@@ -111,25 +111,42 @@ namespace Build
         {
             foreach (var runtime in Settings.TargetRuntimes)
             {
+                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
-                Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
-                                    $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                    $"/p:CommitHash=\"{Settings.CommitId}\" " +
-                                    (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                    $"-o {outputPath} -c Release -f net6.0" +
-                                    (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
+                ExecuteDotnetPublish(outputPath, rid, "net6.0", skipLaunchingNet8ChildProcess: isMinVersion);
 
-                if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
+                if (isMinVersion)
                 {
+                    RemoveLanguageWorkers(outputPath);
+
+                    // For min versions, publish net8.0 as well
+                    outputPath = BuildNet8ArtifactPath(runtime);
+                    ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
                     RemoveLanguageWorkers(outputPath);
                 }
             }
-  
+
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
                 _integrationManifest.CommitId = Settings.CommitId;
             }
+        }
+
+        private static string BuildNet8ArtifactPath(string runtime)
+        {
+            return Path.Combine(Settings.OutputDir, runtime + "_net8.0");
+        }
+
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
+        {
+            Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
+                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
+                                $"/p:SkipNet8Child=\"{skipLaunchingNet8ChildProcess}\" " +
+                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
+                                $"-o {outputPath} -c Release -f {targetFramework}" +
+                                (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
         public static void FilterPowershellRuntimes()
@@ -372,7 +389,7 @@ namespace Build
 
             // These assemblies are currently signed, but with an invalid root cert.
             // Until that is resolved, we are explicity signing the AppService.Middleware packages
-            
+
             unSignedBinaries = unSignedBinaries.Concat(allFiles
                 .Where(f => f.Contains("Microsoft.Azure.AppService.Middleware") || f.Contains("Microsoft.Azure.AppService.Proxy"))).ToList();
 
@@ -385,6 +402,8 @@ namespace Build
 
         public static void TestPreSignedArtifacts()
         {
+            var filterExtensionsSignSet = new HashSet<string>(Settings.SignInfo.FilterExtensionsSign);
+
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
                 if (supportedRuntime.StartsWith("osx"))
@@ -398,24 +417,30 @@ namespace Build
                 Directory.CreateDirectory(targetDir);
                 FileHelpers.RecursiveCopy(sourceDir, targetDir);
 
-                var toSignPathsForIncproc8 = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, "in-proc8", el));
-                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForIncproc8);
+                var inProc8Directory = Path.Combine(targetDir, "in-proc8");
+                var inProc8DirectoryExists = Directory.Exists(inProc8Directory);
 
-                var toSignThirdPartyPathsForInproc8 = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir,"in-proc8", el));
-                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInproc8);
+                var toSignPathsForInProc8 = inProc8DirectoryExists
+                    ? Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(inProc8Directory, el))
+                    : Enumerable.Empty<string>();
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForInProc8);
+
+                var toSignThirdPartyPathsForInProc8 = inProc8DirectoryExists
+                    ? Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(inProc8Directory, el))
+                    : Enumerable.Empty<string>();
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInProc8);
 
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
-                                    .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                                    .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))).ToList();
 
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
-                                        .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))));
+                                        .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
                 unSignedFiles.ForEach(filePath => File.Delete(filePath));
 
                 var unSignedPackages = GetUnsignedBinaries(targetDir);
                 if (unSignedPackages.Count() != 0)
                 {
-
                     var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
                     ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
                     throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
@@ -503,17 +528,36 @@ namespace Build
             return unSignedPackages;
         }
 
+        private static void CreateZipFromArtifact(string artifactSourcePath, string zipPath)
+        {
+            if (!Directory.Exists(artifactSourcePath))
+            {
+                return;
+            }
+
+            ColoredConsole.WriteLine($"Creating {zipPath}");
+            ZipFile.CreateFromDirectory(artifactSourcePath, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+        }
+
         public static void Zip()
         {
             var version = CurrentVersion;
 
             foreach (var runtime in Settings.TargetRuntimes)
             {
-                var path = Path.Combine(Settings.OutputDir, runtime);
+                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
+                var artifactPath = Path.Combine(Settings.OutputDir, runtime);
 
                 var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
-                ColoredConsole.WriteLine($"Creating {zipPath}");
-                ZipFile.CreateFromDirectory(path, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+                CreateZipFromArtifact(artifactPath, zipPath);
+
+                if (isMinVersion)
+                {
+                    // Zip the .net8 version as well.
+                    var net8Path = BuildNet8ArtifactPath(runtime);
+                    var net8ZipPath = zipPath.Replace(".zip", "_net8.0.zip");
+                    CreateZipFromArtifact(net8Path, net8ZipPath);
+                }
 
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
                 // the ./generateMsiFiles.ps1 script
@@ -521,13 +565,12 @@ namespace Build
                 {
                     try
                     {
-                        Directory.Delete(path, recursive: true);
+                        Directory.Delete(artifactPath, recursive: true);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        ColoredConsole.Error.WriteLine($"Error deleting {path}");
+                        ColoredConsole.Error.WriteLine($"Error deleting {artifactPath}. Exception: {ex}");
                     }
-
                 }
 
                 ColoredConsole.WriteLine();

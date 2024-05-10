@@ -38,6 +38,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
     {
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
+
+        // The flag we will pass when launching the child process for in-proc .NET8 application
+        private const string Net8InProcFlag = "net8inproc";
         private readonly ISecretsManager _secretsManager;
         private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
@@ -358,7 +361,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// <summary>
         /// Check local.settings.json to determine whether in-proc .NET8 is enabled.
         /// </summary>
-        private static async Task<bool> IsInprocNet8Enabled()
+        private static async Task<bool> IsInProcNet8Enabled()
         {
             var localSettingsJobject = await GetLocalSettingsJsonAsJObjectAsync();
             if (localSettingsJobject != null)
@@ -368,6 +371,19 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
 
             return false;
+        }
+
+        // We launch the in-proc .NET8 application as a child process only if the SkipNet8Child flag is not defined.
+        // During Build, we pass SkipNet8Child=True only for artifacts used by Visual studio feed.
+        private static bool ShouldLaunchInProcNet8AsChildProcess()
+        {
+#if SkipNet8Child
+            Console.WriteLine("SkipNet8Child is defined");
+            return false;
+#else
+            Console.WriteLine("SkipNet8Child is not defined");
+            return true;
+#endif
         }
 
         private static async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
@@ -404,7 +420,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Utilities.PrintVersion();
 
-            if (await IsInprocNet8Enabled())
+            if (ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
             {
                 await StartInproc8AsChildProcessAsync();
             }
@@ -444,10 +460,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             ColoredConsole.WriteLine(VerboseColor($"Detected .NET8 in-proc application."));
 
-            var originalArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));            
+            var originalArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
 
             // Ensure we launch the child process only once
-            if (!originalArguments.Contains("net8inproc"))
+            if (!originalArguments.Contains(Net8InProcFlag))
             {
                 var tcs = new TaskCompletionSource<bool>();
                 var functionAppRootPath = GlobalCoreToolsSettings.FunctionAppRootPath;
@@ -457,7 +473,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var inprocNet8ChildProcessInfo = new ProcessStartInfo
                 {
                     FileName = inProc8FuncExecutablePath,
-                    Arguments = $"{originalArguments} --net8inproc",
+                    Arguments = $"{originalArguments} --{Net8InProcFlag}",
                     WorkingDirectory = functionAppRootPath,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
