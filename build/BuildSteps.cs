@@ -121,7 +121,7 @@ namespace Build
                     RemoveLanguageWorkers(outputPath);
 
                     // For min versions, publish net8.0 as well
-                    outputPath = Path.Combine(Settings.OutputDir, runtime + "_net8.0");
+                    outputPath = BuildNet8ArtifactPath(runtime);
                     ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
                     RemoveLanguageWorkers(outputPath);
                 }
@@ -131,6 +131,11 @@ namespace Build
             {
                 _integrationManifest.CommitId = Settings.CommitId;
             }
+        }
+
+        private static string BuildNet8ArtifactPath(string runtime)
+        {
+            return Path.Combine(Settings.OutputDir, runtime + "_net8.0");
         }
 
         private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
@@ -523,17 +528,36 @@ namespace Build
             return unSignedPackages;
         }
 
+        private static void CreateZipFromArtifact(string artifactSourcePath, string zipPath)
+        {
+            if (!Directory.Exists(artifactSourcePath))
+            {
+                return;
+            }
+
+            ColoredConsole.WriteLine($"Creating {zipPath}");
+            ZipFile.CreateFromDirectory(artifactSourcePath, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+        }
+
         public static void Zip()
         {
             var version = CurrentVersion;
 
             foreach (var runtime in Settings.TargetRuntimes)
             {
-                var path = Path.Combine(Settings.OutputDir, runtime);
+                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
+                var artifactPath = Path.Combine(Settings.OutputDir, runtime);
 
                 var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
-                ColoredConsole.WriteLine($"Creating {zipPath}");
-                ZipFile.CreateFromDirectory(path, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+                CreateZipFromArtifact(artifactPath, zipPath);
+
+                if (isMinVersion)
+                {
+                    // Zip the .net8 version as well.
+                    var net8Path = BuildNet8ArtifactPath(runtime);
+                    var net8ZipPath = zipPath.Replace(".zip", "_net8.0.zip");
+                    CreateZipFromArtifact(net8Path, net8ZipPath);
+                }
 
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
                 // the ./generateMsiFiles.ps1 script
@@ -541,13 +565,12 @@ namespace Build
                 {
                     try
                     {
-                        Directory.Delete(path, recursive: true);
+                        Directory.Delete(artifactPath, recursive: true);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        ColoredConsole.Error.WriteLine($"Error deleting {path}");
+                        ColoredConsole.Error.WriteLine($"Error deleting {artifactPath}. Exception: {ex}");
                     }
-
                 }
 
                 ColoredConsole.WriteLine();
