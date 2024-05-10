@@ -111,25 +111,37 @@ namespace Build
         {
             foreach (var runtime in Settings.TargetRuntimes)
             {
+                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
-                Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
-                                    $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                    $"/p:CommitHash=\"{Settings.CommitId}\" " +
-                                    (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                    $"-o {outputPath} -c Release -f net6.0" +
-                                    (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
+                ExecuteDotnetPublish(outputPath, rid, "net6.0", skipLaunchingNet8ChildProcess: isMinVersion);
 
-                if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
+                if (isMinVersion)
                 {
+                    RemoveLanguageWorkers(outputPath);
+
+                    // For min versions, publish net8.0 as well
+                    outputPath = Path.Combine(Settings.OutputDir, runtime + "_net8.0");
+                    ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
                     RemoveLanguageWorkers(outputPath);
                 }
             }
-  
+
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
                 _integrationManifest.CommitId = Settings.CommitId;
             }
+        }
+
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
+        {
+            Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
+                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
+                                $"/p:SkipNet8Child=\"{skipLaunchingNet8ChildProcess}\" " +
+                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
+                                $"-o {outputPath} -c Release -f {targetFramework}" +
+                                (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
         public static void FilterPowershellRuntimes()
@@ -372,7 +384,7 @@ namespace Build
 
             // These assemblies are currently signed, but with an invalid root cert.
             // Until that is resolved, we are explicity signing the AppService.Middleware packages
-            
+
             unSignedBinaries = unSignedBinaries.Concat(allFiles
                 .Where(f => f.Contains("Microsoft.Azure.AppService.Middleware") || f.Contains("Microsoft.Azure.AppService.Proxy"))).ToList();
 
@@ -401,7 +413,7 @@ namespace Build
                 var toSignPathsForIncproc8 = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, "in-proc8", el));
                 var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForIncproc8);
 
-                var toSignThirdPartyPathsForInproc8 = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir,"in-proc8", el));
+                var toSignThirdPartyPathsForInproc8 = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, "in-proc8", el));
                 var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInproc8);
 
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
