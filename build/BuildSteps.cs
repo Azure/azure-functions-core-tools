@@ -145,7 +145,7 @@ namespace Build
                                 $"/p:SkipNet8Child=\"{skipLaunchingNet8ChildProcess}\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release -f {targetFramework}" +
+                                $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +
                                 (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
