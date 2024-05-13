@@ -364,7 +364,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet && !string.IsNullOrEmpty(TargetFramework))
             {
-                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated");
+                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
         }
 
