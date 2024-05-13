@@ -147,7 +147,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<List<string>>("functions")
-                .WithDescription("A space seperated list of functions to load.")
+                .WithDescription("A space separated list of functions to load.")
                 .Callback(f => EnabledFunctions = f);
 
             Parser
@@ -361,41 +361,61 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// <summary>
         /// Check local.settings.json to determine whether in-proc .NET8 is enabled.
         /// </summary>
-        private static async Task<bool> IsInProcNet8Enabled()
+        private async Task<bool> IsInProcNet8Enabled()
         {
-            var localSettingsJobject = await GetLocalSettingsJsonAsJObjectAsync();
-            if (localSettingsJobject != null)
+            var localSettingsJObject = await GetLocalSettingsJsonAsJObjectAsync();
+            var inProcNet8EnabledSettingValue = localSettingsJObject?["Values"]?[Constants.FunctionsInProcNet8Enabled]?.Value<string>();
+            var isInProcNet8Enabled = string.Equals("1", inProcNet8EnabledSettingValue);
+
+            if (VerboseLogging == true)
             {
-                var inprocNet8Enabled = localSettingsJobject["Values"]?[Constants.FunctionsInProcNet8Enabled]?.Value<string>();
-                return string.Equals("1", inprocNet8Enabled);
+                var message = isInProcNet8Enabled
+                    ? $"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json"
+                    : $"{Constants.FunctionsInProcNet8Enabled} app setting is not enabled in local.settings.json";
+                ColoredConsole.WriteLine(VerboseColor(message));
+            }
+
+            return isInProcNet8Enabled;
+        }
+
+        // We launch the in-proc .NET8 application as a child process only if the SkipNet8Child conditional compilation symbol is not defined.
+        // During build, we pass SkipNet8Child=True only for artifacts used by Visual studio feed (we don't want to launch child process in that case).
+        private bool ShouldLaunchInProcNet8AsChildProcess()
+        {
+#if SkipNet8Child
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor("SkipNet8Child compilation symbol is defined."));
             }
 
             return false;
-        }
-
-        // We launch the in-proc .NET8 application as a child process only if the SkipNet8Child flag is not defined.
-        // During Build, we pass SkipNet8Child=True only for artifacts used by Visual studio feed.
-        private static bool ShouldLaunchInProcNet8AsChildProcess()
-        {
-#if SkipNet8Child
-            Console.WriteLine("SkipNet8Child is defined");
-            return false;
 #else
-            Console.WriteLine("SkipNet8Child is not defined");
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor("SkipNet8Child compilation symbol is not defined."));
+            }
+
             return true;
 #endif
         }
 
-        private static async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
+        private async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
         {
             var fullPath = Path.Combine(Environment.CurrentDirectory, Constants.LocalSettingsJsonFileName);
             if (FileSystemHelpers.FileExists(fullPath))
             {
                 var fileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(fullPath);
-                if (fileContent != null)
+                if (!string.IsNullOrEmpty(fileContent))
                 {
                     var localSettingsJObject = JObject.Parse(fileContent);
                     return localSettingsJObject;
+                }
+            }
+            else
+            {
+                if (VerboseLogging == true)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"{Constants.LocalSettingsJsonFileName} file not found. Path searched:{fullPath}"));
                 }
             }
 
@@ -422,7 +442,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
             {
-                await StartInproc8AsChildProcessAsync();
+                await StartInProc8AsChildProcessAsync();
             }
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
@@ -456,68 +476,90 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private Task StartInproc8AsChildProcessAsync()
+        private Task StartInProc8AsChildProcessAsync()
         {
-            ColoredConsole.WriteLine(VerboseColor($"Detected .NET8 in-proc application."));
-
-            var originalArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
-
-            // Ensure we launch the child process only once
-            if (!originalArguments.Contains(Net8InProcFlag))
+            if (VerboseLogging == true)
             {
-                var tcs = new TaskCompletionSource<bool>();
-                var functionAppRootPath = GlobalCoreToolsSettings.FunctionAppRootPath;
-                var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location);
-                var inProc8FuncExecutablePath = Path.Combine(funcExecutableDirectory, "in-proc8", "func.exe");
-
-                var inprocNet8ChildProcessInfo = new ProcessStartInfo
-                {
-                    FileName = inProc8FuncExecutablePath,
-                    Arguments = $"{originalArguments} --{Net8InProcFlag}",
-                    WorkingDirectory = functionAppRootPath,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                Process childProcess = null;
-                try
-                {
-                    childProcess = Process.Start(inprocNet8ChildProcessInfo);
-                    childProcess.OutputDataReceived += (sender, e) =>
-                    {
-                        if (!string.IsNullOrEmpty(e.Data))
-                        {
-                            ColoredConsole.WriteLine(e.Data);
-                        }
-                    };
-                    childProcess.ErrorDataReceived += (sender, e) =>
-                    {
-                        if (!string.IsNullOrEmpty(e.Data))
-                        {
-                            ColoredConsole.WriteLine(ErrorColor(e.Data));
-                        }
-                    };
-                    childProcess.EnableRaisingEvents = true;
-                    childProcess.Exited += (sender, args) =>
-                    {
-                        tcs.SetResult(true);
-                    };
-                    childProcess.BeginOutputReadLine();
-                    childProcess.BeginErrorReadLine();
-                    _processManager.RegisterChildProcess(childProcess);
-                    childProcess.WaitForExit();
-                }
-                catch (Exception ex)
-                {
-                    throw new CliException($"Failed to start the child process for in-proc8. {ex.Message}");
-                }
-
-                return tcs.Task;
+                ColoredConsole.WriteLine(VerboseColor($"Starting child process for .NET8 In-proc."));
             }
 
-            return Task.CompletedTask;
+            var commandLineArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
+
+            // Ensure we launch the child process only once to avoid infinite recursion.
+            if (commandLineArguments.Contains(Net8InProcFlag))
+            {
+                return Task.CompletedTask;
+            }
+
+            var tcs = new TaskCompletionSource<bool>();
+            var functionAppRootPath = GlobalCoreToolsSettings.FunctionAppRootPath!;
+            var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
+            var inProc8FuncExecutablePath = Path.Combine(funcExecutableDirectory, "in-proc8", "func.exe");
+
+            EnsureNet8FuncExecutablePresent(inProc8FuncExecutablePath);
+
+            var inprocNet8ChildProcessInfo = new ProcessStartInfo
+            {
+                FileName = inProc8FuncExecutablePath,
+                Arguments = $"{commandLineArguments} --{Net8InProcFlag}",
+                WorkingDirectory = functionAppRootPath,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            try
+            {
+                var childProcess = Process.Start(inprocNet8ChildProcessInfo);
+                if (VerboseLogging == true)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Started child process with ID: {childProcess.Id}"));
+                }
+                childProcess!.OutputDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        ColoredConsole.WriteLine(e.Data);
+                    }
+                };
+                childProcess.ErrorDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        ColoredConsole.WriteLine(ErrorColor(e.Data));
+                    }
+                };
+                childProcess.EnableRaisingEvents = true;
+                childProcess.Exited += (sender, args) =>
+                {
+                    tcs.SetResult(true);
+                };
+                childProcess.BeginOutputReadLine();
+                childProcess.BeginErrorReadLine();
+                _processManager.RegisterChildProcess(childProcess);
+                childProcess.WaitForExit();
+            }
+            catch (Exception ex)
+            {
+                throw new CliException($"Failed to start the child process for in-proc8. {ex.Message}");
+            }
+
+            return tcs.Task;
+        }
+
+        private void EnsureNet8FuncExecutablePresent(string inProc8FuncExecutablePath)
+        {
+            bool net8ExeExist = File.Exists(inProc8FuncExecutablePath);
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"{inProc8FuncExecutablePath} {(net8ExeExist ? "present" : "not present")} "));
+            }
+
+            if (!net8ExeExist)
+            {
+                throw new CliException($"Failed to locate the in-proc8 func executable at {inProc8FuncExecutablePath}");
+            }
         }
 
         private void ValidateAndBuildHostJsonConfigurationIfFileExists(ScriptApplicationHostOptions hostOptions)
