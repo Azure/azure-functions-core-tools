@@ -28,7 +28,6 @@
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
-    <CoreToolsTargetRuntime>$(CoreToolsTargetRuntime)</CoreToolsTargetRuntime>
   </PropertyGroup>
 
   <!-- SkipNet8Child build property will be True for artifacts used by VS feed -->

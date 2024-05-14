@@ -101,7 +101,7 @@ namespace Build
             Shell.Run("dotnet", $"pack {Settings.SrcProjectPath} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net6.0 " +
+                                $"/p:TargetFramework=net6.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release ");
@@ -114,6 +114,7 @@ namespace Build
                 var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
+
                 ExecuteDotnetPublish(outputPath, rid, "net6.0", skipLaunchingNet8ChildProcess: isMinVersion);
 
                 if (isMinVersion)
@@ -122,6 +123,7 @@ namespace Build
 
                     // For min versions, publish net8.0 as well
                     outputPath = BuildNet8ArtifactPath(runtime);
+
                     ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
                     RemoveLanguageWorkers(outputPath);
                 }
