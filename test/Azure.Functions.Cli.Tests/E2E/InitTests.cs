@@ -209,6 +209,37 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_dotnet_app_net8()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet --target-framework net8.0" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "local.settings.json"),
+                        ContentContains = new[]
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "dotnet",
+                            "FUNCTIONS_INPROC_NET8_ENABLED",
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "dotnet-funcs.csproj"),
+                        ContentContains = new[]
+                        {
+                            "Microsoft.NET.Sdk.Functions",
+                            "v4"
+                        }
+                    }
+                }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_unknown_worker_runtime()
         {
             const string unknownWorkerRuntime = "foo";

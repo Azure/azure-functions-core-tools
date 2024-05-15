@@ -336,7 +336,8 @@ namespace Azure.Functions.Cli.Tests.E2E
 
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
-                            testOutputHelper.Output.Should().Contain("Starting child process for .NET8 In-proc.");
+                            testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
+                            testOutputHelper.Output.Should().Contain("Starting child process for in-process model host");
                             testOutputHelper.Output.Should().Contain("Started child process with ID");
                         }
                     }
