@@ -120,13 +120,12 @@ namespace Build
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
-
-                    // For min versions, publish net8.0 as well
-                    outputPath = BuildNet8ArtifactPath(runtime);
-
-                    ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
-                    RemoveLanguageWorkers(outputPath);
                 }
+
+                // Publish net8 version of the artifact as well.
+                var outputPathNet8 = BuildNet8ArtifactPath(runtime);
+                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
+                RemoveLanguageWorkers(outputPathNet8);
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
@@ -553,13 +552,11 @@ namespace Build
                 var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
                 CreateZipFromArtifact(artifactPath, zipPath);
 
-                if (isMinVersion)
-                {
-                    // Zip the .net8 version as well.
-                    var net8Path = BuildNet8ArtifactPath(runtime);
-                    var net8ZipPath = zipPath.Replace(".zip", "_net8.0.zip");
-                    CreateZipFromArtifact(net8Path, net8ZipPath);
-                }
+                // Zip the .net8 version as well.
+                var net8Path = BuildNet8ArtifactPath(runtime);
+                var net8ZipPath = zipPath.Replace(".zip", "_net8.0.zip");
+                CreateZipFromArtifact(net8Path, net8ZipPath);
+                
 
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
                 // the ./generateMsiFiles.ps1 script
