@@ -15,3 +15,5 @@
 
 # Adding codeowner for Language specific files such that GitHub automatically adds language owners as a reviewers.
 src/Azure.Functions.Cli/Azure.Functions.Cli.csproj @vrdmr @Francisco-Gamino @andystaples @amamounelsayed @ejizba @hossam-nasr @AnatoliB
+
+*.yml @khkh-ms @VpOfEngineering @arroyc
