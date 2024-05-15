@@ -12,11 +12,6 @@ namespace Azure.Functions.Cli.Helpers
         private static WorkerRuntime _currentWorkerRuntime;
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
-        /// <summary>
-        /// Gets the root path of the function app from where the func exe was invoked.
-        /// </summary>
-        public static string? FunctionAppRootPath { get; private set; }
-
         public static WorkerRuntime CurrentWorkerRuntime
         {
             get
@@ -43,8 +38,6 @@ namespace Azure.Functions.Cli.Helpers
         {
             try
             {
-                FunctionAppRootPath = Environment.CurrentDirectory;
-
                 if (args.Contains("--csharp"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.dotnet;
@@ -84,7 +77,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     _currentWorkerRuntime = WorkerRuntime.powershell;
                 }
-                else if(args.Contains("--custom"))
+                else if (args.Contains("--custom"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.custom;
                 }

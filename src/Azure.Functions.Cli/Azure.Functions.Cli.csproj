@@ -30,9 +30,9 @@
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
   </PropertyGroup>
 
-  <!-- SkipNet8Child build property will be True for artifacts used by VS feed -->
-  <PropertyGroup Condition="'$(SkipNet8Child)' == 'True'">
-    <DefineConstants>SkipNet8Child</DefineConstants>
+  <!-- SkipInProcessHost build property will be True for artifacts used by VS feed -->
+  <PropertyGroup Condition="'$(SkipInProcessHost)' == 'True'">
+    <DefineConstants>SkipInProcessHost</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
     <PublishReadyToRun>false</PublishReadyToRun>
@@ -305,17 +305,17 @@
     </CreateItem>
   </Target>
   <!-- Build/Publish for net8.0 TFM as well-->
-  <Target Name="BuildInProcNet8" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipNet8Child)'!='True'">
+  <Target Name="BuildInProcNet8" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipInProcessHost)'!='True'">
     <PropertyGroup>
       <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
     </PropertyGroup>
-    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True" />
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
   </Target>
-  <Target Name="PublishInProcNet8" AfterTargets="Publish" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipNet8Child)'!='True'">
+  <Target Name="PublishInProcNet8" AfterTargets="Publish" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipInProcessHost)'!='True'">
     <PropertyGroup>
       <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
     </PropertyGroup>
-    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True" />
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
   </Target>
 
 </Project>

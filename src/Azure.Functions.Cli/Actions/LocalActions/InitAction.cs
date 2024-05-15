@@ -64,6 +64,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         // Default to .NET 8 if the target framework is not specified
         private const string DefaultTargetFramework = Common.TargetFramework.net8;
 
+        private const string DefaultInProcTargetFramework = Common.TargetFramework.net6;
+
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
             { new Lazy<string>(() => ".gitignore"), StaticResources.GitIgnore }
@@ -349,20 +351,31 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private void ValidateTargetFramework()
         {
-            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            if (string.IsNullOrEmpty(TargetFramework))
             {
-                if (string.IsNullOrEmpty(TargetFramework))
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
                 {
-                    // Default to .NET 8 if the target framework is not specified
-                    // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
                     TargetFramework = DefaultTargetFramework;
                 }
-                if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
+                else if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet)
                 {
-                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"");
+                    TargetFramework = DefaultInProcTargetFramework;
+                }
+                else
+                {
+                    return;
                 }
             }
-            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet && !string.IsNullOrEmpty(TargetFramework))
+
+            var supportedFrameworks = ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated
+                ? TargetFrameworkHelper.GetSupportedTargetFrameworks()
+                : TargetFrameworkHelper.GetSupportedInProcTargetFrameworks();
+
+            if (!supportedFrameworks.Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
+            {
+                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are {string.Join(", ", supportedFrameworks)}");
+            }
+            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet)
             {
                 throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }

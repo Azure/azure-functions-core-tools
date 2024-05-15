@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -38,9 +39,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
     {
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
-
-        // The flag we will pass when launching the child process for in-proc .NET8 application
-        private const string Net8InProcFlag = "net8inproc";
+        private const string Net6FrameworkDescriptionPrefix = ".NET 6.0";
         private readonly ISecretsManager _secretsManager;
         private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
@@ -378,21 +377,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return isInProcNet8Enabled;
         }
 
-        // We launch the in-proc .NET8 application as a child process only if the SkipNet8Child conditional compilation symbol is not defined.
-        // During build, we pass SkipNet8Child=True only for artifacts used by Visual studio feed (we don't want to launch child process in that case).
+        // We launch the in-proc .NET8 application as a child process only if the SkipInProcessHost conditional compilation symbol is not defined.
+        // During build, we pass SkipInProcessHost=True only for artifacts used by our feed (we don't want to launch child process in that case).
         private bool ShouldLaunchInProcNet8AsChildProcess()
         {
-#if SkipNet8Child
+#if SkipInProcessHost
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor("SkipNet8Child compilation symbol is defined."));
+                ColoredConsole.WriteLine(VerboseColor("SkipInProcessHost compilation symbol is defined."));
             }
 
             return false;
 #else
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor("SkipNet8Child compilation symbol is not defined."));
+                ColoredConsole.WriteLine(VerboseColor("SkipInProcessHost compilation symbol is not defined."));
             }
 
             return true;
@@ -426,6 +425,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             await PreRunConditions();
 
+            var isCurrentProcessNet6Build = RuntimeInformation.FrameworkDescription.Contains(Net6FrameworkDescriptionPrefix);
+            if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
+            {
+                await StartInProc8AsChildProcessAsync();
+                return;
+            }
+
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
@@ -439,11 +445,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.Hosting.Lifetime", "None");
 
             Utilities.PrintVersion();
-
-            if (ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
-            {
-                await StartInProc8AsChildProcessAsync();
-            }
 
             ScriptApplicationHostOptions hostOptions = SelfHostWebHostSettingsFactory.Create(Environment.CurrentDirectory);
 
@@ -480,19 +481,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor($"Starting child process for .NET8 In-proc."));
+                ColoredConsole.WriteLine(VerboseColor($"Starting child process for in-process model host."));
             }
 
             var commandLineArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
-
-            // Ensure we launch the child process only once to avoid infinite recursion.
-            if (commandLineArguments.Contains(Net8InProcFlag))
-            {
-                return Task.CompletedTask;
-            }
-
-            var tcs = new TaskCompletionSource<bool>();
-            var functionAppRootPath = GlobalCoreToolsSettings.FunctionAppRootPath!;
+            var tcs = new TaskCompletionSource();
             var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
             var inProc8FuncExecutablePath = Path.Combine(funcExecutableDirectory, "in-proc8", "func.exe");
 
@@ -501,8 +494,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var inprocNet8ChildProcessInfo = new ProcessStartInfo
             {
                 FileName = inProc8FuncExecutablePath,
-                Arguments = $"{commandLineArguments} --{Net8InProcFlag}",
-                WorkingDirectory = functionAppRootPath,
+                Arguments = $"{commandLineArguments} --no-build",
+                WorkingDirectory = Environment.CurrentDirectory,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -533,7 +526,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 childProcess.EnableRaisingEvents = true;
                 childProcess.Exited += (sender, args) =>
                 {
-                    tcs.SetResult(true);
+                    tcs.SetResult();
                 };
                 childProcess.BeginOutputReadLine();
                 childProcess.BeginErrorReadLine();
@@ -542,7 +535,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             catch (Exception ex)
             {
-                throw new CliException($"Failed to start the child process for in-proc8. {ex.Message}");
+                throw new CliException($"Failed to start the in-process model host. {ex.Message}");
             }
 
             return tcs.Task;
@@ -558,7 +551,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (!net8ExeExist)
             {
-                throw new CliException($"Failed to locate the in-proc8 func executable at {inProc8FuncExecutablePath}");
+                throw new CliException($"Failed to locate the in-process model host at {inProc8FuncExecutablePath}");
             }
         }
 
