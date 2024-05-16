@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -250,6 +249,21 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = new[]
                 {
                     $"Worker runtime '{unknownWorkerRuntime}' is not a valid option."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_with_unsupported_target_framework_for_dotnet()
+        {
+            const string unsupportedTargetFramework = "net7.0";
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet --target-framework {unsupportedTargetFramework}" },
+                HasStandardError = true,
+                ErrorContains = new[]
+                {
+                    $"Unable to parse target framework {unsupportedTargetFramework}. Valid options are net8.0, net6.0"
                 }
             }, _output);
         }

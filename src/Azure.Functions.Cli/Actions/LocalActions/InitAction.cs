@@ -11,10 +11,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
-using DurableTask.Core;
-using Dynamitey;
 using Fclp;
-using Microsoft.Azure.AppService.Proxy.Common.Constants;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -127,7 +124,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("target-framework")
-                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"")
+                .WithDescription($"Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated or dotnet. Options are - {string.Join(", ", TargetFrameworkHelper.GetSupportedTargetFrameworks())}")
                 .Callback(tf => TargetFramework = tf);
 
             Parser
