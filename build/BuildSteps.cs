@@ -123,7 +123,7 @@ namespace Build
                 }
 
                 // Publish net8 version of the artifact as well.
-                var outputPathNet8 = BuildNet8ArtifactPath(runtime);
+                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
                 ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
                 RemoveLanguageWorkers(outputPathNet8);
             }
@@ -134,10 +134,12 @@ namespace Build
             }
         }
 
-        private static string BuildNet8ArtifactPath(string runtime)
+        private static string BuildNet8ArtifactFullPath(string runtime)
         {
-            return Path.Combine(Settings.OutputDir, runtime + "_net8.0");
+            return Path.Combine(Settings.OutputDir, BuildNet8ArtifactDirectory(runtime));
         }
+
+        private static string BuildNet8ArtifactDirectory(string runtime) => runtime + "_net8.0";
 
         private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
         {
@@ -172,7 +174,7 @@ namespace Build
                             $"{Environment.NewLine}Found runtimes are {string.Join(", ", allFoundPowershellRuntimes)}");
                     }
 
-                    // Delete all the runtimes that should not belong to the current runtime
+                    // Delete all the runtimes that should not belong to the current artifactDirectory
                     allFoundPowershellRuntimes.Except(powershellRuntimesForCurrentToolsRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
                 }
             }
@@ -196,6 +198,8 @@ namespace Build
                     }
                 }
             }
+
+            // No action needed for the "_net8.0" versions of these artifacts as they have an empty "workers" directory.
         }
 
         public static void FilterPythonRuntimes()
@@ -224,11 +228,13 @@ namespace Build
 
                     if (!atLeastOne)
                     {
-                        throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for runtime '{runtime}'. " +
+                        throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for artifactDirectory '{runtime}'. " +
                             $"Something went wrong.");
                     }
                 }
             }
+
+            // No action needed for the "_net8.0" versions of these artifacts as they have an empty "workers" directory.
         }
 
         public static void AddDistLib()
@@ -251,6 +257,8 @@ namespace Build
 
             File.Delete(distLibZip);
             Directory.Delete(distLibDir, recursive: true);
+
+            // No action needed for the "_net8.0" versions of these artifacts as we don't ship workers for them.
         }
 
         public static void AddTemplatesNupkgs()
@@ -533,7 +541,7 @@ namespace Build
         {
             if (!Directory.Exists(artifactSourcePath))
             {
-                return;
+                throw new Exception($"Artifact source path {artifactSourcePath} does not exist.");
             }
 
             ColoredConsole.WriteLine($"Creating {zipPath}");
@@ -553,10 +561,10 @@ namespace Build
                 CreateZipFromArtifact(artifactPath, zipPath);
 
                 // Zip the .net8 version as well.
-                var net8Path = BuildNet8ArtifactPath(runtime);
+                var net8Path = BuildNet8ArtifactFullPath(runtime);
                 var net8ZipPath = zipPath.Replace(".zip", "_net8.0.zip");
                 CreateZipFromArtifact(net8Path, net8ZipPath);
-                
+
 
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
                 // the ./generateMsiFiles.ps1 script
@@ -596,12 +604,15 @@ namespace Build
         public static void GenerateSBOMManifestForZips()
         {
             Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
-            // Generate the SBOM manifest for each runtime
-            foreach (var runtime in Settings.TargetRuntimes)
+            // Generate the SBOM manifest for each artifactDirectory
+
+            var allArtifactDirectories = Settings.TargetRuntimes.Concat(Settings.TargetRuntimes.Select(r => BuildNet8ArtifactDirectory(r)));
+
+            foreach (var artifactDirectory in allArtifactDirectories)
             {
-                var packageName = $"Azure.Functions.Cli.{runtime}.{CurrentVersion}";
-                var buildPath = Path.Combine(Settings.OutputDir, runtime);
-                var manifestFolderPath = Path.Combine(buildPath, "_manifest");
+                var packageName = $"Azure.Functions.Cli.{artifactDirectory}.{CurrentVersion}";
+                var artifactDirectoryFullPath = Path.Combine(Settings.OutputDir, artifactDirectory);
+                var manifestFolderPath = Path.Combine(artifactDirectoryFullPath, "_manifest");
                 var telemetryFilePath = Path.Combine(Settings.SBOMManifestTelemetryDir, Guid.NewGuid().ToString() + ".json");
 
                 // Delete the manifest folder if it exists
@@ -612,8 +623,8 @@ namespace Build
 
                 // Generate the SBOM manifest
                 Shell.Run("dotnet",
-                    $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {buildPath}"
-                    + $" -BuildComponentPath {buildPath} -Verbosity Information -t {telemetryFilePath}");
+                    $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {artifactDirectoryFullPath}"
+                    + $" -BuildComponentPath {artifactDirectoryFullPath} -Verbosity Information -t {telemetryFilePath}");
             }
         }
 

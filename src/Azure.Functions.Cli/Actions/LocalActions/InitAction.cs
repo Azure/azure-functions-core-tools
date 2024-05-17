@@ -370,7 +370,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (!supportedFrameworks.Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
             {
-                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are {string.Join(", ", supportedFrameworks)}");
+                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework} for worker runtime {ResolvedWorkerRuntime}. Valid options are {string.Join(", ", supportedFrameworks)}");
             }
             else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet)
             {
