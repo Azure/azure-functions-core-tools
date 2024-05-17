@@ -263,7 +263,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 HasStandardError = true,
                 ErrorContains = new[]
                 {
-                    $"Unable to parse target framework {unsupportedTargetFramework}. Valid options are net8.0, net6.0"
+                    $"Unable to parse target framework {unsupportedTargetFramework} for worker runtime dotnet. Valid options are net8.0, net6.0"
                 }
             }, _output);
         }
