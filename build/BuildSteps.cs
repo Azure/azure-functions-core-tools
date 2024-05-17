@@ -104,7 +104,7 @@ namespace Build
                                 $"/p:TargetFramework=net6.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release --no-build");
+                                $"-o {outputPath} -c Release ");
         }
 
         public static void DotnetPublishForZips()
