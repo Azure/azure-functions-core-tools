@@ -101,6 +101,7 @@ namespace Build
             Shell.Run("dotnet", $"pack {Settings.SrcProjectPath} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
+                                $"/p:TargetFramework=net6.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release --no-build");
@@ -110,25 +111,45 @@ namespace Build
         {
             foreach (var runtime in Settings.TargetRuntimes)
             {
+                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
-                Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
-                                    $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                    $"/p:CommitHash=\"{Settings.CommitId}\" " +
-                                    (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                    $"-o {outputPath} -c Release " +
-                                    (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
 
-                if (runtime.StartsWith(Settings.MinifiedVersionPrefix))
+                ExecuteDotnetPublish(outputPath, rid, "net6.0", skipLaunchingNet8ChildProcess: isMinVersion);
+
+                if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
                 }
+
+                // Publish net8 version of the artifact as well.
+                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
+                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
+                RemoveLanguageWorkers(outputPathNet8);
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
                 _integrationManifest.CommitId = Settings.CommitId;
             }
+        }
+
+        private static string BuildNet8ArtifactFullPath(string runtime)
+        {
+            return Path.Combine(Settings.OutputDir, BuildNet8ArtifactDirectory(runtime));
+        }
+
+        private static string BuildNet8ArtifactDirectory(string runtime) => runtime + "_net8.0";
+
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
+        {
+            Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
+                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
+                                $"/p:SkipInProcessHost=\"{skipLaunchingNet8ChildProcess}\" " +
+                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
+                                $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +
+                                (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
         public static void FilterPowershellRuntimes()
@@ -153,7 +174,7 @@ namespace Build
                             $"{Environment.NewLine}Found runtimes are {string.Join(", ", allFoundPowershellRuntimes)}");
                     }
 
-                    // Delete all the runtimes that should not belong to the current runtime
+                    // Delete all the runtimes that should not belong to the current artifactDirectory
                     allFoundPowershellRuntimes.Except(powershellRuntimesForCurrentToolsRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
                 }
             }
@@ -177,6 +198,8 @@ namespace Build
                     }
                 }
             }
+
+            // No action needed for the "_net8.0" versions of these artifacts as they have an empty "workers" directory.
         }
 
         public static void FilterPythonRuntimes()
@@ -205,11 +228,13 @@ namespace Build
 
                     if (!atLeastOne)
                     {
-                        throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for runtime '{runtime}'. " +
+                        throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for artifactDirectory '{runtime}'. " +
                             $"Something went wrong.");
                     }
                 }
             }
+
+            // No action needed for the "_net8.0" versions of these artifacts as they have an empty "workers" directory.
         }
 
         public static void AddDistLib()
@@ -232,6 +257,8 @@ namespace Build
 
             File.Delete(distLibZip);
             Directory.Delete(distLibDir, recursive: true);
+
+            // No action needed for the "_net8.0" versions of these artifacts as we don't ship workers for them.
         }
 
         public static void AddTemplatesNupkgs()
@@ -314,7 +341,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx");
         }
 
         public static void CopyBinariesToSign()
@@ -371,7 +398,7 @@ namespace Build
 
             // These assemblies are currently signed, but with an invalid root cert.
             // Until that is resolved, we are explicity signing the AppService.Middleware packages
-            
+
             unSignedBinaries = unSignedBinaries.Concat(allFiles
                 .Where(f => f.Contains("Microsoft.Azure.AppService.Middleware") || f.Contains("Microsoft.Azure.AppService.Proxy"))).ToList();
 
@@ -384,6 +411,8 @@ namespace Build
 
         public static void TestPreSignedArtifacts()
         {
+            var filterExtensionsSignSet = new HashSet<string>(Settings.SignInfo.FilterExtensionsSign);
+
             foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
             {
                 if (supportedRuntime.StartsWith("osx"))
@@ -397,20 +426,30 @@ namespace Build
                 Directory.CreateDirectory(targetDir);
                 FileHelpers.RecursiveCopy(sourceDir, targetDir);
 
-                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
-                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
+                var inProc8Directory = Path.Combine(targetDir, "in-proc8");
+                var inProc8DirectoryExists = Directory.Exists(inProc8Directory);
+
+                var toSignPathsForInProc8 = inProc8DirectoryExists
+                    ? Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(inProc8Directory, el))
+                    : Enumerable.Empty<string>();
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForInProc8);
+
+                var toSignThirdPartyPathsForInProc8 = inProc8DirectoryExists
+                    ? Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(inProc8Directory, el))
+                    : Enumerable.Empty<string>();
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInProc8);
+
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
-                                    .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
+                                    .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))).ToList();
 
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
-                                        .Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))));
+                                        .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
                 unSignedFiles.ForEach(filePath => File.Delete(filePath));
 
                 var unSignedPackages = GetUnsignedBinaries(targetDir);
                 if (unSignedPackages.Count() != 0)
                 {
-
                     var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
                     ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
                     throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
@@ -498,17 +537,34 @@ namespace Build
             return unSignedPackages;
         }
 
+        private static void CreateZipFromArtifact(string artifactSourcePath, string zipPath)
+        {
+            if (!Directory.Exists(artifactSourcePath))
+            {
+                throw new Exception($"Artifact source path {artifactSourcePath} does not exist.");
+            }
+
+            ColoredConsole.WriteLine($"Creating {zipPath}");
+            ZipFile.CreateFromDirectory(artifactSourcePath, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+        }
+
         public static void Zip()
         {
             var version = CurrentVersion;
 
             foreach (var runtime in Settings.TargetRuntimes)
             {
-                var path = Path.Combine(Settings.OutputDir, runtime);
+                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
+                var artifactPath = Path.Combine(Settings.OutputDir, runtime);
 
                 var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
-                ColoredConsole.WriteLine($"Creating {zipPath}");
-                ZipFile.CreateFromDirectory(path, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+                CreateZipFromArtifact(artifactPath, zipPath);
+
+                // Zip the .net8 version as well.
+                var net8Path = BuildNet8ArtifactFullPath(runtime);
+                var net8ZipPath = zipPath.Replace(".zip", "_net8.0.zip");
+                CreateZipFromArtifact(net8Path, net8ZipPath);
+
 
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
                 // the ./generateMsiFiles.ps1 script
@@ -516,13 +572,12 @@ namespace Build
                 {
                     try
                     {
-                        Directory.Delete(path, recursive: true);
+                        Directory.Delete(artifactPath, recursive: true);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        ColoredConsole.Error.WriteLine($"Error deleting {path}");
+                        ColoredConsole.Error.WriteLine($"Error deleting {artifactPath}. Exception: {ex}");
                     }
-
                 }
 
                 ColoredConsole.WriteLine();
@@ -549,12 +604,15 @@ namespace Build
         public static void GenerateSBOMManifestForZips()
         {
             Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
-            // Generate the SBOM manifest for each runtime
-            foreach (var runtime in Settings.TargetRuntimes)
+            // Generate the SBOM manifest for each artifactDirectory
+
+            var allArtifactDirectories = Settings.TargetRuntimes.Concat(Settings.TargetRuntimes.Select(r => BuildNet8ArtifactDirectory(r)));
+
+            foreach (var artifactDirectory in allArtifactDirectories)
             {
-                var packageName = $"Azure.Functions.Cli.{runtime}.{CurrentVersion}";
-                var buildPath = Path.Combine(Settings.OutputDir, runtime);
-                var manifestFolderPath = Path.Combine(buildPath, "_manifest");
+                var packageName = $"Azure.Functions.Cli.{artifactDirectory}.{CurrentVersion}";
+                var artifactDirectoryFullPath = Path.Combine(Settings.OutputDir, artifactDirectory);
+                var manifestFolderPath = Path.Combine(artifactDirectoryFullPath, "_manifest");
                 var telemetryFilePath = Path.Combine(Settings.SBOMManifestTelemetryDir, Guid.NewGuid().ToString() + ".json");
 
                 // Delete the manifest folder if it exists
@@ -565,8 +623,8 @@ namespace Build
 
                 // Generate the SBOM manifest
                 Shell.Run("dotnet",
-                    $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {buildPath}"
-                    + $" -BuildComponentPath {buildPath} -Verbosity Information -t {telemetryFilePath}");
+                    $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {artifactDirectoryFullPath}"
+                    + $" -BuildComponentPath {artifactDirectoryFullPath} -Verbosity Information -t {telemetryFilePath}");
             }
         }
 
@@ -576,9 +634,10 @@ namespace Build
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
+                                $"/p:TargetFramework=net6.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release");
+                                $"-c Release -f net6.0");
         }
 
         public static void GenerateSBOMManifestForNupkg()

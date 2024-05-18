@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <AssemblyName>Azure.Functions.Cli.Tests</AssemblyName>
     <RootNamespace>Azure.Functions.Cli.Tests</RootNamespace>
@@ -45,4 +45,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Azure.Functions.Cli\Azure.Functions.Cli.csproj" />
   </ItemGroup>
+  <!-- The "in-proc8" directory content is created using an msbuild target in "Azure.Functions.Cli" project and they don't automatically gets copied to the test project output directory -->
+  <Target Name="CopyInProc8" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0'">
+    <Exec Command="xcopy /Y /I /E &quot;$(MSBuildThisFileDirectory)..\..\src\Azure.Functions.Cli\bin\$(Configuration)\$(TargetFramework)\in-proc8\*&quot; &quot;$(OutDir)in-proc8\&quot;" />
+  </Target>
 </Project>
