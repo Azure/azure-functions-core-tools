@@ -22,14 +22,22 @@
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>func</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
   </PropertyGroup>
 
+  <!-- Pack only the net6.0 version (which will include the bits needed for net8.0 usecase) -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>func</ToolCommandName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  
   <!-- SkipInProcessHost build property will be True for artifacts used by VS feed -->
   <PropertyGroup Condition="'$(SkipInProcessHost)' == 'True'">
     <DefineConstants>SkipInProcessHost</DefineConstants>
