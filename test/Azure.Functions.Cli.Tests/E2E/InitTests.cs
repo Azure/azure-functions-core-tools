@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -209,6 +208,37 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_dotnet_app_net8()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet --target-framework net8.0" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "local.settings.json"),
+                        ContentContains = new[]
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "dotnet",
+                            "FUNCTIONS_INPROC_NET8_ENABLED",
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "dotnet-funcs.csproj"),
+                        ContentContains = new[]
+                        {
+                            "Microsoft.NET.Sdk.Functions",
+                            "v4"
+                        }
+                    }
+                }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_unknown_worker_runtime()
         {
             const string unknownWorkerRuntime = "foo";
@@ -219,6 +249,21 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = new[]
                 {
                     $"Worker runtime '{unknownWorkerRuntime}' is not a valid option."
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_with_unsupported_target_framework_for_dotnet()
+        {
+            const string unsupportedTargetFramework = "net7.0";
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet --target-framework {unsupportedTargetFramework}" },
+                HasStandardError = true,
+                ErrorContains = new[]
+                {
+                    $"Unable to parse target framework {unsupportedTargetFramework} for worker runtime dotnet. Valid options are net8.0, net6.0"
                 }
             }, _output);
         }

@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -37,7 +39,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
     {
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
+        private const string Net6FrameworkDescriptionPrefix = ".NET 6.0";
         private readonly ISecretsManager _secretsManager;
+        private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
         private readonly KeyVaultReferencesManager _keyVaultReferencesManager;
 
@@ -73,9 +77,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string JsonOutputFile { get; set; }
 
-        public StartHostAction(ISecretsManager secretsManager)
+        public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
         {
             _secretsManager = secretsManager;
+            _processManager = processManager;
             _keyVaultReferencesManager = new KeyVaultReferencesManager();
         }
 
@@ -141,7 +146,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                 .Setup<List<string>>("functions")
-                .WithDescription("A space seperated list of functions to load.")
+                .WithDescription("A space separated list of functions to load.")
                 .Callback(f => EnabledFunctions = f);
 
             Parser
@@ -307,7 +312,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             Environment.SetEnvironmentVariable("DOTNET_STARTUP_HOOKS", "Microsoft.Azure.Functions.Worker.Core");
         }
-        
+
         private void EnableWorkerIndexing(IDictionary<string, string> secrets)
         {
             // Set only if the environment variable already doesn't exist and app setting doesn't have this setting.
@@ -321,7 +326,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             foreach (var secret in secrets)
             {
-                if (string.IsNullOrEmpty(secret.Key)) {
+                if (string.IsNullOrEmpty(secret.Key))
+                {
                     ColoredConsole.WriteLine(WarningColor($"Skipping local setting with empty key."));
                 }
                 else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(secret.Key)))
@@ -351,9 +357,80 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
+        /// <summary>
+        /// Check local.settings.json to determine whether in-proc .NET8 is enabled.
+        /// </summary>
+        private async Task<bool> IsInProcNet8Enabled()
+        {
+            var localSettingsJObject = await GetLocalSettingsJsonAsJObjectAsync();
+            var inProcNet8EnabledSettingValue = localSettingsJObject?["Values"]?[Constants.FunctionsInProcNet8Enabled]?.Value<string>();
+            var isInProcNet8Enabled = string.Equals("1", inProcNet8EnabledSettingValue);
+
+            if (VerboseLogging == true)
+            {
+                var message = isInProcNet8Enabled
+                    ? $"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json"
+                    : $"{Constants.FunctionsInProcNet8Enabled} app setting is not enabled in local.settings.json";
+                ColoredConsole.WriteLine(VerboseColor(message));
+            }
+
+            return isInProcNet8Enabled;
+        }
+
+        // We launch the in-proc .NET8 application as a child process only if the SkipInProcessHost conditional compilation symbol is not defined.
+        // During build, we pass SkipInProcessHost=True only for artifacts used by our feed (we don't want to launch child process in that case).
+        private bool ShouldLaunchInProcNet8AsChildProcess()
+        {
+#if SkipInProcessHost
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor("SkipInProcessHost compilation symbol is defined."));
+            }
+
+            return false;
+#else
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor("SkipInProcessHost compilation symbol is not defined."));
+            }
+
+            return true;
+#endif
+        }
+
+        private async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
+        {
+            var fullPath = Path.Combine(Environment.CurrentDirectory, Constants.LocalSettingsJsonFileName);
+            if (FileSystemHelpers.FileExists(fullPath))
+            {
+                var fileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(fullPath);
+                if (!string.IsNullOrEmpty(fileContent))
+                {
+                    var localSettingsJObject = JObject.Parse(fileContent);
+                    return localSettingsJObject;
+                }
+            }
+            else
+            {
+                if (VerboseLogging == true)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"{Constants.LocalSettingsJsonFileName} file not found. Path searched:{fullPath}"));
+                }
+            }
+
+            return null;
+        }
+
         public override async Task RunAsync()
         {
             await PreRunConditions();
+
+            var isCurrentProcessNet6Build = RuntimeInformation.FrameworkDescription.Contains(Net6FrameworkDescriptionPrefix);
+            if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
+            {
+                await StartInProc8AsChildProcessAsync();
+                return;
+            }
 
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
@@ -398,6 +475,84 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 ColoredConsole.WriteLine(AdditionalInfoColor("For detailed output, run func with --verbose flag."));
             }
             await runTask;
+        }
+
+        private Task StartInProc8AsChildProcessAsync()
+        {
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"Starting child process for in-process model host."));
+            }
+
+            var commandLineArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
+            var tcs = new TaskCompletionSource();
+            var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
+            var inProc8FuncExecutablePath = Path.Combine(funcExecutableDirectory, "in-proc8", "func.exe");
+
+            EnsureNet8FuncExecutablePresent(inProc8FuncExecutablePath);
+
+            var inprocNet8ChildProcessInfo = new ProcessStartInfo
+            {
+                FileName = inProc8FuncExecutablePath,
+                Arguments = $"{commandLineArguments} --no-build",
+                WorkingDirectory = Environment.CurrentDirectory,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            try
+            {
+                var childProcess = Process.Start(inprocNet8ChildProcessInfo);
+                if (VerboseLogging == true)
+                {
+                    ColoredConsole.WriteLine(VerboseColor($"Started child process with ID: {childProcess.Id}"));
+                }
+                childProcess!.OutputDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        ColoredConsole.WriteLine(e.Data);
+                    }
+                };
+                childProcess.ErrorDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        ColoredConsole.WriteLine(ErrorColor(e.Data));
+                    }
+                };
+                childProcess.EnableRaisingEvents = true;
+                childProcess.Exited += (sender, args) =>
+                {
+                    tcs.SetResult();
+                };
+                childProcess.BeginOutputReadLine();
+                childProcess.BeginErrorReadLine();
+                _processManager.RegisterChildProcess(childProcess);
+                childProcess.WaitForExit();
+            }
+            catch (Exception ex)
+            {
+                throw new CliException($"Failed to start the in-process model host. {ex.Message}");
+            }
+
+            return tcs.Task;
+        }
+
+        private void EnsureNet8FuncExecutablePresent(string inProc8FuncExecutablePath)
+        {
+            bool net8ExeExist = File.Exists(inProc8FuncExecutablePath);
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"{inProc8FuncExecutablePath} {(net8ExeExist ? "present" : "not present")} "));
+            }
+
+            if (!net8ExeExist)
+            {
+                throw new CliException($"Failed to locate the in-process model host at {inProc8FuncExecutablePath}");
+            }
         }
 
         private void ValidateAndBuildHostJsonConfigurationIfFileExists(ScriptApplicationHostOptions hostOptions)

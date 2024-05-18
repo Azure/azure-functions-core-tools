@@ -67,6 +67,11 @@ $DotnetSDKVersionRequirements = @{
         MinimalPatch = '417'
         DefaultPatch = '417'
     }
+
+    '8.0' = @{
+        MinimalPatch = '204'
+        DefaultPatch = '204'
+    }
 }
 
 function AddLocalDotnetDirPath {
