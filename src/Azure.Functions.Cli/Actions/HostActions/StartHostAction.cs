@@ -473,7 +473,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
                     s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
                 if (forwardedHttpUrl != null){
-                    baseUri = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
+                    var baseUrl = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
+                    baseUri = new Uri(baseUrl);
                 }
 
                 DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
