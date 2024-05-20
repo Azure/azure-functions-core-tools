@@ -80,6 +80,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
+	<EmbeddedResource Include="StaticResources\Dockerfile.dotnet8">
+	  <LogicalName>$(AssemblyName).Dockerfile.dotnet8</LogicalName>
+	</EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
     </EmbeddedResource>

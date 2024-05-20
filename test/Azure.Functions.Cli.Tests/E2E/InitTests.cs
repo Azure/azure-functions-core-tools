@@ -325,6 +325,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_dotnet8InProcess_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet --target-framework net8.0 --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:4-dotnet8" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_dotnetIsolated_dockerfile()
         {
             return CliTester.Run(new RunConfiguration
