@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Common
         public const string Dotnet = "dotnet";
         public const string FunctionsInProcNet8Enabled = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
-        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>"
+        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
         // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
 
 
