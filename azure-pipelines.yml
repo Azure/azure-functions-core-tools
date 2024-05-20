@@ -109,7 +109,7 @@ jobs:
   - task: EsrpCodeSigning@1
     displayName: 'Authenticode signing'
     inputs:
-      ConnectedServiceName: 'ESRP Service'
+      ConnectedServiceName: $(ESRPServiceConnectionName)
       FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Authenticode\'
       Pattern: '*.dll, *.exe'
       signConfigType: 'inlineSignParams'
@@ -330,7 +330,7 @@ jobs:
   - task: EsrpCodeSigning@3
     displayName: Sign
     inputs:
-      ConnectedServiceName: 'ESRP Service'
+      ConnectedServiceName: $(ESRPServiceConnectionName)
       FolderPath: '/home/vsts/work/1/s/publish-scripts/artifact/'
       Pattern: '*.deb'
       signConfigType: 'inlineSignParams'
