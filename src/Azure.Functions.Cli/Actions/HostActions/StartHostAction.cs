@@ -473,8 +473,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
                     s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
                 if (forwardedHttpUrl != null){
-                    Regex rgx = new Regex("<port>");
-                    baseUri = rgx.Replace(forwardedHttpUrl, Port.ToString(), 1);
+                    baseUri = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
                 }
 
                 DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
