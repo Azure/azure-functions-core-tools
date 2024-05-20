@@ -410,6 +410,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCsxDotNet);
                 }
+                else if (targetFramework == Common.TargetFramework.net8)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet8);
+                }
                 else
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet);
