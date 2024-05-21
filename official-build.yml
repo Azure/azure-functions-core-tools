@@ -159,7 +159,7 @@ extends:
           - task: EsrpCodeSigning@1
             displayName: 'Third party signing'
             inputs:
-              ConnectedServiceName: 'ESRP Service'
+              ConnectedServiceName: $(ESRPServiceConnectionName)
               FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\ThirdParty\'
               Pattern: '*.dll, *.exe'
               signConfigType: 'inlineSignParams'
