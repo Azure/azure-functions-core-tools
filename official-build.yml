@@ -194,7 +194,7 @@ extends:
           - task: EsrpCodeSigning@1
             displayName: 'Mac signing'
             inputs:
-              ConnectedServiceName: 'ESRP Service'
+              ConnectedServiceName: $(ESRPServiceConnectionName)
               FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Mac\'
               Pattern: '*.zip'
               signConfigType: 'inlineSignParams'
@@ -240,7 +240,7 @@ extends:
           - task: EsrpCodeSigning@1
             displayName: 'MSI Code Signing'
             inputs:
-              ConnectedServiceName: 'ESRP Service'
+              ConnectedServiceName: $(ESRPServiceConnectionName)
               FolderPath: '$(Build.Repository.LocalPath)\artifacts'
               Pattern: '*.msi'
               signConfigType: 'inlineSignParams'
