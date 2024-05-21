@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
@@ -468,6 +469,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var httpOptions = hostService.Services.GetRequiredService<IOptions<HttpOptions>>();
             if (scriptHost != null && scriptHost.Functions.Any())
             {
+                // Checking if in Limelight - it should have a `AzureDevSessionsRemoteHostName` value in local.settings.json.
+                var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
+                    s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
+                if (forwardedHttpUrl != null){
+                    var baseUrl = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
+                    baseUri = new Uri(baseUrl);
+                }
+
                 DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
             }
             if (VerboseLogging == null || !VerboseLogging.Value)
