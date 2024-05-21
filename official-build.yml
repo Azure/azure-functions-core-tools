@@ -33,9 +33,9 @@ extends:
           condition: eq(variables['LinuxPackageBuildTag'], '')
           timeoutInMinutes: "180"
           pool:
-            name: '1ES-Hosted-AzFunc'
-            demands:
-              - ImageOverride -equals MMS2022TLS
+            name: 1es-pool-azfunc
+            image: 1es-windows-2022 
+            os: windows
 
           variables:
             devops_buildNumber: $[counter(format(''), 1500)]
