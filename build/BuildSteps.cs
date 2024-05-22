@@ -16,6 +16,7 @@ namespace Build
 {
     public static class BuildSteps
     {
+        private const string Net8ArtifactNameSuffix = "_net8";
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
         private static IntegrationTestBuildManifest _integrationManifest;
 
@@ -139,7 +140,7 @@ namespace Build
             return Path.Combine(Settings.OutputDir, BuildNet8ArtifactDirectory(runtime));
         }
 
-        private static string BuildNet8ArtifactDirectory(string runtime) => runtime + "_net8.0";
+        private static string BuildNet8ArtifactDirectory(string runtime) => $"{runtime}{Net8ArtifactNameSuffix}";
 
         private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
         {
@@ -355,7 +356,9 @@ namespace Build
             Directory.CreateDirectory(thirdPartyDirectory);
             Directory.CreateDirectory(macDirectory);
 
-            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            var combinedRuntimesToSign = GetAllRuntimesToSign();
+
+            foreach (var supportedRuntime in combinedRuntimesToSign)
             {
                 var sourceDir = Path.Combine(Settings.OutputDir, supportedRuntime);
                 var dirName = $"Azure.Functions.Cli.{supportedRuntime}.{CurrentVersion}";
@@ -413,7 +416,9 @@ namespace Build
         {
             var filterExtensionsSignSet = new HashSet<string>(Settings.SignInfo.FilterExtensionsSign);
 
-            foreach (var supportedRuntime in Settings.SignInfo.RuntimesToSign)
+            var combinedRuntimesToSign = GetAllRuntimesToSign();
+
+            foreach (var supportedRuntime in combinedRuntimesToSign)
             {
                 if (supportedRuntime.StartsWith("osx"))
                 {
@@ -491,9 +496,12 @@ namespace Build
         {
             // Download sigcheck.exe
             var sigcheckPath = Path.Combine(Settings.OutputDir, "sigcheck.exe");
-            using (var client = new WebClient())
+            if (!File.Exists(sigcheckPath))
             {
-                client.DownloadFile(Settings.SignInfo.SigcheckDownloadURL, sigcheckPath);
+                using (var client = new WebClient())
+                {
+                    client.DownloadFile(Settings.SignInfo.SigcheckDownloadURL, sigcheckPath);
+                }
             }
 
             // https://peter.hahndorf.eu/blog/post/2010/03/07/WorkAroundSysinternalsLicensePopups
@@ -562,7 +570,7 @@ namespace Build
 
                 // Zip the .net8 version as well.
                 var net8Path = BuildNet8ArtifactFullPath(runtime);
-                var net8ZipPath = zipPath.Replace(".zip", "_net8.0.zip");
+                var net8ZipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}{Net8ArtifactNameSuffix}.{version}.zip");
                 CreateZipFromArtifact(net8Path, net8ZipPath);
 
 
@@ -573,10 +581,11 @@ namespace Build
                     try
                     {
                         Directory.Delete(artifactPath, recursive: true);
+                        Directory.Delete(net8Path, recursive: true);
                     }
                     catch (Exception ex)
                     {
-                        ColoredConsole.Error.WriteLine($"Error deleting {artifactPath}. Exception: {ex}");
+                        ColoredConsole.Error.WriteLine($"Error deleting artifact for runtime {runtime}. Exception: {ex}");
                     }
                 }
 
@@ -724,9 +733,29 @@ namespace Build
             }
         }
 
+        /// <summary>
+        /// Returns all target runtimes and their net8.0 versions.
+        /// </summary>
+        private static IEnumerable<string> GetAllTargetRuntimes()
+        {
+            var targetRuntimes = Settings.TargetRuntimes;
+            var net8Runtimes = targetRuntimes.Select(r => BuildNet8ArtifactDirectory(r));
+
+            return targetRuntimes.Concat(net8Runtimes);
+        }
+
+        private static IEnumerable<string> GetAllRuntimesToSign()
+        {
+            var runtimeToSign = Settings.SignInfo.RuntimesToSign;
+            var net8Runtimes = runtimeToSign.Select(r => BuildNet8ArtifactDirectory(r));
+
+            return runtimeToSign.Concat(net8Runtimes);
+        }
+
         public static void AddGoZip()
         {
-            foreach (var runtime in Settings.TargetRuntimes)
+            var combinedRuntimesToSign = GetAllTargetRuntimes();
+            foreach (var runtime in combinedRuntimesToSign)
             {
                 var outputPath = Path.Combine(Settings.OutputDir, runtime, "gozip");
                 Environment.SetEnvironmentVariable("GOARCH", "amd64");
