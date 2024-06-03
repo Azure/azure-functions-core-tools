@@ -1,0 +1,378 @@
+name: $(Build.SourceBranchName)_$(Build.Reason)
+
+pr: none
+
+trigger:
+  branches:
+    include:
+    - v4.x
+    - release_4.0
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+variables:
+  - template: /ci/variables/cfs.yml@eng
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc
+      image: 1es-windows-2022
+      os: windows
+    stages:     
+      - stage: Stage
+        jobs:
+        - job: Default
+          condition: eq(variables['LinuxPackageBuildTag'], '')
+          timeoutInMinutes: "180"
+          pool:
+            name: 1es-pool-azfunc
+            image: 1es-windows-2022 
+            os: windows
+
+          variables:
+            devops_buildNumber: $[counter(format(''), 1500)]
+            DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+            DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+          steps:
+          - pwsh: |
+              $simulateReleaseBuild = $null
+              if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+              {
+                  throw "SimulateReleaseBuild can only be set to true or false."
+              }
+
+              $isReleaseBuild = $false
+              if ($env:BuildSourceBranchName -like "release_4.0*" -or $simulateReleaseBuild)
+              {
+                  $isReleaseBuild = $true
+              }
+              Write-Host "Setting IsReleaseBuild to $isReleaseBuild because the branch name is $env:BuildSourceBranchName and SimulateReleaseBuild is $env:SimulateReleaseBuild"
+              Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
+              Write-Host "IsReleaseBuild: $isReleaseBuild"
+            displayName: 'Set IsReleaseBuild variable'
+            env:
+              BuildSourceBranchName: $(Build.SourceBranchName)
+              SimulateReleaseBuild: $(SimulateReleaseBuild)
+          - pwsh: |
+              $isIntegrationBuild = $false
+              $isCodeqlBuild = $false
+              if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
+              {
+                  $isIntegrationBuild = $true
+              }
+              Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
+              Write-Host "IsIntegrationBuild: $isIntegrationBuild"
+              Write-Host "##vso[task.setvariable variable=IsCodeqlBuild]$isCodeqlBuild"
+              Write-Host "IsCodeqlBuild: $isCodeqlBuild"
+            displayName: 'Set IsIntegrationBuild variable'
+          - pwsh: |
+              Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
+            displayName: Set up environment variables
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+          - pwsh: |
+              Import-Module ".\pipelineUtilities.psm1" -Force
+              Install-Dotnet
+            displayName: 'Install .NET 6.0 and 3.1'
+          - pwsh: |
+              Import-Module ".\pipelineUtilities.psm1" -Force
+              Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
+            env:
+              SBOMUtilSASUrl: $(SBOMUtilSASUrl)
+            condition: eq(variables['IsReleaseBuild'], 'true')
+            displayName: 'Install SBOM ManifestTool'
+          - task: NuGetToolInstaller@1
+            inputs:
+              versionSpec:
+            displayName: Install Nuget tool
+          - task: AzureCLI@2
+            displayName: Login via Azure CLI to acquire access token
+            inputs:
+              azureSubscription: $(E2ETestServiceConnectionName)
+              scriptType: ps
+              scriptLocation: inlineScript
+              inlineScript: |
+                # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
+                $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
+                echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+          - pwsh: |
+              .\validateWorkerVersions.ps1
+            displayName: 'Validate worker versions'
+            condition: ne(variables['skipWorkerVersionValidation'], 'true')
+          - pwsh: |
+              .\build.ps1
+            env:
+              AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+              BuildArtifactsStorage: $(BuildArtifactsStorage)
+              IsReleaseBuild: $(IsReleaseBuild)
+              IsCodeqlBuild: $(isCodeqlBuild)
+              DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+              TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+              IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+            displayName: 'Executing build script'
+          - pwsh: |
+              .\check-vulnerabilities.ps1
+            displayName: "Check for security vulnerabilities"
+          - task: EsrpCodeSigning@1
+            displayName: 'Authenticode signing'
+            inputs:
+              ConnectedServiceName: $(ESRPServiceConnectionName)
+              FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Authenticode\'
+              Pattern: '*.dll, *.exe'
+              signConfigType: 'inlineSignParams'
+              inlineOperation: |
+                [
+                    {
+                      "KeyCode": "CP-230012",
+                      "OperationCode": "SigntoolSign",
+                      "Parameters": {
+                        "OpusName": "Microsoft",
+                        "OpusInfo": "http://www.microsoft.com",
+                        "FileDigest": "/fd \"SHA256\"",
+                        "PageHash": "/NPH",
+                        "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                      },
+                      "ToolName": "sign",
+                      "ToolVersion": "1.0"
+                    },
+                    {
+                      "KeyCode": "CP-230012",
+                      "OperationCode": "SigntoolVerify",
+                      "Parameters": {},
+                      "ToolName": "sign",
+                      "ToolVersion": "1.0"
+                    }
+                ]
+              SessionTimeout: '60'
+              MaxConcurrency: '50'
+              MaxRetryAttempts: '5'
+            condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+          - task: EsrpCodeSigning@1
+            displayName: 'Third party signing'
+            inputs:
+              ConnectedServiceName: $(ESRPServiceConnectionName)
+              FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\ThirdParty\'
+              Pattern: '*.dll, *.exe'
+              signConfigType: 'inlineSignParams'
+              inlineOperation: |
+                [
+                  {
+                      "KeyCode": "CP-231522",
+                      "OperationCode": "SigntoolSign",
+                      "Parameters": {
+                          "OpusName": "Microsoft",
+                          "OpusInfo": "http://www.microsoft.com",
+                          "Append": "/as",
+                          "FileDigest": "/fd \"SHA256\"",
+                          "PageHash": "/NPH",
+                          "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                      },
+                      "ToolName": "sign",
+                      "ToolVersion": "1.0"
+                  },
+                  {
+                      "KeyCode": "CP-231522",
+                      "OperationCode": "SigntoolVerify",
+                      "Parameters": {},
+                      "ToolName": "sign",
+                      "ToolVersion": "1.0"
+                  }
+                ]
+              SessionTimeout: '60'
+              MaxConcurrency: '50'
+              MaxRetryAttempts: '5'
+            condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+          - task: EsrpCodeSigning@1
+            displayName: 'Mac signing'
+            inputs:
+              ConnectedServiceName: $(ESRPServiceConnectionName)
+              FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Mac\'
+              Pattern: '*.zip'
+              signConfigType: 'inlineSignParams'
+              inlineOperation: |
+                [
+                  {
+                      "KeyCode" : "CP-401337-Apple",
+                      "OperationCode" : "MacAppDeveloperSign",
+                      "Parameters" : {},
+                      "ToolName" : "sign",
+                      "ToolVersion" : "1.0"
+                  }
+                ]
+              SessionTimeout: '60'
+              MaxConcurrency: '50'
+              MaxRetryAttempts: '5'
+            condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+          - pwsh: |
+              .\repackageBinaries.ps1
+            displayName: Repackage signed binaries
+            env:
+              AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+              BuildArtifactsStorage: $(BuildArtifactsStorage)
+              DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+              TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+            condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'run'
+              workingDirectory: '.\build'
+              arguments: 'TestSignedArtifacts --signTest'
+            displayName: 'Verify signed binaries'
+            condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+          - pwsh: |
+              .\generateMsiFiles.ps1
+            env:
+              AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+              BuildArtifactsStorage: $(BuildArtifactsStorage)
+              DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+              TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+            displayName: 'Generate MSI files'
+            condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+          - task: EsrpCodeSigning@1
+            displayName: 'MSI Code Signing'
+            inputs:
+              ConnectedServiceName: $(ESRPServiceConnectionName)
+              FolderPath: '$(Build.Repository.LocalPath)\artifacts'
+              Pattern: '*.msi'
+              signConfigType: 'inlineSignParams'
+              inlineOperation: |
+                [
+                    {
+                      "KeyCode": "CP-230012",
+                      "OperationCode": "SigntoolSign",
+                      "Parameters": {
+                        "OpusName": "Microsoft",
+                        "OpusInfo": "http://www.microsoft.com",
+                        "FileDigest": "/fd \"SHA256\"",
+                        "PageHash": "/NPH",
+                        "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                      },
+                      "ToolName": "sign",
+                      "ToolVersion": "1.0"
+                    },
+                    {
+                      "KeyCode": "CP-230012",
+                      "OperationCode": "SigntoolVerify",
+                      "Parameters": {},
+                      "ToolName": "sign",
+                      "ToolVersion": "1.0"
+                    }
+                ]
+              SessionTimeout: '60'
+              MaxConcurrency: '50'
+              MaxRetryAttempts: '5'
+            condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+
+          - pwsh: |
+              .\generateSha.ps1
+            displayName: 'Generate sha files'
+
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '**/*.trx'
+              failTaskOnFailedTests: true
+            condition: succeededOrFailed()
+          - pwsh: |
+              Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
+              Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
+              Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
+              if ($env:IntegrationBuildNumber -like "PreRelease*-*")
+              {
+                  $sourcePath = Join-Path '$(Build.Repository.LocalPath)\artifacts' 'integrationTestsBuildManifest.json'
+                  Move-Item -Path $sourcePath -Destination '$(Build.ArtifactStagingDirectory)'
+              }
+            env:
+              IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+            displayName: 'Move artifacts'
+          - task: 1ES.PublishPipelineArtifact@1
+            condition: succeeded()
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifactName: 'drop'
+              artifactType: 'pipeline'
+          - pwsh: |
+              .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
+            env:
+              IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
+              IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
+            displayName: 'Upload Core Tools build to the storage account for Integration Tests'
+            condition: eq(variables.IsIntegrationBuild, 'true')
+
+        - job: LinuxPackage
+          condition: ne(variables['LinuxPackageBuildTag'], '')
+          timeoutInMinutes: "120"
+          pool:
+            vmImage: 'ubuntu-latest'
+          steps:
+          # Bash v3
+          # Run a Bash script on macOS, Linux, or Windows.
+          - task: Bash@3
+            inputs:
+              targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
+              script: |
+                cd publish-scripts
+                python3 -m venv publish-env
+                source publish-env/bin/activate
+                pip install -r requirements.txt
+                apt-get install fakeroot
+                major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
+                python driver.py "$linuxBuildNumber" "$major_version"
+                python driver.py "$linuxBuildNumber"
+                export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
+                echo "${DEB_PACKAGE}"
+              bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+            env:
+              linuxBuildNumber: $(LinuxPackageBuildTag)      
+          - pwsh: |
+              echo $env:LinuxPackageAccountName
+              $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
+              az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+              az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+            env:
+              LinuxPackageAccountName: $(LinuxPackageAccountName)
+              LinuxPackageAccountKey: $(LinuxPackageAccountKey)
+              LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+            displayName: 'Upload Core Tools Unsigned Linux Package to the storage'
+          - task: EsrpCodeSigning@3
+            displayName: Sign
+            inputs:
+              ConnectedServiceName: $(ESRPServiceConnectionName)
+              FolderPath: '/home/vsts/work/1/s/publish-scripts/artifact/'
+              Pattern: '*.deb'
+              signConfigType: 'inlineSignParams'
+              inlineOperation: |
+                [
+                  {
+                    "keyCode": "CP-450779-Pgp",
+                    "operationSetCode": "LinuxSign",
+                    "parameters": [],
+                    "toolName": "signtool.exe",
+                    "toolVersion": "1.0"
+                  }
+                ]
+              SessionTimeout: '60'
+              MaxConcurrency: '50'
+              MaxRetryAttempts: '5'
+          - pwsh: |
+              echo $env:LinuxPackageAccountName
+              $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
+              az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+              az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+            env:
+              LinuxPackageAccountName: $(LinuxPackageAccountName)
+              LinuxPackageAccountKey: $(LinuxPackageAccountKey)
+              LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+            displayName: 'Upload Core Tools Signed Linux Package to the storage'
