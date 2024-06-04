@@ -1,7 +1,7 @@
 jobs:
 - job: Default
-condition: eq(variables['LinuxPackageBuildTag'], '')
-timeoutInMinutes: "180"
+  condition: eq(variables['LinuxPackageBuildTag'], '')
+  timeoutInMinutes: "180"
 pool:
   name: 1es-pool-azfunc
   image: 1es-windows-2022 

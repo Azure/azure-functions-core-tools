@@ -1,7 +1,7 @@
 jobs:
 - job: LinuxPackage
-condition: ne(variables['LinuxPackageBuildTag'], '')
-timeoutInMinutes: "120"
+  condition: ne(variables['LinuxPackageBuildTag'], '')
+  timeoutInMinutes: "120"
 pool:
   vmImage: 'ubuntu-latest'
 steps:
