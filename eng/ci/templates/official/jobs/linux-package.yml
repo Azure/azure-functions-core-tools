@@ -1,5 +1,5 @@
 jobs:
-  - job: LinuxPackage
+- job: LinuxPackage
   condition: ne(variables['LinuxPackageBuildTag'], '')
   timeoutInMinutes: "120"
   pool:
