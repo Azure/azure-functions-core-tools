@@ -145,7 +145,7 @@ jobs:
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
   steps:  
-    - task: EsrpCodeSigning@1
+  - task: EsrpCodeSigning@1
     displayName: 'Third party signing'
     inputs:
       ConnectedServiceName: $(ESRPServiceConnectionName)
