@@ -30,7 +30,7 @@ extends:
       image: 1es-windows-2022
       os: windows
     stages:     
-      - stage: Stage
+      - stage: BuildAndTest
         jobs:
         - template: /eng/ci/templates/official/jobs/build-test.yml@self
         - template: /eng/ci/templates/official/jobs/linux-package.yml@self

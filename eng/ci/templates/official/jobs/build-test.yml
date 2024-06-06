@@ -126,7 +126,26 @@ jobs:
       MaxConcurrency: '50'
       MaxRetryAttempts: '5'
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
-  - task: EsrpCodeSigning@1
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true
+    condition: succeededOrFailed()
+- job: Packaging
+  condition: eq(variables['LinuxPackageBuildTag'], '')
+  timeoutInMinutes: "180"
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-windows-2022 
+    os: windows
+  
+  variables:
+    devops_buildNumber: $[counter(format(''), 1500)]
+    DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+    DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+  steps:  
+    - task: EsrpCodeSigning@1
     displayName: 'Third party signing'
     inputs:
       ConnectedServiceName: $(ESRPServiceConnectionName)
@@ -246,12 +265,6 @@ jobs:
       .\generateSha.ps1
     displayName: 'Generate sha files'
 
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFormat: 'VSTest'
-      testResultsFiles: '**/*.trx'
-      failTaskOnFailedTests: true
-    condition: succeededOrFailed()
   - pwsh: |
       Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
       Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
