@@ -1,13 +1,20 @@
 name: $(Build.SourceBranchName)_$(Build.Reason)
 
-pr: none
-
-trigger:
+pr:
   branches:
     include:
     - v4.x
-    - v3.x
     - release_4.0
+    - v3.x
+    - release_3.0
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - v4.x
+    - release_4.0
+    - v3.x
     - release_3.0
 
 resources:
@@ -25,7 +32,7 @@ variables:
   - template: /ci/variables/cfs.yml@eng
 
 extends:
-  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
   parameters:
     pool:
       name: 1es-pool-azfunc
@@ -34,6 +41,5 @@ extends:
     stages:     
       - stage: BuildAndTest
         jobs:
-        - template: /eng/ci/templates/official/jobs/build-test.yml@self
-        - template: /eng/ci/templates/official/jobs/linux-package.yml@self
+        - template: /eng/ci/templates/official/jobs/build-test-public.yml@self
 

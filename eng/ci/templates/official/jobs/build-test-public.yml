@@ -1,0 +1,82 @@
+jobs:
+- job: Default
+  timeoutInMinutes: "180"
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-windows-2022 
+    os: windows
+
+  variables:
+    devops_buildNumber: $[counter(format(''), 1500)]
+    DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+    DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+  steps:
+  - pwsh: |
+      $simulateReleaseBuild = $null
+      if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
+      {
+          throw "SimulateReleaseBuild can only be set to true or false."
+      }
+
+      $isReleaseBuild = $false
+      if ($env:BuildSourceBranchName -like "release_4.0*" -or $simulateReleaseBuild)
+      {
+          $isReleaseBuild = $true
+      }
+      Write-Host "Setting IsReleaseBuild to $isReleaseBuild because the branch name is $env:BuildSourceBranchName and SimulateReleaseBuild is $env:SimulateReleaseBuild"
+      Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
+      Write-Host "IsReleaseBuild: $isReleaseBuild"
+    displayName: 'Set IsReleaseBuild variable'
+    env:
+      BuildSourceBranchName: $(Build.SourceBranchName)
+      SimulateReleaseBuild: $(SimulateReleaseBuild)
+  - pwsh: |
+      $isIntegrationBuild = $false
+      $isCodeqlBuild = $false
+      if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
+      {
+          $isIntegrationBuild = $true
+      }
+      Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
+      Write-Host "IsIntegrationBuild: $isIntegrationBuild"
+      Write-Host "##vso[task.setvariable variable=IsCodeqlBuild]$isCodeqlBuild"
+      Write-Host "IsCodeqlBuild: $isCodeqlBuild"
+    displayName: 'Set IsIntegrationBuild variable'
+  - pwsh: |
+      Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
+    displayName: Set up environment variables
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+  - pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET 6.0 and 3.1'
+  - task: NuGetToolInstaller@1
+    inputs:
+      versionSpec:
+    displayName: Install Nuget tool
+  - pwsh: |
+      .\validateWorkerVersions.ps1
+    displayName: 'Validate worker versions'
+    condition: ne(variables['skipWorkerVersionValidation'], 'true')
+  - pwsh: |
+      .\build.ps1
+    env:
+      AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
+      BuildArtifactsStorage: $(BuildArtifactsStorage)
+      IsReleaseBuild: $(IsReleaseBuild)
+      IsCodeqlBuild: $(isCodeqlBuild)
+      DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+      IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+    displayName: 'Executing build script'
+  - pwsh: |
+      .\check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true
+    condition: succeededOrFailed()
