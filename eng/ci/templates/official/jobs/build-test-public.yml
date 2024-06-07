@@ -46,11 +46,12 @@ jobs:
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
-      IsReleaseBuild: false
-      IsCodeqlBuild: $(isCodeqlBuild)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
-      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-      IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+      TELEMETRY_INSTRUMENTATION_KEY: ""
+      IntegrationBuildNumber: ""
+      IsReleaseBuild: false
+      IsPublicBuild: true
+      IsCodeqlBuild: false
     displayName: 'Executing build script'
   - pwsh: |
       .\check-vulnerabilities.ps1
