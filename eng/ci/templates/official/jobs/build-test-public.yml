@@ -2,7 +2,7 @@ jobs:
 - job: Default
   timeoutInMinutes: "180"
   pool:
-    name: 1es-pool-azfunc
+    name: 1es-pool-azfunc-public
     image: 1es-windows-2022 
     os: windows
 
