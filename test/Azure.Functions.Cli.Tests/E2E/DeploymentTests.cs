@@ -27,6 +27,12 @@ namespace Azure.Functions.Cli.Tests.E2E
             _storageAccountManager = saManager;
             _serverFarmManager = sfManager;
             _functionAppManager = faManager;
+
+            if (EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.IsPublicBuild))
+            {
+                return;
+            }
+
             if ((!_storageAccountManager.Contains(linuxStorageAccountName) ||
                 !_serverFarmManager.Contains(linuxConsumptionServerFarm) ||
                 !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp)) &&
@@ -63,6 +69,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async void RemoteBuildPythonFunctionApp()
         {
+            TestConditions.SkipIfPublicBuild();
             TestConditions.SkipIfCodeQLBuildOrEnableDeploymentTestsNotDefined();
             await CliTester.Run(new[] {
                 new RunConfiguration
