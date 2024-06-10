@@ -28,8 +28,15 @@ namespace Azure.Functions.Cli.Tests.E2E
             _serverFarmManager = sfManager;
             _functionAppManager = faManager;
 
-            if (EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.IsPublicBuild))
+            if (EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.IsPublicBuild) == true)
             {
+                // no need to create the resources for public build.
+                return;
+            }
+
+            if (!EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.EnableDeploymentTests))
+            {
+                // no need to create the resources if deployment tests are not enabled.
                 return;
             }
 
