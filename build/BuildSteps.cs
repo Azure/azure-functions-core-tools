@@ -610,8 +610,12 @@ namespace Build
             // Don't upload for public build.
             if (Settings.IsPublicBuild)
             {
+                ColoredConsole.WriteLine($"Skipping upload for public build.");
                 return;
             }
+
+            ColoredConsole.WriteLine($"Going to run the UploadToStorage. Setting is {Settings.IsPublicBuild}");
+
             
             if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
             {
