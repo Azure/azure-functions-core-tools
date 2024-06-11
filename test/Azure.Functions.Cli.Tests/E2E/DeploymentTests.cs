@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         private readonly static string linuxStorageAccountName = $"lcte2estorage{id}";
         private readonly static string linuxConsumptionServerFarm = $"lcte2ecserverfarm{id}";
         private readonly static string linuxConsumptionPythonFunctionApp = $"lcte2ecpython{id}";
+        private bool ResroucesCreated = false;
 
         public DeploymentTests(ITestOutputHelper output, StorageAccountManager saManager, ServerFarmManager sfManager, FunctionAppManager faManager) : base(output)
         {
@@ -40,13 +41,22 @@ namespace Azure.Functions.Cli.Tests.E2E
                 return;
             }
 
-            if ((!_storageAccountManager.Contains(linuxStorageAccountName) ||
+            try
+            {
+                if ((!_storageAccountManager.Contains(linuxStorageAccountName) ||
                 !_serverFarmManager.Contains(linuxConsumptionServerFarm) ||
                 !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp)) &&
-                ! EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.CodeQLBuild))
-            {
-                InitializeLinuxResources().Wait();
+                !EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.CodeQLBuild))
+                {
+                    InitializeLinuxResources().Wait();
+                }
+                ResroucesCreated = true;
             }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"Failed to initialize resources: {ex}");
+            }
+            
         }
 
         private async Task InitializeLinuxResources()
@@ -76,6 +86,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [SkippableFact]
         public async void RemoteBuildPythonFunctionApp()
         {
+            Skip.IfNot(ResroucesCreated, "Resources are not created");
             TestConditions.SkipIfPublicBuild();
             TestConditions.SkipIfCodeQLBuildOrEnableDeploymentTestsNotDefined();
             await CliTester.Run(new[] {
