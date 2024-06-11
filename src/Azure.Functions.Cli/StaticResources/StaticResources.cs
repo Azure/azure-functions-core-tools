@@ -30,6 +30,8 @@ namespace Azure.Functions.Cli
         public static Task<string> GitIgnore => GetValue("gitignore");
 
         public static Task<string> DockerfileDotNet => GetValue("Dockerfile.dotnet");
+        
+        public static Task<string> DockerfileDotNet8 => GetValue("Dockerfile.dotnet8");
 
         public static Task<string> DockerfileCustom => GetValue("Dockerfile.custom");
 

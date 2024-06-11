@@ -1,23 +1,30 @@
 ﻿using System;
 using System.Linq;
 using Autofac;
-using Colors.Net;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
-using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli
 {
     internal class Program
     {
+        static IContainer _container;
         internal static void Main(string[] args)
         {
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
-            ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
+            _container = InitializeAutofacContainer();
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+
+            ConsoleApp.Run<Program>(args, _container);
+        }
+
+        private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            var processManager = _container.Resolve<IProcessManager>();
+            processManager?.KillChildProcesses();
         }
 
         private static void SetupGlobalExceptionHandler()

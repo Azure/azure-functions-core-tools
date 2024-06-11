@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
@@ -22,12 +22,25 @@
     <ApplicationIcon>AzureFunctions-CLI.ico</ApplicationIcon>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>func</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
+  </PropertyGroup>
+
+  <!-- Pack only the net6.0 version (which will include the bits needed for net8.0 usecase) -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>func</ToolCommandName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  
+  <!-- SkipInProcessHost build property will be True for artifacts used by VS feed -->
+  <PropertyGroup Condition="'$(SkipInProcessHost)' == 'True'">
+    <DefineConstants>SkipInProcessHost</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
     <PublishReadyToRun>false</PublishReadyToRun>
@@ -67,6 +80,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
+	<EmbeddedResource Include="StaticResources\Dockerfile.dotnet8">
+	  <LogicalName>$(AssemblyName).Dockerfile.dotnet8</LogicalName>
+	</EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
     </EmbeddedResource>
@@ -268,7 +284,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.2" />
-    <PackageReference Include="Azure.Identity" Version="1.11.0" />
+    <PackageReference Include="Azure.Identity" Version="1.11.2" />
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.2.0" />
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />
@@ -276,27 +292,41 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.33.2" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.834.3" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.60.3" />
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="6.35.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.1.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.35.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
     <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.14.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.9.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.10.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.3131" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.3147" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.27.2" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.3220" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.3219" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.28.1" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
       <Output TaskParameter="Include" ItemName="PublishReadyToRunExclude" />
     </CreateItem>
   </Target>
+  <!-- Build/Publish for net8.0 TFM as well-->
+  <Target Name="BuildInProcNet8" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipInProcessHost)'!='True'">
+    <PropertyGroup>
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
+  </Target>
+  <Target Name="PublishInProcNet8" AfterTargets="Publish" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipInProcessHost)'!='True'">
+    <PropertyGroup>
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
+  </Target>
+
 </Project>

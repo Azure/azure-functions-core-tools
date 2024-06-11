@@ -11,6 +11,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static WorkerRuntime _currentWorkerRuntime;
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
+
         public static WorkerRuntime CurrentWorkerRuntime
         {
             get
@@ -76,7 +77,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     _currentWorkerRuntime = WorkerRuntime.powershell;
                 }
-                else if(args.Contains("--custom"))
+                else if (args.Contains("--custom"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.custom;
                 }
