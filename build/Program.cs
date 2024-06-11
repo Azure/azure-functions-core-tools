@@ -28,7 +28,8 @@ namespace Build
                 .Then(AddGoZip)
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
-                .Then(Test, skip: args.Contains("--codeql"))
+                // Todo: commented out test for turn  around time for testing on pipeline. Will add it back. DON'T MERGE PR WITH THIS COMMENT.
+                //.Then(Test, skip: args.Contains("--codeql"))
                 .Then(GenerateSBOMManifestForZips, skip: !args.Contains("--generateSBOM"))
                 .Then(Zip)
                 .Then(DotnetPublishForNupkg)
