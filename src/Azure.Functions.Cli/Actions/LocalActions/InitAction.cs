@@ -11,10 +11,7 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
-using DurableTask.Core;
-using Dynamitey;
 using Fclp;
-using Microsoft.Azure.AppService.Proxy.Common.Constants;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -63,6 +60,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         // Default to .NET 8 if the target framework is not specified
         private const string DefaultTargetFramework = Common.TargetFramework.net8;
+
+        private const string DefaultInProcTargetFramework = Common.TargetFramework.net6;
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -125,7 +124,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("target-framework")
-                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"")
+                .WithDescription($"Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated or dotnet. Options are - {string.Join(", ", TargetFrameworkHelper.GetSupportedTargetFrameworks())}")
                 .Callback(tf => TargetFramework = tf);
 
             Parser
@@ -349,22 +348,33 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private void ValidateTargetFramework()
         {
-            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            if (string.IsNullOrEmpty(TargetFramework))
             {
-                if (string.IsNullOrEmpty(TargetFramework))
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
                 {
-                    // Default to .NET 8 if the target framework is not specified
-                    // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
                     TargetFramework = DefaultTargetFramework;
                 }
-                if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
+                else if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet)
                 {
-                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"");
+                    TargetFramework = DefaultInProcTargetFramework;
+                }
+                else
+                {
+                    return;
                 }
             }
-            else if (!string.IsNullOrEmpty(TargetFramework))
+
+            var supportedFrameworks = ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated
+                ? TargetFrameworkHelper.GetSupportedTargetFrameworks()
+                : TargetFrameworkHelper.GetSupportedInProcTargetFrameworks();
+
+            if (!supportedFrameworks.Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
             {
-                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated");
+                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework} for worker runtime {ResolvedWorkerRuntime}. Valid options are {string.Join(", ", supportedFrameworks)}");
+            }
+            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet)
+            {
+                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
         }
 
@@ -399,6 +409,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (csx)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCsxDotNet);
+                }
+                else if (targetFramework == Common.TargetFramework.net8)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet8);
                 }
                 else
                 {
