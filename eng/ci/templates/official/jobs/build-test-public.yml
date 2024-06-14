@@ -13,15 +13,12 @@ jobs:
   steps:
   - pwsh: |
       $isIntegrationBuild = $false
-      $isCodeqlBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
       {
           $isIntegrationBuild = $true
       }
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
-      Write-Host "##vso[task.setvariable variable=IsCodeqlBuild]$isCodeqlBuild"
-      Write-Host "IsCodeqlBuild: $isCodeqlBuild"
     displayName: 'Set IsIntegrationBuild variable'
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"

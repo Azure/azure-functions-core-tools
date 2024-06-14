@@ -28,7 +28,7 @@ namespace Build
                 .Then(AddGoZip)
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
-                .Then(Test, skip: args.Contains("--codeql"))
+                .Then(Test)
                 .Then(GenerateSBOMManifestForZips, skip: !args.Contains("--generateSBOM"))
                 .Then(Zip)
                 .Then(DotnetPublishForNupkg)
@@ -36,7 +36,7 @@ namespace Build
                 .Then(DotnetPack)
                 .Then(DeleteSBOMTelemetryFolder, skip: !args.Contains("--generateSBOM"))
                 .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
-                .Then(UploadToStorage, skip: !args.Contains("--ci") || args.Contains("--codeql"))
+                .Then(UploadToStorage, skip: !args.Contains("--ci"))
                 .Run();
         }
     }

@@ -33,15 +33,12 @@ jobs:
       SimulateReleaseBuild: $(SimulateReleaseBuild)
   - pwsh: |
       $isIntegrationBuild = $false
-      $isCodeqlBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
       {
           $isIntegrationBuild = $true
       }
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
-      Write-Host "##vso[task.setvariable variable=IsCodeqlBuild]$isCodeqlBuild"
-      Write-Host "IsCodeqlBuild: $isCodeqlBuild"
     displayName: 'Set IsIntegrationBuild variable'
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
@@ -84,7 +81,6 @@ jobs:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: $(IsReleaseBuild)
-      IsCodeqlBuild: $(isCodeqlBuild)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
