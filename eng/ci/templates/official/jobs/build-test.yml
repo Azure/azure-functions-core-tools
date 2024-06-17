@@ -127,7 +127,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Mac signing'
-      folderPath: ''$(Build.Repository.LocalPath)\artifacts\ToSign\Mac\'
+      folderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Mac\'
       pattern: '*.zip'
       signType: zip
   
