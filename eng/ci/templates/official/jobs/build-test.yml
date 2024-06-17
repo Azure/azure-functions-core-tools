@@ -118,7 +118,6 @@ jobs:
             }
         ]
 
-
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
