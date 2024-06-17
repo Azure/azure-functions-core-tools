@@ -67,6 +67,7 @@ jobs:
       azureSubscription: $(E2ETestServiceConnectionName)
       scriptType: ps
       scriptLocation: inlineScript
+      signType: inline
       inlineScript: |
         # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
@@ -94,6 +95,7 @@ jobs:
       displayName: 'Authenticode signing (dll)'
       folderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Authenticode\'
       pattern: '*.dll, *.exe'
+      signType: inline
       inlineOperation: |
         [
             {
@@ -130,6 +132,7 @@ jobs:
       displayName: 'Third party signing (dll)'
       folderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\ThirdParty\'
       pattern: '*.dll, *.exe'
+      signType: inline
       inlineOperation: |
         [
           {
@@ -160,6 +163,7 @@ jobs:
       displayName: 'Mac signing'
       folderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Mac\'
       pattern: '*.zip'
+      signType: inline
       inlineOperation: |
         [
           {
@@ -202,6 +206,7 @@ jobs:
       displayName: 'MSI Code Signing'
       folderPath: '$(Build.Repository.LocalPath)\artifacts'
       pattern: '*.msi'
+      signType: inline
       inlineOperation: |
         [
             {
