@@ -19,7 +19,7 @@ resources:
   - repository: eng
     type: git
     name: engineering
-    ref: khkh/fix-sign-file
+    ref: refs/heads/khkh/fix-sign-files
 
 variables:
   - template: /ci/variables/cfs.yml@eng
