@@ -41,11 +41,7 @@ jobs:
   - pwsh: |
       .\build.ps1
     env:
-      AzureBlobSigningConnectionString: ""
       BuildArtifactsStorage: $(BuildArtifactsStorage)
-      DURABLE_STORAGE_CONNECTION: ""
-      TELEMETRY_INSTRUMENTATION_KEY: ""
-      IntegrationBuildNumber: ""
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
