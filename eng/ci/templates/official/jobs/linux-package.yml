@@ -34,13 +34,12 @@ jobs:
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
       LinuxPackageBuildTag: $(LinuxPackageBuildTag)
     displayName: 'Upload Core Tools Unsigned Linux Package to the storage'
-  - task: EsrpCodeSigning@3
-    displayName: Sign
-    inputs:
-      ConnectedServiceName: $(ESRPServiceConnectionName)
-      FolderPath: '/home/vsts/work/1/s/publish-scripts/artifact/'
-      Pattern: '*.deb'
-      signConfigType: 'inlineSignParams'
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Sign'
+      folderPath: '/home/vsts/work/1/s/publish-scripts/artifact/'
+      pattern: '*.deb'
+      signType: inline
       inlineOperation: |
         [
           {
