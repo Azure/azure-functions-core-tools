@@ -50,9 +50,6 @@ jobs:
             "toolVersion": "1.0"
           }
         ]
-      SessionTimeout: '60'
-      MaxConcurrency: '50'
-      MaxRetryAttempts: '5'
   - pwsh: |
       echo $env:LinuxPackageAccountName
       $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
