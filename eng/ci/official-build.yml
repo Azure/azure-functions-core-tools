@@ -1,3 +1,11 @@
+schedules:
+- cron: "0 0 * * *"
+  displayName: Nightly Build
+  branches:
+    include:
+      - v4.x
+  always: true
+
 name: $(Build.SourceBranchName)_$(Build.Reason)
 
 pr: none
@@ -6,9 +14,7 @@ trigger:
   branches:
     include:
     - v4.x
-    - v3.x
     - release_4.0
-    - release_3.0
 
 resources:
   repositories:
@@ -19,7 +25,7 @@ resources:
   - repository: eng
     type: git
     name: engineering
-    ref: khkh/fix-sign-files
+    ref: refs/heads/khkh/fix-sign-files
 
 variables:
   - template: /ci/variables/cfs.yml@eng
@@ -28,6 +34,7 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
   parameters:
     pool:
+      name: 1es-pool-azfunc
       image: 1es-windows-2022
       os: windows
     stages:     
