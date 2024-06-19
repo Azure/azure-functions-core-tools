@@ -23,6 +23,18 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         public DeploymentTests(ITestOutputHelper output, StorageAccountManager saManager, ServerFarmManager sfManager, FunctionAppManager faManager) : base(output)
         {
+            if (EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.IsPublicBuild) == true)
+            {
+                // no need to create the resources for public build.
+                return;
+            }
+
+            if (!EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.EnableDeploymentTests))
+            {
+                // no need to create the resources if deployment tests are not enabled.
+                return;
+            }
+            
             _storageAccountManager = saManager;
             _serverFarmManager = sfManager;
             _functionAppManager = faManager;
