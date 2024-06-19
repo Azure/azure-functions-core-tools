@@ -31,5 +31,11 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     !EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.EnableDeploymentTests),
                 reason: $"{E2ETestConstants.CodeQLBuild} is set to false and/or {E2ETestConstants.EnableDeploymentTests} is not set to true ");
         }
+
+        public static void SkipIfPublicBuild()
+        {
+            Skip.If(EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.IsPublicBuild) == true,
+                               reason: $"{E2ETestConstants.IsPublicBuild} is set to true");
+        }
     }
 }
