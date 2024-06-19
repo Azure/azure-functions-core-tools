@@ -170,7 +170,7 @@ jobs:
     displayName: 'Generate MSI files'
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
   - template: ci/sign-files.yml@eng
-    inputs:
+    parameters:
       displayName: 'MSI Code Signing'
       folderPath: '$(Build.Repository.LocalPath)\artifacts'
       pattern: '*.msi'
