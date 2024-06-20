@@ -116,6 +116,7 @@ namespace Build
         public static string CommitId => config("N/A", "Build.SourceVersion");
 
         public static string TelemetryInstrumentationKey => config(null, "TELEMETRY_INSTRUMENTATION_KEY");
+        public static bool IsPublicBuild => string.Equals(config(null, "IsPublicBuild"), true.ToString(), System.StringComparison.OrdinalIgnoreCase);
 
         public static string BuildArtifactsStorage => config(null);
 
