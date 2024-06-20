@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Tests.E2E.AzureResourceManagers.Commons;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
 using Xunit.Abstractions;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
