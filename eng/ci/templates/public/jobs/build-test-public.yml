@@ -44,7 +44,6 @@ jobs:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: false
       IsPublicBuild: true
-      IsCodeqlBuild: false
     displayName: 'Executing build script'
   - task: PublishTestResults@2
     inputs:
