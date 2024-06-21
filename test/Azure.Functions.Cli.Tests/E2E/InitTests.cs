@@ -124,7 +124,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[]
                         {
                             "Microsoft.NET.Sdk.Functions",
-                            "v3"
+                            "3.1.1"
                         }
                     }
                 }
