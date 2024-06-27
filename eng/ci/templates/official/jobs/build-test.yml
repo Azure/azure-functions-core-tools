@@ -8,7 +8,7 @@ jobs:
     - ImageOverride -equals MMS2019TLS
 
   variables:
-    devops_buildNumber: $[counter(format(''), 1500)]
+    devops_buildNumber: $[counter(format(''), 6100)]
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
   steps:
