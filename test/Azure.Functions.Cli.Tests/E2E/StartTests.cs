@@ -257,6 +257,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
                 new RunConfiguration
                 {
@@ -366,7 +367,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var functionJson = await File.ReadAllTextAsync(filePath);
                         functionJson = functionJson.Replace("\"type\": \"http\"", "\"type\": \"http2\"");
                         await File.WriteAllTextAsync(filePath, functionJson);
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
                 new RunConfiguration
                 {
@@ -506,7 +508,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var content = File.ReadAllText(settingsFile);
                         content = content.Replace("EMPTY_VALUE", "");
                         File.WriteAllText(settingsFile,content);
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
                 new RunConfiguration
                 {
