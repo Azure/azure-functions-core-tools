@@ -41,6 +41,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
         private const string Net6FrameworkDescriptionPrefix = ".NET 6.0";
+        private const string WindowsExecutableName = "func.exe";
+        private const string LinuxExecutableName = "func";
+        private const string InProc8DirectoryName = "in-proc8";
         private readonly ISecretsManager _secretsManager;
         private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
@@ -472,7 +475,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 // Checking if in Limelight - it should have a `AzureDevSessionsRemoteHostName` value in local.settings.json.
                 var forwardedHttpUrl = _secretsManager.GetSecrets().FirstOrDefault(
                     s => s.Key.Equals(Constants.AzureDevSessionsRemoteHostName, StringComparison.OrdinalIgnoreCase)).Value;
-                if (forwardedHttpUrl != null){
+                if (forwardedHttpUrl != null)
+                {
                     var baseUrl = forwardedHttpUrl.Replace(Constants.AzureDevSessionsPortSuffixPlaceholder, Port.ToString(), StringComparison.OrdinalIgnoreCase);
                     baseUri = new Uri(baseUrl);
                 }
@@ -486,6 +490,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
+        private static string GetInProcNet8ExecutablePath()
+        {
+            var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
+            var executableName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? WindowsExecutableName : LinuxExecutableName;
+
+            return Path.Combine(funcExecutableDirectory, InProc8DirectoryName, executableName);
+        }
+
         private Task StartInProc8AsChildProcessAsync()
         {
             if (VerboseLogging == true)
@@ -495,8 +507,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             var commandLineArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
             var tcs = new TaskCompletionSource();
-            var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
-            var inProc8FuncExecutablePath = Path.Combine(funcExecutableDirectory, "in-proc8", "func.exe");
+
+            var inProc8FuncExecutablePath = GetInProcNet8ExecutablePath();
 
             EnsureNet8FuncExecutablePresent(inProc8FuncExecutablePath);
 
