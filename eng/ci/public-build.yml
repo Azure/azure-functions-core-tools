@@ -13,8 +13,6 @@ pr:
     include:
     - v4.x
     - release_4.0
-    - v3.x
-    - release_3.0
 
 trigger:
   batch: true
@@ -22,8 +20,6 @@ trigger:
     include:
     - v4.x
     - release_4.0
-    - v3.x
-    - release_3.0
 
 resources:
   repositories:
