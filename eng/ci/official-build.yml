@@ -1,0 +1,44 @@
+schedules:
+- cron: "0 0 * * *"
+  displayName: Nightly Build
+  branches:
+    include:
+      - v3.x
+  always: true
+
+name: $(Build.SourceBranchName)_$(Build.Reason)
+
+pr: none
+
+trigger:
+  branches:
+    include:
+    - v3.x
+    - release_3.0
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+variables:
+  - template: /ci/variables/cfs.yml@eng
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc
+      image: 1es-windows-2022
+      os: windows
+    stages:     
+      - stage: BuildAndTest
+        jobs:
+        - template: /eng/ci/templates/official/jobs/build-test.yml@self
+

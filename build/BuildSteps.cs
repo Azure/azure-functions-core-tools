@@ -565,6 +565,13 @@ namespace Build
 
         public static void UploadToStorage()
         {
+            // Don't upload for public build.
+            if (Settings.IsPublicBuild)
+            {
+                ColoredConsole.WriteLine($"Skipping upload for public build.");
+                return;
+            }
+
             if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
             {
                 var version = new Version(CurrentVersion);

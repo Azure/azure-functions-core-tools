@@ -302,12 +302,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             var localSettingsJsonContent = await StaticResources.LocalSettingsJson;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime));
-
-            var storageConnectionStringValue = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? Constants.StorageEmulatorConnectionString
-                : string.Empty;
-
-            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", storageConnectionStringValue);
+            
+            localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", string.Empty);
 
             if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
