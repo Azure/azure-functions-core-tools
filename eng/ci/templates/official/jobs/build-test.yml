@@ -8,7 +8,7 @@ jobs:
     os: windows
 
   variables:
-    devops_buildNumber: $[counter(format(''), 6100)]
+    devops_buildNumber: $[counter(format('1'), 6100)]
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
   steps:
