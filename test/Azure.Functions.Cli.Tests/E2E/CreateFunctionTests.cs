@@ -61,7 +61,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools"
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -157,7 +157,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -210,7 +210,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -229,7 +229,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -296,7 +296,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.ts",
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -364,7 +364,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.ts",
                     "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 

@@ -295,10 +295,8 @@
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.834.3" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.1.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
