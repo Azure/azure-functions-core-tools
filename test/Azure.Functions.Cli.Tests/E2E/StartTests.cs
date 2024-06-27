@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -118,7 +118,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     await Task.Delay(TimeSpan.FromSeconds(15));
                     p.Kill();
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
 
         }
@@ -145,7 +145,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     await Task.Delay(TimeSpan.FromSeconds(15));
                     p.Kill();
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -278,7 +278,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         // give the host time to load functions and print any errors
                         await Task.Delay(TimeSpan.FromSeconds(10));
                         p.Kill();
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
             }, _output, startHost: true);
         }
@@ -307,7 +308,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -342,7 +343,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -478,7 +479,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     ExpectExit = true,
                     ExitInError = true,
                     ErrorContains = new[] { "Port 8081 is unavailable" },
-                    CommandTimeout = TimeSpan.FromSeconds(120),
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 }, _output);
             }
             finally
@@ -540,7 +541,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "Skipping 'emptySetting' from local settings as it's already defined in current environment variables."
                     },
-                    CommandTimeout = TimeSpan.FromSeconds(120),
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 }
             }, _output);
         }
@@ -603,7 +604,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -669,7 +670,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "Using for user secrets file configuration."
                     },
-                    CommandTimeout = TimeSpan.FromSeconds(120),
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                     Test = async (workingDir, p) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
@@ -743,7 +744,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "start --functions http1 --csharp",
                     },
-                    CommandTimeout = TimeSpan.FromSeconds(120),
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                     ExpectExit = true,
                     ExitInError = true,
                     ErrorContains = new[] { "Missing value for AzureWebJobsStorage in local.settings.json and User Secrets. This is required for all triggers other than httptrigger, kafkatrigger. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets." },

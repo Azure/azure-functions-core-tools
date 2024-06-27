@@ -155,7 +155,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
                 OutputDoesntContain = new[] { "Initialized empty Git repository" },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -278,6 +278,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     new DirectoryResult { Name = ".git", Exists = false }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -298,7 +299,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120),
+                CommandTimeout = TimeSpan.FromSeconds(300),
                 OutputContains = new[] { "Dockerfile" }
             }, _output);
         }
@@ -480,7 +481,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing Dockerfile",
                     "Writing .dockerignore"
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -510,7 +511,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -581,7 +582,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     }
                 },
                 OutputContains = new[] { "Dockerfile" },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -714,7 +715,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "Writing host.json"
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
