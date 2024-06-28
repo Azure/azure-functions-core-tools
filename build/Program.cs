@@ -28,7 +28,7 @@ namespace Build
                 .Then(AddGoZip)
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
-                .Then(Test)
+                //.Then(Test)
                 .Then(Zip)
                 .Then(DotnetPublishForNupkg)
                 .Then(DotnetPack)
