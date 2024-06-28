@@ -1,0 +1,47 @@
+schedules:
+- cron: "0 0 * * *"
+  displayName: Nightly Build
+  branches:
+    include:
+      - v4.x
+  always: true
+
+name: $(Build.SourceBranchName)_$(Build.Reason)
+
+pr:
+  branches:
+    include:
+    - v4.x
+    - release_4.0
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - v4.x
+    - release_4.0
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-windows-2022
+      os: windows
+    sdl:
+      codeql:
+         compiled:
+           enabled: true
+         runSourceLanguagesInSourceAnalysis: true
+    stages:     
+      - stage: BuildAndTest
+        jobs:
+        - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
+
