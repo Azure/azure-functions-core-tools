@@ -37,6 +37,13 @@ extends:
       name: 1es-pool-azfunc
       image: 1es-windows-2022
       os: windows
+    sdl:
+      codeql:
+         enabledOnNonDefaultBranches: true
+         cadence: 0
+         compiled:
+           enabled: true
+         runSourceLanguagesInSourceAnalysis: true
     stages:     
       - stage: BuildAndTest
         jobs:
