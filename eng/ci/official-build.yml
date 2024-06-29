@@ -39,8 +39,6 @@ extends:
       os: windows
     sdl:
       codeql:
-         enabledOnNonDefaultBranches: true
-         cadence: 0
          compiled:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
