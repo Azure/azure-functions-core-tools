@@ -1,11 +1,3 @@
-schedules:
-- cron: "0 0 * * *"
-  displayName: Nightly Build
-  branches:
-    include:
-      - v4.x
-  always: true
-
 name: $(Build.SourceBranchName)_$(Build.Reason)
 
 pr: none
@@ -14,7 +6,6 @@ trigger:
   branches:
     include:
     - v4.x
-    - release_4.0
 
 resources:
   repositories:
@@ -37,14 +28,8 @@ extends:
       name: 1es-pool-azfunc
       image: 1es-windows-2022
       os: windows
-    sdl:
-      codeql:
-         compiled:
-           enabled: true
-         runSourceLanguagesInSourceAnalysis: true
     stages:     
       - stage: BuildAndTest
         jobs:
-        - template: /eng/ci/templates/official/jobs/build-test.yml@self
         - template: /eng/ci/templates/official/jobs/linux-package.yml@self
 
