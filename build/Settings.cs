@@ -175,7 +175,7 @@ namespace Build
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
-        public static readonly string SBOMManifestTelemetryDir = Path.Combine(OutputDir, "SBOMManifestTelemetry");
+        public static readonly string SBOMManifestTelemetryDir = Path.Combine(OutputDir, "SBOMManifestTelemetry"); 
         
         public static string TargetFramework = "net6.0";
 
