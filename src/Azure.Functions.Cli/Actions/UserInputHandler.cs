@@ -160,6 +160,10 @@ namespace Azure.Functions.Cli.Actions
                 { "$blobTrigger_path_label", "Container Path" },
                 { "$blobTrigger_connection_label", "Storage Account Connection String" },
                 { "$eventGrid_name_label", "EventGrid Name" },
+                { "$chat_model_name_label", "Chat Model Name" },
+                { "$embeddings_model_name_label", "Embeddings Model Name" },
+                { "rag_collection_name_label", "Collection Name"},
+                { "$rag_connection_label", "Connection Name" }
             };
         }
     }
