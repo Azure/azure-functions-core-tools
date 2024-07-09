@@ -18,6 +18,11 @@ namespace Azure.Functions.Cli
             _container = InitializeAutofacContainer();
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
 
+            Console.CancelKeyPress += (s, e) =>
+            {
+                _container.Resolve<IProcessManager>()?.KillChildProcesses();
+            };
+
             ConsoleApp.Run<Program>(args, _container);
         }
 
@@ -74,7 +79,8 @@ namespace Azure.Functions.Cli
                 .ExternallyOwned();
 
             builder.RegisterType<ProcessManager>()
-                .As<IProcessManager>();
+                .As<IProcessManager>()
+                .SingleInstance();
 
             builder.RegisterType<SecretsManager>()
                 .As<ISecretsManager>();
