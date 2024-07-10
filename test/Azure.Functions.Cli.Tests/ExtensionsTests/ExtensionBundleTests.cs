@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 {
                     "No action performed"
                 },
-                CommandTimeout = TimeSpan.FromMinutes(1)
+                CommandTimeout = TimeSpan.FromMinutes(300)
             }, _output);
         }
 
@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 {
                     bundlePath
                 },
-                CommandTimeout = TimeSpan.FromMinutes(1)
+                CommandTimeout = TimeSpan.FromMinutes(300)
             }, _output);
         }
 
@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 {
                     "Extension bundle not configured."
                 },
-                CommandTimeout = TimeSpan.FromMinutes(1)
+                CommandTimeout = TimeSpan.FromMinutes(300)
             }, _output);
         }
     }

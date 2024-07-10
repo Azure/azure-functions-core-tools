@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Common
         public const string PySteinFunctionAppPy = "function_app.py";
         public const string FunctionJsonFileName = "function.json";
         public const string HostJsonFileName = "host.json";
+        public const string PackageJsonFileName = "package.json";
         public const string ProxiesJsonFileName = "proxies.json";
         public const string ExtensionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
@@ -43,6 +44,7 @@ namespace Azure.Functions.Cli.Common
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
         public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
         public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
+        public const string ScmDoBuildDuringDeployment = "SCM_DO_BUILD_DURING_DEPLOYMENT";
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
@@ -65,6 +67,35 @@ namespace Azure.Functions.Cli.Common
         public const long DefaultMaxRequestBodySize = 104857600;
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
+        public const string HelpCommand = "help";
+        public const string CoreToolsVersionsFeedUrl = "https://functionscdn.azureedge.net/public/cli-feed-v4.json";
+        public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
+        public const string GetFunctionNameParamId = "trigger-functionName";
+        public const string HttpTriggerAuthLevelParamId = "httpTrigger-authLevel";
+        public const string GetFileNameParamId = "app-selectedFileName";
+        public const string GetBluePrintFileNameParamId = "blueprint-fileName";
+        public const string GetBluePrintExistingFileNameParamId = "blueprint-existingFileName";
+        public const string UserPromptBooleanType = "boolean";
+        public const string UserPromptEnumType = "enum";
+        public const string UserInputActionType = "UserInput";
+        public const string UserPromptExtensionBundleFileName = "userPrompts.json";
+        public const string TemplatesExtensionBundleFileName = "templates.json";
+        public const string ShowMarkdownPreviewActionType = "ShowMarkdownPreview";
+        public const string FunctionBodyTargetFileName = "FUNCTION_BODY_TARGET_FILE_NAME";
+        public const string PythonProgrammingModelFunctionBodyFileKey = "function_body.py";
+        public const string UserPromptFileName = "NewTemplate-userPrompts.json";
+        public const string FunctionAppDeploymentToContainerAppsMessage = "Deploying function app to Container Apps...";
+        public const string FunctionAppDeploymentToContainerAppsStatusMessage = "Checking status of function app deployment to Container Apps...";
+        public const string FunctionAppDeploymentToContainerAppsFailedMessage = "Deploy function app request to Container Apps was not successful.";
+        public const string FunctionAppFailedToDeployOnContainerAppsMessage = "Failed to deploy function app to Container Apps.";
+        public const string LocalSettingsJsonFileName = "local.settings.json";
+        public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
+        public const string Dotnet = "dotnet";
+        public const string FunctionsInProcNet8Enabled = "FUNCTIONS_INPROC_NET8_ENABLED";
+        public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
+        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
+        // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
+
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
 
@@ -149,6 +180,7 @@ namespace Azure.Functions.Cli.Common
             public const string LinuxPython38ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.8-buildenv";
             public const string LinuxPython39ImageAmd64 = "mcr.microsoft.com/azure-functions/python:3.0.15066-python3.9-buildenv";
             public const string LinuxPython310ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.10-buildenv";
+            public const string LinuxPython311ImageAmd64 = "mcr.microsoft.com/azure-functions/python:4-python3.11-buildenv";
         }
 
         public static class StaticResourcesNames

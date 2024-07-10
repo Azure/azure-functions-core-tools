@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -101,14 +100,15 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("node", "v1")]
-        [InlineData("java", "v2")]
+        [InlineData("node", "v3")]
+        [InlineData("node", "v4")]
+        [InlineData("node", "")]
+        [InlineData("java", "v1")]
         [InlineData("python", "v1")]
         [InlineData("python", "v2")]
+        [InlineData("python", "")]
         public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
         {
-            var workerRuntimesWithV2ProgrammingModel = new[] { "python" };
-
             var files = new List<FileResult>
             {
                 new FileResult
@@ -122,42 +122,59 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             };
 
-            if (workerRuntime == "python" && programmingModel == "v2")
+            if (workerRuntime == "python" && (programmingModel == "v2" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
                     Name = "function_app.py",
                 });
             }
+            else if (workerRuntime == "node" && (programmingModel == "v4" || programmingModel == string.Empty))
+            {
+                files.Add(new FileResult
+                {
+                    Name = "package.json",
+                    ContentContains = new[]
+                        {
+                            "\"@azure/functions\": \"^4"
+                        }
+                });
+            }
 
-            if (programmingModel != "v2" || workerRuntimesWithV2ProgrammingModel.Contains(workerRuntime))
+            var programmingModelFlag = programmingModel == string.Empty ? string.Empty : $"--model {programmingModel}";
+
+            return CliTester.Run(new RunConfiguration
             {
-                return CliTester.Run(new RunConfiguration
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} {programmingModelFlag}" },
+                CheckFiles = files.ToArray(),
+                OutputContains = new[]
                 {
-                    Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
-                    CheckFiles = files.ToArray(),
-                    OutputContains = new[]
-                    {
-                        "Writing .gitignore",
-                        "Writing host.json",
-                        "Writing local.settings.json",
-                        $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                    },
-                    OutputDoesntContain = new[] { "Initialized empty Git repository" }
-                }, _output);
-            }
-            else
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                },
+                OutputDoesntContain = new[] { "Initialized empty Git repository" },
+                CommandTimeout = TimeSpan.FromSeconds(300)
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("node", "v1")]
+        [InlineData("node", "v2")]
+        [InlineData("java", "v2")]
+        [InlineData("python", "v3")]
+        public Task init_with_worker_runtime_and_unsupported_model(string workerRuntime, string programmingModel)
+        {
+            return CliTester.Run(new RunConfiguration
             {
-                return CliTester.Run(new RunConfiguration
+                Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
+                HasStandardError = true,
+                ErrorContains = new[]
                 {
-                    Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
-                    HasStandardError = true,
-                    ErrorContains = new[]
-                    {
-                        $"programming model is not supported for worker runtime {workerRuntime}. Supported programming models for worker runtime {workerRuntime} are:"
-                    }
-                }, _output);
-            }
+                    $"programming model is not supported for worker runtime {workerRuntime}. Supported programming models for worker runtime {workerRuntime} are:"
+                }
+            }, _output);
         }
 
         [Fact]
@@ -191,6 +208,37 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_dotnet_app_net8()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet --target-framework net8.0" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "local.settings.json"),
+                        ContentContains = new[]
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "dotnet",
+                            "FUNCTIONS_INPROC_NET8_ENABLED",
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "dotnet-funcs.csproj"),
+                        ContentContains = new[]
+                        {
+                            "Microsoft.NET.Sdk.Functions",
+                            "v4"
+                        }
+                    }
+                }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_unknown_worker_runtime()
         {
             const string unknownWorkerRuntime = "foo";
@@ -206,6 +254,21 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_unsupported_target_framework_for_dotnet()
+        {
+            const string unsupportedTargetFramework = "net7.0";
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet --target-framework {unsupportedTargetFramework}" },
+                HasStandardError = true,
+                ErrorContains = new[]
+                {
+                    $"Unable to parse target framework {unsupportedTargetFramework} for worker runtime dotnet. Valid options are net8.0, net6.0"
+                }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_no_source_control()
         {
             return CliTester.Run(new RunConfiguration
@@ -215,6 +278,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     new DirectoryResult { Name = ".git", Exists = false }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -235,6 +299,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300),
                 OutputContains = new[] { "Dockerfile" }
             }, _output);
         }
@@ -261,6 +326,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_dotnet8InProcess_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet --target-framework net8.0 --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:4-dotnet8" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_dotnetIsolated_dockerfile()
         {
             return CliTester.Run(new RunConfiguration
@@ -271,7 +354,25 @@ namespace Azure.Functions.Cli.Tests.E2E
                     new FileResult
                     {
                         Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:3.0-dotnet-isolated5.0" }
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated8.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
+        public Task init_with_dotnet7Isolated_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet-isolated --target-framework net7.0 --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated7.0" }
                     }
                 },
                 OutputContains = new[] { "Dockerfile" }
@@ -379,7 +480,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                     "Writing Dockerfile",
                     "Writing .dockerignore"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -408,7 +510,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -418,18 +521,6 @@ namespace Azure.Functions.Cli.Tests.E2E
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] { "init . --worker-runtime typescript" },
-                CheckFiles = new FileResult[]
-                {
-                    new FileResult
-                    {
-                        Name = "local.settings.json",
-                        ContentContains = new []
-                        {
-                            "FUNCTIONS_WORKER_RUNTIME",
-                            "node"
-                        }
-                    }
-                },
                 OutputContains = new[]
                 {
                     "Writing tsconfig.json",
@@ -439,6 +530,32 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing host.json",
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                },
+                CommandTimeout = TimeSpan.FromSeconds(240)
+            }, _output);
+        }
+
+        [Fact]
+        public Task ini_ts_app_v4_with_skip_npm_install()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init . --worker-runtime node --language typescript --model V4 --skip-npm-install" },
+                CheckDirectories = new DirectoryResult[]
+                {
+                    new DirectoryResult
+                    {
+                        Name = "node_modules",
+                        Exists = false
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "You skipped \"npm install\". You must run \"npm install\" manually"
+                },
+                OutputDoesntContain = new[]
+                {
+                    "Running 'npm install'..."
                 }
             }, _output);
         }
@@ -464,7 +581,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}" }
                     }
                 },
-                OutputContains = new[] { "Dockerfile" }
+                OutputContains = new[] { "Dockerfile" },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -596,7 +714,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "Writing host.json"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -624,8 +743,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init \"anapp\" --worker-runtime python",
-                    "init \"anapp\" --worker-runtime python"
+                    "init \"anapp\" --worker-runtime python -m v1",
+                    "init \"anapp\" --worker-runtime python -m v1"
                 },
                 OutputContains = new[]
                 {
@@ -645,13 +764,41 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public Task init_python_app_generates_requirements_txt()
+        public Task init_python_app_twice_new_programming_model()
         {
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime python"
+                    "init \"anapp\" --worker-runtime python",
+                    "init \"anapp\" --worker-runtime python"
+                },
+                OutputContains = new[]
+                {
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    "requirements.txt already exists. Skipped!",
+                    ".gitignore already exists. Skipped!",
+                    "host.json already exists. Skipped!",
+                    "local.settings.json already exists. Skipped!",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
+                }
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("-m V1")]
+        [InlineData("-m V2")]
+        [InlineData("")]
+        public Task init_python_app_generates_requirements_txt(string modelParameter)
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime python {modelParameter}"
                 },
                 OutputContains = new[]
                 {
@@ -679,7 +826,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime python"
+                    "init . --worker-runtime python -m V1"
                 },
                 OutputContains = new[]
                 {

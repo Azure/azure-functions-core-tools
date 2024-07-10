@@ -3,12 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
+using Azure.Core;
 using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ContainerApps.Models;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
+using Microsoft.Azure.AppService.Middleware;
+using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Http.Logging;
 using Newtonsoft.Json;
@@ -21,7 +27,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static string _storageApiVersion = "2018-02-01";
 
-        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null)
+        internal static async Task<Site> GetFunctionApp(string name, string accessToken, string managementURL, string slot = null, string defaultSubscription = null, IEnumerable<ArmSubscription> allSubs = null, Func<Site, string, string, Task<Site>> loadFunction = null)
         {
             IEnumerable<string> allSubscriptionIds;
             if (defaultSubscription != null)
@@ -34,7 +40,7 @@ namespace Azure.Functions.Cli.Helpers
                 allSubscriptionIds = subscriptions.Select(sub => sub.subscriptionId);
             }
 
-            var result = await TryGetFunctionAppFromArg(name, allSubscriptionIds, accessToken, managementURL, slot);
+            var result = await TryGetFunctionAppFromArg(name, allSubscriptionIds, accessToken, managementURL, slot, loadFunction);
             if (result != null)
             {
                 return result;
@@ -47,7 +53,7 @@ namespace Azure.Functions.Cli.Helpers
             throw new ArmResourceNotFoundException(errorMsg);
         }
 
-        private static async Task<Site> TryGetFunctionAppFromArg(string name, IEnumerable<string> subscriptions, string accessToken, string managementURL, string slot = null)
+        private static async Task<Site> TryGetFunctionAppFromArg(string name, IEnumerable<string> subscriptions, string accessToken, string managementURL, string slot = null, Func<Site, string, string, Task<Site>> loadFunctionAppFunc = null)
         {
             var resourceType = "Microsoft.Web/sites";
             var resourceName = name;
@@ -61,8 +67,20 @@ namespace Azure.Functions.Cli.Helpers
             try
             {
                 string siteId = await GetResourceIDFromArg(subscriptions, query, accessToken, managementURL);
+
                 var app = new Site(siteId);
-                await LoadFunctionApp(app, accessToken, managementURL);
+
+                // The implementation of the load function is different for certain function apps like function apps based on Container Apps. 
+                // If the implementation is not provided in the param then default one is used.
+                if (loadFunctionAppFunc != null)
+                {
+                    await loadFunctionAppFunc(app, accessToken, managementURL);
+                }
+                else
+                {
+                    await LoadFunctionApp(app, accessToken, managementURL);
+                }
+                
                 return app;
             }
             catch { }
@@ -104,6 +122,20 @@ namespace Azure.Functions.Cli.Helpers
             // we need the first item of the first row
             return argResponse.Data?.Rows?.FirstOrDefault()?.FirstOrDefault()
                 ?? throw new CliException("Error finding the Azure Resource information.");
+        }
+
+
+        internal static async Task<bool> IsBasicAuthAllowedForSCM(Site functionApp, string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}{functionApp.SiteId}/basicPublishingCredentialsPolicies/scm?api-version={ArmUriTemplates.BasicAuthCheckApiVersion}");
+            
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadAsStringAsync();
+            var basicAuthResponse = JsonConvert.DeserializeObject<BasicAuthCheckResponse>(result);
+
+            return basicAuthResponse.Properties.Allow;
         }
 
         internal static ArmResourceId ParseResourceId(string resourceId)
@@ -187,6 +219,18 @@ namespace Azure.Functions.Cli.Helpers
             return key;
         }
         
+
+        internal static async Task<Site> LoadFunctionAppInContainerApp(Site site, string accessToken, string managementURL)
+        {
+            await new[]
+            {
+                LoadSiteObjectAsync(site, accessToken, managementURL),
+                LoadSiteConfigAsync(site, accessToken, managementURL),
+                LoadAppSettings(site, accessToken, managementURL),
+            }
+            .WhenAll();
+            return site;
+        }
 
         private static async Task<Site> LoadFunctionApp(Site site, string accessToken, string managementURL)
         {
@@ -321,18 +365,94 @@ namespace Azure.Functions.Cli.Helpers
             return ArmClient.HttpInvoke(HttpMethod.Post, url, accessToken);
         }
 
+        internal static async Task CheckFunctionHostStatusForFlex(Site functionApp, string accessToken, string managementURL,
+            HttpMessageHandler messageHandler = null)
+        {
+            ColoredConsole.Write("Checking the app health...");
+            var masterKey = await GetMasterKeyAsync(functionApp.SiteId, accessToken, managementURL);
+
+            if (masterKey is null)
+            {
+                throw new CliException($"The masterKey is null. hostname: {functionApp.HostName}.");
+            }
+
+            HttpMessageHandler handler = messageHandler ?? new HttpClientHandler();
+            if (StaticSettings.IsDebug)
+            {
+                handler = new LoggingHandler(handler);
+            }
+
+            var functionAppReadyClient = new HttpClient(handler);
+            const string jsonContentType = "application/json";
+            functionAppReadyClient.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+            functionAppReadyClient.DefaultRequestHeaders.Add("Accept", jsonContentType);
+            
+            await RetryHelper.Retry(async () =>
+            {
+                functionAppReadyClient.DefaultRequestHeaders.Add("x-ms-request-id", Guid.NewGuid().ToString());
+                var uri = new Uri($"https://{functionApp.HostName}/admin/host/status?code={masterKey}");
+                var request = new HttpRequestMessage()
+                {
+                    RequestUri = uri,
+                    Method = HttpMethod.Get
+                };
+
+                var response = await functionAppReadyClient.SendAsync(request);
+                ColoredConsole.Write(".");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    ColoredConsole.WriteLine(" done");
+                }
+                else
+                {
+                    throw new CliException($"The host didn't return success status. Returned: {response.StatusCode}");
+                }
+
+            }, 15, TimeSpan.FromSeconds(3));
+        }
+
         public static async Task<Site> LoadSiteObjectAsync(Site site, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
             var armSite = await ArmHttpAsync<ArmWrapper<ArmWebsite>>(HttpMethod.Get, url, accessToken);
 
-            site.HostName = armSite.properties.enabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
-            site.ScmUri = armSite.properties.enabledHostNames.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
+            site.HostName = armSite.properties.enabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) == -1);
+            site.ScmUri = armSite.properties.enabledHostNames?.FirstOrDefault(s => s.IndexOf(".scm.", StringComparison.OrdinalIgnoreCase) != -1);
             site.Location = armSite.location;
             site.Kind = armSite.kind;
             site.Sku = armSite.properties.sku;
             site.SiteName = armSite.name;
+            site.FunctionAppConfig = armSite.properties.functionAppConfig;
             return site;
+        }
+
+        public static async Task<bool> UpdateFlexRuntime(Site site, string runtimeName, string runtimeValue, string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var functionAppJson = await ArmHttpAsyncForFlex(HttpMethod.Get, url, accessToken);
+            dynamic functionApp = JsonConvert.DeserializeObject(functionAppJson);
+            var runtimeConfig = functionApp?.properties?.functionAppConfig?.runtime;
+
+            if (runtimeConfig == null)
+            {
+                return false;
+            }
+
+            runtimeConfig.name = runtimeName;
+            runtimeConfig.version = runtimeValue;
+
+            url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.FlexApiVersion}");
+            var result = await ArmHttpAsyncForFlex(new HttpMethod("PUT"), url, accessToken, functionApp);
+            return true;
+        }
+
+        private static async Task<string> ArmHttpAsyncForFlex(HttpMethod method, Uri uri, string accessToken, object payload = null)
+        {
+            var response = await ArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadAsStringAsync();
         }
 
         private static async Task<T> ArmHttpAsync<T>(HttpMethod method, Uri uri, string accessToken, object payload = null)
@@ -373,6 +493,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");
+
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAppSettings });
             if (response.IsSuccessStatusCode)
             {
@@ -449,11 +570,67 @@ namespace Azure.Functions.Cli.Helpers
                   }, 18, TimeSpan.FromSeconds(3)
             );
         }
+        public static async Task<string> CreateFunctionAppOnContainerService(string accessToken, string managementURL, string subscriptionId, string resourceGroup, ContainerAppsFunctionPayload payload)
+        {
+            string hostName = string.Empty;
+            var url = new Uri($"{managementURL}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/sites/{payload.Name}?api-version={ArmUriTemplates.FunctionAppOnContainerAppsApiVersion}");
+            ColoredConsole.WriteLine(Constants.FunctionAppDeploymentToContainerAppsMessage);
+            var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, payload);
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorMessage;
+                try
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var errorResponse = JsonConvert.DeserializeObject<ContainerAppsFunctionDeployResponse>(content);
+                    errorMessage = $"{Constants.FunctionAppFailedToDeployOnContainerAppsMessage} {(!string.IsNullOrWhiteSpace(errorResponse?.Message)? $"Error: {errorResponse.Message}" : string.Empty )}";
+                }
+                catch (Exception)
+                {
+                    errorMessage = Constants.FunctionAppFailedToDeployOnContainerAppsMessage;
+                }
 
+                throw new CliException(errorMessage);
+            }
+            
+            var statusUrlHeader = response.Headers.GetValues("location").FirstOrDefault();
+            if (string.IsNullOrEmpty(statusUrlHeader))
+            {
+                throw new CliException(Constants.FunctionAppDeploymentToContainerAppsFailedMessage);
+            }
 
+            ColoredConsole.Write(Constants.FunctionAppDeploymentToContainerAppsStatusMessage);
+            var statusUrl = new Uri(statusUrlHeader);
+            int maxRetries = 12; // 12 * 5 seconds = 1 minute
+            for (int retry = 1; retry <= maxRetries; retry++)
+            {
+                var getResponse = await ArmClient.HttpInvoke(HttpMethod.Get, statusUrl, accessToken, payload);
+                if (getResponse.StatusCode != System.Net.HttpStatusCode.Accepted)
+                {
+                    getResponse.EnsureSuccessStatusCode();
+                    var content = await getResponse.Content.ReadAsStringAsync();
+                    var deployResponse = JsonConvert.DeserializeObject<ContainerAppFunctonCreateResponse>(content);
+                    hostName = deployResponse?.Properties?.DefaultHostName;
+                    break;
+                }
 
-    public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
-    {
+                if (retry == maxRetries)
+                {
+                    throw new CliException("The creation of the function app could not be verified.");
+                }
+
+                // Waiting for 5 seconds before another request
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                ColoredConsole.Write(".");
+            }
+
+            ColoredConsole.Write(Environment.NewLine);
+            ColoredConsole.WriteLine($"The functon app \"{payload.Name}\" was successfully deployed.");
+            return hostName;
+        }
+
+        public static async Task PrintFunctionsInfo(Site functionApp, string accessToken, string managementURL, bool showKeys)
+        {
             if (functionApp.IsKubeApp)
             {
                 ColoredConsole.Write("Waiting for the functions host up and running ");
@@ -461,10 +638,10 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             ArmArrayWrapper<FunctionInfo> functions = await GetFunctions(functionApp, accessToken, managementURL);
-
             functions = await GetFunctions(functionApp, accessToken, managementURL);
 
             ColoredConsole.WriteLine(TitleColor($"Functions in {functionApp.SiteName}:"));
+            
             if (functionApp.IsKubeApp && !functions.value.Any())
             {
                 ColoredConsole.WriteLine(WarningColor(
@@ -493,18 +670,78 @@ namespace Azure.Functions.Cli.Helpers
                 ColoredConsole.WriteLine($"    {function.Name} - [{VerboseColor(trigger.ToString())}]");
                 if (!string.IsNullOrEmpty(function.InvokeUrlTemplate))
                 {
+                    var invokeUrlUrlTemplate = function.InvokeUrlTemplate;
+                    if (!string.IsNullOrEmpty(invokeUrlUrlTemplate) && !invokeUrlUrlTemplate.Contains(functionApp.HostName))
+                    {
+                        invokeUrlUrlTemplate = invokeUrlUrlTemplate.Replace($"{functionApp.SiteName}.azurewebsites.net", $"{functionApp.HostName}");
+                    }
                     // If there's a key available and the key is requested, add it to the url
                     var key = showFunctionKey ? await GetFunctionKey(function.Name, functionApp.SiteId, accessToken, managementURL) : null;
                     if (!string.IsNullOrEmpty(key))
                     {
-                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{function.InvokeUrlTemplate}?code={key}")}");
+                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor($"{invokeUrlUrlTemplate}?code={key}")}");
                     }
                     else
                     {
-                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor(function.InvokeUrlTemplate)}");
+                        ColoredConsole.WriteLine($"        Invoke url: {VerboseColor(invokeUrlUrlTemplate)}");
                     }
                 }
                 ColoredConsole.WriteLine();
+            }
+        }
+
+        public static async Task<(string, string)> GetManagedEnvironmentInfo(string accessToken, string managementURL, string subscriptionId, string resourceGroup, string name)
+        {
+            var url = new Uri($"{managementURL}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.App/managedEnvironments/{name}?api-version={ArmUriTemplates.ManagedEnvironmentApiVersion}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var managedEnvironment = JsonConvert.DeserializeObject<ManagedEnvironementGetResponse>(content);
+                return (managedEnvironment?.Id, managedEnvironment?.Location);
+            }
+            else
+            {
+                return (null, null);
+            }
+        }
+
+        public static async Task<FunctionsStacks> GetFunctionsStacks(string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}/providers/Microsoft.Web/functionAppStacks?api-version={ArmUriTemplates.FunctionsStacksApiVersion}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<FunctionsStacks>(content);
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static async Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string accessToken, string managementURL, string runtime, string region)
+        {
+            // API only supports dotnet as runtime. The dotnet-isolated is part of the dotnet for this API.
+            if (runtime.Equals("dotnet-isolated", StringComparison.OrdinalIgnoreCase))
+            {
+                runtime = "dotnet";
+            }
+
+            var url = new Uri($"{managementURL}//providers/Microsoft.Web/locations/{region}/functionAppStacks?api-version={ArmUriTemplates.FlexFunctionsStacksApiVersion}&removeHiddenStacks=true&removeDeprecatedStacks=true&stack={runtime}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<FlexFunctionsStacks>(content);
+            }
+            else
+            {
+                return null;
             }
         }
     }

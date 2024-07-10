@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
@@ -20,6 +21,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "init", HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
     internal class InitAction : BaseAction
     {
+
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
 
         public bool InitSourceControl { get; set; }
@@ -48,11 +50,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string ProgrammingModel { get; set; }
 
+        public bool SkipNpmInstall { get; set; } = false;
+
         public WorkerRuntime ResolvedWorkerRuntime { get; set; }
 
         public string ResolvedLanguage { get; set; }
 
         public ProgrammingModel ResolvedProgrammingModel { get; set; }
+
+        // Default to .NET 8 if the target framework is not specified
+        private const string DefaultTargetFramework = Common.TargetFramework.net8;
+
+        private const string DefaultInProcTargetFramework = Common.TargetFramework.net6;
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -115,18 +124,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("target-framework")
-                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net48\", \"net6.0\", and \"net7.0\"")
+                .WithDescription($"Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated or dotnet. Options are - {string.Join(", ", TargetFrameworkHelper.GetSupportedTargetFrameworks())}")
                 .Callback(tf => TargetFramework = tf);
 
             Parser
                 .Setup<bool>("managed-dependencies")
                 .WithDescription("Installs managed dependencies. Currently, only the PowerShell worker runtime supports this functionality.")
                 .Callback(f => ManagedDependencies = f);
-            
+
             Parser
                 .Setup<string>('m', "model")
-                .WithDescription($"Selects the programming model for the function app. Options are {EnumerationHelper.Join(", ", ProgrammingModelHelper.GetProgrammingModels())}. Currently, only the Python worker runtime supports the preview programming model")
+                .WithDescription($"Selects the programming model for the function app. Note this flag is now only applicable to Python and JavaScript/TypeScript. Options are V1 and V2 for Python; V3 and V4 for JavaScript/TypeScript. Currently, the V2 and V4 programming models are in preview.")
                 .Callback(m => ProgrammingModel = m);
+
+            Parser
+                .Setup<bool>("skip-npm-install")
+                .WithDescription("Skips the npm installation phase when using V4 programming model for NodeJS")
+                .Callback(skip => SkipNpmInstall = skip);
 
             Parser
                 .Setup<bool>("no-bundle")
@@ -171,7 +185,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, Csx);
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, TargetFramework, Csx);
         }
 
         private async Task InitFunctionAppProject()
@@ -196,10 +210,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "WorkerRuntime", ResolvedWorkerRuntime.ToString());
-            
+
             ValidateTargetFramework();
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
+                await ShowEolMessage();
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime, TargetFramework);
             }
             else
@@ -219,7 +234,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             if (InitDocker)
             {
-                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx);
+            }
+
+            if (!SkipNpmInstall)
+            {
+                await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
+            }
+            else
+            {
+                ColoredConsole.Write(AdditionalInfoColor("You skipped \"npm install\". You must run \"npm install\" manually"));
             }
         }
 
@@ -275,14 +299,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string language,
             ProgrammingModel programmingModel,
             bool managedDependenciesOption,
-            bool generatePythonDocumentation=true)
+            bool generatePythonDocumentation = true)
         {
-            switch (workerRuntime) {
+            switch (workerRuntime)
+            {
                 case Helpers.WorkerRuntime.python:
                     await PythonHelpers.SetupPythonProject(programmingModel, generatePythonDocumentation);
                     break;
                 case Helpers.WorkerRuntime.powershell:
-                    await WriteFiles("profile.ps1", await StaticResources.PowerShellProfilePs1);
+                    await FileSystemHelpers.WriteFileIfNotExists("profile.ps1", await StaticResources.PowerShellProfilePs1);
 
                     if (managedDependenciesOption)
                     {
@@ -312,42 +337,44 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         }
 
                         requirementsContent = Regex.Replace(requirementsContent, "GUIDANCE", guidance);
-                        await WriteFiles("requirements.psd1", requirementsContent);
+                        await FileSystemHelpers.WriteFileIfNotExists("requirements.psd1", requirementsContent);
                     }
                     break;
                 case Helpers.WorkerRuntime.node:
-                    if (language == Constants.Languages.TypeScript)
-                    {
-                        await WriteFiles(".funcignore", await StaticResources.FuncIgnore);
-                        await WriteFiles("package.json", await StaticResources.PackageJson);
-                        await WriteFiles("tsconfig.json", await StaticResources.TsConfig);
-                    }
-                    else
-                    {
-                        await WriteFiles("package.json", await StaticResources.JavascriptPackageJson);
-                    }
+                    await NodeJSHelpers.SetupProject(programmingModel, language);
                     break;
             }
         }
 
         private void ValidateTargetFramework()
         {
-            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            if (string.IsNullOrEmpty(TargetFramework))
             {
-                if (string.IsNullOrEmpty(TargetFramework))
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
                 {
-                    // Default to .NET 6 if the target framework is not specified
-                    // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
-                    TargetFramework = Common.TargetFramework.net6;
+                    TargetFramework = DefaultTargetFramework;
                 }
-                if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
+                else if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet)
                 {
-                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net48\", \"net6.0\", and \"net7.0\"");
+                    TargetFramework = DefaultInProcTargetFramework;
+                }
+                else
+                {
+                    return;
                 }
             }
-            else if (!string.IsNullOrEmpty(TargetFramework))
+
+            var supportedFrameworks = ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated
+                ? TargetFrameworkHelper.GetSupportedTargetFrameworks()
+                : TargetFrameworkHelper.GetSupportedInProcTargetFrameworks();
+
+            if (!supportedFrameworks.Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
             {
-                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated");
+                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework} for worker runtime {ResolvedWorkerRuntime}. Valid options are {string.Join(", ", supportedFrameworks)}");
+            }
+            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet)
+            {
+                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
         }
 
@@ -367,40 +394,55 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
             }
 
-            if (programmingModel == Common.ProgrammingModel.V2)
+            if ((workerRuntime == Helpers.WorkerRuntime.python && programmingModel == Common.ProgrammingModel.V2) || (workerRuntime == Helpers.WorkerRuntime.node && programmingModel == Common.ProgrammingModel.V4))
             {
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.AzureWebJobsFeatureFlags, Constants.EnableWorkerIndexing);
             }
 
-            await WriteFiles("local.settings.json", localSettingsJsonContent);
+            await FileSystemHelpers.WriteFileIfNotExists("local.settings.json", localSettingsJsonContent);
         }
 
-        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, bool csx)
+        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, string targetFramework, bool csx)
         {
             if (workerRuntime == Helpers.WorkerRuntime.dotnet)
             {
                 if (csx)
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileCsxDotNet);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCsxDotNet);
+                }
+                else if (targetFramework == Common.TargetFramework.net8)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet8);
                 }
                 else
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileDotNet);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+                if (targetFramework == Common.TargetFramework.net7)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet7Isolated);
+                }
+                else if (targetFramework == Common.TargetFramework.net8)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet8Isolated);
+                }
+                else
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
+                }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.node)
             {
                 if (language == Constants.Languages.TypeScript)
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileTypescript);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypescriptNode18);
                 }
                 else
                 {
-                    await WriteFiles("Dockerfile", await StaticResources.DockerfileNode16);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileNode18);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
@@ -409,23 +451,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.powershell)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfilePowershell72);
+                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfilePowershell72);
             }
-            else if(workerRuntime == Helpers.WorkerRuntime.custom)
+            else if (workerRuntime == Helpers.WorkerRuntime.custom)
             {
-                await WriteFiles("Dockerfile", await StaticResources.DockerfileCustom);
+                await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCustom);
             }
             else if (workerRuntime == Helpers.WorkerRuntime.None)
             {
                 throw new CliException("Can't find WorkerRuntime None");
             }
-            await WriteFiles(".dockerignore", await StaticResources.DockerIgnoreFile);
+            await FileSystemHelpers.WriteFileIfNotExists(".dockerignore", await StaticResources.DockerIgnoreFile);
         }
 
         private static async Task WritePythonDockerFile()
         {
             WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
-            await WriteFiles("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker));
+            await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker));
         }
 
         private static async Task WriteExtensionsJson()
@@ -436,7 +478,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FileSystemHelpers.CreateDirectory(Path.GetDirectoryName(file));
             }
 
-            await WriteFiles(file, await StaticResources.VsCodeExtensionsJson);
+            await FileSystemHelpers.WriteFileIfNotExists(file, await StaticResources.VsCodeExtensionsJson);
         }
 
         private static async Task SetupSourceControl()
@@ -465,20 +507,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             foreach (var pair in fileToContentMap)
             {
-                await WriteFiles(pair.Key.Value, await pair.Value);
-            }
-        }
-
-        private static async Task WriteFiles(string fileName, string fileContent)
-        {
-            if (!FileSystemHelpers.FileExists(fileName))
-            {
-                ColoredConsole.WriteLine($"Writing {fileName}");
-                await FileSystemHelpers.WriteAllTextToFileAsync(fileName, fileContent);
-            }
-            else
-            {
-                ColoredConsole.WriteLine($"{fileName} already exists. Skipped!");
+                await FileSystemHelpers.WriteFileIfNotExists(pair.Key.Value, await pair.Value);
             }
         }
 
@@ -517,18 +546,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
                 }
+                else if (ResolvedProgrammingModel == Common.ProgrammingModel.V4 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.node)
+                {
+                    hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigNodeV4);
+                }
                 else
                 {
                     hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfig);
                 }
             }
 
-            if(workerRuntime == Helpers.WorkerRuntime.custom)
+            if (workerRuntime == Helpers.WorkerRuntime.custom)
             {
                 hostJsonContent = await hostJsonContent.AppendContent(Constants.CustomHandlerPropertyName, StaticResources.CustomHandlerConfig);
             }
 
-            await WriteFiles(Constants.HostJsonFileName, hostJsonContent);
+            await FileSystemHelpers.WriteFileIfNotExists(Constants.HostJsonFileName, hostJsonContent);
         }
 
         private static string AddLocalSetting(string localSettingsContent, string key, string value)
@@ -543,6 +576,58 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             return JsonConvert.SerializeObject(localSettingsObj, Formatting.Indented);
+        }
+
+        public async Task FetchPackages(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
+        {
+            if (workerRuntime == Helpers.WorkerRuntime.node && programmingModel == Common.ProgrammingModel.V4)
+            {
+                try
+                {
+                    await NpmHelper.Install();
+                }
+                catch (Exception)
+                {
+                    Console.Error.WriteLine(WarningColor("Warning: You must run \"npm install\" manually"));
+                }
+            }
+        }
+
+        private async Task ShowEolMessage()
+        {
+            try
+            {
+                if (!WorkerRuntimeLanguageHelper.IsDotnetIsolated(ResolvedWorkerRuntime) || TargetFramework == DefaultTargetFramework)
+                    return;
+                
+                var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(TargetFramework);
+
+                if (majorDotnetVersion == null)
+                    return;
+
+                var stacksContent = await StaticResources.StacksJson;
+                var stacks = JsonConvert.DeserializeObject<FunctionsStacks>(stacksContent);
+
+                var currentRuntimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
+
+                if (currentRuntimeSettings == null)
+                    return;
+
+                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                {
+                    var warningMessage = EolMessages.GetAfterEolCreateMessageDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                {
+                    var warningMessage = EolMessages.GetEarlyEolCreateMessageForDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+            }
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the init command.
+            }
         }
     }
 }

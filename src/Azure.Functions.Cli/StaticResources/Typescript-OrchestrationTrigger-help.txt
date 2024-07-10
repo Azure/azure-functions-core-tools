@@ -1,0 +1,3 @@
+﻿Durable Functions is an extension of Azure Functions that enables you to write long-running, reliable, event-driven, and stateful logic in a serverless environment.  
+
+You can use an orchestrator function to orchestrate the execution of other Durable functions within a function app. 

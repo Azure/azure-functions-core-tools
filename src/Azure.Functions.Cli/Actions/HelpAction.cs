@@ -14,6 +14,7 @@ using System.Text;
 using Fclp.Internals;
 using Colors.Net.StringColorExtensions;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Actions.LocalActions;
 
 namespace Azure.Functions.Cli.Actions
 {
@@ -55,11 +56,10 @@ namespace Azure.Functions.Cli.Actions
             _parseResult = parseResult;
         }
 
-        public override Task RunAsync()
+        public async override Task RunAsync()
         {
+            var latestVersionMessageTask = VersionHelper.IsRunningAnOlderVersion();
             ScriptHostHelpers.SetIsHelpRunning();
-
-            Utilities.PrintLogo();
             if (!string.IsNullOrEmpty(_context) || !string.IsNullOrEmpty(_subContext))
             {
                 var context = Context.None;
@@ -67,18 +67,25 @@ namespace Azure.Functions.Cli.Actions
 
                 if (!string.IsNullOrEmpty(_context) && !Enum.TryParse(_context, true, out context))
                 {
+                    // Show help for create action if the name matches with one of the supported triggers
+                    if (await ShowCreateActionHelp())
+                    {
+                        return;
+                    }
+
+                    Utilities.PrintLogo();
                     ColoredConsole.Error.WriteLine(ErrorColor($"Error: unknown argument {_context}"));
                     DisplayGeneralHelp();
-                    return Task.CompletedTask;
+                    return;
                 }
 
+                Utilities.PrintLogo();
                 if (!string.IsNullOrEmpty(_subContext) && !Enum.TryParse(_subContext, true, out subContext))
                 {
                     ColoredConsole.Error.WriteLine(ErrorColor($"Error: unknown argument {_subContext} in {context.ToLowerCaseString()} Context"));
                     DisplayContextHelp(context, Context.None);
-                    return Task.CompletedTask;
+                    return;
                 }
-
                 DisplayContextHelp(context, subContext);
             }
             else if (_action != null && _parseResult != null)
@@ -89,7 +96,33 @@ namespace Azure.Functions.Cli.Actions
             {
                 DisplayGeneralHelp();
             }
-            return Task.CompletedTask;
+
+            await RunVersionCheckTask(latestVersionMessageTask);
+            return;
+        }
+
+        private static async Task RunVersionCheckTask(Task<bool> versionCheckTask)
+        {
+            try
+            {
+                var versionCheckMessage = await VersionHelper.RunAsync(versionCheckTask);
+                if (!string.IsNullOrEmpty(versionCheckMessage))
+                {
+                    ColoredConsole.WriteLine(WarningColor($"{versionCheckMessage}{Environment.NewLine}"));
+                }
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
+        }
+
+        private async Task<bool> ShowCreateActionHelp()
+        {
+            var actionType = _actionTypes.First(x => x.Names.Contains("new"));
+            var action = _createAction.Invoke(actionType.Type);
+            var createAction = (CreateFunctionAction)action;
+            return await createAction.ProcessHelpRequest(_context);
         }
 
         private void DisplayContextHelp(Context context, Context subContext)

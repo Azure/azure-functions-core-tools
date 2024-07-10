@@ -30,13 +30,13 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task create_timerTrigger_authConfigured_returns_error()
+        public async Task create_timerTrigger_authConfigured_returns_error_v3()
         {
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime node",
+                    "init . --worker-runtime node -m v3",
                     "new --template TimerTrigger --name testfunc --authlevel function"
                 },
                 HasStandardError = true,
@@ -48,30 +48,31 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task create_httpTrigger_Invalid_AuthConfig_returns_error()
+        public async Task create_httpTrigger_Invalid_AuthConfig_returns_error_v3()
         {
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime node",
+                    "init . --worker-runtime node -m v3",
                     "new --template httpTrigger --name testfunc --authlevel invalid"
                 },
                 OutputContains = new[]
                 {
                     "Authorization level is applicable to templates that use Http trigger, Allowed values: [function, anonymous, admin]. Authorization level is not enforced when running functions from core tools"
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
         [Fact]
-        public async Task create_httpTrigger_with_authConfigured_node()
+        public async Task create_httpTrigger_with_authConfigured_node_v3()
         {
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime node",
+                    "init . --worker-runtime node -m v3",
                     "new --template HttpTrigger --name testfunc --authlevel function"
                 },
                 OutputContains = new[]
@@ -125,6 +126,23 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task create_template_function_using_alias_v3()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node -m v3",
+                    "new --language js --template \"http trigger\" --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
         public async Task create_template_function_using_alias()
         {
             await CliTester.Run(new RunConfiguration
@@ -136,8 +154,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
+                    "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"http trigger\" template."
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -159,6 +179,23 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task create_template_function_js_no_space_name_v3()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node -m v3",
+                    "new --language js --template httptrigger --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
+                }
+            }, _output);
+        }
+
+        [Fact]
         public async Task create_template_function_js_no_space_name()
         {
             await CliTester.Run(new RunConfiguration
@@ -170,8 +207,29 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputContains = new[]
                 {
+                    "\\src\\functions\\testfunc.js",
                     "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_template_function_js_no_space_name_v4_model_param()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node -m v4",
+                    "new --language js --template httptrigger --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "\\src\\functions\\testfunc.js",
+                    "The function \"testfunc\" was created successfully from the \"httptrigger\" template."
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -193,13 +251,13 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task create_typescript_template()
+        public async Task create_typescript_template_v3()
         {
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    "init . --worker-runtime node --language typescript",
+                    "init . --worker-runtime node --language typescript -m v3",
                     "new --template \"http trigger\" --name testfunc"
                 },
                 CheckFiles = new FileResult[]
@@ -224,13 +282,32 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task create_typescript_template_blob()
+        public async Task create_typescript_template()
         {
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
                     "init . --worker-runtime node --language typescript",
+                    "new --template \"http trigger\" --name testfunc"
+                },
+                OutputContains = new[]
+                {
+                    "\\src\\functions\\testfunc.ts",
+                    "The function \"testfunc\" was created successfully from the \"http trigger\" template."
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_typescript_template_blob_v3()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node --language typescript -m v3",
                     "new --template \"azure Blob Storage trigger\" --name testfunc"
                 },
                 CheckFiles = new FileResult[]
@@ -254,6 +331,40 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
                 }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task create_typescript_template_blob()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node --language typescript",
+                    "new --template \"azure Blob Storage trigger\" --name testfunc"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("src", "functions", "testfunc.ts"),
+                        ContentContains = new []
+                        {
+                            "(blob: Buffer, context: InvocationContext)",
+                        },
+                        ContentNotContains = new []
+                        {
+                            "const { app }",
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "\\src\\functions\\testfunc.ts",
+                    "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 

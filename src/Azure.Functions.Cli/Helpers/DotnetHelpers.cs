@@ -46,6 +46,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
+            ColoredConsole.WriteLine($"{Environment.NewLine}Creating dotnet function...");
             await TemplateOperation(async () =>
             {
                 // In .NET 6.0, the 'dotnet new' command requires the short name.
@@ -64,10 +65,20 @@ namespace Azure.Functions.Cli.Helpers
                 }
 
                 var exe = new Executable("dotnet", exeCommandArguments);
-                var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+                string dotnetNewErrorMessage = string.Empty;
+                var exitCode = await exe.RunAsync(o => { }, e => {
+                    dotnetNewErrorMessage = string.Concat(dotnetNewErrorMessage, Environment.NewLine, e);
+                });
+
                 if (exitCode != 0)
                 {
-                    throw new CliException("Error creating function");
+                    // Only print the error message from dotnet new command when command was not successful to avoid confusing people. 
+                    if (!string.IsNullOrWhiteSpace(dotnetNewErrorMessage))
+                    {
+                        ColoredConsole.Error.WriteLine(ErrorColor(dotnetNewErrorMessage));
+                    }
+                        
+                    throw new CliException("Error creating function.");
                 }
             }, workerRuntime);
         }
@@ -75,9 +86,11 @@ namespace Azure.Functions.Cli.Helpers
         private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
         {
             "blobtrigger" => "blob",
+            "eventgridblobtrigger" => "eventgridblob",
             "cosmosdbtrigger" => "cosmos",
             "durablefunctionsorchestration" => "durable",
             "eventgridtrigger" => "eventgrid",
+            "eventgridcloudeventtrigger" => "eventgridcloudevent",
             "eventhubtrigger" => "eventhub",
             "httptrigger" => "http",
             "iothubtrigger" => "iothub",
@@ -88,6 +101,9 @@ namespace Azure.Functions.Cli.Helpers
             "servicebusqueuetrigger" => "squeue",
             "servicebustopictrigger" => "stopic",
             "timertrigger" => "timer",
+            "daprpublishoutputbinding" => "daprPublishOutputBinding",
+            "daprserviceinvocationtrigger" => "daprServiceInvocationTrigger",
+            "daprtopictrigger" => "daprTopicTrigger",
             _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
         };
 
@@ -100,12 +116,16 @@ namespace Azure.Functions.Cli.Helpers
                     "QueueTrigger",
                     "HttpTrigger",
                     "BlobTrigger",
+                    "EventGridBlobTrigger",
                     "TimerTrigger",
                     "EventHubTrigger",
                     "ServiceBusQueueTrigger",
                     "ServiceBusTopicTrigger",
                     "EventGridTrigger",
-                    "CosmosDBTrigger"
+                    "CosmosDBTrigger",
+                    "DaprPublishOutputBinding",
+                    "DaprServiceInvocationTrigger",
+                    "DaprTopicTrigger",
                 };
             }
 
@@ -123,8 +143,12 @@ namespace Azure.Functions.Cli.Helpers
                 "ServiceBusQueueTrigger",
                 "ServiceBusTopicTrigger",
                 "EventGridTrigger",
+                "EventGridCloudEventTrigger",
                 "CosmosDBTrigger",
-                "IotHubTrigger"
+                "IotHubTrigger",
+                "DaprPublishOutputBinding",
+                "DaprServiceInvocationTrigger",
+                "DaprTopicTrigger",
             };
         }
 

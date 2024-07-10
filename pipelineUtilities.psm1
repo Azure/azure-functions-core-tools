@@ -52,14 +52,25 @@ function Install-SBOMUtil
 $DotnetSDKVersionRequirements = @{
 
     # .NET SDK 3.1 is required by the Microsoft.ManifestTool.dll tool
+    '2.1' = @{
+        MinimalPatch = '818'
+        DefaultPatch = '818'
+    }
+
+    # .NET SDK 3.1 is required by the Microsoft.ManifestTool.dll tool
     '3.1' = @{
         MinimalPatch = '415'
         DefaultPatch = '415'
     }
 
     '6.0' = @{
-        MinimalPatch = '100'
-        DefaultPatch = '100'
+        MinimalPatch = '417'
+        DefaultPatch = '417'
+    }
+
+    '8.0' = @{
+        MinimalPatch = '204'
+        DefaultPatch = '204'
     }
 }
 
