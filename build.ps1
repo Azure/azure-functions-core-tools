@@ -6,7 +6,7 @@ if (-not (Test-Path $buildFolderPath))
 
 Set-Location $buildFolderPath
 
-$buildCommand = $null
+$buildCommand = $null 
 
 $isReleaseBuild = $null
 if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild)))
