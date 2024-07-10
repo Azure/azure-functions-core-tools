@@ -52,5 +52,10 @@ namespace Azure.Functions.Cli.Extensions
             hostJsonObj.Add(contentPropertyName, additionalConfig);
             return JsonConvert.SerializeObject(hostJsonObj, Formatting.Indented);
         }
+
+        public static bool EqualsIgnoreCase(this string str1, string str2)
+        {
+            return string.Equals(str1, str2, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

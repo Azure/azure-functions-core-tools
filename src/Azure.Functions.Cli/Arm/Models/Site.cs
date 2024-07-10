@@ -40,6 +40,9 @@ namespace Azure.Functions.Cli.Arm.Models
         public bool IsDynamic
             => Sku?.Equals("dynamic", StringComparison.OrdinalIgnoreCase) == true;
 
+        public bool IsFlex
+            => Sku?.Equals("flexconsumption", StringComparison.OrdinalIgnoreCase) == true;
+
         public bool IsElasticPremium
             => Sku?.Equals("elasticpremium", StringComparison.OrdinalIgnoreCase) == true;
 
@@ -50,5 +53,7 @@ namespace Azure.Functions.Cli.Arm.Models
         {
             SiteId = siteId;
         }
+
+        public FunctionAppConfig FunctionAppConfig { get; set; }
     }
 }

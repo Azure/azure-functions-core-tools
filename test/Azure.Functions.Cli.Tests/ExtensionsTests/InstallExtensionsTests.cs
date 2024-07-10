@@ -39,7 +39,8 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                         Name = "extensions.csproj",
                         Exists = false
                     }
-                }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -49,7 +50,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] {
-                    "init . --worker-runtime node --no-bundle",
+                    "init . --worker-runtime node --no-bundle -m v3",
                     "new --template SendGrid --name testfunc",
                     "extensions install"
                 },
@@ -85,7 +86,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[] {
-                    "init . --worker-runtime node --no-bundle",
+                    "init . --worker-runtime node --no-bundle -m v3",
                     "new --template SendGrid --name testfunc",
                     "extensions install",
                     "extensions install -p Microsoft.Azure.WebJobs.Extensions.Storage -v 3.0.8"

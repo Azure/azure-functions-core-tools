@@ -19,14 +19,14 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2288";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2288";
-        public const string DotnetItemTemplatesVersion = "4.0.2185";
-        public const string DotnetProjectTemplatesVersion = "4.0.2185";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.3038";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.3038";
+        public const string DotnetItemTemplatesVersion = "4.0.3038";
+        public const string DotnetProjectTemplatesVersion = "4.0.3038";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
-        
+
         public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
 
         public static readonly string ConstantsFile = Path.Combine(SrcProjectPath, "Common", "Constants.cs");
@@ -79,6 +79,65 @@ namespace Build
             "win7-x64"
         };
 
+        private static readonly string[] _winPowershellRuntimesNet8 = new[]
+        {
+            "win-x86",
+            "win",
+            "win-arm64",
+            "win-x64"
+        };
+
+        private static readonly string[] _linPowershellRuntimes = new[]
+        {
+            "linux",
+            "linux-x64",
+            "unix",
+            "linux-musl-x64"
+        };
+
+        private static readonly string[] _osxPowershellRuntimes = new[]
+        {
+            "osx",
+            "osx-x64",
+            "unix"
+        };
+
+        private static readonly string[] _osxARMPowershellRuntimes = new[]
+        {
+            "osx",
+            "osx-arm64",
+            "unix"
+        };
+
+        private static Dictionary<string, string[]> GetPowerShell72Runtimes()
+        {
+            var runtimes = new Dictionary<string, string[]>
+            {
+                { "win-x86", _winPowershellRuntimes },
+                { "win-x64", _winPowershellRuntimes },
+                { "win-arm64", _winPowershellRuntimes },
+                { "linux-x64", _linPowershellRuntimes },
+                { "osx-x64", _osxPowershellRuntimes },
+                { "osx-arm64", _osxARMPowershellRuntimes }
+            };
+
+            return runtimes;
+        }
+        private static Dictionary<string, string[]> GetPowerShell74Runtimes()
+        {
+            var runtimes = new Dictionary<string, string[]>
+            {
+                { "win-x86", _winPowershellRuntimesNet8 },
+                { "win-x64", _winPowershellRuntimesNet8 },
+                { "win-arm64", _winPowershellRuntimesNet8 },
+                { "linux-x64", _linPowershellRuntimes },
+                { "osx-x64", _osxPowershellRuntimes },
+                { "osx-arm64", _osxARMPowershellRuntimes }
+            };
+
+            return runtimes;
+        }
+
         public static readonly Dictionary<string, Dictionary<string, string[]>> ToolsRuntimeToPowershellRuntimes = new Dictionary<string, Dictionary<string, string[]>>
         {
             {
@@ -88,8 +147,8 @@ namespace Build
                     { "win-x86", _winPowershellRuntimes },
                     { "win-x64", _winPowershellRuntimes },
                     { "win-arm64", _winPowershellRuntimes },
-                    { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
+                    { "linux-x64", _linPowershellRuntimes },
+                    { "osx-x64", _osxPowershellRuntimes },
                     // NOTE: PowerShell 7.0 does not support arm. First version supporting it is 7.2
                     // https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#supported-versions
                     // That being said, we might as well include "osx" and "unix" since it'll hardly affect package size and should lead to more accurate error messages
@@ -98,15 +157,11 @@ namespace Build
             },
             {
                 "7.2",
-                new Dictionary<string, string[]>
-                {
-                    { "win-x86", _winPowershellRuntimes },
-                    { "win-x64", _winPowershellRuntimes },
-                    { "win-arm64", _winPowershellRuntimes },
-                    { "linux-x64", new [] { "linux", "linux-x64", "unix", "linux-musl-x64" } },
-                    { "osx-x64", new [] { "osx", "osx-x64", "unix" } },
-                    { "osx-arm64", new [] { "osx", "osx-arm64", "unix" } }
-                }
+                GetPowerShell72Runtimes()
+            },
+            {
+                "7.4",
+                GetPowerShell74Runtimes()
             }
         };
 
@@ -149,6 +204,7 @@ namespace Build
         public static string CommitId => config("N/A", "Build.SourceVersion");
 
         public static string TelemetryInstrumentationKey => config(null, "TELEMETRY_INSTRUMENTATION_KEY");
+        public static bool IsPublicBuild => string.Equals(config(null, "IsPublicBuild"), true.ToString(), System.StringComparison.OrdinalIgnoreCase);
 
         public static string BuildArtifactsStorage => config(null);
 
@@ -168,7 +224,7 @@ namespace Build
             public static readonly string ToThirdPartySign = "ThirdParty";
             public static readonly string ToMacSign = "Mac";
             public static readonly string[] RuntimesToSign = new string[] { "min.win-arm64", "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
-            public static readonly string[] FilterExtensionsSign = new[] { ".json", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
+            public static readonly string[] FilterExtensionsSign = new[] { ".json", "json.sha256", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
             public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
 
             public static readonly string[] SkipSigcheckTest = new[] {

@@ -1,7 +1,11 @@
-﻿using System.Diagnostics;
+﻿using Colors.Net;
+using System;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -10,10 +14,27 @@ namespace Azure.Functions.Cli.Common
         public static bool CommandValid(string fileName, string args)
             => CheckExitCode(fileName, args);
 
+        // c:\windows\system32\where.exe
         public static bool CommandExists(string command)
-            => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? CheckExitCode("where", command)
-            : CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                var wherePath = GetWindowsWherePath();
+                if (File.Exists(wherePath))
+                {
+                    return CheckExitCode(wherePath, command);
+                }
+                else
+                {
+                    ColoredConsole.WriteLine(WarningColor($"The 'where' command executable was not found at the expected path at {Environment.SystemDirectory}."));
+                    return CheckExitCode("where", command);
+                }
+            }
+            else
+            {
+                return CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
+            }
+        }
 
         public static async Task<bool> PowerShellModuleExistsAsync(string powershellExecutable, string module)
         {
@@ -40,6 +61,11 @@ namespace Azure.Functions.Cli.Common
             var process = Process.Start(processStartInfo);
             process?.WaitForExit();
             return process?.ExitCode == 0;
+        }
+        
+        public static string GetWindowsWherePath()
+        {
+            return $"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe";
         }
     }
 }

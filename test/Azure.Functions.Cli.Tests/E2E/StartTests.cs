@@ -53,9 +53,47 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
+                        result.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_nodejs_v3()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node -m v3",
+                    "new --template \"Http trigger\" --name HttpTrigger",
+                    "start"
+                },
+                ExpectExit = false,
+                OutputContains = new[]
+                {
+                    "Functions:",
+                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
+                },
+                OutputDoesntContain = new string[]
+                {
+                        "Initializing function HTTP routes",
+                        "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
+                },
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -80,6 +118,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     await Task.Delay(TimeSpan.FromSeconds(15));
                     p.Kill();
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
 
         }
@@ -106,6 +145,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     await Task.Delay(TimeSpan.FromSeconds(15));
                     p.Kill();
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -217,6 +257,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
                         await File.WriteAllTextAsync(filePath, hostJsonContent);
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
                 new RunConfiguration
                 {
@@ -238,7 +279,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         // give the host time to load functions and print any errors
                         await Task.Delay(TimeSpan.FromSeconds(10));
                         p.Kill();
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
             }, _output, startHost: true);
         }
@@ -267,6 +309,42 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet8_inproc()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net8.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+
+                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                        {
+                            testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
+                            testOutputHelper.Output.Should().Contain("Starting child process for in-process model host");
+                            testOutputHelper.Output.Should().Contain("Started child process with ID");
+                        }
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -281,7 +359,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime node",
+                        "init . --worker-runtime node -m v3",
                         $"new --template \"Http Trigger\" --name {functionName}",
                     },
                     Test = async (workingDir, _) =>
@@ -290,7 +368,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var functionJson = await File.ReadAllTextAsync(filePath);
                         functionJson = functionJson.Replace("\"type\": \"http\"", "\"type\": \"http2\"");
                         await File.WriteAllTextAsync(filePath, functionJson);
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
                 new RunConfiguration
                 {
@@ -401,7 +480,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                     ExpectExit = true,
                     ExitInError = true,
-                    ErrorContains = new[] { "Port 8081 is unavailable" }
+                    ErrorContains = new[] { "Port 8081 is unavailable" },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 }, _output);
             }
             finally
@@ -429,7 +509,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var content = File.ReadAllText(settingsFile);
                         content = content.Replace("EMPTY_VALUE", "");
                         File.WriteAllText(settingsFile,content);
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
                 new RunConfiguration
                 {
@@ -462,7 +543,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     OutputDoesntContain = new string[]
                     {
                         "Skipping 'emptySetting' from local settings as it's already defined in current environment variables."
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 }
             }, _output);
         }
@@ -525,10 +607,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                         p.Kill();
                     }
                 },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
-        [Theory]
+        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/3644")]
         [InlineData("dotnet")]
         [InlineData("dotnet-isolated")]
         public async Task start_with_user_secrets(string language)
@@ -571,26 +654,26 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
                         Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {\""+ Constants.FunctionsWorkerRuntime + "\": \"" + language + "\", \"AzureWebJobsSecretStorageType\": \"files\"} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
                             { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-                            { Constants.FunctionsWorkerRuntime, "dotnet" },
                             { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
                     },
                     Commands = new[]
                     {
-                        "start --functions http1 --csharp",
+                        "start --functions http1 --" + language,
                     },
                     ExpectExit = false,
                     OutputContains = new string[]
                     {
                         "Using for user secrets file configuration."
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                     Test = async (workingDir, p) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
@@ -664,6 +747,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "start --functions http1 --csharp",
                     },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                     ExpectExit = true,
                     ExitInError = true,
                     ErrorContains = new[] { "Missing value for AzureWebJobsStorage in local.settings.json and User Secrets. This is required for all triggers other than httptrigger, kafkatrigger. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets." },

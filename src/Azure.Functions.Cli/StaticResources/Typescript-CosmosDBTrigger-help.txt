@@ -1,0 +1,1 @@
+﻿The Azure Cosmos DB Trigger uses the Azure Cosmos DB change feed to listen for inserts and updates across partitions. The change feed publishes new and updated items, not including updates from deletions. 

@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <AssemblyName>Azure.Functions.Cli.Tests</AssemblyName>
     <RootNamespace>Azure.Functions.Cli.Tests</RootNamespace>
@@ -16,7 +16,7 @@
     <PackageReference Include="FluentAssertions" Version="5.2.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.6.2" />
     <PackageReference Include="Moq" Version="4.8.2" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NSubstitute" Version="3.1.0" />
     <PackageReference Include="Octokit" Version="0.29.0" />
     <PackageReference Include="RichardSzalay.MockHttp" Version="5.0.0" />
@@ -45,4 +45,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Azure.Functions.Cli\Azure.Functions.Cli.csproj" />
   </ItemGroup>
+  <!-- The "in-proc8" directory content is created using an msbuild target in "Azure.Functions.Cli" project and they don't automatically gets copied to the test project output directory -->
+  <Target Name="CopyInProc8" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0'">
+    <Exec Command="xcopy /Y /I /E &quot;$(MSBuildThisFileDirectory)..\..\src\Azure.Functions.Cli\bin\$(Configuration)\$(TargetFramework)\in-proc8\*&quot; &quot;$(OutDir)in-proc8\&quot;" />
+  </Target>
 </Project>
