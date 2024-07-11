@@ -40,6 +40,9 @@ extends:
          compiled:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
+    settings:
+      # PR's from forks do not have sufficient permissions to set tags.
+      skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
     stages:     
       - stage: BuildAndTest
         jobs:
