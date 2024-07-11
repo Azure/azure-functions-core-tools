@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
@@ -297,6 +297,7 @@
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
+    <PackageReference Include="System.Formats.Asn1" Version="6.0.1" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
