@@ -54,7 +54,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "Writing local.settings.json",
                     $".vscode{Path.DirectorySeparatorChar}extensions.json",
                 },
-                OutputDoesntContain = new[] { "Initialized empty Git repository" }
+                OutputDoesntContain = new[] { "Initialized empty Git repository" },
+                CommandTimeout = TimeSpan.FromSeconds(60)
             }, _output);
         }
 
