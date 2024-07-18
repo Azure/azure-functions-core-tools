@@ -92,12 +92,6 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.java11">
       <LogicalName>$(AssemblyName).Dockerfile.java11</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.node14">
-      <LogicalName>$(AssemblyName).Dockerfile.node14</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.node16">
-      <LogicalName>$(AssemblyName).Dockerfile.node16</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.powershell7">
       <LogicalName>$(AssemblyName).Dockerfile.powershell7</LogicalName>
     </EmbeddedResource>
@@ -119,14 +113,11 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.11">
       <LogicalName>$(AssemblyName).Dockerfile.python3.11</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.javascript">
+      <LogicalName>$(AssemblyName).Dockerfile.javascript</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.typescript">
       <LogicalName>$(AssemblyName).Dockerfile.typescript</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.node18">
-      <LogicalName>$(AssemblyName).Dockerfile.node18</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="StaticResources\Dockerfile.typescript.node18">
-      <LogicalName>$(AssemblyName).Dockerfile.typescript.node18</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\gitignore">
       <LogicalName>$(AssemblyName).gitignore</LogicalName>
