@@ -37,9 +37,19 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<string> DetermineTargetFramework(string projectDirectory)
         {
             EnsureDotnet();
-            var exe = new Executable("dotnet", "build -getproperty:TargetFramework", workingDirectory: projectDirectory);
-            StringBuilder output = new();
+            var exe = new Executable(
+                "dotnet",
+                "build -getproperty:TargetFramework",
+                workingDirectory: projectDirectory,
+                environmentVariables: new Dictionary<string, string>
+                {
+                    // https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables
+                    ["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1",  // do not write disclaimer to stdout
+                    ["DOTNET_NOLOGO"] = "1",  // do not write disclaimer to stdout
+                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1", // just in case
+                });
 
+            StringBuilder output = new();
             var exitCode = await exe.RunAsync(o => output.Append(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
             if (exitCode != 0)
             {
@@ -49,7 +59,7 @@ namespace Azure.Functions.Cli.Helpers
             return output.ToString();
         }
         
-        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
+        public static async Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
             await TemplateOperation(async () =>
             {
