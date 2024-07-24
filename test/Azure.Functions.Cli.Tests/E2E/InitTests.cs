@@ -209,6 +209,36 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_dotnet_app_net9_isolated()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { "init dotnet-funcs --worker-runtime dotnet-isolated --target-framework net9.0" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "local.settings.json"),
+                        ContentContains = new[]
+                        {
+                            "FUNCTIONS_WORKER_RUNTIME",
+                            "dotnet-isolated",
+                        }
+                    },
+                    new FileResult
+                    {
+                        Name = Path.Combine("dotnet-funcs", "dotnet-funcs.csproj"),
+                        ContentContains = new[]
+                        {
+                            "Microsoft.NET.Sdk",
+                            "v4"
+                        }
+                    }
+                }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_dotnet_app_net8()
         {
             return CliTester.Run(new RunConfiguration
