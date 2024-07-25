@@ -170,18 +170,20 @@ namespace Azure.Functions.Cli.Common
                 }
             }
 
-            if (searchOption == SearchOption.AllDirectories)
+            if (searchOption == SearchOption.TopDirectoryOnly)
             {
-                foreach (var directory in Instance.Directory.GetDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly))
+                yield break;
+            }
+                
+            foreach (var directory in Instance.Directory.GetDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly))
+            {
+                var directoryName = Path.GetFileName(directory);
+                if (excludedDirectories == null ||
+                    !excludedDirectories.Any(d => d.Equals(directoryName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    var directoryName = Path.GetFileName(directory);
-                    if (excludedDirectories == null ||
-                        !excludedDirectories.Any(d => d.Equals(directoryName, StringComparison.OrdinalIgnoreCase)))
+                    foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles, searchPattern, searchOption))
                     {
-                        foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles, searchPattern, searchOption))
-                        {
-                            yield return file;
-                        }
+                        yield return file;
                     }
                 }
             }
