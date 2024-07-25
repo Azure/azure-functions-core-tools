@@ -155,8 +155,9 @@ namespace Azure.Functions.Cli.Helpers
         public static bool CanDotnetBuild()
         {
             EnsureDotnet();
-            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
-            var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").ToList();
+            // dotnet build will only search for .csproj files within the current directory (when no .csproj file is passed), so we limit our search to that directory only
+            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
+            var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
             // If the project name is extensions only then is extensions.csproj a valid csproj file
             if (!Path.GetFileName(Environment.CurrentDirectory).Equals("extensions"))
             {
