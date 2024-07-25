@@ -232,7 +232,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
                             "Microsoft.NET.Sdk",
                             "v4",
-                            "net9.0"
+                            "net9.0",
                         }
                     }
                 }
