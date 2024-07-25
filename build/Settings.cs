@@ -19,10 +19,10 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.3038";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.3038";
-        public const string DotnetItemTemplatesVersion = "4.0.3038";
-        public const string DotnetProjectTemplatesVersion = "4.0.3038";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.3062";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.3062";
+        public const string DotnetItemTemplatesVersion = "4.0.3062";
+        public const string DotnetProjectTemplatesVersion = "4.0.3062";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
@@ -40,15 +40,16 @@ namespace Build
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
         public static readonly string[] TargetRuntimes = new[] {
+            /*
             "min.win-arm64",
             "min.win-x86",
             "min.win-x64",
             "linux-x64",
             "osx-x64",
             "osx-arm64",
-            "win-x86",
-            "win-x64",
-            "win-arm64" };
+            */
+            //"win-x86",
+            "win-x64", };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
