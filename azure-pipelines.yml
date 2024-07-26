@@ -68,11 +68,18 @@ jobs:
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
   - task: UseDotNet@2
-    displayName: 'Install .NET9 SDK'
     inputs:
       packageType: 'sdk'
       version: "9.0.100-preview.6.24328.19"
       includePreviewVersions: true
+    displayName: 'Install .NET9 SDK using UseDotNet'
+  - pwsh: |
+      # Download dotnet-install script
+      Invoke-WebRequest -Uri https://dot.net/v1/dotnet-install.ps1 -OutFile dotnet-install.ps1
+
+      # Install .NET SDK 9.0
+      .\dotnet-install.ps1 -Version 9.0.100-preview.6.24328.19
+    displayName: 'Install .NET 9 SDK'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
