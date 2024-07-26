@@ -72,6 +72,7 @@ jobs:
     inputs:
       packageType: 'sdk'
       version: "9.0.100-preview.6.24328.19"
+      includePreviewVersions: true
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
