@@ -72,6 +72,12 @@ $DotnetSDKVersionRequirements = @{
         MinimalPatch = '204'
         DefaultPatch = '204'
     }
+
+    '9.0' = @{
+        MinimalPatch = '100-preview.6.24328.19'
+        DefaultPatch = '100-preview.6.24328.19'
+
+    }
 }
 
 function AddLocalDotnetDirPath {
@@ -128,11 +134,6 @@ function Install-Dotnet {
         [string]$Channel = 'release'
     )
     try {
-        Write-Host "Installing .NET 9"
-        Invoke-WebRequest -Uri https://dot.net/v1/dotnet-install.ps1 -OutFile dotnet-install.ps1
-
-        # Install .NET SDK 9.0
-        .\dotnet-install.ps1 -Version 9.0.100-preview.6.24328.19
         Find-Dotnet
         return  # Simply return if we find dotnet SDk with the correct version
     } catch { }
@@ -150,6 +151,9 @@ function Install-Dotnet {
             }
         }
         AddLocalDotnetDirPath
+        $listSdksOutput = dotnet --list-sdks
+        $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
+        Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
     }
     finally {
         if (Test-Path  $installScript) {
