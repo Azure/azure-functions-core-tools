@@ -122,9 +122,9 @@ function Install-DotnetVersion($Version,$Channel) {
 
     Write-Host "Installing dotnet SDK version $Version"
     if ($IsWindows) {
-        & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
+        & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version -Runtime aspnetcore
     } else {
-        bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
+        bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version -Runtime aspnetcore
     }
 }
 
@@ -151,9 +151,13 @@ function Install-Dotnet {
             }
         }
         AddLocalDotnetDirPath
-        $listSdksOutput = dotnet --list-sdks
+        $listSdksOutput = dotnet --list-runtimes
         $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
         Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
+
+        $listRuntimesOutput = dotnet --list-sdks
+        $installedDotnetRuntimes = $listRuntimesOutput | ForEach-Object { $_.Split(" ")[0] }
+        Write-Host "Detected dotnet Runtimes: $($installedDotnetRuntimes -join ', ')"
     }
     finally {
         if (Test-Path  $installScript) {
