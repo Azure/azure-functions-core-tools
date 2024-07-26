@@ -64,8 +64,10 @@ jobs:
     inputs:
       versionSpec: '18.x'
   - pwsh: |
+      Write-Host "Is this even working?"
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
+      Write-Host "Installing .NET 9"
       Invoke-WebRequest -Uri https://dot.net/v1/dotnet-install.ps1 -OutFile dotnet-install.ps1
 
       # Install .NET SDK 9.0
