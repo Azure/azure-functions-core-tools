@@ -158,7 +158,7 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        internal static IEnumerable<string> GetFiles(string directoryPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> excludedFiles = null, string searchPattern = "*")
+        internal static IEnumerable<string> GetFiles(string directoryPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> excludedFiles = null, string searchPattern = "*", SearchOption searchOption = SearchOption.AllDirectories)
         {
             foreach (var file in Instance.Directory.GetFiles(directoryPath, searchPattern, SearchOption.TopDirectoryOnly))
             {
@@ -170,13 +170,18 @@ namespace Azure.Functions.Cli.Common
                 }
             }
 
+            if (searchOption == SearchOption.TopDirectoryOnly)
+            {
+                yield break;
+            }
+                
             foreach (var directory in Instance.Directory.GetDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly))
             {
                 var directoryName = Path.GetFileName(directory);
                 if (excludedDirectories == null ||
                     !excludedDirectories.Any(d => d.Equals(directoryName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles, searchPattern))
+                    foreach (var file in GetFiles(directory, excludedDirectories, excludedFiles, searchPattern, searchOption))
                     {
                         yield return file;
                     }
