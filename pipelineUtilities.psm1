@@ -145,17 +145,17 @@ function Install-Dotnet {
             $version = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)"
             Write-Host "Installing dotnet SDK version $version"
             if ($IsWindows) {
-                & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
+                & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version -Runtime dotnet
             } else {
-                bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
+                bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version -Runtime dotnet
             }
         }
         AddLocalDotnetDirPath
-        $listSdksOutput = dotnet --list-runtimes
+        $listSdksOutput = dotnet --list-sdks
         $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
         Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
 
-        $listRuntimesOutput = dotnet --list-sdks
+        $listRuntimesOutput = dotnet --list-runtimes
         $installedDotnetRuntimes = $listRuntimesOutput | ForEach-Object { $_.Split(" ")[0] }
         Write-Host "Detected dotnet Runtimes: $($installedDotnetRuntimes -join ', ')"
     }
