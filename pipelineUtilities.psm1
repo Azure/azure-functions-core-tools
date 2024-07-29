@@ -123,6 +123,7 @@ function Install-DotnetVersion($Version,$Channel) {
     Write-Host "Installing dotnet SDK version $Version"
     if ($IsWindows) {
         & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
+        & .\$installScript -InstallDir "$env:ProgramFiles (x86)/dotnet" -Channel $Channel -Version $Version
     } else {
         bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
     }
