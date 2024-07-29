@@ -74,8 +74,8 @@ $DotnetSDKVersionRequirements = @{
     }
 
     '9.0' = @{
-        MinimalPatch = '0-preview.6.24327.7'
-        DefaultPatch = '0-preview.6.24327.7'
+        MinimalPatch = '100-preview.6.24328.19/'
+        DefaultPatch = '100-preview.6.24328.19'
 
     }
 }
@@ -145,10 +145,16 @@ function Install-Dotnet {
             $version = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)"
             Write-Host "Installing dotnet SDK version $version"
             if ($IsWindows) {
-                & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version -Runtime dotnet
+                & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
             } else {
-                bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version -Runtime dotnet
+                bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
             }
+        }
+        # install dotnet runtime
+        if ($IsWindows) {
+            & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version "9.0.0-preview.6.24327.7" -Runtime dotnet
+        } else {
+            bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v "9.0.0-preview.6.24327.7" -Runtime dotnet
         }
         AddLocalDotnetDirPath
         $listSdksOutput = dotnet --list-sdks
