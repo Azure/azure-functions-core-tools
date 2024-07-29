@@ -9,9 +9,7 @@
 # most precedence.
 # =======================================================
 
-
-# All of CoreTools PR should have the owners in the PR.
-* @khkh-ms @amamounelsayed
+* @azure/azure-functions-core
 
 # Adding codeowner for Language specific files such that GitHub automatically adds language owners as a reviewers.
-src/Azure.Functions.Cli/Azure.Functions.Cli.csproj @vrdmr @Francisco-Gamino @andystaples @amamounelsayed @ejizba @hossam-nasr @AnatoliB
+src/Azure.Functions.Cli/Azure.Functions.Cli.csproj @azure/azure-functions-worker-owners

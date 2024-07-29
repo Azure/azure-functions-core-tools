@@ -14,7 +14,8 @@ trigger:
 
 jobs:
 - job: Default
-  timeoutInMinutes: "90"
+  condition: eq(variables['LinuxPackageBuildTag'], '')
+  timeoutInMinutes: "180"
   pool:
     name: '1ES-Hosted-AzFunc'
     demands:
@@ -46,12 +47,15 @@ jobs:
       SimulateReleaseBuild: $(SimulateReleaseBuild)
   - pwsh: |
       $isIntegrationBuild = $false
+      $isCodeqlBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
       {
           $isIntegrationBuild = $true
       }
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
+      Write-Host "##vso[task.setvariable variable=IsCodeqlBuild]$isCodeqlBuild"
+      Write-Host "IsCodeqlBuild: $isCodeqlBuild"
     displayName: 'Set IsIntegrationBuild variable'
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
@@ -94,6 +98,7 @@ jobs:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: $(IsReleaseBuild)
+      IsCodeqlBuild: $(isCodeqlBuild)
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
@@ -104,7 +109,7 @@ jobs:
   - task: EsrpCodeSigning@1
     displayName: 'Authenticode signing'
     inputs:
-      ConnectedServiceName: 'ESRP Service'
+      ConnectedServiceName: $(ESRPServiceConnectionName)
       FolderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Authenticode\'
       Pattern: '*.dll, *.exe'
       signConfigType: 'inlineSignParams'
@@ -274,6 +279,7 @@ jobs:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
   - task: PublishPipelineArtifact@1
+    condition: succeeded()
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: 'drop'
@@ -285,3 +291,69 @@ jobs:
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
     displayName: 'Upload Core Tools build to the storage account for Integration Tests'
     condition: eq(variables.IsIntegrationBuild, 'true')
+
+- job: LinuxPackage
+  condition: ne(variables['LinuxPackageBuildTag'], '')
+  timeoutInMinutes: "120"
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+  # Bash v3
+  # Run a Bash script on macOS, Linux, or Windows.
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
+      script: |
+        cd publish-scripts
+        python3 -m venv publish-env
+        source publish-env/bin/activate
+        pip install -r requirements.txt
+        apt-get install fakeroot
+        major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
+        python driver.py "$linuxBuildNumber" "$major_version"
+        python driver.py "$linuxBuildNumber"
+        export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
+        echo "${DEB_PACKAGE}"
+      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+    env:
+      linuxBuildNumber: $(LinuxPackageBuildTag)      
+  - pwsh: |
+      echo $env:LinuxPackageAccountName
+      $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+    env:
+      LinuxPackageAccountName: $(LinuxPackageAccountName)
+      LinuxPackageAccountKey: $(LinuxPackageAccountKey)
+      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+    displayName: 'Upload Core Tools Unsigned Linux Package to the storage'
+  - task: EsrpCodeSigning@3
+    displayName: Sign
+    inputs:
+      ConnectedServiceName: $(ESRPServiceConnectionName)
+      FolderPath: '/home/vsts/work/1/s/publish-scripts/artifact/'
+      Pattern: '*.deb'
+      signConfigType: 'inlineSignParams'
+      inlineOperation: |
+        [
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "signtool.exe",
+            "toolVersion": "1.0"
+          }
+        ]
+      SessionTimeout: '60'
+      MaxConcurrency: '50'
+      MaxRetryAttempts: '5'
+  - pwsh: |
+      echo $env:LinuxPackageAccountName
+      $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /home/vsts/work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+    env:
+      LinuxPackageAccountName: $(LinuxPackageAccountName)
+      LinuxPackageAccountKey: $(LinuxPackageAccountKey)
+      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+    displayName: 'Upload Core Tools Signed Linux Package to the storage'

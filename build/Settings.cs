@@ -19,10 +19,10 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.2848";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.2848";
-        public const string DotnetItemTemplatesVersion = "4.0.2848";
-        public const string DotnetProjectTemplatesVersion = "4.0.2848";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.3038";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.3038";
+        public const string DotnetItemTemplatesVersion = "4.0.3038";
+        public const string DotnetProjectTemplatesVersion = "4.0.3038";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
@@ -204,6 +204,7 @@ namespace Build
         public static string CommitId => config("N/A", "Build.SourceVersion");
 
         public static string TelemetryInstrumentationKey => config(null, "TELEMETRY_INSTRUMENTATION_KEY");
+        public static bool IsPublicBuild => string.Equals(config(null, "IsPublicBuild"), true.ToString(), System.StringComparison.OrdinalIgnoreCase);
 
         public static string BuildArtifactsStorage => config(null);
 

@@ -93,7 +93,8 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                 .SingleInstance();
 
             builder.RegisterType<ProcessManager>()
-                .As<IProcessManager>();
+                .As<IProcessManager>()
+                .SingleInstance();
 
             var mockedSecretsManager = Substitute.For<ISecretsManager>();
             builder.RegisterInstance(mockedSecretsManager)

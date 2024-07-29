@@ -90,7 +90,11 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionAppFailedToDeployOnContainerAppsMessage = "Failed to deploy function app to Container Apps.";
         public const string LocalSettingsJsonFileName = "local.settings.json";
         public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
-
+        public const string Dotnet = "dotnet";
+        public const string FunctionsInProcNet8Enabled = "FUNCTIONS_INPROC_NET8_ENABLED";
+        public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
+        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
+        // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
 
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);

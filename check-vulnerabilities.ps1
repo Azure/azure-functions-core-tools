@@ -7,6 +7,11 @@ if (-not (Test-Path $projectPath))
 }
 
 cd $projectPath
+
+$cmd = "restore"
+Write-Host "dotnet $cmd"
+dotnet $cmd | Tee-Object $logFilePath
+
 $cmd = "list", "package", "--include-transitive", "--vulnerable"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath

@@ -9,8 +9,8 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
-using Dynamitey;
 using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -21,6 +21,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "init", HelpText = "Create a new Function App in the current folder. Initializes git repo.")]
     internal class InitAction : BaseAction
     {
+
         public SourceControl SourceControl { get; set; } = SourceControl.Git;
 
         public bool InitSourceControl { get; set; }
@@ -49,11 +50,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public string ProgrammingModel { get; set; }
 
+        public bool SkipNpmInstall { get; set; } = false;
+
         public WorkerRuntime ResolvedWorkerRuntime { get; set; }
 
         public string ResolvedLanguage { get; set; }
 
         public ProgrammingModel ResolvedProgrammingModel { get; set; }
+
+        // Default to .NET 8 if the target framework is not specified
+        private const string DefaultTargetFramework = Common.TargetFramework.net8;
+
+        private const string DefaultInProcTargetFramework = Common.TargetFramework.net6;
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
@@ -116,7 +124,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("target-framework")
-                .WithDescription("Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated. Options are - \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"")
+                .WithDescription($"Initialize a project with the given target framework moniker. Currently supported only when --worker-runtime set to dotnet-isolated or dotnet. Options are - {string.Join(", ", TargetFrameworkHelper.GetSupportedTargetFrameworks())}")
                 .Callback(tf => TargetFramework = tf);
 
             Parser
@@ -128,6 +136,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Setup<string>('m', "model")
                 .WithDescription($"Selects the programming model for the function app. Note this flag is now only applicable to Python and JavaScript/TypeScript. Options are V1 and V2 for Python; V3 and V4 for JavaScript/TypeScript. Currently, the V2 and V4 programming models are in preview.")
                 .Callback(m => ProgrammingModel = m);
+
+            Parser
+                .Setup<bool>("skip-npm-install")
+                .WithDescription("Skips the npm installation phase when using V4 programming model for NodeJS")
+                .Callback(skip => SkipNpmInstall = skip);
 
             Parser
                 .Setup<bool>("no-bundle")
@@ -201,6 +214,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             ValidateTargetFramework();
             if (WorkerRuntimeLanguageHelper.IsDotnet(ResolvedWorkerRuntime) && !Csx)
             {
+                await ShowEolMessage();
                 await DotnetHelpers.DeployDotnetProject(Utilities.SanitizeLiteral(Path.GetFileName(Environment.CurrentDirectory), allowed: "-"), Force, ResolvedWorkerRuntime, TargetFramework);
             }
             else
@@ -223,7 +237,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx);
             }
 
-            await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
+            if (!SkipNpmInstall)
+            {
+                await FetchPackages(ResolvedWorkerRuntime, ResolvedProgrammingModel);
+            }
+            else
+            {
+                ColoredConsole.Write(AdditionalInfoColor("You skipped \"npm install\". You must run \"npm install\" manually"));
+            }
         }
 
         private static (WorkerRuntime, string) ResolveWorkerRuntimeAndLanguage(string workerRuntimeString, string languageString)
@@ -327,22 +348,33 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private void ValidateTargetFramework()
         {
-            if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            if (string.IsNullOrEmpty(TargetFramework))
             {
-                if (string.IsNullOrEmpty(TargetFramework))
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
                 {
-                    // Default to .NET 8 if the target framework is not specified
-                    // NOTE: we must have TargetFramework be non-empty for a dotnet-isolated project, even if it is not specified by the user, due to the structure of the new templates
-                    TargetFramework = Common.TargetFramework.net8;
+                    TargetFramework = DefaultTargetFramework;
                 }
-                if (!TargetFrameworkHelper.GetSupportedTargetFrameworks().Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
+                else if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet)
                 {
-                    throw new CliArgumentsException($"Unable to parse target framework {TargetFramework}. Valid options are \"net8.0\", \"net7.0\", \"net6.0\", and \"net48\"");
+                    TargetFramework = DefaultInProcTargetFramework;
+                }
+                else
+                {
+                    return;
                 }
             }
-            else if (!string.IsNullOrEmpty(TargetFramework))
+
+            var supportedFrameworks = ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated
+                ? TargetFrameworkHelper.GetSupportedTargetFrameworks()
+                : TargetFrameworkHelper.GetSupportedInProcTargetFrameworks();
+
+            if (!supportedFrameworks.Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
             {
-                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated");
+                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework} for worker runtime {ResolvedWorkerRuntime}. Valid options are {string.Join(", ", supportedFrameworks)}");
+            }
+            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet)
+            {
+                throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
         }
 
@@ -378,6 +410,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCsxDotNet);
                 }
+                else if (targetFramework == Common.TargetFramework.net8)
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet8);
+                }
                 else
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet);
@@ -402,11 +438,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (language == Constants.Languages.TypeScript)
                 {
-                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypescriptNode18);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileTypeScript);
                 }
                 else
                 {
-                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileNode18);
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileJavaScript);
                 }
             }
             else if (workerRuntime == Helpers.WorkerRuntime.python)
@@ -554,6 +590,43 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     Console.Error.WriteLine(WarningColor("Warning: You must run \"npm install\" manually"));
                 }
+            }
+        }
+
+        private async Task ShowEolMessage()
+        {
+            try
+            {
+                if (!WorkerRuntimeLanguageHelper.IsDotnetIsolated(ResolvedWorkerRuntime) || TargetFramework == DefaultTargetFramework)
+                    return;
+                
+                var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(TargetFramework);
+
+                if (majorDotnetVersion == null)
+                    return;
+
+                var stacksContent = await StaticResources.StacksJson;
+                var stacks = JsonConvert.DeserializeObject<FunctionsStacks>(stacksContent);
+
+                var currentRuntimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
+
+                if (currentRuntimeSettings == null)
+                    return;
+
+                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                {
+                    var warningMessage = EolMessages.GetAfterEolCreateMessageDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                {
+                    var warningMessage = EolMessages.GetEarlyEolCreateMessageForDotNet(majorDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+            }
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the init command.
             }
         }
     }

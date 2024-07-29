@@ -1,0 +1,57 @@
+jobs:
+- job: Default
+  timeoutInMinutes: "180"
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022 
+    os: windows
+
+  variables:
+    devops_buildNumber: $[counter(format(''), 1500)]
+    DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+    DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+  steps:
+  - pwsh: |
+      $isIntegrationBuild = $false
+      if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
+      {
+          $isIntegrationBuild = $true
+      }
+      Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
+      Write-Host "IsIntegrationBuild: $isIntegrationBuild"
+    displayName: 'Set IsIntegrationBuild variable'
+  - pwsh: |
+      Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
+    displayName: Set up environment variables
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+  - pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET 6.0 and 3.1'
+  - task: NuGetToolInstaller@1
+    inputs:
+      versionSpec:
+    displayName: Install Nuget tool
+  - pwsh: |
+      .\validateWorkerVersions.ps1
+    displayName: 'Validate worker versions'
+    condition: ne(variables['skipWorkerVersionValidation'], 'true')
+  - pwsh: |
+      .\check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
+  - pwsh: |
+      .\build.ps1
+    env:
+      BuildArtifactsStorage: $(BuildArtifactsStorage)
+      IsReleaseBuild: false
+      IsPublicBuild: true
+      IsCodeqlBuild: false
+    displayName: 'Executing build script'
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true
+    condition: succeededOrFailed()

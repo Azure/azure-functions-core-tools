@@ -9,18 +9,18 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using NuGet.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using Site = Azure.Functions.Cli.Arm.Models.Site;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
-        private static string _requiredNetFrameworkVersion = "6.0";
+        private static string _requiredNetFrameworkVersion = "8.0";
 
         public bool PublishLocalSettings { get; set; }
         public bool OverwriteSettings { get; set; }
@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Callback(s => DotnetCliParameters = s);
             Parser
                 .Setup<string>("dotnet-version")
-                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET version for the function app. For example, set to '5.0' when publishing a .NET 5.0 app.")
+                .WithDescription("Only applies to dotnet-isolated applications. Specifies the .NET version for the function app. For example, set to '6.0' when publishing a .NET 6 app.")
                 .Callback(s => DotnetFrameworkVersion = s);
             return base.ParseArgs(args);
         }
@@ -167,9 +167,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (projectFilePath != null)
                 {
                     var targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath));
-                    if (targetFramework.Equals("net7.0", StringComparison.InvariantCultureIgnoreCase))
+
+                    var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
+                    
+                    if (majorDotnetVersion != null)
                     {
-                        _requiredNetFrameworkVersion = "7.0";
+                        // Get Stacks
+                        var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
+                        var runtimeSettings = stacks.GetRuntimeSettings(majorDotnetVersion.Value, out bool isLTS);
+
+                        ShowEolMessage(stacks, runtimeSettings, majorDotnetVersion.Value);
+
+                        // This is for future proofing with stacks API for future dotnet versions.
+                        if (runtimeSettings != null && 
+                            (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false) && 
+                            (runtimeSettings.IsDeprecatedForRuntime == null || runtimeSettings.IsDeprecatedForRuntime == false))
+                        {
+                            _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
+                        }
                     }
                     else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
                     {
@@ -254,7 +269,14 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
             }
 
-            if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out string workerRuntimeStr))
+            string workerRuntimeStr = null;
+            if (functionApp.IsFlex)
+            {
+                workerRuntimeStr = functionApp.FunctionAppConfig.runtime.name;
+            }
+
+            if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr) || 
+                (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr))))
             {
                 var resolution = $"You can pass --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
                 try
@@ -298,7 +320,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"Azure Functions Core Tools does not support this deployment path. Please configure the app to deploy from a remote package using the steps here: https://aka.ms/deployfromurl");
             }
 
-            await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
+            if (functionApp.IsFlex)
+            {
+                if (result.ContainsKey(Constants.FunctionsWorkerRuntime))
+                {
+                    await UpdateRuntimeConfigForFlex(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), null, azureHelperService);
+                    result.Remove(Constants.FunctionsWorkerRuntime);
+                }
+            }
+            else
+            {
+                await UpdateFrameworkVersions(functionApp, workerRuntime, DotnetFrameworkVersion, Force, azureHelperService);
+            }
 
             // Special checks for python dependencies
             if (workerRuntime == WorkerRuntime.python)
@@ -307,10 +340,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
                 // Check if remote LinuxFxVersion exists and is different from local version
                 var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
-                if (!PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor))
+
+                if ((!functionApp.IsFlex && !PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor)) ||
+                    (functionApp.IsFlex && !PythonHelpers.IsFlexPythonRuntimeVersionMatched(functionApp.FunctionAppConfig?.runtime?.name, functionApp.FunctionAppConfig?.runtime?.version, localVersion.Major, localVersion.Minor)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
-                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{functionApp.LinuxFxVersion}'."));
+                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{(functionApp.IsFlex? functionApp.FunctionAppConfig.runtime.version: functionApp.LinuxFxVersion)}'."));
                 }
             }
 
@@ -320,6 +355,68 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             return result;
+        }
+
+        public static async Task UpdateRuntimeConfigForFlex(Site site, string runtimeName, string runtimeVersion, AzureHelperService helperService)
+        {
+            if (string.IsNullOrEmpty(runtimeName))
+            {
+                return;
+            }
+
+            List<FlexSku> skuList = await GetFlexSkus(site, runtimeName, helperService);
+
+            if (!skuList.Any())
+            {
+                throw new CliException($"We couldn't validate '{runtimeName}' runtime for Flex SKU in '{site.Location}'.");
+            }
+
+            if (string.IsNullOrEmpty(runtimeVersion))
+            {
+                var defaultSku = skuList.FirstOrDefault(s => s.IsDefault);
+                if (defaultSku == null)
+                {
+                    defaultSku = skuList.FirstOrDefault();
+                }
+
+                runtimeVersion = defaultSku?.functionAppConfigProperties.Runtime.Version;
+            }
+
+            ColoredConsole.WriteLine($"Updating function app runtime setting with '{runtimeName} {runtimeVersion}'.");
+            await helperService.UpdateFlexRuntime(site, runtimeName, runtimeVersion);
+        }
+
+        private static async Task<List<FlexSku>> GetFlexSkus(Site site, string runtimeName, AzureHelperService helperService)
+        {
+            var flexStacks = await helperService.GetFlexFunctionsStacks(runtimeName, site.Location);
+            var skuList = new List<FlexSku>();
+
+            if (flexStacks == null)
+            {
+                return skuList;
+            }
+
+            var languageProperties = flexStacks.Languages.FirstOrDefault()?.LanguageProperties;
+            foreach (var majorVersion in languageProperties.MajorVersions)
+            {
+                var minorVersionSkuList = majorVersion?.MinorVersions?
+                    .Where(m => m.StackSettings?.LinuxRuntimeSettings?.Sku != null)
+                    .Select(s => { return new { skus = s.StackSettings.LinuxRuntimeSettings.Sku, isDefault = s.StackSettings.LinuxRuntimeSettings.IsDefault }; });
+
+                foreach (var minorVersionSkus in minorVersionSkuList)
+                {
+                    foreach (var sku in minorVersionSkus.skus)
+                    {
+                        if (sku.SkuCode.Equals("FC1", StringComparison.OrdinalIgnoreCase))
+                        {
+                            sku.IsDefault = minorVersionSkus.isDefault;
+                            skuList.Add(sku);
+                        }
+                    }
+                }
+            }
+
+            return skuList;
         }
 
         internal static async Task UpdateFrameworkVersions(Site functionApp, WorkerRuntime workerRuntime, string requestedDotNetVersion, bool force, AzureHelperService helperService)
@@ -672,6 +769,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         /// <returns>ShouldSyncTrigger value</returns>
         private async Task<bool> HandleFlexConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
+            // Get the WorkerRuntime
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+
+            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            {
+                var flexSkus = await GetFlexSkus(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), new AzureHelperService(AccessToken, ManagementURL));
+                if (!flexSkus.Any(s => s.functionAppConfigProperties.Runtime.Version == _requiredNetFrameworkVersion))
+                {
+                    var versions = string.Join(", ", flexSkus.Select(s => s.functionAppConfigProperties.Runtime.Version));
+                    throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton supports .NET {versions}. Please upgrade your app to an appropriate .NET version and try the deployment again.");
+                }
+            }
+
             Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
             var deploymentParameters = new Dictionary<string, string>();
 
@@ -690,7 +800,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
             using (var client = GetRemoteZipClient(functionApp, handler))
             using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri(
-                $"api/Deploy/Zip?isAsync=true&author={Environment.MachineName}&Deployer=core_tools&{string.Join("&", deploymentParameters?.Select(kvp => $"{kvp.Key}={kvp.Value}")) ?? string.Empty}", UriKind.Relative)))
+                $"api/publish?isAsync=true&author={Environment.MachineName}&Deployer=core_tools&{string.Join("&", deploymentParameters?.Select(kvp => $"{kvp.Key}={kvp.Value}")) ?? string.Empty}", UriKind.Relative)))
             {
                 ColoredConsole.WriteLine(GetLogMessage("Creating archive for current directory..."));
 
@@ -1127,7 +1237,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task<bool> PublishAppSettings(Site functionApp, IDictionary<string, string> local, IDictionary<string, string> additional)
         {
+            string flexRuntimeName = null;
+            string flexRuntimeVersion = null;
+            if (functionApp.IsFlex)
+            {
+                // if the additiona keys has runtime, it would mean that runtime is already updated. 
+                if (!additional.ContainsKey(Constants.FunctionsWorkerRuntime))
+                {
+                    if (local.ContainsKey(Constants.FunctionsWorkerRuntime))
+                    {
+                        flexRuntimeName = local[Constants.FunctionsWorkerRuntime];
+                        local.Remove(Constants.FunctionsWorkerRuntime);
+                    }
+
+                    if (local.ContainsKey(Constants.FunctionsWorkerRuntimeVersion))
+                    {
+                        flexRuntimeVersion = local[Constants.FunctionsWorkerRuntimeVersion];
+                        local.Remove(Constants.FunctionsWorkerRuntimeVersion);
+                    }
+                }
+            }
+
             functionApp.AzureAppSettings = MergeAppSettings(functionApp.AzureAppSettings, local, additional);
+
             var result = await AzureHelper.UpdateFunctionAppAppSettings(functionApp, AccessToken, ManagementURL);
             if (!result.IsSuccessful)
             {
@@ -1137,6 +1269,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     .WriteLine(ErrorColor(result.ErrorResult));
                 return false;
             }
+
+            if (functionApp.IsFlex && !string.IsNullOrEmpty(flexRuntimeName))
+            {
+                await UpdateRuntimeConfigForFlex(functionApp, flexRuntimeName, flexRuntimeVersion, new AzureHelperService(AccessToken, ManagementURL));
+            }
+
             return true;
         }
 
@@ -1274,6 +1412,41 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
                  AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
+
+            public virtual Task UpdateFlexRuntime(Site functionApp, string runtimeName, string runtimeVersion) =>
+                 AzureHelper.UpdateFlexRuntime(functionApp, runtimeName, runtimeVersion, _accessToken, _managementUrl);
+
+            public virtual Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string runtime, string region) =>
+                 AzureHelper.GetFlexFunctionsStacks(_accessToken, _managementUrl, runtime, region);
+        }
+
+        private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)
+        {
+            try
+            {
+                if (currentRuntimeSettings.IsDeprecated == true || currentRuntimeSettings.IsDeprecatedForRuntime == true)
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetAfterEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
+                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                {
+                    var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
+                    if (nextDotnetVersion != null)
+                    {
+                        var warningMessage = EolMessages.GetEarlyEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        ColoredConsole.WriteLine(WarningColor(warningMessage));
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the deployment.
+            }
         }
     }
 }

@@ -184,6 +184,54 @@
     }
   },
   {
+    "id": "EventGridBlobTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app } = require('@azure/functions');\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: 'samples-workitems/{name}',\r\n    source: 'EventGrid',\r\n    connection: '',\r\n    handler: (blob, context) => {\r\n        context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "eventGridBlobTrigger",
+      "description": "$BlobTrigger_description",
+      "name": "Azure Blob Storage trigger (using Event Grid)",
+      "language": "JavaScript",
+      "triggerType": "blobTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "blob",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "connection",
+        "path"
+      ]
+    }
+  },
+  {
+    "id": "EventGridBlobTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, InvocationContext } from \"@azure/functions\";\r\n\r\nexport async function %functionName%(blob: Buffer, context: InvocationContext): Promise<void> {\r\n    context.log(`Storage blob function processed blob \"${context.triggerMetadata.name}\" with size ${blob.length} bytes`);\r\n}\r\n\r\napp.storageBlob('%functionName%', {\r\n    path: 'samples-workitems/{name}',\r\n    source: 'EventGrid',\r\n    connection: '',\r\n    handler: %functionName%\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "eventGridBlobTrigger",
+      "description": "$BlobTrigger_description",
+      "name": "Azure Blob Storage trigger (using Event Grid)",
+      "language": "TypeScript",
+      "triggerType": "blobTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "blob",
+      "enabledInTryMode": true,
+      "userPrompt": [
+        "connection",
+        "path"
+      ]
+    }
+  },
+  {
     "id": "EventGridTrigger-JavaScript-4.x",
     "runtime": "2",
     "files": {
