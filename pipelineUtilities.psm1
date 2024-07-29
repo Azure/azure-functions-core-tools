@@ -74,8 +74,8 @@ $DotnetSDKVersionRequirements = @{
     }
 
     '9.0' = @{
-        MinimalPatch = '100-preview.6.24328.19'
-        DefaultPatch = '100-preview.6.24328.19'
+        MinimalPatch = '0-preview.6.24327.7'
+        DefaultPatch = '0-preview.6.24327.7'
 
     }
 }
