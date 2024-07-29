@@ -122,9 +122,9 @@ function Install-DotnetVersion($Version,$Channel) {
 
     Write-Host "Installing dotnet SDK version $Version"
     if ($IsWindows) {
-        & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version -Runtime aspnetcore
+        & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
     } else {
-        bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version -Runtime aspnetcore
+        bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
     }
 }
 
@@ -134,29 +134,13 @@ function Install-Dotnet {
         [string]$Channel = 'release'
     )
     try {
-        Find-Dotnet
-        return  # Simply return if we find dotnet SDk with the correct version
-    } catch { }
-    $obtainUrl = "https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain"
-    try {
-        $installScript = if ($IsWindows) { "dotnet-install.ps1" } else { "dotnet-install.sh" }
-        Invoke-WebRequest -Uri $obtainUrl/$installScript -OutFile $installScript
-        foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
-            $version = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)"
-            Write-Host "Installing dotnet SDK version $version"
-            if ($IsWindows) {
-                & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
-            } else {
-                bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
-            }
+        $versionsToInstall = Find-DotnetVersionsToInstall
+        if ($versionsToInstall.Count -eq 0) {
+            return
         }
-        # install dotnet runtime
-        if ($IsWindows) {
-            & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version "9.0.0-preview.6.24327.7" -Runtime dotnet
-        } else {
-            bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v "9.0.0-preview.6.24327.7" -Runtime dotnet
+        foreach ($version in $versionsToInstall) {
+            Install-DotnetVersion -Version $version -Channel $Channel
         }
-        AddLocalDotnetDirPath
         $listSdksOutput = dotnet --list-sdks
         $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
         Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
