@@ -20,11 +20,11 @@ namespace Azure.Functions.Cli.Common
         private readonly IDictionary<string, string> _environmentVariables;
 
         public Executable(
-            string exeName, 
-            string arguments = null, 
-            bool streamOutput = true, 
-            bool shareConsole = false, 
-            bool visibleProcess = false, 
+            string exeName,
+            string arguments = null,
+            bool streamOutput = true,
+            bool shareConsole = false,
+            bool visibleProcess = false,
             string workingDirectory = null,
             IDictionary<string, string> environmentVariables = null)
         {

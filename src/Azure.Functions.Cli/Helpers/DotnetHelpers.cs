@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.Helpers
 
             return output.ToString();
         }
-        
+
         public static async Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
             await TemplateOperation(async () =>
