@@ -156,7 +156,7 @@ function Install-Dotnet {
         Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
 
         $listRuntimesOutput = dotnet --list-runtimes
-        $installedDotnetRuntimes = $listRuntimesOutput | ForEach-Object { $_.Split(" ")[0] }
+        $installedDotnetRuntimes = $listRuntimesOutput | ForEach-Object { $_.Split(" ")[1] }
         Write-Host "Detected dotnet Runtimes: $($installedDotnetRuntimes -join ', ')"
     }
     finally {
