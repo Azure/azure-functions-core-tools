@@ -332,15 +332,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        await Task.Delay(TimeSpan.FromSeconds(10));
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
                         result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 

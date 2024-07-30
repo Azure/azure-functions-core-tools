@@ -72,7 +72,7 @@ $DotnetSDKVersionRequirements = @{
         MinimalPatch = '204'
         DefaultPatch = '204'
     }
-
+    # Update .NET 9 patch once .NET 9 has been released out of preview
     '9.0' = @{
         MinimalPatch = '100-preview.6.24328.19'
         DefaultPatch = '100-preview.6.24328.19'
