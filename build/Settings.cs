@@ -47,7 +47,8 @@ namespace Build
             "osx-x64",
             "osx-arm64",
             "win-x86",
-            "win-x64", };
+            "win-x64",
+            "win-arm64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
