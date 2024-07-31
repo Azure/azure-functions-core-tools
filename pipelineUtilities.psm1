@@ -72,6 +72,12 @@ $DotnetSDKVersionRequirements = @{
         MinimalPatch = '204'
         DefaultPatch = '204'
     }
+    # Update .NET 9 patch once .NET 9 has been released out of preview
+    '9.0' = @{
+        MinimalPatch = '100-preview.6.24328.19'
+        DefaultPatch = '100-preview.6.24328.19'
+
+    }
 }
 
 function AddLocalDotnetDirPath {
@@ -81,21 +87,46 @@ function AddLocalDotnetDirPath {
     }
 }
 
-function Find-Dotnet
+function Find-DotnetVersionsToInstall
 {
     AddLocalDotnetDirPath
     $listSdksOutput = dotnet --list-sdks
     $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
     Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
+    $missingVersions = [System.Collections.Generic.List[string]]::new()
     foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
         $minimalVersion = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].MinimalPatch)"
         $firstAcceptable = $installedDotnetSdks |
                                 Where-Object { $_.StartsWith("$majorMinorVersion.") } |
                                 Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
                                 Select-Object -First 1
-        if (-not $firstAcceptable) {
-            throw "Cannot find the dotnet SDK for .NET Core $majorMinorVersion. Version $minimalVersion or higher is required. Please specify '-Bootstrap' to install build dependencies."
+        if ($firstAcceptable) {
+            Write-Host "Found dotnet SDK $firstAcceptable for .NET Core $majorMinorVersion."
+        }                               
+        else {
+            Write-Host "Cannot find the dotnet SDK for .NET Core $majorMinorVersion. Version $minimalVersion or higher is required."
+            $missingVersions.Add("$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)")
         }
+    }
+    return $missingVersions
+}
+
+$installScript = if ($IsWindows) { "dotnet-install.ps1" } else { "dotnet-install.sh" }
+$obtainUrl = "https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain"
+
+function Install-DotnetVersion($Version,$Channel) {
+    if ((Test-Path  $installScript) -ne $True) {
+        Write-Host "Downloading dotnet-install script"
+        Invoke-WebRequest -Uri $obtainUrl/$installScript -OutFile $installScript
+    }
+
+    Write-Host "Installing dotnet SDK version $Version"
+    if ($IsWindows) {
+        & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
+        # Installing .NET into x86 directory since the E2E App runs the tests on x86 and looks for the specified framework there
+        & .\$installScript -InstallDir "$env:ProgramFiles (x86)/dotnet" -Channel $Channel -Version $Version
+    } else {
+        bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
     }
 }
 
@@ -105,25 +136,24 @@ function Install-Dotnet {
         [string]$Channel = 'release'
     )
     try {
-        Find-Dotnet
-        return  # Simply return if we find dotnet SDk with the correct version
-    } catch { }
-    $obtainUrl = "https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain"
-    try {
-        $installScript = if ($IsWindows) { "dotnet-install.ps1" } else { "dotnet-install.sh" }
-        Invoke-WebRequest -Uri $obtainUrl/$installScript -OutFile $installScript
-        foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
-            $version = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)"
-            Write-Host "Installing dotnet SDK version $version"
-            if ($IsWindows) {
-                & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
-            } else {
-                bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
-            }
+        $versionsToInstall = Find-DotnetVersionsToInstall
+        if ($versionsToInstall.Count -eq 0) {
+            return
         }
-        AddLocalDotnetDirPath
+        foreach ($version in $versionsToInstall) {
+            Install-DotnetVersion -Version $version -Channel $Channel
+        }
+        $listSdksOutput = dotnet --list-sdks
+        $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
+        Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
+
+        $listRuntimesOutput = dotnet --list-runtimes
+        $installedDotnetRuntimes = $listRuntimesOutput | ForEach-Object { $_.Split(" ")[1] }
+        Write-Host "Detected dotnet Runtimes: $($installedDotnetRuntimes -join ', ')"
     }
     finally {
-        Remove-Item $installScript -Force -ErrorAction SilentlyContinue
+        if (Test-Path  $installScript) {
+            Remove-Item $installScript -Force -ErrorAction SilentlyContinue
+        }
     }
 }

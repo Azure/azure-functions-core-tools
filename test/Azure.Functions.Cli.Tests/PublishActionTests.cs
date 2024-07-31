@@ -19,6 +19,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("something", "6.0")]
         [InlineData("6.0", "6.0")]
         [InlineData("7.0", "7.0")]
+        [InlineData("9.0", "9.0")]
         public async Task NetFrameworkVersion_DotnetIsolated_Linux_Consumption_Updated(string initialLinuxFxVersion, string expectedNetFrameworkVersion)
         {
             var site = new Site("test")
