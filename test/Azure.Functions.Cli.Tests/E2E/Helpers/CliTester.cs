@@ -84,6 +84,12 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     var command = runConfiguration.Commands[i];
                     var exe = new Executable(_func, command, workingDirectory: workingDir);
+                    // Special case for dotnet commands
+                    if (command.StartsWith("dotnet", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // we have to remove the "dotnet" part of the command so we pass in command.Substring(7) as the second arg
+                        exe = new Executable("dotnet", command.Substring(7), workingDirectory: workingDir);
+                    }
 
                     if (startHost && i == runConfiguration.Commands.Length - 1)
                     {

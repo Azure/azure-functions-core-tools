@@ -72,6 +72,12 @@ $DotnetSDKVersionRequirements = @{
         MinimalPatch = '204'
         DefaultPatch = '204'
     }
+    # Update .NET 9 patch once .NET 9 has been released out of preview
+    '9.0' = @{
+        MinimalPatch = '100-preview.6.24328.19'
+        DefaultPatch = '100-preview.6.24328.19'
+
+    }
 }
 
 function AddLocalDotnetDirPath {
@@ -117,6 +123,8 @@ function Install-DotnetVersion($Version,$Channel) {
     Write-Host "Installing dotnet SDK version $Version"
     if ($IsWindows) {
         & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
+        # Installing .NET into x86 directory since the E2E App runs the tests on x86 and looks for the specified framework there
+        & .\$installScript -InstallDir "$env:ProgramFiles (x86)/dotnet" -Channel $Channel -Version $Version
     } else {
         bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
     }
@@ -135,7 +143,13 @@ function Install-Dotnet {
         foreach ($version in $versionsToInstall) {
             Install-DotnetVersion -Version $version -Channel $Channel
         }
-        AddLocalDotnetDirPath
+        $listSdksOutput = dotnet --list-sdks
+        $installedDotnetSdks = $listSdksOutput | ForEach-Object { $_.Split(" ")[0] }
+        Write-Host "Detected dotnet SDKs: $($installedDotnetSdks -join ', ')"
+
+        $listRuntimesOutput = dotnet --list-runtimes
+        $installedDotnetRuntimes = $listRuntimesOutput | ForEach-Object { $_.Split(" ")[1] }
+        Write-Host "Detected dotnet Runtimes: $($installedDotnetRuntimes -join ', ')"
     }
     finally {
         if (Test-Path  $installScript) {

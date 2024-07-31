@@ -314,6 +314,35 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task start_dotnet_isolated_csharp_net9()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                // TODO: Remove dotnet add package step once the worker package is available in public feed
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated --target-framework net9.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "dotnet add package Microsoft.Azure.Functions.Worker.Sdk --version 1.18.0-preview1-20240723.1 --source https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsTempStaging/nuget/v3/index.json",
+                    "start --build --port 7073"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
+                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
         public async Task start_dotnet8_inproc()
         {
             await CliTester.Run(new RunConfiguration
