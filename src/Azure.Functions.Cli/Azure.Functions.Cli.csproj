@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
@@ -27,7 +27,6 @@
     <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
   </PropertyGroup>
-
   <!-- Pack only the net6.0 version (which will include the bits needed for net8.0 usecase) -->
   <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
     <IsPackable>true</IsPackable>
@@ -37,7 +36,6 @@
   <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-  
   <!-- SkipInProcessHost build property will be True for artifacts used by VS feed -->
   <PropertyGroup Condition="'$(SkipInProcessHost)' == 'True'">
     <DefineConstants>SkipInProcessHost</DefineConstants>
@@ -80,9 +78,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet</LogicalName>
     </EmbeddedResource>
-	<EmbeddedResource Include="StaticResources\Dockerfile.dotnet8">
-	  <LogicalName>$(AssemblyName).Dockerfile.dotnet8</LogicalName>
-	</EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet8">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet8</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnetIsolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnetIsolated</LogicalName>
     </EmbeddedResource>
@@ -283,7 +281,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.834.3" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.835.1" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -298,7 +296,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.3220" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.3219" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.28.1" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.29.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
@@ -318,5 +316,4 @@
     </PropertyGroup>
     <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
   </Target>
-
 </Project>
