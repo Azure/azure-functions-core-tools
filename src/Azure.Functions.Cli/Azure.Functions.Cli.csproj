@@ -68,6 +68,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet8Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet8Isolated</LogicalName>
     </EmbeddedResource>
+	<EmbeddedResource Include="StaticResources\Dockerfile.dotnet9Isolated">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet9Isolated</LogicalName>
+	</EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
