@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -12,8 +13,6 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    using System.Text;
-
     public static class DotnetHelpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
@@ -44,7 +43,6 @@ namespace Azure.Functions.Cli.Helpers
                 environmentVariables: new Dictionary<string, string>
                 {
                     // https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables
-                    ["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1",  // do not write disclaimer to stdout
                     ["DOTNET_NOLOGO"] = "1",  // do not write disclaimer to stdout
                     ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1", // just in case
                 });
