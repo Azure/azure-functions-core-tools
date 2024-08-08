@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
         [InlineData("azure functionapp enable-git-repo appName", typeof(DeprecatedAzureActions))]
         [InlineData("azure functionapp fetch-app-settings appName", typeof(FetchAppSettingsAction))]
         [InlineData("azure functionapp fetch appName", typeof(FetchAppSettingsAction))]
-        [InlineData("azure functionapp publish app-name -g resource-group", typeof(FetchAppSettingsAction))]
+        [InlineData("azure functionapp publish app-name -g resource-group", typeof(PublishFunctionAppAction))]
         [InlineData("azure get-publish-username", typeof(DeprecatedAzureActions))]
         [InlineData("azure account list", typeof(DeprecatedAzureActions))]
         [InlineData("azure subscriptions list", typeof(DeprecatedAzureActions))]
