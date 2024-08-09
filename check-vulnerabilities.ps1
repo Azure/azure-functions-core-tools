@@ -1,33 +1,60 @@
-$projectPath = ".\src\Azure.Functions.Cli"
-$projectFileName = ".\Azure.Functions.Cli.csproj"
-$logFilePath = "..\..\build.log"
-if (-not (Test-Path $projectPath))
-{
-    throw "Project path '$projectPath' does not exist."
+param
+(
+    [String[]]
+    $CsprojFilePath
+)
+
+if (-not $CsprojFilePath) {
+    $CsprojFilePath = @(
+        "$PSScriptRoot/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj"
+        "$PSScriptRoot/test/Azure.Functions.Cli.Tests/Azure.Functions.Cli.Tests.csproj"
+        "$PSScriptRoot/build/Build.csproj"
+    )
 }
 
-cd $projectPath
+$logFilePath = "$PSScriptRoot/build.log"
+foreach ($projectFilePath in $CsprojFilePath) {
+    Write-Host "`r`nAnalyzing '$projectFilePath' for vulnerabilities..."
+    $projectFolder = Split-Path $projectFilePath
 
-$cmd = "restore"
-Write-Host "dotnet $cmd"
-dotnet $cmd | Tee-Object $logFilePath
+    try {
+        Push-Location $projectFolder
 
-$cmd = "list", "package", "--include-transitive", "--vulnerable"
-Write-Host "dotnet $cmd"
-dotnet $cmd | Tee-Object $logFilePath
+        # Restore and analyze the project
+        & { dotnet restore $projectFilePath }
+        if ($LASTEXITCODE -ne 0) {
+            throw "Command 'dotnet restore $projectFilePath' failed with exit code $LASTEXITCODE"
+        }
 
-$result = Get-content $logFilePath | select-string "has no vulnerable packages given the current sources"
+        & { dotnet list $projectFilePath package --include-transitive --vulnerable } 3>&1 2>&1 > $logFilePath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Command 'dotnet list $projectFilePath package --include-transitive --vulnerable' failed with exit code $LASTEXITCODE"
+        }
 
-$logFileExists = Test-Path $logFilePath -PathType Leaf
-if ($logFileExists)
-{
-  Remove-Item $logFilePath
-}
+        # Check and report if vulnerabilities are found
+        if (-not (Test-Path $logFilePath)) {
+            throw "Log file '$logFilePath' was not generated."
+        }
 
-cd ../..
+        $report = Get-Content $logFilePath -Raw
+        $result = $report | Select-String "has no vulnerable packages given the current sources"
 
-if (!$result)
-{
-  Write-Host "Vulnerabilities found" 
-  Exit 1
+        if ($result) {
+            Write-Host "No vulnerabilities found" -ForegroundColor Green
+        }
+        else {
+            $output = [System.Environment]::NewLine + "Vulnerabilities found!"
+            $output += $report
+
+            Write-Host $output -ForegroundColor Red
+            Exit 1
+        }
+    }
+    finally {
+        Pop-Location
+
+        if (Test-Path $logFilePath) {
+            Remove-Item $logFilePath -Force
+        }
+    }
 }
