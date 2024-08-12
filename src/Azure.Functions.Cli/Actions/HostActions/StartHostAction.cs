@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
@@ -28,6 +27,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Mono.Unix;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -511,6 +511,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var inProc8FuncExecutablePath = GetInProcNet8ExecutablePath();
 
             EnsureNet8FuncExecutablePresent(inProc8FuncExecutablePath);
+            EnsureUnixExecutePermissions(inProc8FuncExecutablePath);
 
             var inprocNet8ChildProcessInfo = new ProcessStartInfo
             {
@@ -560,6 +561,29 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
 
             return tcs.Task;
+        }
+
+        private void EnsureUnixExecutePermissions(string executableFilePath)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return;
+            }
+
+            var fileInfo = new UnixFileInfo(executableFilePath);
+            if (fileInfo.FileAccessPermissions.HasFlag(FileAccessPermissions.UserExecute) &&
+                fileInfo.FileAccessPermissions.HasFlag(FileAccessPermissions.GroupExecute) &&
+                fileInfo.FileAccessPermissions.HasFlag(FileAccessPermissions.OtherExecute))
+            {
+                return;
+            }
+
+            if (VerboseLogging == true)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"Assigning execute permissions to file: {executableFilePath}"));
+            }
+
+            fileInfo.FileAccessPermissions |= FileAccessPermissions.UserExecute | FileAccessPermissions.GroupExecute | FileAccessPermissions.OtherExecute;
         }
 
         private void EnsureNet8FuncExecutablePresent(string inProc8FuncExecutablePath)
