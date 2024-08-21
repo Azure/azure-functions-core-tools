@@ -93,11 +93,11 @@ namespace Azure.Functions.Cli.Tests
             string[] pythons;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                pythons = new string[] { "python.exe", "python3.exe", "python36.exe", "python37.exe", "python38.exe", "python39.exe", "python310.exe", "python311.exe", "py.exe" };
+                pythons = new string[] { "python.exe", "python3.exe", "python37.exe", "python38.exe", "python39.exe", "python310.exe", "python311.exe", "python312.exe", "py.exe" };
             }
             else
             {
-                pythons = new string[] { "python", "python3", "python36", "python37", "python38", "python39", "python310", "python311" };
+                pythons = new string[] { "python", "python3", "python37", "python38", "python39", "python310", "python311", "python312" };
             }
 
             string pythonExe = pythons.FirstOrDefault(p => CheckIfPythonExist(p));
