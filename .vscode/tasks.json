@@ -21,7 +21,9 @@
                 "publish",
                 "${workspaceFolder}/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj",
                 "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
+                "/consoleloggerparameters:NoSummary",
+                "--framework",
+                "${input:targetFramework}"
             ],
             "problemMatcher": "$msCompile"
         },
@@ -36,6 +38,17 @@
                 "${workspaceFolder}/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj"
             ],
             "problemMatcher": "$msCompile"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "targetFramework",
+            "type": "pickString",
+            "options": [
+                "net8.0",
+                "net6.0"
+            ],
+            "description": "Target framework"
         }
     ]
 }
