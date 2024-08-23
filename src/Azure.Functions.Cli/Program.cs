@@ -4,26 +4,39 @@ using Autofac;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 
 namespace Azure.Functions.Cli
 {
     internal class Program
     {
         static IContainer _container;
+        private readonly static string[] _versionArgs = new[] { "version", "v" };
+
         internal static void Main(string[] args)
         {
-            FirstTimeCliExperience();
-            SetupGlobalExceptionHandler();
-            SetCoreToolsEnvironmentVariables(args);
-            _container = InitializeAutofacContainer();
-            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-
-            Console.CancelKeyPress += (s, e) =>
+            // Check for version arg up front and prioritize speed over all else
+            // Tools like VS Code may call this often and we want their UI to be responsive
+            if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
             {
-                _container.Resolve<IProcessManager>()?.KillChildProcesses();
-            };
+                ColoredConsole.WriteLine($"{Constants.CliVersion}");
+                Environment.Exit(ExitCodes.Success);
+            }
+            else
+            {
+                FirstTimeCliExperience();
+                SetupGlobalExceptionHandler();
+                SetCoreToolsEnvironmentVariables(args);
+                _container = InitializeAutofacContainer();
+                AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
 
-            ConsoleApp.Run<Program>(args, _container);
+                Console.CancelKeyPress += (s, e) =>
+                {
+                    _container.Resolve<IProcessManager>()?.KillChildProcesses();
+                };
+
+                ConsoleApp.Run<Program>(args, _container);
+            }
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
