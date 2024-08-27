@@ -44,6 +44,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private const string WindowsExecutableName = "func.exe";
         private const string LinuxExecutableName = "func";
         private const string InProc8DirectoryName = "in-proc8";
+        private const string OutOfProcDirectoryName = "out-of-proc";
         private readonly ISecretsManager _secretsManager;
         private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
@@ -80,6 +81,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public bool? EnableJsonOutput { get; set; }
 
         public string JsonOutputFile { get; set; }
+
+        public string? SetHostRuntime { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
         {
@@ -175,6 +178,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                .Setup<string>("json-output-file")
                .WithDescription("If provided, a path to the file that will be used to write the output when using --enable-json-output.")
                .Callback(jsonOutputFile => JsonOutputFile = jsonOutputFile);
+
+            Parser
+               .Setup<string>("runtime")
+               .WithDescription("If provided, determines which version of the host to start.")
+               .Callback(startHostAction => SetHostRuntime = startHostAction);
 
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
@@ -430,10 +438,36 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await PreRunConditions();
 
             var isCurrentProcessNet6Build = RuntimeInformation.FrameworkDescription.Contains(Net6FrameworkDescriptionPrefix);
-            if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
+            if (SetHostRuntime != null)
             {
-                await StartInProc8AsChildProcessAsync();
-                return;
+                if (SetHostRuntime == "default")
+                {
+                    if (isCurrentProcessNet6Build)
+                    {
+                        await StartHostAsChildProcessAsync(true);
+                        return;
+                    }
+                }
+                else if (SetHostRuntime == "inproc8")
+                {
+                    if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
+                    {
+                        await StartHostAsChildProcessAsync(false);
+                        return;
+                    }
+
+                }
+                else if (SetHostRuntime == "inproc6")
+                {
+                    if (!isCurrentProcessNet6Build)
+                    {
+                        throw new CliException($"Cannot set host runtime to '{SetHostRuntime}' for the current process. The current process is not a .NET 6 build.");
+                    }
+                }
+                else
+                {
+                    throw new CliException($"Invalid host runtime '{SetHostRuntime}'. Valid values are 'default', 'in-proc8', 'in-proc6'.");
+                }
             }
 
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
@@ -498,23 +532,31 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return Path.Combine(funcExecutableDirectory, InProc8DirectoryName, executableName);
         }
 
-        private Task StartInProc8AsChildProcessAsync()
+        private static string GetOutOfProcExecutablePath()
+        {
+            var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
+            var executableName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? WindowsExecutableName : LinuxExecutableName;
+
+            return Path.Combine(funcExecutableDirectory, OutOfProcDirectoryName, executableName);
+        }
+
+        private Task StartHostAsChildProcessAsync(bool isOutOfProc)
         {
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor($"Starting child process for in-process model host."));
+                ColoredConsole.WriteLine(VerboseColor($"Starting child process for  {(isOutOfProc ? "out-of-process" : "in-process")} model host."));
             }
 
             var commandLineArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
             var tcs = new TaskCompletionSource();
 
-            var inProc8FuncExecutablePath = GetInProcNet8ExecutablePath();
+            var funcExecutablePath = isOutOfProc? GetOutOfProcExecutablePath(): GetInProcNet8ExecutablePath();
 
-            EnsureNet8FuncExecutablePresent(inProc8FuncExecutablePath);
+            EnsureNet8FuncExecutablePresent(funcExecutablePath);
 
-            var inprocNet8ChildProcessInfo = new ProcessStartInfo
+            var childProcessInfo = new ProcessStartInfo
             {
-                FileName = inProc8FuncExecutablePath,
+                FileName = funcExecutablePath,
                 Arguments = $"{commandLineArguments} --no-build",
                 WorkingDirectory = Environment.CurrentDirectory,
                 UseShellExecute = false,
@@ -525,7 +567,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             try
             {
-                var childProcess = Process.Start(inprocNet8ChildProcessInfo);
+                var childProcess = Process.Start(childProcessInfo);
                 if (VerboseLogging == true)
                 {
                     ColoredConsole.WriteLine(VerboseColor($"Started child process with ID: {childProcess.Id}"));
@@ -556,7 +598,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             catch (Exception ex)
             {
-                throw new CliException($"Failed to start the in-process model host. {ex.Message}");
+                throw new CliException($"Failed to start the {(isOutOfProc ? "out-of-process" : "in-process")} model host. {ex.Message}");
             }
 
             return tcs.Task;
