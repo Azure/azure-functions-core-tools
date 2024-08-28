@@ -469,6 +469,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     throw new CliException($"Invalid host runtime '{SetHostRuntime}'. Valid values are 'default', 'in-proc8', 'in-proc6'.");
                 }
             }
+            else
+            {
+                var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
+                
+                // Default should be OOP host
+                if (isCurrentProcessNet6Build)
+                {
+                    await StartHostAsChildProcessAsync(true);
+                    return;
+                }
+            }
 
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
