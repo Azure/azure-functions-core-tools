@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
@@ -18,12 +19,14 @@ using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.NativeMethods;
 using Colors.Net;
 using Fclp;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -389,6 +392,73 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return isInProcNet8Enabled;
         }
 
+        /// <summary>
+        /// Check local.settings.json to determine what value of FUNCTIONS_WORKER_RUNTIME is.
+        /// </summary>
+        private async Task<string> GetFunctionsWorkerRuntime()
+        {
+            var localSettingsJObject = await GetLocalSettingsJsonAsJObjectAsync();
+            var functionsWorkerRuntimeValue = localSettingsJObject?["Values"]?[Constants.FunctionsWorkerRuntime]?.Value<string>();
+
+            if (VerboseLogging == true)
+            {
+                var message = functionsWorkerRuntimeValue != null
+                    ? $"{Constants.FunctionsWorkerRuntime} app setting enabled in local.settings.json"
+                    : $"{Constants.FunctionsWorkerRuntime} app setting is not enabled in local.settings.json";
+                ColoredConsole.WriteLine(VerboseColor(message));
+            }
+
+            return functionsWorkerRuntimeValue;
+        }
+
+        /// <summary>
+        /// Gets Target Framework Version from deps.json file.
+        /// </summary>
+        private async Task<string> GetTargetFrameworkVersion(bool isVerbose)
+        {
+            string version = "";
+            var funcDepsJsonFile = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.deps.json", searchOption: SearchOption.TopDirectoryOnly).ToList();
+
+            if (funcDepsJsonFile != null)
+            {
+                foreach (var jsonFile in funcDepsJsonFile)
+                {
+                    string jsonString = await File.ReadAllTextAsync(jsonFile);
+                    // Parse the JSON
+                    using JsonDocument doc = JsonDocument.Parse(jsonString);
+
+                    // Get the root element
+                    JsonElement root = doc.RootElement;
+
+                    // Access the nested "runtimeTarget" property and then "name"
+                    string runtimeTargetName = root
+                        .GetProperty("runtimeTarget")
+                        .GetProperty("name")
+                        .GetString();
+
+                    // Regular expression to match "vX.X" where X is a digit
+                    string pattern = @"Version=(v\d+\.\d+)";
+
+                    // Perform the regular expression match
+                    Match match = Regex.Match(runtimeTargetName, pattern);
+
+                    // Check if a match was found
+                    if (match.Success)
+                    {
+                        // Extract the version from the matched group
+                        version = match.Groups[1].Value;
+
+                        if (isVerbose)
+                        {
+                            // Output the extracted version
+                            Console.WriteLine($"Extracted Target Framework Version: {version}");
+                        }
+                    }
+                }
+            }
+            return version;
+        }
+
         // We launch the in-proc .NET8 application as a child process only if the SkipInProcessHost conditional compilation symbol is not defined.
         // During build, we pass SkipInProcessHost=True only for artifacts used by our feed (we don't want to launch child process in that case).
         private bool ShouldLaunchInProcNet8AsChildProcess()
@@ -436,6 +506,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             await PreRunConditions();
+            var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
 
             var isCurrentProcessNet6Build = RuntimeInformation.FrameworkDescription.Contains(Net6FrameworkDescriptionPrefix);
             if (SetHostRuntime != null)
@@ -444,6 +515,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     if (isCurrentProcessNet6Build)
                     {
+                        if (isVerbose)
+                        {
+                            ColoredConsole.WriteLine(VerboseColor("Selected out-of-process host"));
+                        }
                         await StartHostAsChildProcessAsync(true);
                         return;
                     }
@@ -452,6 +527,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
                     {
+                        if (isVerbose)
+                        {
+                            ColoredConsole.WriteLine(VerboseColor("Selected inproc8 host"));
+                        }
                         await StartHostAsChildProcessAsync(false);
                         return;
                     }
@@ -459,6 +538,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 }
                 else if (SetHostRuntime == "inproc6")
                 {
+                    if (isVerbose)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor("Selected inproc6 host"));
+                    }
                     if (!isCurrentProcessNet6Build)
                     {
                         throw new CliException($"Cannot set host runtime to '{SetHostRuntime}' for the current process. The current process is not a .NET 6 build.");
@@ -471,17 +554,46 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else
             {
-                var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
-                
-                // Default should be OOP host
-                if (isCurrentProcessNet6Build)
+                // We should try to infer if we run inproc6 host, inproc8 host, or OOP host (default)
+                var functionsWorkerRuntime = await GetFunctionsWorkerRuntime();
+                var targetFrameworkVersion = await GetTargetFrameworkVersion(isVerbose);
+                bool shouldLaunchOopProcess = true;
+
+                // Check if the app is in-proc
+                if (functionsWorkerRuntime != null && functionsWorkerRuntime == "dotnet")
                 {
+                    // Start .NET 8 child process if InProc8 is enabled and if TFM of function app is .NET 8
+                    if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled() && targetFrameworkVersion.StartsWith("v8"))
+                    {
+                        if (isVerbose)
+                        {
+                            ColoredConsole.WriteLine(VerboseColor("Selected inproc8 host"));
+                        }
+                        await StartHostAsChildProcessAsync(false);
+                        return;
+                    }
+                    // Start .NET 6 process if TFM of function app is .NET 6
+                    else if (isCurrentProcessNet6Build && targetFrameworkVersion.StartsWith("v6"))
+                    {
+                        if (isVerbose)
+                        {
+                            ColoredConsole.WriteLine(VerboseColor("Selected inproc6 host"));
+                        }
+                        shouldLaunchOopProcess = false;
+                    }
+                }
+                // If the above conditions fail, the default should be OOP host
+                if (isCurrentProcessNet6Build && shouldLaunchOopProcess)
+                {
+                    if (isVerbose)
+                    {
+                        ColoredConsole.WriteLine(VerboseColor("Selected out-of-process host"));
+                    }
                     await StartHostAsChildProcessAsync(true);
                     return;
                 }
             }
 
-            var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
                 Utilities.PrintLogo();
