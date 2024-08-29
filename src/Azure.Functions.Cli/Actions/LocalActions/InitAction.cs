@@ -394,11 +394,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
             }
 
-            if ((workerRuntime == Helpers.WorkerRuntime.python && programmingModel == Common.ProgrammingModel.V2) || (workerRuntime == Helpers.WorkerRuntime.node && programmingModel == Common.ProgrammingModel.V4))
-            {
-                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.AzureWebJobsFeatureFlags, Constants.EnableWorkerIndexing);
-            }
-
             await FileSystemHelpers.WriteFileIfNotExists("local.settings.json", localSettingsJsonContent);
         }
 

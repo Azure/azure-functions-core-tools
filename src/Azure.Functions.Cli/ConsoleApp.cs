@@ -387,14 +387,14 @@ namespace Azure.Functions.Cli
             {
                 // TODO: we can probably display help here as well.
                 // This happens for actions that expect an ordered untyped options.
-                ColoredConsole.Error.WriteLine(ex.Message);
+
                 // If we matched the action, we can log the invoke command
                 _telemetryEvent.CommandName = invokeCommand.ToString();
                 _telemetryEvent.IActionName = action.GetType().Name;
                 _telemetryEvent.Parameters = new List<string>();
                 _telemetryEvent.ParseError = true;
                 _telemetryEvent.IsSuccessful = false;
-                return null;
+                throw;
             }
         }
 

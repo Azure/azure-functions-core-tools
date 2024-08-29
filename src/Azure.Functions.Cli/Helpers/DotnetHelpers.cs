@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -25,7 +26,38 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
+        /// <summary>
+        /// Function that determines TargetFramework of a project even when it's defined outside of the .csproj file,
+        /// e.g. in Directory.Build.props
+        /// </summary>
+        /// <param name="projectDirectory">Directory containing the .csproj file</param>
+        /// <returns>Target framework, e.g. net8.0</returns>
+        /// <exception cref="CliException"></exception>
+        public static async Task<string> DetermineTargetFramework(string projectDirectory)
+        {
+            EnsureDotnet();
+            var exe = new Executable(
+                "dotnet",
+                "build -getproperty:TargetFramework",
+                workingDirectory: projectDirectory,
+                environmentVariables: new Dictionary<string, string>
+                {
+                    // https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables
+                    ["DOTNET_NOLOGO"] = "1",  // do not write disclaimer to stdout
+                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1", // just in case
+                });
+
+            StringBuilder output = new();
+            var exitCode = await exe.RunAsync(o => output.Append(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+            if (exitCode != 0)
+            {
+                throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
+            }
+
+            return output.ToString();
+        }
+
+        public static async Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
             await TemplateOperation(async () =>
             {

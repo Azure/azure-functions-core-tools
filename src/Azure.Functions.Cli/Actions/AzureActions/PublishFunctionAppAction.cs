@@ -8,7 +8,6 @@ using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure.Core;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -17,7 +16,6 @@ using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Fclp;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -168,8 +166,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
                 {
-                    var projectRoot = ProjectHelpers.GetProject(projectFilePath);
-                    var targetFramework = ProjectHelpers.GetPropertyValue(projectRoot, Constants.TargetFrameworkElementName);
+                    var targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath));
 
                     var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
                     
@@ -192,6 +189,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     else if (targetFramework.Equals("net8.0", StringComparison.InvariantCultureIgnoreCase))
                     {
                         _requiredNetFrameworkVersion = "8.0";
+                    }
+                    else
+                    {
+                        ColoredConsole.WriteLine(WarningColor(
+                            $"Can not interpret target framework '{targetFramework}', assuming framework '{_requiredNetFrameworkVersion}'"));
                     }
                 }
                 // We do not change the default targetFramework if no .csproj file is found

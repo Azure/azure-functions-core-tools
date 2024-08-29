@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -10,14 +11,22 @@ namespace Azure.Functions.Cli.Common
 {
     internal class Executable
     {
-        private string _arguments;
-        private string _exeName;
-        private bool _shareConsole;
-        private bool _streamOutput;
+        private readonly string _arguments;
+        private readonly string _exeName;
+        private readonly bool _shareConsole;
+        private readonly bool _streamOutput;
         private readonly bool _visibleProcess;
         private readonly string _workingDirectory;
+        private readonly IDictionary<string, string> _environmentVariables;
 
-        public Executable(string exeName, string arguments = null, bool streamOutput = true, bool shareConsole = false, bool visibleProcess = false, string workingDirectory = null)
+        public Executable(
+            string exeName,
+            string arguments = null,
+            bool streamOutput = true,
+            bool shareConsole = false,
+            bool visibleProcess = false,
+            string workingDirectory = null,
+            IDictionary<string, string> environmentVariables = null)
         {
             _exeName = exeName;
             _arguments = arguments;
@@ -25,6 +34,7 @@ namespace Azure.Functions.Cli.Common
             _shareConsole = shareConsole;
             _visibleProcess = visibleProcess;
             _workingDirectory = workingDirectory;
+            _environmentVariables = environmentVariables;
         }
 
         public string Command => $"{_exeName} {_arguments}";
@@ -38,19 +48,29 @@ namespace Azure.Functions.Cli.Common
                 Colors.Net.ColoredConsole.WriteLine(VerboseColor($"> {Command}"));
             }
 
-            Process = new Process
+            var startInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
+                FileName = _exeName,
+                Arguments = _arguments,
+                CreateNoWindow = !_visibleProcess,
+                UseShellExecute = _shareConsole,
+                RedirectStandardError = _streamOutput,
+                RedirectStandardInput = _streamOutput || !string.IsNullOrEmpty(stdIn),
+                RedirectStandardOutput = _streamOutput,
+                WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory,
+            };
+
+            if (_environmentVariables is not null)
+            {
+                foreach (var (key, value) in _environmentVariables)
                 {
-                    FileName = _exeName,
-                    Arguments = _arguments,
-                    CreateNoWindow = !_visibleProcess,
-                    UseShellExecute = _shareConsole,
-                    RedirectStandardError = _streamOutput,
-                    RedirectStandardInput = _streamOutput || !string.IsNullOrEmpty(stdIn),
-                    RedirectStandardOutput = _streamOutput,
-                    WorkingDirectory = _workingDirectory ?? Environment.CurrentDirectory
+                    startInfo.EnvironmentVariables[key] = value;
                 }
+            }
+
+            Process = new()
+            {
+                StartInfo = startInfo,
             };
 
             var exitCodeTask = Process.CreateWaitForExitTask();
