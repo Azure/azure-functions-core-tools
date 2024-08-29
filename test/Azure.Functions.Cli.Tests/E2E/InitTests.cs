@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
