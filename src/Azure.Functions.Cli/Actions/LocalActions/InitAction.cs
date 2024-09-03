@@ -404,7 +404,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, string targetFramework, bool csx)
         {
-            if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime))
+            if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && string.IsNullOrEmpty(targetFramework))
             {
                 var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
