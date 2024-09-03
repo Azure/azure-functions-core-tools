@@ -33,12 +33,12 @@ namespace Azure.Functions.Cli.Helpers
         /// <param name="projectDirectory">Directory containing the .csproj file</param>
         /// <returns>Target framework, e.g. net8.0</returns>
         /// <exception cref="CliException"></exception>
-        public static async Task<string> DetermineTargetFramework(string projectDirectory)
+        public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = "")
         {
             EnsureDotnet();
             var exe = new Executable(
                 "dotnet",
-                "build -getproperty:TargetFramework",
+                $"build {projectFilename} -getproperty:TargetFramework",
                 workingDirectory: projectDirectory,
                 environmentVariables: new Dictionary<string, string>
                 {
