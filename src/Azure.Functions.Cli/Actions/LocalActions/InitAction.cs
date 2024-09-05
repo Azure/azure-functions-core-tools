@@ -408,10 +408,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
-                string ProjectFileName = Path.GetFileName(projectFilePath);
                 if (projectFilePath != null)
                 {
-                    targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath), ProjectFileName);
+                    string projectFileName = Path.GetFileName(projectFilePath);
+                    targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath)/*, projectFileName*/);
                 }
             }
 
