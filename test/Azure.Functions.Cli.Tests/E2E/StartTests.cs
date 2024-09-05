@@ -378,6 +378,108 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --build --port 7073 --runtime default --verbose"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
+
+                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                        {
+                            testOutputHelper.Output.Should().Contain("4.10");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host");
+                        }
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet_isolated_csharp_with_oop_host_without_runtime_specified()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
+
+                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                        {
+                            testOutputHelper.Output.Should().Contain("4.10");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host");
+                        }
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet_in_proc_csharp_with_oop_host_without_runtime_specified()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+
+                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                        {
+                            testOutputHelper.Output.Should().Contain("4.10");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process-host");
+                        }
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
         public async Task start_displays_error_on_invalid_function_json()
         {
             var functionName = "HttpTriggerJS";
