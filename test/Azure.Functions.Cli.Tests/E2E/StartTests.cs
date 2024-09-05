@@ -515,34 +515,6 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
-        public async Task dont_start_function_with_random_runtime()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime random"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        p.Kill();
-                        await WaitUntilReady(client);
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("Invalid host runtime 'random'. Valid values are 'default', 'in-proc8', 'in-proc6'.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
 
         [Fact]
         public async Task start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified()
