@@ -411,7 +411,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (projectFilePath != null)
                 {
                     string projectFileName = Path.GetFileName(projectFilePath);
-                    targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath)/*, projectFileName*/);
+                    targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath), projectFileName);
                 }
             }
 
