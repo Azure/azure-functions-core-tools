@@ -277,7 +277,7 @@
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.2" />
     <PackageReference Include="Azure.Identity" Version="1.11.4" />
-    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.2.0" />
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.6.0" />
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />
     <PackageReference Include="DotNetZip" Version="1.16.0" />
@@ -293,7 +293,7 @@
 	<PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0' AND '$(PublishOutofProcessHost)'=='True'">
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1033.5-22427" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1036.1" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)'=='net6.0' OR ('$(TargetFramework)'=='net8.0' AND '$(PublishOutofProcessHost)'=='False')">
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.35.3" />
@@ -302,9 +302,9 @@
     <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="20240410.1.0-v4" />
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.10.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.3220" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.3219" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.29.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.4020" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4021" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.31.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
