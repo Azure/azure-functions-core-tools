@@ -412,6 +412,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_dotnet9Isolated_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet-isolated --target-framework net9.0 --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated9.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_Dockerfile_for_csx()
         {
             return CliTester.Run(new RunConfiguration
