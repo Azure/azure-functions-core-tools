@@ -58,6 +58,7 @@ if (-Not $hostVersion) {
 }
 
 function getHostFileContent([string]$filePath) {
+    Write-Output "Host version $hostVersion"
     $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/v$hostVersion/$filePath"
     return removeBomIfExists((Invoke-WebRequest -Uri $uri -MaximumRetryCount 5 -RetryIntervalSec 2).Content)
 }
