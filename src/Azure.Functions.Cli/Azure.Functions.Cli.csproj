@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
@@ -40,9 +40,9 @@
   <PropertyGroup Condition="'$(SkipInProcessHost)' == 'True'">
     <DefineConstants>SkipInProcessHost</DefineConstants>
   </PropertyGroup>
-	<PropertyGroup>
-		<PublishOutofProcessHost>True</PublishOutofProcessHost>
-	</PropertyGroup>
+  <PropertyGroup>
+    <PublishOutofProcessHost>True</PublishOutofProcessHost>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
@@ -290,16 +290,16 @@
     <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
     <PackageReference Include="System.Formats.Asn1" Version="6.0.1" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
-	<PackageReference Include="YamlDotNet" Version="6.0.0" />
+    <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0' AND '$(PublishOutofProcessHost)'=='True'">
     <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1036.1" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)'=='net6.0' OR ('$(TargetFramework)'=='net8.0' AND '$(PublishOutofProcessHost)'=='False')">
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.35.3" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.35.4" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="20240410.1.0-v4" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.16.0" />
     <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.10.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.4020" />
@@ -314,28 +314,27 @@
   <!-- Build/Publish for OOP host as well-->
   <Target Name="BuildOutOfProc" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0' AND '$(PublishOutofProcessHost)'=='True'">
     <PropertyGroup>
-		<RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
-	</PropertyGroup>
-	    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/out-of-proc $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/out-of-proc $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
   </Target>
   <Target Name="PublishOutOfProc" AfterTargets="Publish" Condition="'$(TargetFramework)'=='net6.0' AND '$(PublishOutofProcessHost)'=='True'">
-	  <PropertyGroup>
-		  <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
-	  </PropertyGroup>
-	  <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/out-of-proc $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
+    <PropertyGroup>
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/out-of-proc $(RuntimeIdentifierOption) -p:NoWorkers=True --self-contained" />
   </Target>
-
   <!-- Build/Publish for net8.0 TFM as well-->
   <Target Name="BuildInProcNet8" AfterTargets="Build" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipInProcessHost)'!='True'">
-	  <PropertyGroup>
-		  <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
-	  </PropertyGroup>
-	  <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True -p:PublishOutOfProcessHost=False --self-contained" />
+    <PropertyGroup>
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(OutputPath)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True -p:PublishOutOfProcessHost=False --self-contained" />
   </Target>
   <Target Name="PublishInProcNet8" AfterTargets="Publish" Condition="'$(TargetFramework)'=='net6.0' AND '$(SkipInProcessHost)'!='True'">
-	  <PropertyGroup>
-		  <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
-	  </PropertyGroup>
-	  <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True  -p:PublishOutOfProcessHost=False --self-contained" />
+    <PropertyGroup>
+      <RuntimeIdentifierOption Condition="'$(RuntimeIdentifier)' != ''">-r $(RuntimeIdentifier)</RuntimeIdentifierOption>
+    </PropertyGroup>
+    <Exec Command="dotnet publish -c $(Configuration) -f net8.0 --output $(PublishDir)/in-proc8 $(RuntimeIdentifierOption) -p:NoWorkers=True  -p:PublishOutOfProcessHost=False --self-contained" />
   </Target>
 </Project>
