@@ -313,7 +313,7 @@
 	<PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.3220" />
 	<PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.3219" />
 	<PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.29.0" />
-</ItemGroup>
+  </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
       <Output TaskParameter="Include" ItemName="PublishReadyToRunExclude" />
