@@ -467,6 +467,9 @@ namespace Build
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPathsOutOfProc))
                                         .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
+                unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPathsOutOfProc))
+                                        .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
+
                 unSignedFiles.ForEach(filePath => File.Delete(filePath));
 
                 var unSignedPackages = GetUnsignedBinaries(targetDir);
