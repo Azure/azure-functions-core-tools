@@ -85,7 +85,7 @@ foreach ($selectedHostVersion in $versionArray) {
 
         if ($Update) {
             setCliPackageVersion $packageName $hostWorkerVersion
-        } elseif ($cliWorkerVersion -contains $hostWorkerVersion) {
+        } elseif ($cliWorkerVersion -notcontains $hostWorkerVersion) {
             Write-Output "Reference to $worker in the host ($hostWorkerVersion) does not match version in the cli ($cliWorkerVersion)"
             $failedValidation = $true
         }
