@@ -464,7 +464,7 @@ namespace Build
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
                                         .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
-                unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPathsOutOfProc))
+                unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPathsForOutOfProc))
                                         .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPathsOutOfProc))
