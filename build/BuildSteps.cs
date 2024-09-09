@@ -444,10 +444,27 @@ namespace Build
                     : Enumerable.Empty<string>();
                 var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInProc8);
 
+                // Add out of proc directory as well
+                var outOfProcDirectory = Path.Combine(targetDir, "out-of-proc");
+                var outOfProcDirectoryExists = Directory.Exists(outOfProcDirectory);
+
+                var toSignPathsForOutOfProc = outOfProcDirectoryExists
+                    ? Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(outOfProcDirectory, el))
+                    : Enumerable.Empty<string>();
+                var toSignPathsOutOfProc = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForOutOfProc);
+
+                var toSignThirdPartyPathsForOutOfProc = outOfProcDirectoryExists
+                    ? Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(outOfProcDirectory, el))
+                    : Enumerable.Empty<string>();
+                var toSignThirdPartyPathsOutOfProc = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForOutOfProc);
+
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
                                     .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))).ToList();
 
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
+                                        .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
+
+                unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPathsOutOfProc))
                                         .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
                 unSignedFiles.ForEach(filePath => File.Delete(filePath));
