@@ -727,7 +727,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = true,
                     ExitInError = true,
-                    ErrorContains = new[] { "Host.json file in missing" },
+                    ErrorContains = new[] { "Unable to find project root. Expecting to find one of host.json in project root." },
                 },
             }, _output);
         }

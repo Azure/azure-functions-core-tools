@@ -622,7 +622,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor($"Starting child process for  {(isOutOfProc ? "out-of-process" : "in-process")} model host."));
+                ColoredConsole.WriteLine(VerboseColor($"Starting child process for {(isOutOfProc ? "out-of-process" : "in-process")} model host."));
             }
 
             var commandLineArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
@@ -630,7 +630,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             var funcExecutablePath = isOutOfProc? GetOutOfProcExecutablePath(): GetInProcNet8ExecutablePath();
 
-            EnsureNet8FuncExecutablePresent(funcExecutablePath);
+            EnsureFuncExecutablePresent(funcExecutablePath, isOutOfProc);
 
             var childProcessInfo = new ProcessStartInfo
             {
@@ -682,17 +682,17 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return tcs.Task;
         }
 
-        private void EnsureNet8FuncExecutablePresent(string inProc8FuncExecutablePath)
+        private void EnsureFuncExecutablePresent(string funcExecutablePath, bool isOutOfProc)
         {
-            bool net8ExeExist = File.Exists(inProc8FuncExecutablePath);
+            bool funcExeExist = File.Exists(funcExecutablePath);
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor($"{inProc8FuncExecutablePath} {(net8ExeExist ? "present" : "not present")} "));
+                ColoredConsole.WriteLine(VerboseColor($"{funcExecutablePath} {(funcExeExist ? "present" : "not present")} "));
             }
 
-            if (!net8ExeExist)
+            if (!funcExeExist)
             {
-                throw new CliException($"Failed to locate the in-process model host at {inProc8FuncExecutablePath}");
+                throw new CliException($"Failed to locate the {(isOutOfProc ? "out-of-process": "in-process")} model host at {funcExecutablePath}");
             }
         }
 
