@@ -376,7 +376,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 var binding = bindings.Where(b => b["type"].ToString().Equals(HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-                binding["authLevel"] = AuthorizationLevel.ToString();
+                binding["authLevel"] = AuthorizationLevel.ToString().ToLowerInvariant();
             }
         }
 
