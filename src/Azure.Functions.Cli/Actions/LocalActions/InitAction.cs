@@ -407,10 +407,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && string.IsNullOrEmpty(targetFramework))
             {
                 var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
-                string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
-                if (projectFilePath != null)
+                if (functionAppRoot != null)
                 {
-                    targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath));
+                    targetFramework = await DotnetHelpers.DetermineTargetFramework(functionAppRoot);
                 }
             }
 

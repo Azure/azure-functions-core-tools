@@ -31,16 +31,19 @@ namespace Azure.Functions.Cli.Helpers
         /// e.g. in Directory.Build.props
         /// </summary>
         /// <param name="projectDirectory">Directory containing the .csproj file</param>
+        /// <param name="projectFilename">Name of the .csproj file</param>
         /// <returns>Target framework, e.g. net8.0</returns>
         /// <exception cref="CliException"></exception>
-        public static async Task<string> DetermineTargetFramework(string projectDirectory)
+        public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = null)
         {
             EnsureDotnet();
-            string projectFilename = null;
-            var projectFilePath = ProjectHelpers.FindProjectFile(projectDirectory);
-            if (projectFilePath != null)
+            if (projectFilename == null) 
             {
-                projectFilename = Path.GetFileName(projectFilePath);
+                var projectFilePath = ProjectHelpers.FindProjectFile(projectDirectory);
+                if (projectFilePath != null)
+                {
+                    projectFilename = Path.GetFileName(projectFilePath);
+                }
             }
             var exe = new Executable(
                 "dotnet",
