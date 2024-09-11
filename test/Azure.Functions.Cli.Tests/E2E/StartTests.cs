@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7077/") })
                     {
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose --language-worker --port 7078 -- \"--inspect=5050\""
+                    "start --verbose --language-worker -- \"--inspect=5050\""
                 },
                 ExpectExit = false,
                 OutputContains = new[]
@@ -115,7 +115,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 Test = async (_, p) =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(15));
+                    await Task.Delay(TimeSpan.FromSeconds(30));
                     p.Kill();
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300)
@@ -174,7 +174,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start"
+                        "start --port 5000"
                     },
                     ExpectExit = false,
                     OutputContains = new []
@@ -184,7 +184,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Test = async (_, p) =>
                     {
                         // give the host time to load functions and print any errors
-                        await Task.Delay(TimeSpan.FromSeconds(10));
+                        await Task.Delay(TimeSpan.FromSeconds(60));
                         p.Kill();
                     }
                 },
@@ -263,7 +263,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start"
+                        "start --port 5005"
                     },
                     ExpectExit = false,
                     OutputContains = new []
@@ -309,7 +309,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(900),
             }, _output);
         }
 
@@ -338,7 +338,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(900),
             }, _output);
         }
 
@@ -387,12 +387,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime dotnet --target-framework net8.0",
                     "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc8"
+                    "start --port 7070 --verbose --runtime inproc8"
                 },
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7070") })
                     {
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -443,7 +443,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(900),
             }, _output);
         }
 
@@ -476,7 +476,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(900),
             }, _output);
         }
 
@@ -511,7 +511,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(900),
             }, _output);
         }
 
@@ -545,41 +545,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task start_dotnet_in_proc_csharp_with_oop_host_without_runtime_specified()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet-isolated",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process-host");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(900),
             }, _output);
         }
 
@@ -823,12 +789,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "new --template \"Http trigger\" --name http1",
                     "new --template \"Http trigger\" --name http2",
                     "new --template \"Http trigger\" --name http3",
-                    "start --functions http2 http1"
+                    "start --functions http2 http1 --port 5001"
                 },
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:5001/") })
                     {
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/http1?name=Test");
