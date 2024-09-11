@@ -32,7 +32,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start"
+                    "start --port 7077"
                 },
                 ExpectExit = false,
                 OutputContains = new[]
@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose --language-worker -- \"--inspect=5050\""
+                    "start --verbose --language-worker --port 7078 -- \"--inspect=5050\""
                 },
                 ExpectExit = false,
                 OutputContains = new[]
@@ -133,7 +133,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "init . --worker-runtime node",
                     "settings add AzureFunctionsJobHost__logging__logLevel__Default Debug",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start"
+                    "start --port 7074 --verbose"
                 },
                 ExpectExit = false,
                 OutputContains = new[]
@@ -415,7 +415,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task start_dotnet6_inproc_with_specifying_runtime_to_dotnet8()
+        public async Task start_dotnet8_inproc_with_specifying_runtime_to_dotnet8()
         {
             await CliTester.Run(new RunConfiguration
             {
@@ -423,7 +423,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime dotnet --target-framework net8.0",
                     "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc8"
+                    "start --port 7073 --runtime inproc8 --verbose"
                 },
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
@@ -605,7 +605,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
                         await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
 
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
@@ -645,7 +645,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start"
+                        "start --port 7076"
                     },
                     ExpectExit = false,
                     OutputContains = new []
@@ -688,7 +688,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start"
+                        "start -port 7075"
                     },
                     ExpectExit = true,
                     ExitInError = true,
