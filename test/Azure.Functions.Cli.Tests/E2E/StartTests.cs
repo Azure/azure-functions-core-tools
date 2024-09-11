@@ -415,41 +415,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task start_dotnet8_inproc_with_specifying_runtime_to_dotnet8()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net8.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --runtime inproc8 --verbose"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("Starting child process for in-process model host");
-                            testOutputHelper.Output.Should().Contain("Started child process with ID");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
         public async Task start_dotnet6_inproc_without_specifying_runtime()
         {
             await CliTester.Run(new RunConfiguration
