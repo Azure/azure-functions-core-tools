@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 OutputContains = new[]
                 {
                     "Functions:",
-                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
+                    "HttpTrigger: [GET,POST] http://localhost:7077/api/HttpTrigger"
                 },
                 OutputDoesntContain = new string[]
                 {

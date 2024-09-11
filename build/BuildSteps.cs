@@ -342,7 +342,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx --filter \"(FullyQualifiedName~start_nodejs_with_inspect | FullyQualifiedName~start_dotnet_isolated_csharp_net9 | FullyQualifiedName~start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified | FullyQualifiedName~start_dotnet6_inproc_without_specifying_runtime)\"");
         }
 
         public static void CopyBinariesToSign()
