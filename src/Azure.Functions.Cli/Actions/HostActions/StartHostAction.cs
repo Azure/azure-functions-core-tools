@@ -186,7 +186,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                .Setup<string>("runtime")
-               .WithDescription("If provided, determines which version of the host to start. Allowed values are inproc6, inproc8, and default.")
+               .WithDescription($"If provided, determines which version of the host to start. Allowed values are {InProc6HostRuntime}, {InProc8HostRuntime}, and default.")
                .Callback(startHostAction => SetHostRuntime = startHostAction);
 
             var parserResult = base.ParseArgs(args);
@@ -437,7 +437,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
             if (SetHostRuntime != null)
             {
-                var shouldReturn = await HandleRuntimeParam(isCurrentProcessNet6Build, isVerbose);
+                var shouldReturn = await ShouldReturnAfterHandlingRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
                 if (shouldReturn)
                 {
                     return;
@@ -445,7 +445,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else
             {
-                var shouldReturn = await InferHostToLaunchOnStartup(isCurrentProcessNet6Build, isVerbose);
+                var shouldReturn = await ShouldReturnAfterInferringHostRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
                 if (shouldReturn)
                 {
                     return;
@@ -505,16 +505,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private async Task<bool> HandleRuntimeParam(bool isCurrentProcessNet6Build, bool isVerbose)
+        private async Task<bool> ShouldReturnAfterHandlingRuntimeAsync(bool isCurrentProcessNet6Build, bool isVerbose)
         {
             if (string.Equals(SetHostRuntime, "default", StringComparison.OrdinalIgnoreCase))
             {
                 if (isCurrentProcessNet6Build)
                 {
-                    if (isVerbose)
-                    {
-                        ColoredConsole.WriteLine(VerboseColor("Selected out-of-process host"));
-                    }
+                    PrintVerboseForHostSelection(isVerbose, "out-of-process");
                     await StartHostAsChildProcessAsync(isOutOfProc: true);
                     return true;
                 }
@@ -523,20 +520,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
                 {
-                    if (isVerbose)
-                    {
-                        ColoredConsole.WriteLine(VerboseColor($"Selected {InProc8HostRuntime} host"));
-                    }
+                    PrintVerboseForHostSelection(isVerbose, InProc8HostRuntime);
                     await StartHostAsChildProcessAsync(isOutOfProc: false);
                     return true;
                 }
             }
             else if (string.Equals(SetHostRuntime, InProc6HostRuntime, StringComparison.OrdinalIgnoreCase))
             {
-                if (isVerbose)
-                {
-                    ColoredConsole.WriteLine(VerboseColor($"Selected {InProc6HostRuntime} host"));
-                }
+                PrintVerboseForHostSelection(isVerbose, InProc8HostRuntime);
                 if (!isCurrentProcessNet6Build)
                 {
                     throw new CliException($"Cannot set host runtime to '{SetHostRuntime}' for the current process. The current process is not a .NET 6 build.");
@@ -544,12 +535,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else
             {
-                throw new CliException($"Invalid host runtime '{SetHostRuntime}'. Valid values are 'default', 'in-proc8', 'in-proc6'.");
+                throw new CliException($"Invalid host runtime '{SetHostRuntime}'. Valid values are 'default', '{InProc8HostRuntime}', '{InProc6HostRuntime}'.");
             }
             return false;
         }
 
-        private async Task<bool> InferHostToLaunchOnStartup(bool isCurrentProcessNet6Build, bool isVerbose)
+        private void PrintVerboseForHostSelection(bool isVerbose, string hostRuntime)
+        {
+            if (isVerbose)
+            {
+                ColoredConsole.WriteLine(VerboseColor($"Selected {hostRuntime} host"));
+            }
+        }
+
+        private async Task<bool> ShouldReturnAfterInferringHostRuntimeAsync(bool isCurrentProcessNet6Build, bool isVerbose)
         {
             // We should try to infer if we run inproc6 host, inproc8 host, or OOP host (default)
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);

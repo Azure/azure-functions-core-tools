@@ -17,6 +17,7 @@ namespace Build
     public static class BuildSteps
     {
         private const string Net8ArtifactNameSuffix = "_net8";
+        private const string OutOfProcDirectoryName = "out-of-proc";
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
         private static IntegrationTestBuildManifest _integrationManifest;
 
@@ -342,7 +343,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx --filter \"(FullyQualifiedName~start_nodejs_with_inspect | FullyQualifiedName~start_dotnet_isolated_csharp_net9 | FullyQualifiedName~start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified | FullyQualifiedName~start_dotnet6_inproc_without_specifying_runtime)\"");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx");
         }
 
         public static void CopyBinariesToSign()
@@ -445,7 +446,7 @@ namespace Build
                 var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInProc8);
 
                 // Add out of proc directory as well
-                var outOfProcDirectory = Path.Combine(targetDir, "out-of-proc");
+                var outOfProcDirectory = Path.Combine(targetDir, OutOfProcDirectoryName);
                 var outOfProcDirectoryExists = Directory.Exists(outOfProcDirectory);
 
                 var toSignPathsForOutOfProc = outOfProcDirectoryExists
