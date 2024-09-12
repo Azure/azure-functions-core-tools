@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose --language-worker -- \"--inspect=5050\""
+                    "start --verbose --language-worker --port 7090 -- \"--inspect=5050\""
                 },
                 ExpectExit = false,
                 OutputContains = new[]

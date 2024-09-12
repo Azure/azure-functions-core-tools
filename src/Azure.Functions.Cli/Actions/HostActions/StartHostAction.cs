@@ -437,16 +437,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
             if (SetHostRuntime != null)
             {
-                var shouldReturn = await ShouldReturnAfterHandlingRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
-                if (shouldReturn)
+                var alreadyStartedChildProcess = await ShouldReturnAfterHandlingRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
+                if (alreadyStartedChildProcess)
                 {
                     return;
                 }
             }
             else
             {
-                var shouldReturn = await ShouldReturnAfterInferringHostRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
-                if (shouldReturn)
+                var alreadyStartedChildProcess = await ShouldReturnAfterInferringHostRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
+                if (alreadyStartedChildProcess)
                 {
                     return;
                 }
@@ -527,7 +527,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (string.Equals(SetHostRuntime, InProc6HostRuntime, StringComparison.OrdinalIgnoreCase))
             {
-                PrintVerboseForHostSelection(isVerbose, InProc8HostRuntime);
+                PrintVerboseForHostSelection(isVerbose, InProc6HostRuntime);
                 if (!isCurrentProcessNet6Build)
                 {
                     throw new CliException($"Cannot set host runtime to '{SetHostRuntime}' for the current process. The current process is not a .NET 6 build.");
