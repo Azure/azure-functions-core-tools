@@ -490,12 +490,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime dotnet-isolated",
                     "new --template Httptrigger --name HttpTrigger",
-                    "start --build --port 7073 --runtime default --verbose"
+                    "start --port 7080 --runtime default --verbose"
                 },
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7080") })
                     {
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
