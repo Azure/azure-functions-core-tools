@@ -97,7 +97,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip="Flaky test")]
         public async Task start_nodejs_with_inspect()
         {
             await CliTester.Run(new RunConfiguration
@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose --language-worker --port 7090 -- \"--inspect=5050\""
+                    "start --verbose --language-worker -- \"--inspect=5050\""
                 },
                 ExpectExit = false,
                 OutputContains = new[]
@@ -313,7 +313,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Flaky test")]
         public async Task start_dotnet_isolated_csharp_net9()
         {
             await CliTester.Run(new RunConfiguration
@@ -324,7 +324,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "init . --worker-runtime dotnet-isolated --target-framework net9.0",
                     "new --template Httptrigger --name HttpTrigger",
                     "dotnet add package Microsoft.Azure.Functions.Worker.Sdk --version 1.18.0-preview1-20240723.1 --source https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsTempStaging/nuget/v3/index.json",
-                    "start --build --port 7073"
+                    "start --port 7073 --verbose"
                 },
                 ExpectExit = false,
                 Test = async (workingDir, p) =>

@@ -437,17 +437,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
             if (SetHostRuntime != null)
             {
-                var alreadyStartedChildProcess = await ShouldReturnAfterHandlingRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
-                if (alreadyStartedChildProcess)
+                // Check if we should start child process from user specified host runtime and return
+                var shouldStartChildProcess = await ShouldStartChildProcessFromHostRuntime(isCurrentProcessNet6Build, isVerbose);
+                var isOutOfProcSpecified = IsOutOfProcSpecifiedFromHostRuntime();
+                if (shouldStartChildProcess)
                 {
+                    await StartHostAsChildProcessAsync(isOutOfProcSpecified);
                     return;
                 }
             }
             else
             {
-                var alreadyStartedChildProcess = await ShouldReturnAfterInferringHostRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
-                if (alreadyStartedChildProcess)
+                // Infer host runtime and check if we should launch child process
+                var shouldLaunchOutOfProc = ShouldLaunchOutOfProcFromWorkerRuntime();
+                var shouldStartChildProcess = await ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(isCurrentProcessNet6Build, isVerbose);
+                if (shouldStartChildProcess)
                 {
+                    await StartHostAsChildProcessAsync(shouldLaunchOutOfProc);
                     return;
                 }
             }
@@ -505,14 +511,18 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private async Task<bool> ShouldReturnAfterHandlingRuntimeAsync(bool isCurrentProcessNet6Build, bool isVerbose)
+        private bool IsOutOfProcSpecifiedFromHostRuntime()
+        {
+            return (string.Equals(SetHostRuntime, "default", StringComparison.OrdinalIgnoreCase)) ? true : false;
+        }
+
+        private async Task<bool> ShouldStartChildProcessFromHostRuntime(bool isCurrentProcessNet6Build, bool isVerbose)
         {
             if (string.Equals(SetHostRuntime, "default", StringComparison.OrdinalIgnoreCase))
             {
                 if (isCurrentProcessNet6Build)
                 {
                     PrintVerboseForHostSelection(isVerbose, "out-of-process");
-                    await StartHostAsChildProcessAsync(isOutOfProc: true);
                     return true;
                 }
             }
@@ -521,7 +531,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
                 {
                     PrintVerboseForHostSelection(isVerbose, InProc8HostRuntime);
-                    await StartHostAsChildProcessAsync(isOutOfProc: false);
                     return true;
                 }
             }
@@ -548,13 +557,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private async Task<bool> ShouldReturnAfterInferringHostRuntimeAsync(bool isCurrentProcessNet6Build, bool isVerbose)
+        private bool ShouldLaunchOutOfProcFromWorkerRuntime()
+        {
+            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
+            if (workerRuntime == WorkerRuntime.dotnet)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        private async Task<bool> ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(bool isCurrentProcessNet6Build, bool isVerbose)
         {
             // We should try to infer if we run inproc6 host, inproc8 host, or OOP host (default)
             var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
 
-            // Get the WorkerRuntime
-            var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
             string targetFramework = "";
 
             string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
@@ -566,7 +583,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             bool shouldLaunchOopProcess = true;
 
             // Check if the app is in-proc
-            if (workerRuntime == WorkerRuntime.dotnet)
+            if (!ShouldLaunchOutOfProcFromWorkerRuntime())
             {
                 // Start .NET 8 child process if InProc8 is enabled and if TFM of function app is .NET 8
                 if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled() && targetFramework == "net8.0")
@@ -575,7 +592,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     {
                         ColoredConsole.WriteLine(VerboseColor($"Selected {InProc8HostRuntime} host"));
                     }
-                    await StartHostAsChildProcessAsync(isOutOfProc: false);
                     return true;
                 }
                 // Start .NET 6 process if TFM of function app is .NET 6
@@ -595,7 +611,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole.WriteLine(VerboseColor("Selected out-of-process host"));
                 }
-                await StartHostAsChildProcessAsync(isOutOfProc: true);
                 return true;
             }
             return false;
