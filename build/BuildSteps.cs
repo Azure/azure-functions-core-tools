@@ -116,9 +116,8 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
-                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
-                RemoveLanguageWorkers(outputPathNet8);
+                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
+                RemoveLanguageWorkers(outputPath);
 
             }
 
