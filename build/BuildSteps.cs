@@ -6,29 +6,34 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Colors.Net;
-using Colors.Net.StringColorExtensions;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 
 namespace Build
 {
     public static class BuildSteps
     {
-        private const string Net8ArtifactNameSuffix = "_net8";
+        private const string Net6TargetFramework = "net6.0";
+        private const string DefaultTargetFramework = "net8.0";
+        private const string Net6TargetFrameworkArgument = "--inproc6";
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
         private static IntegrationTestBuildManifest _integrationManifest;
+        private static string _targetFramework = string.Empty;
 
         public static void Clean()
         {
             Directory.Delete(Settings.OutputDir, recursive: true);
         }
 
+        public static void Initialize()
+        {
+            _targetFramework = Environment.GetCommandLineArgs().Contains(Net6TargetFrameworkArgument) ? Net6TargetFramework : DefaultTargetFramework;
+        }
+
         public static void RestorePackages()
         {
-            // This will use the sources from the nuget.config file in the repo root
-            Shell.Run("dotnet", $"restore");
+            Shell.Run("dotnet", $"restore {Settings.ProjectFile} ");
         }
 
         public static void UpdatePackageVersionForIntegrationTests()
@@ -96,38 +101,21 @@ namespace Build
             return runtime;
         }
 
-        public static void DotnetPack()
-        {
-            var outputPath = Path.Combine(Settings.OutputDir);
-            Shell.Run("dotnet", $"pack {Settings.SrcProjectPath} " +
-                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net6.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
-                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
-                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release --no-build");
-        }
-
         public static void DotnetPublishForZips()
         {
             foreach (var runtime in Settings.TargetRuntimes)
             {
-                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
-                var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
-
-                ExecuteDotnetPublish(outputPath, rid, "net6.0", skipLaunchingNet8ChildProcess: isMinVersion);
-
-                if (isMinVersion)
-                {
-                    RemoveLanguageWorkers(outputPath);
-                }
-
-                // Publish net8 version of the artifact as well.
-                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
-                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
-                RemoveLanguageWorkers(outputPathNet8);
+                var outputPath = Path.Combine(Settings.OutputDir, runtime);
+                ExecuteDotnetPublish(outputPath, rid, _targetFramework);
             }
+
+            // in-proc version does not need language workers.
+            foreach (var runtime in Settings.TargetRuntimes)
+            {
+                var outputPath = Path.Combine(Settings.OutputDir, runtime);
+                RemoveLanguageWorkers(outputPath);
+            };
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
@@ -135,107 +123,15 @@ namespace Build
             }
         }
 
-        private static string BuildNet8ArtifactFullPath(string runtime)
-        {
-            return Path.Combine(Settings.OutputDir, BuildNet8ArtifactDirectory(runtime));
-        }
-
-        private static string BuildNet8ArtifactDirectory(string runtime) => $"{runtime}{Net8ArtifactNameSuffix}";
-
-        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework)
         {
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
-                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                $"/p:SkipInProcessHost=\"{skipLaunchingNet8ChildProcess}\" " +
+                                $"/p:BuildNumber={Settings.BuildNumber} " +
+                                $"/p:NoWorkers=\"true\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +
+                                $"-o {outputPath} -c Release -f {targetFramework} --no-restore --self-contained" +
                                 (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
-        }
-
-        public static void FilterPowershellRuntimes()
-        {
-            var minifiedRuntimes = Settings.TargetRuntimes.Where(r => r.StartsWith(Settings.MinifiedVersionPrefix));
-            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
-            {
-                var powershellWorkerRootPath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell");
-                var allPowershellWorkerPaths = Directory.GetDirectories(powershellWorkerRootPath);
-                foreach (var powershellWorkerPath in allPowershellWorkerPaths)
-                {
-                    var powerShellVersion = Path.GetFileName(powershellWorkerPath);
-                    var powershellRuntimePath = Path.Combine(powershellWorkerPath, "runtimes");
-
-                    var allFoundPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
-                    var powershellRuntimesForCurrentToolsRuntime = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime];
-
-                    // Check to make sure all the expected runtimes are available
-                    if (allFoundPowershellRuntimes.All(powershellRuntimesForCurrentToolsRuntime.Contains))
-                    {
-                        throw new Exception($"Expected PowerShell runtimes not found for Powershell v{powerShellVersion}. Expected runtimes are {string.Join(", ", powershellRuntimesForCurrentToolsRuntime)}." +
-                            $"{Environment.NewLine}Found runtimes are {string.Join(", ", allFoundPowershellRuntimes)}");
-                    }
-
-                    // Delete all the runtimes that should not belong to the current artifactDirectory
-                    allFoundPowershellRuntimes.Except(powershellRuntimesForCurrentToolsRuntime).ToList().ForEach(r => Directory.Delete(Path.Combine(powershellRuntimePath, r), recursive: true));
-                }
-            }
-
-            // Small test to ensure we have all the right runtimes at the right places
-            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
-            {
-                var powershellWorkerRootPath = Path.Combine(Settings.OutputDir, runtime, "workers", "powershell");
-                var allPowershellWorkerPaths = Directory.GetDirectories(powershellWorkerRootPath);
-                foreach (var powershellWorkerPath in allPowershellWorkerPaths)
-                {
-                    var powerShellVersion = Path.GetFileName(powershellWorkerPath);
-                    var powershellRuntimePath = Path.Combine(powershellWorkerPath, "runtimes");
-                    var currentPowershellRuntimes = Directory.GetDirectories(powershellRuntimePath).Select(Path.GetFileName).ToList();
-                    var requiredPowershellRuntimes = Settings.ToolsRuntimeToPowershellRuntimes[powerShellVersion][runtime].Distinct().ToList();
-
-                    if (currentPowershellRuntimes.Count != requiredPowershellRuntimes.Count() || !requiredPowershellRuntimes.All(currentPowershellRuntimes.Contains))
-                    {
-                        throw new Exception($"Mismatch between Expected Powershell runtimes ({string.Join(", ", requiredPowershellRuntimes)}) and Found Powershell runtimes " +
-                            $"({string.Join(", ", currentPowershellRuntimes)}) in the path {powershellRuntimePath}");
-                    }
-                }
-            }
-
-            // No action needed for the "_net8.0" versions of these artifacts as they have an empty "workers" directory.
-        }
-
-        public static void FilterPythonRuntimes()
-        {
-            var minifiedRuntimes = Settings.TargetRuntimes.Where(r => r.StartsWith(Settings.MinifiedVersionPrefix));
-            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
-            {
-                var pythonWorkerPath = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
-                var allPythonVersions = Directory.GetDirectories(pythonWorkerPath);
-
-                foreach (var pyVersionPath in allPythonVersions)
-                {
-                    var allOs = Directory.GetDirectories(pyVersionPath).Select(Path.GetFileName).ToList();
-                    bool atLeastOne = false;
-                    foreach (var os in allOs)
-                    {
-                        if (!string.Equals(Settings.RuntimesToOS[runtime], os, StringComparison.OrdinalIgnoreCase))
-                        {
-                            Directory.Delete(Path.Combine(pyVersionPath, os), recursive: true);
-                        }
-                        else
-                        {
-                            atLeastOne = true;
-                        }
-                    }
-
-                    if (!atLeastOne)
-                    {
-                        throw new Exception($"No Python worker matched the OS '{Settings.RuntimesToOS[runtime]}' for artifactDirectory '{runtime}'. " +
-                            $"Something went wrong.");
-                    }
-                }
-            }
-
-            // No action needed for the "_net8.0" versions of these artifacts as they have an empty "workers" directory.
         }
 
         public static void AddDistLib()
@@ -258,8 +154,6 @@ namespace Build
 
             File.Delete(distLibZip);
             Directory.Delete(distLibDir, recursive: true);
-
-            // No action needed for the "_net8.0" versions of these artifacts as we don't ship workers for them.
         }
 
         public static void AddTemplatesNupkgs()
@@ -431,18 +325,8 @@ namespace Build
                 Directory.CreateDirectory(targetDir);
                 FileHelpers.RecursiveCopy(sourceDir, targetDir);
 
-                var inProc8Directory = Path.Combine(targetDir, "in-proc8");
-                var inProc8DirectoryExists = Directory.Exists(inProc8Directory);
-
-                var toSignPathsForInProc8 = inProc8DirectoryExists
-                    ? Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(inProc8Directory, el))
-                    : Enumerable.Empty<string>();
-                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForInProc8);
-
-                var toSignThirdPartyPathsForInProc8 = inProc8DirectoryExists
-                    ? Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(inProc8Directory, el))
-                    : Enumerable.Empty<string>();
-                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInProc8);
+                var toSignPaths = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el));
+                var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el));
 
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
                                     .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))).ToList();
@@ -466,12 +350,12 @@ namespace Build
         {
             string[] zipFiles = Directory.GetFiles(Settings.OutputDir, "*.zip");
 
-            foreach (string zipFilePath in zipFiles)
+            foreach (var zipFilePath in zipFiles)
             {
                 if (zipFilePath.Contains("osx"))
                 {
                     // sigcheck.exe does not work for mac signatures
-                    continue;
+                    return;
                 }
 
                 bool isSignedRuntime = Settings.SignInfo.RuntimesToSign.Any(r => zipFilePath.Contains(r));
@@ -568,12 +452,6 @@ namespace Build
                 var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
                 CreateZipFromArtifact(artifactPath, zipPath);
 
-                // Zip the .net8 version as well.
-                var net8Path = BuildNet8ArtifactFullPath(runtime);
-                var net8ZipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}{Net8ArtifactNameSuffix}.{version}.zip");
-                CreateZipFromArtifact(net8Path, net8ZipPath);
-
-
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
                 // the ./generateMsiFiles.ps1 script
                 if (!runtime.StartsWith("win"))
@@ -581,15 +459,12 @@ namespace Build
                     try
                     {
                         Directory.Delete(artifactPath, recursive: true);
-                        Directory.Delete(net8Path, recursive: true);
                     }
                     catch (Exception ex)
                     {
                         ColoredConsole.Error.WriteLine($"Error deleting artifact for runtime {runtime}. Exception: {ex}");
                     }
                 }
-
-                ColoredConsole.WriteLine();
             }
         }
 
@@ -615,7 +490,7 @@ namespace Build
             Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
             // Generate the SBOM manifest for each artifactDirectory
 
-            var allArtifactDirectories = Settings.TargetRuntimes.Concat(Settings.TargetRuntimes.Select(r => BuildNet8ArtifactDirectory(r)));
+            var allArtifactDirectories = Settings.TargetRuntimes;
 
             foreach (var artifactDirectory in allArtifactDirectories)
             {
@@ -635,18 +510,6 @@ namespace Build
                     $"{Settings.SBOMManifestToolPath} generate -PackageName {packageName} -BuildDropPath {artifactDirectoryFullPath}"
                     + $" -BuildComponentPath {artifactDirectoryFullPath} -Verbosity Information -t {telemetryFilePath}");
             }
-        }
-
-        public static void DotnetPublishForNupkg()
-        {
-            // By default, this publishes to the /bin/Release/$targetFramework$/publish
-            Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
-                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net6.0 " +
-                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
-                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release -f net6.0");
         }
 
         public static void GenerateSBOMManifestForNupkg()
@@ -673,55 +536,6 @@ namespace Build
             Directory.Delete(Settings.SBOMManifestTelemetryDir, recursive: true);
         }
 
-        public static void UploadToStorage()
-        {
-            // Don't upload for public build.
-            if (Settings.IsPublicBuild)
-            {
-                ColoredConsole.WriteLine($"Skipping upload for public build.");
-                return;
-            }
-
-            ColoredConsole.WriteLine($"Going to run the UploadToStorage. Setting is {Settings.IsPublicBuild}");
-
-            
-            if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
-            {
-                var version = new Version(CurrentVersion);
-                var storageAccount = CloudStorageAccount.Parse(Settings.BuildArtifactsStorage);
-                var blobClient = storageAccount.CreateCloudBlobClient();
-                var container = blobClient.GetContainerReference("builds");
-                container.CreateIfNotExistsAsync().Wait();
-
-                container.SetPermissionsAsync(new BlobContainerPermissions
-                {
-                    PublicAccess = BlobContainerPublicAccessType.Blob
-                });
-
-                foreach (var file in Directory.GetFiles(Settings.OutputDir, "Azure.Functions.Cli.*", SearchOption.TopDirectoryOnly))
-                {
-                    var fileName = Path.GetFileName(file);
-                    ColoredConsole.Write($"Uploading {fileName}...");
-
-                    var versionedBlob = container.GetBlockBlobReference($"{version.ToString()}/{fileName}");
-                    var latestBlob = container.GetBlockBlobReference($"{version.Major}/latest/{fileName.Replace($".{version.ToString()}", string.Empty)}");
-                    versionedBlob.UploadFromFileAsync(file).Wait();
-                    latestBlob.StartCopyAsync(versionedBlob).Wait();
-
-                    ColoredConsole.WriteLine("Done");
-                }
-
-                var latestVersionBlob = container.GetBlockBlobReference($"{version.Major}/latest/version.txt");
-                latestVersionBlob.UploadTextAsync(version.ToString()).Wait();
-            }
-            else
-            {
-                var error = $"{nameof(Settings.BuildArtifactsStorage)} is null or empty. Can't run {nameof(UploadToStorage)} target";
-                ColoredConsole.Error.WriteLine(error.Red());
-                throw new Exception(error);
-            }
-        }
-
         public static void LogIntoAzure()
         {
             var directoryId = Environment.GetEnvironmentVariable("AZURE_DIRECTORY_ID");
@@ -744,23 +558,11 @@ namespace Build
         }
 
         /// <summary>
-        /// Returns all target runtimes and their net8.0 versions.
+        /// Returns all target runtimes for the current target framework.
         /// </summary>
-        private static IEnumerable<string> GetAllTargetRuntimes()
-        {
-            var targetRuntimes = Settings.TargetRuntimes;
-            var net8Runtimes = targetRuntimes.Select(r => BuildNet8ArtifactDirectory(r));
+        private static IEnumerable<string> GetAllTargetRuntimes() => Settings.TargetRuntimes;
 
-            return targetRuntimes.Concat(net8Runtimes);
-        }
-
-        private static IEnumerable<string> GetAllRuntimesToSign()
-        {
-            var runtimeToSign = Settings.SignInfo.RuntimesToSign;
-            var net8Runtimes = runtimeToSign.Select(r => BuildNet8ArtifactDirectory(r));
-
-            return runtimeToSign.Concat(net8Runtimes);
-        }
+        private static IEnumerable<string> GetAllRuntimesToSign() => Settings.SignInfo.RuntimesToSign;
 
         public static void AddGoZip()
         {
