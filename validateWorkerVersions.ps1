@@ -32,12 +32,11 @@ $cliCsprojXml = [xml]$cliCsprojContent
 
 function getPackageVersion([string]$packageName, [string]$csprojContent)
 {
-    $version = (Select-Xml -Content $csprojContent -XPath "/Project//PackageReference[@Include='$packageName']/@Version")
+    $version = (Select-Xml -Content $csprojContent -XPath "/Project//PackageReference[@Include='$packageName']/@Version").ToString()
     if (-Not $version) {
         throw "Failed to find version for package $packageName"
     }
-    $stringArray = $version -split ' '
-    return $stringArray
+    return $version
 }
 
 function setCliPackageVersion([string]$packageName, [string]$newVersion)
@@ -57,47 +56,40 @@ if (-Not $hostVersion) {
 } elseif ($Update) {
     setCliPackageVersion $hostPackageName $hostVersion
 }
- Write-Output "Value of Host Version: $hostVersion"
 
-
-function getHostFileContent([string]$filePath, [string]$version) {
-    $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/v$version/$filePath"
-    return removeBomIfExists((Invoke-WebRequest -Uri $uri).Content)
+function getHostFileContent([string]$filePath) {
+    $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/v$hostVersion/$filePath"
+    return removeBomIfExists((Invoke-WebRequest -Uri $uri -MaximumRetryCount 5 -RetryIntervalSec 2).Content)
 }
+$hostCsprojContent = getHostFileContent "src/WebJobs.Script/WebJobs.Script.csproj"
+$pythonPropsContent = getHostFileContent "build/python.props"
 
-$versionArray = $hostVersion -split ' '
-foreach ($selectedHostVersion in $versionArray) {
-    Write-Output "Checking host version $selectedHostVersion DONE"
-    $hostCsprojContent = getHostFileContent "src/WebJobs.Script/WebJobs.Script.csproj" $selectedHostVersion
-    $pythonPropsContent = getHostFileContent "build/python.props" $selectedHostVersion
+$workers = "JavaWorker", "NodeJsWorker", "PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PowerShellWorker.PS7.4", "PythonWorker"
 
-    $workers = "JavaWorker", "NodeJsWorker", "PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PowerShellWorker.PS7.4", "PythonWorker"
-
-    $failedValidation = $false
-    foreach($worker in $workers) {
-        $packageName = "Microsoft.Azure.Functions.$worker"
-        if ($worker -eq "PythonWorker") {
-            $hostWorkerVersion = getPackageVersion $packageName $pythonPropsContent
-        } else {
-            $hostWorkerVersion = getPackageVersion $packageName $hostCsprojContent
-        }
-        $cliWorkerVersion = getPackageVersion $packageName $cliCsprojContent
-
-        if ($Update) {
-            setCliPackageVersion $packageName $hostWorkerVersion
-        } elseif ($cliWorkerVersion -notcontains $hostWorkerVersion) {
-            Write-Output "Reference to $worker in the host ($hostWorkerVersion) does not match version in the cli ($cliWorkerVersion)"
-            $failedValidation = $true
-        }
+$failedValidation = $false
+foreach($worker in $workers) {
+    $packageName = "Microsoft.Azure.Functions.$worker"
+    if ($worker -eq "PythonWorker") {
+        $hostWorkerVersion = getPackageVersion $packageName $pythonPropsContent
+    } else {
+        $hostWorkerVersion = getPackageVersion $packageName $hostCsprojContent
     }
+    $cliWorkerVersion = getPackageVersion $packageName $cliCsprojContent
 
     if ($Update) {
-        $cliCsprojXml.Save($cliCsprojPath)
-        Write-Output "Updated worker versions! 🚀"
-    } elseif ($failedValidation) {
-        Write-Output "You can run './validateWorkerVersions.ps1 -Update' locally to fix worker versions."
-        throw "Not all worker versions matched. 😢 See output for more info"
-    } else {
-        Write-Output "Worker versions match! 🥳"
+        setCliPackageVersion $packageName $hostWorkerVersion
+    } elseif ($hostWorkerVersion -ne $cliWorkerVersion) {
+        Write-Output "Reference to $worker in the host ($hostWorkerVersion) does not match version in the cli ($cliWorkerVersion)"
+        $failedValidation = $true
     }
+}
+
+if ($Update) {
+    $cliCsprojXml.Save($cliCsprojPath)
+    Write-Output "Updated worker versions! 🚀"
+} elseif ($failedValidation) {
+    Write-Output "You can run './validateWorkerVersions.ps1 -Update' locally to fix worker versions."
+    throw "Not all worker versions matched. 😢 See output for more info"
+} else {
+    Write-Output "Worker versions match! 🥳"
 }

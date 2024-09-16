@@ -313,7 +313,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact(Skip = "Flaky test")]
+        [Fact]
         public async Task start_dotnet_isolated_csharp_net9()
         {
             await CliTester.Run(new RunConfiguration
@@ -353,25 +353,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "new --template Httptrigger --name HttpTrigger",
                     "start --port 7073 --verbose"
                 },
-                ExpectExit = false,
+                ExpectExit = true,
+                ErrorContains = ["Failed to locate the inproc8 model host"],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
                         await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
-                            testOutputHelper.Output.Should().Contain("Starting child process for in-process model host");
-                            testOutputHelper.Output.Should().Contain("Started child process with ID");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host");
-                        }
                     }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
@@ -389,25 +377,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "new --template Httptrigger --name HttpTrigger",
                     "start --port 7070 --verbose --runtime inproc8"
                 },
-                ExpectExit = false,
+                ExpectExit = true,
+                ErrorContains = ["Failed to locate the inproc8 model host"],
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7070") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
                         await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
-                            testOutputHelper.Output.Should().Contain("Starting child process for in-process model host");
-                            testOutputHelper.Output.Should().Contain("Started child process with ID");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host");
-                        }
                     }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
@@ -426,21 +402,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose"
                 },
                 ExpectExit = false,
+                ErrorContains = ["Failed to locate the inproc6 model host at"],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
                         await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("Selected inproc6 host");
-                        }
                     }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(900),
@@ -459,24 +426,15 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc6"
                 },
                 ExpectExit = false,
+                ErrorContains = ["Failed to locate the inproc6 model host at"],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
                         await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("Selected inproc6 host");
-                        }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(100),
             }, _output);
         }
 

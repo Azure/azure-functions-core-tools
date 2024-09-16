@@ -17,7 +17,6 @@ namespace Build
     public static class BuildSteps
     {
         private const string Net8ArtifactNameSuffix = "_net8";
-        private const string OutOfProcDirectoryName = "out-of-proc";
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
         private static IntegrationTestBuildManifest _integrationManifest;
 
@@ -103,7 +102,7 @@ namespace Build
             Shell.Run("dotnet", $"pack {Settings.SrcProjectPath} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net6.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
+                                $"/p:TargetFramework=net8.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release --no-build");
@@ -117,17 +116,9 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                ExecuteDotnetPublish(outputPath, rid, "net6.0", skipLaunchingNet8ChildProcess: isMinVersion);
+                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: isMinVersion);
+                RemoveLanguageWorkers(outputPath);
 
-                if (isMinVersion)
-                {
-                    RemoveLanguageWorkers(outputPath);
-                }
-
-                // Publish net8 version of the artifact as well.
-                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
-                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
-                RemoveLanguageWorkers(outputPathNet8);
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
@@ -343,7 +334,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx");
         }
 
         public static void CopyBinariesToSign()
@@ -445,30 +436,10 @@ namespace Build
                     : Enumerable.Empty<string>();
                 var toSignThirdPartyPaths = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForInProc8);
 
-                // Add out of proc directory as well
-                var outOfProcDirectory = Path.Combine(targetDir, OutOfProcDirectoryName);
-                var outOfProcDirectoryExists = Directory.Exists(outOfProcDirectory);
-
-                var toSignPathsForOutOfProc = outOfProcDirectoryExists
-                    ? Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(outOfProcDirectory, el))
-                    : Enumerable.Empty<string>();
-                var toSignPathsOutOfProc = Settings.SignInfo.authentiCodeBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignPathsForOutOfProc);
-
-                var toSignThirdPartyPathsForOutOfProc = outOfProcDirectoryExists
-                    ? Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(outOfProcDirectory, el))
-                    : Enumerable.Empty<string>();
-                var toSignThirdPartyPathsOutOfProc = Settings.SignInfo.thirdPartyBinaries.Select(el => Path.Combine(targetDir, el)).Concat(toSignThirdPartyPathsForOutOfProc);
-
                 var unSignedFiles = FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPaths))
                                     .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))).ToList();
 
                 unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPaths))
-                                        .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
-
-                unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignPathsForOutOfProc))
-                                        .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
-
-                unSignedFiles.AddRange(FileHelpers.GetAllFilesFromFilesAndDirs(FileHelpers.ExpandFileWildCardEntries(toSignThirdPartyPathsOutOfProc))
                                         .Where(file => !filterExtensionsSignSet.Any(ext => file.EndsWith(ext))));
 
                 unSignedFiles.ForEach(filePath => File.Delete(filePath));
@@ -664,10 +635,10 @@ namespace Build
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net6.0 " +
+                                $"/p:TargetFramework=net8.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release -f net6.0");
+                                $"-c Release -f net8.0");
         }
 
         public static void GenerateSBOMManifestForNupkg()
