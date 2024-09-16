@@ -5,14 +5,14 @@ pr:
     include:    
     - v4.x
     - release_4.0
-    - feature/*
+    - 'feature/*'
 
 trigger:
   branches:
     include:
     - v4.x
     - release_4.0
-    - feature/*
+    - 'feature/*'
 
 jobs:
 - job: Default
