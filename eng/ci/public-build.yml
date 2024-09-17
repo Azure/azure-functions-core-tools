@@ -23,13 +23,6 @@ trigger:
     - release_4.0
     - feature/*
 
-
-
-
-
-
-
-
 resources:
   repositories:
   - repository: 1es
