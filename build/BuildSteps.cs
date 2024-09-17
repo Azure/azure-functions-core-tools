@@ -117,6 +117,10 @@ namespace Build
                 var rid = GetRuntimeId(runtime);
 
                 ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
+                if (isMinVersion)
+                {
+                    RemoveLanguageWorkers(outputPath);
+                }
 
                 // Publish net8 version of the artifact as well for VS.
                 var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
