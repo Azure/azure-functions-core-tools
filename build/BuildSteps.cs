@@ -116,7 +116,7 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
+                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: isMinVersion);
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);

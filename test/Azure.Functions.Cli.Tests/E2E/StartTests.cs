@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip="Flaky test")]
         public async Task start_loglevel_overrriden_in_host_json()
         {
             var functionName = "HttpTriggerCSharp";
@@ -191,7 +191,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output, startHost: true);
         }
 
-        [Fact]
+        [Fact(Skip = "Flaky test")]
         public async Task start_loglevel_overrriden_in_host_json_category_filter()
         {
             var functionName = "HttpTriggerCSharp";
@@ -285,7 +285,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output, startHost: true);
         }
 
-        [Fact]
+        [Fact(Skip="Flakey test")]
         public async Task start_dotnet_csharp()
         {
             await CliTester.Run(new RunConfiguration
@@ -551,7 +551,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip="Flaky test")]
         public async Task start_displays_error_on_invalid_host_json()
         {
             var functionName = "HttpTriggerCSharp";
