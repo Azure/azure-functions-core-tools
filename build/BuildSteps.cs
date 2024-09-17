@@ -122,11 +122,6 @@ namespace Build
                     RemoveLanguageWorkers(outputPath);
                 }
 
-                // Publish net8 version of the artifact as well for VS.
-                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
-                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
-                RemoveLanguageWorkers(outputPathNet8);
-
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
