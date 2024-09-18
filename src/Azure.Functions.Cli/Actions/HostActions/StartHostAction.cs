@@ -175,8 +175,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             Parser
                .Setup<string>("runtime")
-               .WithDescription($"If provided, determines which version of the host to start. Allowed values are {DotnetConstants.InProc6HostRuntime}, {DotnetConstants.InProc8HostRuntime}, and default.")
-               .Callback(startHostAction => HostRuntime = startHostAction);
+               .WithDescription($"If provided, determines which version of the host to start. Allowed values are '{DotnetConstants.InProc6HostRuntime}', '{DotnetConstants.InProc8HostRuntime}', and 'default' (which runs the out-of-process host).")
+               .Callback(startHostFromRuntime => HostRuntime = startHostFromRuntime);
 
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
@@ -423,14 +423,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
 
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
-            if (HostRuntime != null)
+            if (HostRuntime is not null)
             {
                 // Check if we should start child process from user specified host runtime and return
                 var shouldStartChildProcess = await ShouldStartChildProcessFromHostRuntime(isVerbose);
 
                 if (shouldStartChildProcess)
                 {
-                    var isNet8InProcSpecified = (string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase)) ? true : false;
+                    var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
                     await StartHostAsChildProcessAsync(isNet8InProcSpecified);
                     return;
                 }

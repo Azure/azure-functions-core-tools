@@ -150,7 +150,6 @@ function Install-Dotnet {
         $listRuntimesOutput = dotnet --list-runtimes
         $installedDotnetRuntimes = $listRuntimesOutput | ForEach-Object { $_.Split(" ")[1] }
         Write-Host "Detected dotnet Runtimes: $($installedDotnetRuntimes -join ', ')"
-        dotnet --info
     }
     finally {
         if (Test-Path  $installScript) {

@@ -11,7 +11,7 @@ trigger:
     include:
     - v4.x
     - release_4.0
- 
+
 jobs:
 - job: Default
   condition: eq(variables['LinuxPackageBuildTag'], '')
