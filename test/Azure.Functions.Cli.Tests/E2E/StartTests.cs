@@ -375,13 +375,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime dotnet --target-framework net8.0",
                     "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7070 --verbose --runtime inproc8"
+                    "start --port 7076 --verbose --runtime inproc8"
                 },
                 ExpectExit = true,
                 ErrorContains = ["Failed to locate the inproc8 model host"],
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7070") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7076") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(2));
                     }
