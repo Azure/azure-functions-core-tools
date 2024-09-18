@@ -766,13 +766,16 @@ namespace Build
             var combinedRuntimesToSign = GetAllTargetRuntimes();
             foreach (var runtime in combinedRuntimesToSign)
             {
-                if (runtimeToGoEnv.TryGetValue(GetRuntimeId(runtime), out var goEnv))
+                var runtimeId = GetRuntimeId(runtime);
+                // Remove the Net8ArtifactNameSuffix suffix if present
+                runtimeId = runtimeId.Replace(Net8ArtifactNameSuffix, "");
+                if (runtimeToGoEnv.TryGetValue(runtimeId, out var goEnv))
                 {
                     Environment.SetEnvironmentVariable("CGO_ENABLED", "0");
                     Environment.SetEnvironmentVariable("GOOS", goEnv.GOOS);
                     Environment.SetEnvironmentVariable("GOARCH", goEnv.GOARCH);
                     var outputPath = Path.Combine(Settings.OutputDir, runtime, "gozip");
-                    var output = runtime.Contains("win") ? $"{outputPath}.exe" : outputPath;
+                    var output = runtimeId.Contains("win") ? $"{outputPath}.exe" : outputPath;
                     var goFile = Path.GetFullPath("../tools/go/gozip/main.go");
                     Shell.Run("go", $"build -o {output} {goFile}");
                 }
