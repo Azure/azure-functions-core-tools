@@ -87,7 +87,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string JsonOutputFile { get; set; }
 
-        public string? SetHostRuntime { get; set; }
+        public string? HostRuntime { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
         {
@@ -187,7 +187,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             Parser
                .Setup<string>("runtime")
                .WithDescription($"If provided, determines which version of the host to start. Allowed values are {InProc6HostRuntime}, {InProc8HostRuntime}, and default.")
-               .Callback(startHostAction => SetHostRuntime = startHostAction);
+               .Callback(startHostAction => HostRuntime = startHostAction);
 
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
@@ -435,14 +435,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             var isCurrentProcessNet8Build = RuntimeInformation.FrameworkDescription.Contains(Net8FrameworkDescriptionPrefix);
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
-            if (SetHostRuntime != null)
+            if (HostRuntime != null)
             {
                 // Check if we should start child process from user specified host runtime and return
                 var shouldStartChildProcess = await ShouldStartChildProcessFromHostRuntime(isCurrentProcessNet8Build, isVerbose);
 
                 if (shouldStartChildProcess)
                 {
-                    var isNet8InProcSpecified = (string.Equals(SetHostRuntime, InProc8HostRuntime, StringComparison.OrdinalIgnoreCase)) ? true : false;
+                    var isNet8InProcSpecified = (string.Equals(HostRuntime, InProc8HostRuntime, StringComparison.OrdinalIgnoreCase)) ? true : false;
                     await StartHostAsChildProcessAsync(isNet8InProcSpecified);
                     return;
                 }
@@ -517,7 +517,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<bool> ShouldStartChildProcessFromHostRuntime(bool isCurrentProcessNet8Build, bool isVerbose)
         {
             string targetFramework = await GetTargetFrameworkAsync();
-            if (string.Equals(SetHostRuntime, "default", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
             {
                 if (isCurrentProcessNet8Build)
                 {
@@ -525,7 +525,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     return false;
                 }
             }
-            else if (string.Equals(SetHostRuntime, InProc8HostRuntime, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(HostRuntime, InProc8HostRuntime, StringComparison.OrdinalIgnoreCase))
             {
                 if (isCurrentProcessNet8Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
                 {
@@ -541,7 +541,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     throw new CliException($"Invalid config for running {InProc8HostRuntime} host.");
                 }
             }
-            else if (string.Equals(SetHostRuntime, InProc6HostRuntime, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(HostRuntime, InProc6HostRuntime, StringComparison.OrdinalIgnoreCase))
             {
                 if (!isCurrentProcessNet8Build)
                 {
@@ -553,7 +553,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else
             {
-                throw new CliException($"Invalid host runtime '{SetHostRuntime}'. Valid values are 'default', '{InProc8HostRuntime}', '{InProc6HostRuntime}'.");
+                throw new CliException($"Invalid host runtime '{HostRuntime}'. Valid values are 'default', '{InProc8HostRuntime}', '{InProc6HostRuntime}'.");
             }
             return false;
         }

@@ -27,11 +27,10 @@
     <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
   </PropertyGroup>
-  <!-- Pack only the net8.0 version -->
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-	  <IsPackable>true</IsPackable>
-	  <PackAsTool>true</PackAsTool>
-	  <ToolCommandName>func</ToolCommandName>
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+	<PackAsTool>true</PackAsTool>
+	<ToolCommandName>func</ToolCommandName>
   </PropertyGroup>
   <!-- SkipInProcessHost build property will be True for artifacts used by VS feed -->
   <PropertyGroup Condition="'$(SkipInProcessHost)' == 'True'">

@@ -32,13 +32,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     "init . --worker-runtime node",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --port 7077"
+                    "start"
                 },
                 ExpectExit = false,
                 OutputContains = new[]
                 {
                     "Functions:",
-                    "HttpTrigger: [GET,POST] http://localhost:7077/api/HttpTrigger"
+                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
                 },
                 OutputDoesntContain = new string[]
                 {
@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7077/") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                     {
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -115,7 +115,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 Test = async (_, p) =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    await Task.Delay(TimeSpan.FromSeconds(15));
                     p.Kill();
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300)
@@ -133,7 +133,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "init . --worker-runtime node",
                     "settings add AzureFunctionsJobHost__logging__logLevel__Default Debug",
                     "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --port 7074 --verbose"
+                    "start --verbose"
                 },
                 ExpectExit = false,
                 OutputContains = new[]
@@ -174,7 +174,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start --port 5000"
+                        "start"
                     },
                     ExpectExit = false,
                     OutputContains = new []
@@ -184,7 +184,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     Test = async (_, p) =>
                     {
                         // give the host time to load functions and print any errors
-                        await Task.Delay(TimeSpan.FromSeconds(60));
+                        await Task.Delay(TimeSpan.FromSeconds(10));
                         p.Kill();
                     }
                 },
@@ -263,7 +263,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start --port 5005"
+                        "start"
                     },
                     ExpectExit = false,
                     OutputContains = new []
@@ -309,7 +309,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -338,7 +338,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -381,7 +381,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = ["Failed to locate the inproc8 model host"],
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7070") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(2));
                     }
@@ -410,7 +410,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         await Task.Delay(TimeSpan.FromSeconds(2));
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -469,7 +469,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -503,7 +503,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
