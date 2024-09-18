@@ -534,7 +534,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start --port 7076"
+                        "start"
                     },
                     ExpectExit = false,
                     OutputContains = new []
@@ -577,7 +577,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start -port 7075"
+                        "start"
                     },
                     ExpectExit = true,
                     ExitInError = true,
@@ -616,7 +616,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = true,
                     ExitInError = true,
-                    ErrorContains = new[] { "Unable to find project root. Expecting to find one of host.json in project root." },
+                    ErrorContains = new[] { "Host.json file in missing" },
                 },
             }, _output);
         }
@@ -747,12 +747,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "new --template \"Http trigger\" --name http1",
                     "new --template \"Http trigger\" --name http2",
                     "new --template \"Http trigger\" --name http3",
-                    "start --functions http2 http1 --port 5001"
+                    "start --functions http2 http1"
                 },
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
                 {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:5001/") })
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                     {
                         (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                         var response = await client.GetAsync("/api/http1?name=Test");
