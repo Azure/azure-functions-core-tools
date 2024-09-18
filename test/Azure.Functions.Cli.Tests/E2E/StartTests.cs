@@ -587,7 +587,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
 
-        [Fact]
+        [Fact(Skip="Dependent on .NET6")]
         public async Task start_displays_error_on_missing_host_json()
         {
             var functionName = "HttpTriggerCSharp";
