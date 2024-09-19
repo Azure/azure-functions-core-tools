@@ -324,7 +324,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "init . --worker-runtime dotnet-isolated --target-framework net9.0",
                     "new --template Httptrigger --name HttpTrigger",
                     "dotnet add package Microsoft.Azure.Functions.Worker.Sdk --version 1.18.0-preview1-20240723.1 --source https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsTempStaging/nuget/v3/index.json",
-                    "start --port 7073 --verbose"
+                    "start --build --port 7073"
                 },
                 ExpectExit = false,
                 Test = async (workingDir, p) =>
