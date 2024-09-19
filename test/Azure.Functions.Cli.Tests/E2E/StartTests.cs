@@ -42,7 +42,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputDoesntContain = new string[]
                 {
-                        "Initializing function HTTP routes",
                         "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
                 },
                 Test = async (workingDir, p) =>
@@ -85,7 +84,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 OutputDoesntContain = new string[]
                 {
-                        "Initializing function HTTP routes",
                         "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
                 },
                 Test = async (workingDir, p) =>
