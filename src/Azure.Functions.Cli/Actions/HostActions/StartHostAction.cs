@@ -23,6 +23,7 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
+using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -421,17 +422,25 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            var isOutOfProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ? false : true;
+            var isOutOfProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated ? true : false;
+            var isInProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ? true : false;
 
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
             if (HostRuntime is not null)
             {
+                // If we are running an .NET isolated app and the user specifies inproc6 or inproc8, throw an error
                 if (isOutOfProc && (string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase) || string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase)))
                 {
-                    throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. Please make sure that the function app is running in in-proc.");
+                    throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The host runtime is only valid for the worker runtime {WorkerRuntime.dotnet}");
                 }
+                // If we are not running a .NET app and the user specifies inproc6 or inproc8, throw an error
+                if (!isOutOfProc && !isInProc && (string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase) || string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The runtime is only valid for {WorkerRuntime.dotnetIsolated} and {WorkerRuntime.dotnet}");
+                }
+
                 // Check if we should start child process from user specified host runtime and return
-                var shouldStartChildProcess = await ShouldStartChildProcessFromHostRuntime(isVerbose);
+                var shouldStartChildProcess = await ShouldStartChildProcessFromHostRuntime(isInProc, isVerbose);
 
                 if (shouldStartChildProcess)
                 {
@@ -444,7 +453,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 // Infer host runtime and check if we should launch child process
                 var shouldNet8InProcBeLaunched = await IsInProcNet8Enabled();
-                var shouldStartChildProcess = ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(shouldNet8InProcBeLaunched, isOutOfProc, isVerbose);
+                var shouldStartChildProcess = ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(shouldNet8InProcBeLaunched, isInProc, isVerbose);
 
                 if (shouldStartChildProcess)
                 {
@@ -506,10 +515,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private async Task<bool> ShouldStartChildProcessFromHostRuntime(bool isVerbose)
+        private async Task<bool> ShouldStartChildProcessFromHostRuntime(bool isInProc, bool isVerbose)
         {
             if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
             {
+                if (isInProc)
+                {
+                    throw new CliException($"The runtime host value passed in, default, is not a valid host version for your project. The worker runtime must be set to {WorkerRuntime.dotnetIsolated}.");
+                }
                 PrintVerboseForHostSelection(isVerbose, "out-of-process");
                 return false;
             }
@@ -543,10 +556,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        private bool ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(bool shouldLaunchNet8, bool isOutOfProc, bool isVerbose)
+        private bool ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(bool shouldLaunchNet8, bool isInProc, bool isVerbose)
         {
             // Check if the app is in-proc
-            if (!isOutOfProc)
+            if (isInProc)
             {
                 // Start .NET 8 child process if InProc8 is enabled
                 if (shouldLaunchNet8)
