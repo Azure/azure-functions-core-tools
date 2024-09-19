@@ -521,7 +521,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 if (isInProc)
                 {
-                    throw new CliException($"The runtime host value passed in, default, is not a valid host version for your project. The worker runtime must be set to {WorkerRuntime.dotnetIsolated}.");
+                    throw new CliException($"The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to {WorkerRuntime.dotnetIsolated}.");
                 }
                 PrintVerboseForHostSelection(isVerbose, "out-of-process");
                 return false;
@@ -530,7 +530,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 if (!await IsInProcNet8Enabled())
                 {
-                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc8HostRuntime}, is not a valid host version for your project. Please check if the {Constants.FunctionsInProcNet8Enabled} variable is set.");
+                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc8HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc8HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must be set while running a .NET 8 in-proc app.");
                 }
                 PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc8HostRuntime);
                 return true;
@@ -539,7 +539,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 if (await IsInProcNet8Enabled())
                 {
-                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc6HostRuntime}, is not a valid host version for your project. Please check if the {Constants.FunctionsInProcNet8Enabled} variable is not set.");
+                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc6HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc6HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must not be set while running a .NET 6 in-proc app.");
                 }
                 PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
                 return true;
