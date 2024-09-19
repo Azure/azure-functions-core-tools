@@ -444,7 +444,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 // Infer host runtime and check if we should launch child process
                 var shouldNet8InProcBeLaunched = await IsInProcNet8Enabled();
-                var shouldStartChildProcess = ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(shouldNet8InProcBeLaunched, isVerbose);
+                var shouldStartChildProcess = ShouldLaunchChildProcessAfterInferringHostRuntimeAsync(shouldNet8InProcBeLaunched, isOutOfProc, isVerbose);
 
                 if (shouldStartChildProcess)
                 {
