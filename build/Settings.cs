@@ -35,6 +35,8 @@ namespace Build
 
         public static readonly string ProjectFile = Path.Combine(SrcProjectPath, "Azure.Functions.Cli.csproj");
 
+        public static readonly string CustomHostProjectFile = Path.GetFullPath("../host/src/FunctionsCustomHost/FunctionsCustomHost.csproj");
+
         public static readonly string TestProjectFile = Path.Combine(TestProjectPath, "Azure.Functions.Cli.Tests.csproj");
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
