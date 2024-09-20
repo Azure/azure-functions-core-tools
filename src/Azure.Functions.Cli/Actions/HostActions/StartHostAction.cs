@@ -489,22 +489,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
             if (HostRuntime is not null)
             {
-                var isOutOfProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated;
-                // If we are running an .NET isolated app and the user specifies inproc6 or inproc8, throw an error
-                if (isOutOfProc && (string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase) || string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase)))
-                {
-                    throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The host runtime is only valid for the worker runtime {WorkerRuntime.dotnet}");
-                }
-                // If we are not running a .NET app and the user specifies inproc6 or inproc8, throw an error
-                if (!isOutOfProc && !isInProc && (string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase) || string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase)))
-                {
-                    throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The runtime is only valid for {WorkerRuntime.dotnetIsolated} and {WorkerRuntime.dotnet}");
-                }
+                // Validate host runtime passed in
+                await ValidateHostRuntime(isInProc, isVerbose);
 
-                // Check if we should start child process from user specified host runtime and return
-                var shouldStartChildProcess = await ShouldStartChildProcessFromHostRuntime(isInProc, isVerbose);
-
-                if (shouldStartChildProcess)
+                if (!string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
                     var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
                     StartHostAsChildProcess(isNet8InProcSpecified);
@@ -535,8 +523,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return false;
         }
 
-        private async Task<bool> ShouldStartChildProcessFromHostRuntime(bool isInProc, bool isVerbose)
+        private async Task ValidateHostRuntime(bool isInProc, bool isVerbose)
         {
+            var isOutOfProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated;
+            var isInProc6 = string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase);
+            var isInProc8 = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
+
+            // If we are running an .NET isolated app and the user specifies inproc6 or inproc8, throw an error
+            if (isOutOfProc && (isInProc8 || isInProc6))
+            {
+                throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The host runtime is only valid for the worker runtime {WorkerRuntime.dotnet}");
+            }
+            // If we are not running a .NET app and the user specifies inproc6 or inproc8, throw an error
+            if (!isOutOfProc && !isInProc && (isInProc8 || isInProc6))
+            {
+                throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The runtime is only valid for {WorkerRuntime.dotnetIsolated} and {WorkerRuntime.dotnet}");
+            }
+
             if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
             {
                 if (isInProc)
@@ -544,25 +547,22 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     throw new CliException($"The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to {WorkerRuntime.dotnetIsolated}.");
                 }
                 PrintVerboseForHostSelection(isVerbose, "out-of-process");
-                return false;
             }
-            else if (string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase))
+            else if (isInProc8)
             {
                 if (!await IsInProcNet8Enabled())
                 {
                     throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc8HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc8HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must be set while running a .NET 8 in-proc app.");
                 }
                 PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc8HostRuntime);
-                return true;
             }
-            else if (string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase))
+            else if (isInProc6)
             {
                 if (await IsInProcNet8Enabled())
                 {
                     throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc6HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc6HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must not be set while running a .NET 6 in-proc app.");
                 }
                 PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
-                return true;
             }
             // Throw an exception if HostRuntime is set to none of the expected values
             throw new CliException($"Invalid host runtime '{HostRuntime}'. Valid values are 'default', '{DotnetConstants.InProc8HostRuntime}', '{DotnetConstants.InProc6HostRuntime}'.");
