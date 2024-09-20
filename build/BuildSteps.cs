@@ -638,7 +638,6 @@ namespace Build
 
         public static void DotnetPublishForNupkg()
         {
-            Shell.Run("cmd.exe", "mkdir ./bin/Release/net8.0/publish/custom-host");
             // By default, this publishes to the /bin/Release/$targetFramework$/publish
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
@@ -646,11 +645,12 @@ namespace Build
                                 $"/p:TargetFramework=net8.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release -f net8.0 -o ./bin/Release/net8.0/publish/custom-host");
+                                $"-c Release -f net8.0");
         }
 
         public static void DotnetPublishForCustomHost()
         {
+            Shell.Run("cmd", "mkdir ./bin/Release/net8.0/publish/custom-host");
             // By default, this publishes to the /bin/Release/$targetFramework$/publish
             Shell.Run("dotnet", $"publish {Settings.CustomHostProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
@@ -658,7 +658,7 @@ namespace Build
                                 $"/p:TargetFramework=net8.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release -f net8.0 -o ");
+                                $"-c Release -f net8.0 -o ./bin/Release/net8.0/publish/custom-host");
         }
 
         public static void GenerateSBOMManifestForNupkg()
