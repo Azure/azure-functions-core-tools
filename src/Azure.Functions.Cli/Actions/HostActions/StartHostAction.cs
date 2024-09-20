@@ -547,6 +547,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     throw new CliException($"The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to {WorkerRuntime.dotnetIsolated}.");
                 }
                 PrintVerboseForHostSelection(isVerbose, "out-of-process");
+                return;
             }
             else if (isInProc8)
             {
@@ -555,6 +556,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc8HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc8HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must be set while running a .NET 8 in-proc app.");
                 }
                 PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc8HostRuntime);
+                return;
             }
             else if (isInProc6)
             {
@@ -563,6 +565,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc6HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc6HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must not be set while running a .NET 6 in-proc app.");
                 }
                 PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
+                return;
             }
             // Throw an exception if HostRuntime is set to none of the expected values
             throw new CliException($"Invalid host runtime '{HostRuntime}'. Valid values are 'default', '{DotnetConstants.InProc8HostRuntime}', '{DotnetConstants.InProc6HostRuntime}'.");
