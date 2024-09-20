@@ -1,10 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace FunctionsNetHost
+namespace FunctionsCustomHost
 {
     // If having problems with the managed host, enable the following:
     // Environment.SetEnvironmentVariable("COREHOST_TRACE", "1");

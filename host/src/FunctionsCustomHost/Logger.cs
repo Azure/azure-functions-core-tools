@@ -3,7 +3,7 @@
 
 using System.Globalization;
 
-namespace FunctionsNetHost
+namespace FunctionsCustomHost
 {
     internal static class Logger
     {
@@ -21,7 +21,7 @@ namespace FunctionsNetHost
         internal static void Log(string message)
         {
             var ts = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
-            Console.WriteLine($"{Configuration.LogPrefix}[{ts}] [FunctionsNetHost] {message}");
+            Console.WriteLine($"{Configuration.LogPrefix}[{ts}] [FunctionsCustomHost] {message}");
         }
     }
 }
