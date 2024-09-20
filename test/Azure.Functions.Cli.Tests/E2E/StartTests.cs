@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
                         }
                     }
                 },
@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
                         }
                     }
                 },
@@ -728,7 +728,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
                         }
                     }
                 },
@@ -762,7 +762,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
                         }
                     }
                 },
