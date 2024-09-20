@@ -650,7 +650,6 @@ namespace Build
 
         public static void DotnetPublishForCustomHost()
         {
-            Shell.Run("cmd", $"{Settings.NupkgPublishDir}\\custom-host");
             // By default, this publishes to the /bin/Release/$targetFramework$/publish
             Shell.Run("dotnet", $"publish {Settings.CustomHostProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
@@ -658,7 +657,7 @@ namespace Build
                                 $"/p:TargetFramework=net8.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release -f net8.0 -o {Settings.NupkgPublishDir}\\custom-host");
+                                $"-c Release -f net8.0");
         }
 
         public static void GenerateSBOMManifestForNupkg()
