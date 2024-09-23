@@ -81,8 +81,8 @@ namespace FunctionsCustomHost
             }
             Logger.Log(logMessage);
 
-            Logger.LogTrace($"Will wait for worker loaded signal.");
-            WorkerLoadStatusSignalManager.Instance.Signal.WaitOne();
+            // Have this here to stall the process
+            Console.ReadLine();
         }
 
         private static async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
