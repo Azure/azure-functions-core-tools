@@ -19,4 +19,9 @@
     <ExportsFile>$(MSBuildThisFileDirectory)exports.def</ExportsFile>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	<PackageReference Include="Microsoft.NETCore.DotNetAppHost" Version="8.0.0-preview.4.23259.5" />
+  </ItemGroup>
+
 </Project>

@@ -36,7 +36,7 @@ namespace FunctionsCustomHost
                 };
 
                 var hostfxrFullPath = NetHost.GetHostFxrPath(&parameters);
-                Logger.LogTrace($"hostfxr path:{hostfxrFullPath}");
+                Logger.Log($"hostfxr path:{hostfxrFullPath}");
 
                 _hostfxrHandle = NativeLibrary.Load(hostfxrFullPath);
 
@@ -46,18 +46,9 @@ namespace FunctionsCustomHost
                     return -1;
                 }
 
-                Logger.LogTrace($"hostfxr loaded.");
+                Logger.Log($"hostfxr loaded.");
 
-                //var commandLineArguments = _workerStartupOptions.CommandLineArgs.Prepend(assemblyPath).ToArray();
-                //var error = HostFxr.Initialize(commandLineArguments.Length, commandLineArguments, IntPtr.Zero, out _hostContextHandle);
-
-                if (_hostContextHandle == IntPtr.Zero)
-                {
-                    Logger.Log($"Failed to initialize the .NET Core runtime. Assembly path:{assemblyPath}");
-                    return -1;
-                }
-
-                Logger.LogTrace($"hostfxr initialized with {assemblyPath}");
+                Logger.Log($"hostfxr initialized with {assemblyPath}");
                 HostFxr.SetAppContextData(_hostContextHandle, "AZURE_FUNCTIONS_NATIVE_HOST", "1");
 
                 return HostFxr.Run(_hostContextHandle);
