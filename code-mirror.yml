@@ -9,6 +9,7 @@ trigger:
     - release_3.0
     - release_4.0_hotfix
     - feature/*
+    - shkr/feature_oop-host_artifact_gen_mirror_0926
 
 resources:
   repositories:
