@@ -13,10 +13,7 @@ namespace CoreToolsHost
         {
             try
             {
-                if (args.Contains("--verbose"))
-                {
-                    isVerbose = true;
-                }
+                isVerbose = args.Contains(DotnetConstants.Verbose);
 
                 Logger.LogVerbose(isVerbose, "Starting CoreToolsHost");
 
@@ -24,7 +21,7 @@ namespace CoreToolsHost
 
                 var localSettingsJson = await LocalSettingsJsonParser.GetLocalSettingsJsonAsJObjectAsync();
                 localSettingsJson.RootElement.TryGetProperty("Values", out JsonElement valuesElement);
-                string workerRuntime = "";
+                string workerRuntime = string.Empty;
 
                 if (valuesElement.TryGetProperty(EnvironmentVariables.FunctionsWorkerRuntime, out JsonElement workerRuntimeElement))
                 {
@@ -57,7 +54,6 @@ namespace CoreToolsHost
                         Logger.LogVerbose(isVerbose, "Loading inproc6 host");
                         LoadHostAssembly(appLoader, args, isNet8InProc: false);
                     }
-
                 }
             }
             catch (Exception exception)
@@ -73,16 +69,9 @@ namespace CoreToolsHost
 
             string filePath = "";
             filePath = Path.Combine(currentDirectory, isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName, executableName);
+            Logger.LogVerbose(isVerbose, $"File path to load: {filePath}");
 
-            int response = appLoader.RunApplication(filePath, args);
-
-            if (response < 0)
-            {
-                return;
-            }
-
-            var logMessage = $"Host loaded successfully";
-            Logger.LogVerbose(isVerbose, logMessage);
+            appLoader.RunApplication(filePath, args);
         }
     }
 }

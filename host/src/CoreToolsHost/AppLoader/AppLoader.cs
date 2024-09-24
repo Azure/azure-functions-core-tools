@@ -32,10 +32,7 @@ namespace CoreToolsHost
                     assembly_path = GetCharArrayPointer(assemblyPath)
                 };
 
-                if (commandLineArgs.Contains("--verbose"))
-                {
-                    isVerbose = true;
-                }
+                isVerbose = commandLineArgs.Contains(DotnetConstants.Verbose);
 
                 var hostfxrFullPath = NetHost.GetHostFxrPath(&parameters);
                 Logger.LogVerbose(isVerbose, $"hostfxr path:{hostfxrFullPath}");
