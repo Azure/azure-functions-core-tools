@@ -18,8 +18,9 @@ namespace FunctionsCustomHost
         private IntPtr _hostfxrHandle = IntPtr.Zero;
         private IntPtr _hostContextHandle = IntPtr.Zero;
         private bool _disposed;
+        private bool isVerbose = false;
 
-        internal int RunApplication(string? assemblyPath)
+        internal int RunApplication(string? assemblyPath, string[] commandLineArgs)
         {
             ArgumentNullException.ThrowIfNull(assemblyPath, nameof(assemblyPath));
 
@@ -31,8 +32,13 @@ namespace FunctionsCustomHost
                     assembly_path = GetCharArrayPointer(assemblyPath)
                 };
 
+                if (commandLineArgs.Contains("--verbose"))
+                {
+                    isVerbose = true;
+                }
+
                 var hostfxrFullPath = NetHost.GetHostFxrPath(&parameters);
-                Logger.LogTrace($"hostfxr path:{hostfxrFullPath}");
+                Logger.LogVerbose(isVerbose, $"hostfxr path:{hostfxrFullPath}");
 
                 _hostfxrHandle = NativeLibrary.Load(hostfxrFullPath);
 
@@ -42,10 +48,9 @@ namespace FunctionsCustomHost
                     return -1;
                 }
 
-                Logger.LogTrace($"hostfxr loaded.");
+                Logger.LogVerbose(isVerbose, $"hostfxr loaded.");
 
-                string[] arrayForCommandLineArgs = { };
-                var commandLineArguments = arrayForCommandLineArgs.Prepend(assemblyPath).ToArray();
+                var commandLineArguments = commandLineArgs.Prepend(assemblyPath).ToArray();
                 var error = HostFxr.Initialize(commandLineArguments.Length, commandLineArguments, IntPtr.Zero, out _hostContextHandle);
 
                 if (_hostContextHandle == IntPtr.Zero)
@@ -58,7 +63,7 @@ namespace FunctionsCustomHost
                 {
                     return error;
                 }
-                Logger.LogTrace($"hostfxr initialized with {assemblyPath}");
+                Logger.LogVerbose(isVerbose, $"hostfxr initialized with {assemblyPath}");
 
                 return HostFxr.Run(_hostContextHandle);
             }
@@ -82,14 +87,14 @@ namespace FunctionsCustomHost
                 if (_hostfxrHandle != IntPtr.Zero)
                 {
                     NativeLibrary.Free(_hostfxrHandle);
-                    Logger.LogTrace($"Freed hostfxr library handle");
+                    Logger.LogVerbose(isVerbose, $"Freed hostfxr library handle");
                     _hostfxrHandle = IntPtr.Zero;
                 }
 
                 if (_hostContextHandle != IntPtr.Zero)
                 {
                     HostFxr.Close(_hostContextHandle);
-                    Logger.LogTrace($"Closed hostcontext handle");
+                    Logger.LogVerbose(isVerbose, $"Closed hostcontext handle");
                     _hostContextHandle = IntPtr.Zero;
                 }
 

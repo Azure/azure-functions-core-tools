@@ -8,20 +8,20 @@ namespace FunctionsCustomHost
     internal static class Logger
     {
         /// <summary>
-        /// Logs a trace message if trace level logging is enabled.
+        /// Logs a message.
         /// </summary>
-        internal static void LogTrace(string message)
-        {
-            if (Configuration.IsTraceLogEnabled)
-            {
-                Log(message);
-            }
-        }
-
         internal static void Log(string message)
         {
             var ts = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
             Console.WriteLine($"[{ts}] [FunctionsCustomHost] {message}");
+        }
+
+        internal static void LogVerbose(bool isVerbose, string message)
+        {
+            if (isVerbose)
+            {
+                Console.WriteLine($"{message}");
+            }
         }
     }
 }

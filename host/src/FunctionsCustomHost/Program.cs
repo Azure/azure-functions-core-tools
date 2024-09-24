@@ -8,11 +8,17 @@ namespace FunctionsCustomHost
 {
     internal class Program
     {
+        static bool isVerbose = false;
         static async Task Main(string[] args)
         {
             try
             {
-                Logger.LogTrace("Starting FunctionsCustomHost");
+                if (args.Contains("--verbose"))
+                {
+                    isVerbose = true;
+                }
+
+                Logger.LogVerbose(isVerbose, "Starting FunctionsCustomHost");
 
                 using var appLoader = new AppLoader();
 
@@ -42,14 +48,14 @@ namespace FunctionsCustomHost
                     // Load host assembly for .NET 8 in proc host
                     if (!string.IsNullOrEmpty(isInProc8) && string.Equals("1", isInProc8))
                     {
-                        Logger.LogTrace("Loading inproc8 host");
-                        LoadHostAssembly(appLoader, isNet8InProc: true);
+                        Logger.LogVerbose(isVerbose, "Loading inproc8 host");
+                        LoadHostAssembly(appLoader, args, isNet8InProc: true);
                     }
                     else
                     {
                         // Load host assembly for .NET 6 in proc host
-                        Logger.LogTrace("Loading inproc6 host");
-                        LoadHostAssembly(appLoader, isNet8InProc: false);
+                        Logger.LogVerbose(isVerbose, "Loading inproc6 host");
+                        LoadHostAssembly(appLoader, args, isNet8InProc: false);
                     }
 
                 }
@@ -60,7 +66,7 @@ namespace FunctionsCustomHost
             }
         }
 
-        private static void LoadHostAssembly(AppLoader appLoader, bool isNet8InProc)
+        private static void LoadHostAssembly(AppLoader appLoader, string[] args, bool isNet8InProc)
         {
             var currentDirectory = AppContext.BaseDirectory;
             var executableName = DotnetConstants.ExecutableName;
@@ -68,13 +74,15 @@ namespace FunctionsCustomHost
             string filePath = "";
             filePath = Path.Combine(currentDirectory, isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName, executableName);
 
-            appLoader.RunApplication(filePath);
+            int response = appLoader.RunApplication(filePath, args);
+
+            if (response < 0)
+            {
+                return;
+            }
 
             var logMessage = $"FunctionApp assembly loaded successfully. ProcessId:{Environment.ProcessId}";
-            Logger.LogTrace(logMessage);
-
-            // Have this here to stall the process
-            Console.ReadLine();
+            Logger.LogVerbose(isVerbose, logMessage);
         }
     }
 }
