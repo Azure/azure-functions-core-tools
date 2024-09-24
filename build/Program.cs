@@ -29,11 +29,11 @@ namespace Build
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
                 .Then(Test)
-                .Then(Zip, skip: args.Contains("--skipArtifactGeneration"))
+                .Then(Zip)
                 .Then(DotnetPublishForNupkg)
                 .Then(DotnetPack)
                 .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
-                .Then(UploadToStorage, skip: !args.Contains("--ci") || args.Contains("--skipArtifactGeneration"))
+                .Then(UploadToStorage, skip: !args.Contains("--ci"))
                 .Run();
         }
     }
