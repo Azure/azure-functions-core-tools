@@ -16,7 +16,6 @@ trigger:
     - v4.x
     - release_4.0
     - feature/*
-    - aibhandari/custom-host
 
 resources:
   repositories:
@@ -47,7 +46,6 @@ extends:
     stages:     
       - stage: BuildAndTest
         jobs:
-          - template: /eng/ci/templates/official/jobs/build-test.yml@self
-            parameters:
-              tfm: net8
+        - template: /eng/ci/templates/official/jobs/build-test.yml@self
+        - template: /eng/ci/templates/official/jobs/linux-package.yml@self
 

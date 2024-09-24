@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
@@ -23,7 +24,6 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
-using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -40,6 +40,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
     {
         private const int DefaultPort = 7071;
         private const int DefaultTimeout = 20;
+        private const string Net6FrameworkDescriptionPrefix = ".NET 6.0";
+        private const string WindowsExecutableName = "func.exe";
+        private const string LinuxExecutableName = "func";
+        private const string InProc8DirectoryName = "in-proc8";
         private readonly ISecretsManager _secretsManager;
         private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
@@ -76,8 +80,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public bool? EnableJsonOutput { get; set; }
 
         public string JsonOutputFile { get; set; }
-
-        public string? HostRuntime { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
         {
@@ -173,11 +175,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                .Setup<string>("json-output-file")
                .WithDescription("If provided, a path to the file that will be used to write the output when using --enable-json-output.")
                .Callback(jsonOutputFile => JsonOutputFile = jsonOutputFile);
-
-            Parser
-               .Setup<string>("runtime")
-               .WithDescription($"If provided, determines which version of the host to start. Allowed values are '{DotnetConstants.InProc6HostRuntime}', '{DotnetConstants.InProc8HostRuntime}', and 'default' (which runs the out-of-process host).")
-               .Callback(startHostFromRuntime => HostRuntime = startHostFromRuntime);
 
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
@@ -421,14 +418,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public override async Task RunAsync()
         {
             await PreRunConditions();
-            var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            
-            // Return if we have already started a child process
-            if (await ShouldExitAfterDeterminingHostRuntime(isVerbose))
+
+            var isCurrentProcessNet6Build = RuntimeInformation.FrameworkDescription.Contains(Net6FrameworkDescriptionPrefix);
+            if (isCurrentProcessNet6Build && ShouldLaunchInProcNet8AsChildProcess() && await IsInProcNet8Enabled())
             {
+                await StartInProc8AsChildProcessAsync();
                 return;
             }
 
+            var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
                 Utilities.PrintLogo();
@@ -482,128 +480,31 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private async Task<bool> ShouldExitAfterDeterminingHostRuntime(bool isVerbose)
-        {
-            var isInProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet;
-            
-            // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
-            if (HostRuntime is not null)
-            {
-                // Validate host runtime passed in
-                await ValidateHostRuntime(isInProc, isVerbose);
-
-                if (!string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
-                {
-                    var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
-                    StartHostAsChildProcess(isNet8InProcSpecified);
-                    return true;
-                }
-            }
-            else if (isInProc)
-            {
-                // Infer host runtime by checking if .NET 8 is enabled
-                var shouldNet8InProcBeLaunched = await IsInProcNet8Enabled();
-
-                if (shouldNet8InProcBeLaunched)
-                {
-                    PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc8HostRuntime);
-                }
-                // Otherwise start .NET 6 child process since we are running an inproc app
-                else
-                {
-                    PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
-                }
-
-                StartHostAsChildProcess(shouldNet8InProcBeLaunched);
-                return true;
-
-            }
-            // If the host runtime parameter is not set and the app is not in-proc, we should default to out-of-process host
-            PrintVerboseForHostSelection(isVerbose, "out-of-process");
-            return false;
-        }
-
-        private async Task ValidateHostRuntime(bool isInProc, bool isVerbose)
-        {
-            var isOutOfProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated;
-            var isInProc6 = string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase);
-            var isInProc8 = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
-
-            // If we are running an .NET isolated app and the user specifies inproc6 or inproc8, throw an error
-            if (isOutOfProc && (isInProc8 || isInProc6))
-            {
-                throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The host runtime is only valid for the worker runtime {WorkerRuntime.dotnet}");
-            }
-            // If we are not running a .NET app and the user specifies inproc6 or inproc8, throw an error
-            if (!isOutOfProc && !isInProc && (isInProc8 || isInProc6))
-            {
-                throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The runtime is only valid for {WorkerRuntime.dotnetIsolated} and {WorkerRuntime.dotnet}");
-            }
-
-            if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
-            {
-                if (isInProc)
-                {
-                    throw new CliException($"The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to {WorkerRuntime.dotnetIsolated}.");
-                }
-                PrintVerboseForHostSelection(isVerbose, "out-of-process");
-                return;
-            }
-            else if (isInProc8)
-            {
-                if (!await IsInProcNet8Enabled())
-                {
-                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc8HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc8HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must be set while running a .NET 8 in-proc app.");
-                }
-                PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc8HostRuntime);
-                return;
-            }
-            else if (isInProc6)
-            {
-                if (await IsInProcNet8Enabled())
-                {
-                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc6HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc6HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must not be set while running a .NET 6 in-proc app.");
-                }
-                PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
-                return;
-            }
-            // Throw an exception if HostRuntime is set to none of the expected values
-            throw new CliException($"Invalid host runtime '{HostRuntime}'. Valid values are 'default', '{DotnetConstants.InProc8HostRuntime}', '{DotnetConstants.InProc6HostRuntime}'.");
-        }
-
-        private void PrintVerboseForHostSelection(bool isVerbose, string hostRuntime)
-        {
-            if (isVerbose)
-            {
-                ColoredConsole.WriteLine(VerboseColor($"Selected {hostRuntime} host."));
-            }
-        }
-
-        private static string GetInProcExecutablePath(bool isNet8)
+        private static string GetInProcNet8ExecutablePath()
         {
             var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
-            var executableName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? DotnetConstants.WindowsExecutableName : DotnetConstants.LinuxExecutableName;
+            var executableName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? WindowsExecutableName : LinuxExecutableName;
 
-            return Path.Combine(funcExecutableDirectory, (isNet8 ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName), executableName);
+            return Path.Combine(funcExecutableDirectory, InProc8DirectoryName, executableName);
         }
 
-        private void StartHostAsChildProcess(bool shouldStartNet8ChildProcess)
+        private Task StartInProc8AsChildProcessAsync()
         {
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor($"Starting child process for {(shouldStartNet8ChildProcess ? DotnetConstants.InProc8HostRuntime : DotnetConstants.InProc6HostRuntime)} model host."));
+                ColoredConsole.WriteLine(VerboseColor($"Starting child process for in-process model host."));
             }
 
             var commandLineArguments = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
             var tcs = new TaskCompletionSource();
 
-            var funcExecutablePath = GetInProcExecutablePath(isNet8: shouldStartNet8ChildProcess);
+            var inProc8FuncExecutablePath = GetInProcNet8ExecutablePath();
 
-            EnsureFuncExecutablePresent(funcExecutablePath, shouldStartNet8ChildProcess);
+            EnsureNet8FuncExecutablePresent(inProc8FuncExecutablePath);
 
-            var childProcessInfo = new ProcessStartInfo
+            var inprocNet8ChildProcessInfo = new ProcessStartInfo
             {
-                FileName = funcExecutablePath,
+                FileName = inProc8FuncExecutablePath,
                 Arguments = $"{commandLineArguments} --no-build",
                 WorkingDirectory = Environment.CurrentDirectory,
                 UseShellExecute = false,
@@ -614,7 +515,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             try
             {
-                var childProcess = Process.Start(childProcessInfo);
+                var childProcess = Process.Start(inprocNet8ChildProcessInfo);
                 if (VerboseLogging == true)
                 {
                     ColoredConsole.WriteLine(VerboseColor($"Started child process with ID: {childProcess.Id}"));
@@ -645,21 +546,23 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             catch (Exception ex)
             {
-                throw new CliException($"Failed to start the {(shouldStartNet8ChildProcess ? DotnetConstants.InProc8HostRuntime : DotnetConstants.InProc6HostRuntime)} model host. {ex.Message}");
+                throw new CliException($"Failed to start the in-process model host. {ex.Message}");
             }
+
+            return tcs.Task;
         }
 
-        private void EnsureFuncExecutablePresent(string funcExecutablePath, bool isInProcNet8)
+        private void EnsureNet8FuncExecutablePresent(string inProc8FuncExecutablePath)
         {
-            bool funcExeExist = File.Exists(funcExecutablePath);
+            bool net8ExeExist = File.Exists(inProc8FuncExecutablePath);
             if (VerboseLogging == true)
             {
-                ColoredConsole.WriteLine(VerboseColor($"{funcExecutablePath} {(funcExeExist ? "present" : "not present")} "));
+                ColoredConsole.WriteLine(VerboseColor($"{inProc8FuncExecutablePath} {(net8ExeExist ? "present" : "not present")} "));
             }
 
-            if (!funcExeExist)
+            if (!net8ExeExist)
             {
-                throw new CliException($"Failed to locate the {(isInProcNet8 ? DotnetConstants.InProc8HostRuntime : DotnetConstants.InProc6HostRuntime)} model host at {funcExecutablePath}");
+                throw new CliException($"Failed to locate the in-process model host at {inProc8FuncExecutablePath}");
             }
         }
 

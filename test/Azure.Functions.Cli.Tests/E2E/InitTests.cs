@@ -300,7 +300,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact(Skip="Flaky test")]
+        [Fact]
         public Task init_with_no_source_control()
         {
             return CliTester.Run(new RunConfiguration

@@ -23,11 +23,11 @@ if ($env:IntegrationBuildNumber)
         throw $errorMessage
     }
 
-    $buildCommand = { dotnet run --integrationTests}
+    $buildCommand = { dotnet run --integrationTests }
 }
 else
 {
-    $buildCommand = { dotnet run --ci}
+    $buildCommand = { dotnet run --ci }
 }
 
 Write-Host "Running $buildCommand"

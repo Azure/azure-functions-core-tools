@@ -343,16 +343,6 @@ namespace Build
                 "Microsoft.OData.Edm.dll",
                 "Microsoft.Spatial.dll",
                 "Mono.Posix.NETStandard.dll",
-                "OpenTelemetry.Api.dll",
-                "OpenTelemetry.Api.ProviderBuilderExtensions.dll",
-                "OpenTelemetry.dll",
-                "OpenTelemetry.Exporter.Console.dll",
-                "OpenTelemetry.Exporter.OpenTelemetryProtocol.dll",
-                "OpenTelemetry.Extensions.Hosting.dll",
-                "OpenTelemetry.Instrumentation.AspNetCore.dll",
-                "OpenTelemetry.Instrumentation.Http.dll",
-                "OpenTelemetry.PersistentStorage.Abstractions.dll",
-                "OpenTelemetry.PersistentStorage.FileSystem.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
             };
         }

@@ -124,7 +124,7 @@ function Install-DotnetVersion($Version,$Channel) {
     if ($IsWindows) {
         & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
         # Installing .NET into x86 directory since the E2E App runs the tests on x86 and looks for the specified framework there
-        & .\$installScript -InstallDir "$env:ProgramFiles (x86)/dotnet" -Channel $Channel -Version $Version -Architecture x86
+        & .\$installScript -InstallDir "$env:ProgramFiles (x86)/dotnet" -Channel $Channel -Version $Version
     } else {
         bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
     }
