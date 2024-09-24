@@ -23,7 +23,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows
+      arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-x64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: DotnetCoreCLI@2
@@ -36,14 +36,24 @@ jobs:
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: CopyFiles@2
-    displayName: Copy files
+    displayName: Copy files (win-x64)
     inputs:
-      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
       # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
       Contents: |
         func.exe
         nethost.dll
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-x64
+
+  - task: CopyFiles@2
+    displayName: Copy files (win-arm64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
+      # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-arm64
   
   - task: PublishPipelineArtifact@1
     displayName: 'Publish CoreToolsHost packages artifact'
