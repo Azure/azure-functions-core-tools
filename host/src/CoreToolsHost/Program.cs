@@ -81,7 +81,7 @@ namespace CoreToolsHost
                 return;
             }
 
-            var logMessage = $"FunctionApp assembly loaded successfully. ProcessId:{Environment.ProcessId}";
+            var logMessage = $"Host loaded successfully";
             Logger.LogVerbose(isVerbose, logMessage);
         }
     }
