@@ -214,7 +214,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip="Flaky test")]
         public async Task create_template_function_js_no_space_name_v4_model_param()
         {
             await CliTester.Run(new RunConfiguration

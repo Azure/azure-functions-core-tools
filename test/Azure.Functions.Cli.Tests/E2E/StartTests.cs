@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,7 +12,9 @@ using Xunit.Abstractions;
 using System.Net.Sockets;
 using System.Net;
 using System.Diagnostics;
+using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
+using Microsoft.Azure.WebJobs.Script.Description.DotNet.CSharp.Analyzers;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -525,11 +528,379 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "Initializing function HTTP routes"
                     },
                     Test = async (_, p, stdout) =>
+        public async Task start_dotnet8_inproc_without_specifying_runtime()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net8.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose"
+                },
+                ExpectExit = true,
+                ErrorContains = ["Failed to locate the inproc8 model host"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet8_inproc_with_specifying_runtime()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net8.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7076 --verbose --runtime inproc8"
+                },
+                ExpectExit = true,
+                ErrorContains = ["Failed to locate the inproc8 model host"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7076") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet6_inproc_without_specifying_runtime()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net6.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose"
+                },
+                ExpectExit = false,
+                ErrorContains = ["Failed to locate the inproc6 model host at"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet6_inproc_with_specifying_runtime()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net6.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc6"
+                },
+                ExpectExit = false,
+                ErrorContains = ["Failed to locate the inproc6 model host at"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_inproc6_specified_runtime_for_dotnet_isolated()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc6"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, inproc6, is not a valid host version for your project. The host runtime is only valid for the worker runtime dotnet"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_inproc8_specified_runtime_for_dotnet_isolated()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc8"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, inproc8, is not a valid host version for your project. The host runtime is only valid for the worker runtime dotnet"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_inproc8_specified_runtime_for_dotnet_inproc6_app()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net6.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc8"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, inproc8, is not a valid host version for your project. For the inproc8 runtime, the FUNCTIONS_INPROC_NET8_ENABLED variable must be set while running a .NET 8 in-proc app."],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_default_specified_runtime_for_dotnet_inproc6_app()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net6.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime default"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to dotnetIsolated."],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_default_specified_runtime_for_dotnet_inproc8_app()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net8.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime default"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to dotnetIsolated."],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_inproc6_specified_runtime_for_dotnet_inproc8_app()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net8.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc6"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, inproc6, is not a valid host version for your project. For the inproc6 runtime, the FUNCTIONS_INPROC_NET8_ENABLED variable must not be set while running a .NET 6 in-proc app."],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_inproc6_specified_runtime_for_non_dotnet_app()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "new --template \"Httptrigger\" --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc6"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, inproc6, is not a valid host version for your project. The runtime is only valid for dotnetIsolated and dotnet"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task dont_start_inproc8_specified_runtime_for_non_dotnet_app()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime node",
+                    "new --template \"Httptrigger\" --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc8"
+                },
+                ExpectExit = false,
+                ErrorContains = ["The runtime host value passed in, inproc8, is not a valid host version for your project. The runtime is only valid for dotnetIsolated and dotnet"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet_isolated_inproc_with_specifying_runtime()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet --target-framework net6.0",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose --runtime inproc6"
+                },
+                ExpectExit = false,
+                ErrorContains = ["Failed to locate the inproc6 model host at"],
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(100),
+            }, _output);
+        }
+
+
+        [Fact]
+        public async Task start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7080 --runtime default --verbose"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7080") })
+                    {
+                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                        var result = await response.Content.ReadAsStringAsync();
+                        p.Kill();
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
+
+                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                        {
+                            testOutputHelper.Output.Should().Contain("4.10");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
+                        }
+                    }
+                },
+                CommandTimeout = TimeSpan.FromSeconds(300),
+            }, _output);
+        }
+
+        [Fact]
+        public async Task start_dotnet_isolated_csharp_with_oop_host_without_runtime_specified()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime dotnet-isolated",
+                    "new --template Httptrigger --name HttpTrigger",
+                    "start --port 7073 --verbose"
+                },
+                ExpectExit = false,
+                Test = async (workingDir, p) =>
+                {
+                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await LogWatcher.WaitForLogOutput(stdout, "Initializing function HTTP routes", TimeSpan.FromSeconds(5));
                         p.Kill();
-                    },
-                    CommandTimeout = TimeSpan.FromSeconds(300)
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
+
+                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                        {
+                            testOutputHelper.Output.Should().Contain("4.10");
+                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
+                        }
+                    }
                 },
             }, _output);
         }
