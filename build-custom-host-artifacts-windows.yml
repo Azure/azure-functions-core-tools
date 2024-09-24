@@ -18,12 +18,21 @@ jobs:
       useGlobalJson: true
 
   - task: DotnetCoreCLI@2
-    displayName: Dotnet Publish
+    displayName: Dotnet Publish (win-x64)
     inputs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
       arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows
+      workingDirectory: $(Build.SourcesDirectory)/host/src/FunctionsCustomHost
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (win-arm64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows
       workingDirectory: $(Build.SourcesDirectory)/host/src/FunctionsCustomHost
 
   - task: CopyFiles@2
