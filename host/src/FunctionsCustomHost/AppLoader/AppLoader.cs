@@ -11,17 +11,13 @@ namespace FunctionsCustomHost
     // export COREHOST_TRACE=1
 
     /// <summary>
-    /// Manages loading hostfxr & worker assembly.
+    /// Manages loading hostfxr
     /// </summary>
     internal sealed class AppLoader : IDisposable
     {
         private IntPtr _hostfxrHandle = IntPtr.Zero;
         private IntPtr _hostContextHandle = IntPtr.Zero;
         private bool _disposed;
-
-        internal AppLoader()
-        {
-        }
 
         internal int RunApplication(string? assemblyPath)
         {
@@ -36,7 +32,7 @@ namespace FunctionsCustomHost
                 };
 
                 var hostfxrFullPath = NetHost.GetHostFxrPath(&parameters);
-                Logger.Log($"hostfxr path:{hostfxrFullPath}");
+                Logger.LogTrace($"hostfxr path:{hostfxrFullPath}");
 
                 _hostfxrHandle = NativeLibrary.Load(hostfxrFullPath);
 
@@ -46,10 +42,23 @@ namespace FunctionsCustomHost
                     return -1;
                 }
 
-                Logger.Log($"hostfxr loaded.");
+                Logger.LogTrace($"hostfxr loaded.");
 
-                Logger.Log($"hostfxr initialized with {assemblyPath}");
-                HostFxr.SetAppContextData(_hostContextHandle, "AZURE_FUNCTIONS_NATIVE_HOST", "1");
+                string[] arrayForCommandLineArgs = { };
+                var commandLineArguments = arrayForCommandLineArgs.Prepend(assemblyPath).ToArray();
+                var error = HostFxr.Initialize(commandLineArguments.Length, commandLineArguments, IntPtr.Zero, out _hostContextHandle);
+
+                if (_hostContextHandle == IntPtr.Zero)
+                {
+                    Logger.Log($"Failed to initialize the .NET Core runtime. Assembly path:{assemblyPath}");
+                    return -1;
+                }
+
+                if (error < 0)
+                {
+                    return error;
+                }
+                Logger.LogTrace($"hostfxr initialized with {assemblyPath}");
 
                 return HostFxr.Run(_hostContextHandle);
             }

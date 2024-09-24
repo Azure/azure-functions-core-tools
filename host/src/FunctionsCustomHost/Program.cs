@@ -1,9 +1,8 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using Microsoft.VisualBasic;
-using Newtonsoft.Json.Linq;
-using System.IO;
+
+using System.Text.Json;
 
 namespace FunctionsCustomHost
 {
@@ -13,30 +12,43 @@ namespace FunctionsCustomHost
         {
             try
             {
-                Logger.Log("Starting FunctionsCustomHost");
+                Logger.LogTrace("Starting FunctionsCustomHost");
 
                 using var appLoader = new AppLoader();
 
-                var localSettingsJObject = await GetLocalSettingsJsonAsJObjectAsync();
-                var workerRuntime = localSettingsJObject?["Values"]?[EnvironmentVariables.FunctionsWorkerRuntime]?.Value<string>();
+                var localSettingsJson = await LocalSettingsJsonParser.GetLocalSettingsJsonAsJObjectAsync();
+                localSettingsJson.RootElement.TryGetProperty("Values", out JsonElement valuesElement);
+                string workerRuntime = "";
+
+                if (valuesElement.TryGetProperty(EnvironmentVariables.FunctionsWorkerRuntime, out JsonElement workerRuntimeElement))
+                {
+                    workerRuntime = workerRuntimeElement.GetString();
+                }
+                
                 if (string.IsNullOrEmpty(workerRuntime))
                 {
                     Logger.Log($"Environment variable '{EnvironmentVariables.FunctionsWorkerRuntime}' is not set.");
                     return;
                 }
+
                 if (workerRuntime == DotnetConstants.DotnetWorkerRuntime)
                 {
-                    var isInProc8 = localSettingsJObject?["Values"]?[EnvironmentVariables.FunctionsInProcNet8Enabled]?.Value<string>();
+                    string isInProc8 = "";
+                    if (valuesElement.TryGetProperty(EnvironmentVariables.FunctionsInProcNet8Enabled, out JsonElement inProc8EnabledElement))
+                    {
+                        isInProc8 = inProc8EnabledElement.GetString();
+                    }
+
                     // Load host assembly for .NET 8 in proc host
                     if (!string.IsNullOrEmpty(isInProc8) && string.Equals("1", isInProc8))
                     {
-                        Logger.Log("Loading inproc8 host");
+                        Logger.LogTrace("Loading inproc8 host");
                         LoadHostAssembly(appLoader, isNet8InProc: true);
                     }
                     else
                     {
                         // Load host assembly for .NET 6 in proc host
-                        Logger.Log("Loading inproc6 host");
+                        Logger.LogTrace("Loading inproc6 host");
                         LoadHostAssembly(appLoader, isNet8InProc: false);
                     }
 
@@ -53,41 +65,16 @@ namespace FunctionsCustomHost
             var currentDirectory = AppContext.BaseDirectory;
             var executableName = DotnetConstants.ExecutableName;
 
-            string fileName = "";
-            fileName = Path.Combine(currentDirectory, isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName, executableName);
+            string filePath = "";
+            filePath = Path.Combine(currentDirectory, isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName, executableName);
 
-            appLoader.RunApplication(fileName);
+            appLoader.RunApplication(filePath);
 
             var logMessage = $"FunctionApp assembly loaded successfully. ProcessId:{Environment.ProcessId}";
-            if (OperatingSystem.IsWindows())
-            {
-                logMessage += $", AppPoolId:{Environment.GetEnvironmentVariable(EnvironmentVariables.AppPoolId)}";
-            }
-            Logger.Log(logMessage);
+            Logger.LogTrace(logMessage);
 
             // Have this here to stall the process
             Console.ReadLine();
-        }
-
-        private static async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
-        {
-            var fullPath = Path.Combine(Environment.CurrentDirectory, "local.settings.json");
-            if (File.Exists(fullPath))
-            {
-                string fileContent = "";
-                using (var fileStream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                using (var streamReader = new StreamReader(fileStream))
-                {
-                    fileContent = await streamReader.ReadToEndAsync();
-                }
-                if (!string.IsNullOrEmpty(fileContent))
-                {
-                    var localSettingsJObject = JObject.Parse(fileContent);
-                    return localSettingsJObject;
-                }
-            }
-
-            return null;
         }
     }
 }

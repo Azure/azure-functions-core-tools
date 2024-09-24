@@ -21,7 +21,7 @@ namespace FunctionsCustomHost
         internal static void Log(string message)
         {
             var ts = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
-            Console.WriteLine($"{Configuration.LogPrefix}[{ts}] [FunctionsCustomHost] {message}");
+            Console.WriteLine($"[{ts}] [FunctionsCustomHost] {message}");
         }
     }
 }

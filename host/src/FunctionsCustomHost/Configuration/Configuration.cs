@@ -21,14 +21,7 @@ namespace FunctionsCustomHost
         internal static void Reload()
         {
             IsTraceLogEnabled = string.Equals(EnvironmentUtils.GetValue(EnvironmentVariables.EnableTraceLogs), "1");
-            var disableLogPrefix = string.Equals(EnvironmentUtils.GetValue(EnvironmentVariables.DisableLogPrefix), "1");
-            LogPrefix = disableLogPrefix ? string.Empty : DefaultLogPrefix;
         }
-
-        /// <summary>
-        /// Gets the log prefix for the log messages.
-        /// </summary>
-        internal static string? LogPrefix { get; private set; }
 
         /// <summary>
         /// Gets a value indicating whether trace level logging is enabled.

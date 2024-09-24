@@ -12,6 +12,5 @@ namespace FunctionsCustomHost
         public const string InProc8DirectoryName = "in-proc8";
         public const string InProc6DirectoryName = "in-proc6";
         public const string DotnetWorkerRuntime = "dotnet";
-        public const string DotnetIsolatedWorkerRuntime = "dotnet-isolated";
     }
 }
