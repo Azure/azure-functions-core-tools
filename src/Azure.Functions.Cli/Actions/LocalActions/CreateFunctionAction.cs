@@ -13,7 +13,6 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using ImTools;
 using Microsoft.Azure.AppService.Proxy.Common.Context;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
