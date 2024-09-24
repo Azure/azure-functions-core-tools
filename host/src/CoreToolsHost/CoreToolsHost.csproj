@@ -9,7 +9,7 @@
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Speed</OptimizationPreference>
     <AssemblyName>func</AssemblyName>
-	    <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
+	<IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
   </PropertyGroup>
 
   <PropertyGroup>
