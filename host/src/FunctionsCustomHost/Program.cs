@@ -28,49 +28,33 @@ namespace FunctionsCustomHost
                 {
                     var isInProc8 = localSettingsJObject?["Values"]?[EnvironmentVariables.FunctionsInProcNet8Enabled]?.Value<string>();
                     // Load host assembly for .NET 8 in proc host
-                    if (string.Equals("1", isInProc8))
+                    if (!string.IsNullOrEmpty(isInProc8) && string.Equals("1", isInProc8))
                     {
                         Logger.Log("Loading inproc8 host");
-                        LoadHostAssembly(appLoader, isOutOfProc: false, isNet8InProc: true);
+                        LoadHostAssembly(appLoader, isNet8InProc: true);
                     }
                     else
                     {
                         // Load host assembly for .NET 6 in proc host
                         Logger.Log("Loading inproc6 host");
-                        LoadHostAssembly(appLoader, isOutOfProc: false, isNet8InProc: false);
+                        LoadHostAssembly(appLoader, isNet8InProc: false);
                     }
 
-                }
-                else if (workerRuntime == DotnetConstants.DotnetIsolatedWorkerRuntime)
-                {
-                    // Load process for oop host
-                    Logger.Log("Loading out-of-proc host");
-                    LoadHostAssembly(appLoader, isOutOfProc: true, isNet8InProc: false);
                 }
             }
             catch (Exception exception)
             {
-                Logger.Log($"An error occurred while running FunctionsNetHost.{exception}");
+                Logger.Log($"An error occurred while running FunctionsCustomHost.{exception}");
             }
         }
 
-        private static void LoadHostAssembly(AppLoader appLoader, bool isOutOfProc, bool isNet8InProc)
+        private static void LoadHostAssembly(AppLoader appLoader, bool isNet8InProc)
         {
             var currentDirectory = AppContext.BaseDirectory;
-
             var executableName = DotnetConstants.ExecutableName;
 
             string fileName = "";
-
-            if (isOutOfProc)
-            {
-                fileName = Path.Combine(currentDirectory, executableName);
-            }
-            else
-            {
-                fileName = Path.Combine(currentDirectory, isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName, executableName);
-
-            }
+            fileName = Path.Combine(currentDirectory, isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName, executableName);
 
             appLoader.RunApplication(fileName);
 
