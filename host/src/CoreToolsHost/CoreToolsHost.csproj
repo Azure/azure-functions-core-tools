@@ -8,9 +8,7 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Speed</OptimizationPreference>
-
-
-	  <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
+    <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
     <AssemblyName>func</AssemblyName>
   </PropertyGroup>
 
