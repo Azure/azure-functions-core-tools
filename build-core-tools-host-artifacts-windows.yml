@@ -1,0 +1,63 @@
+jobs:
+
+- job: BuildCoreToolsHostWindows
+  displayName: '[Windows] Build CoreToolsHost'
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      displayName: Publish CoreToolsHost packages
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows
+      artifact: _coreToolsHostPackagesWindows
+
+  steps:
+  - task: UseDotNet@2
+    displayName: Install .NET SDK from global.json
+    inputs:
+      useGlobalJson: true
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (win-x64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-x64
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (win-arm64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+
+  - task: CopyFiles@2
+    displayName: Copy files (win-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
+      # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-x64
+
+  - task: CopyFiles@2
+    displayName: Copy files (win-arm64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
+      # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-arm64
+  
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish CoreToolsHost packages artifact'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows'
+      artifact: '_coreToolsHostPackagesWindows'
+      publishLocation: 'pipeline'
