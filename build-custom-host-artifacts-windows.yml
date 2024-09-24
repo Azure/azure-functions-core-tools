@@ -1,0 +1,38 @@
+jobs:
+
+- job: BuildFunctionsCustomHostWindows
+  displayName: '[Windows] Build FunctionsCustomHost'
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      displayName: Publish FunctionsCustomHost packages
+      path: $(Build.ArtifactStagingDirectory)/_functionsCustomHostPackagesWindows
+      artifact: _functionsCustomHostPackagesWindows
+
+  steps:
+  - task: UseDotNet@2
+    displayName: Install .NET SDK from global.json
+    inputs:
+      useGlobalJson: true
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows
+      workingDirectory: $(Build.SourcesDirectory)/host/src/FunctionsCustomHost
+
+  - task: CopyFiles@2
+    displayName: Copy files
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows
+      # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
+      Contents: |
+        func.exe
+        func.pdb
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_functionsCustomHostPackagesWindows

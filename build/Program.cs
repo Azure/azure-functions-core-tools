@@ -31,7 +31,6 @@ namespace Build
                 .Then(Test)
                 .Then(Zip)
                 .Then(DotnetPublishForNupkg)
-                .Then(DotnetPublishForCustomHost)
                 .Then(DotnetPack)
                 .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
                 .Then(UploadToStorage, skip: !args.Contains("--ci"))

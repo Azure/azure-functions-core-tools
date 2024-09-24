@@ -648,18 +648,6 @@ namespace Build
                                 $"-c Release -f net8.0");
         }
 
-        public static void DotnetPublishForCustomHost()
-        {
-            // This publishes to the /bin/Release/$targetFramework$/publish
-            Shell.Run("dotnet", $"publish {Settings.CustomHostProjectFile} " +
-                                $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net8.0 " +
-                                $"/p:CommitHash=\"{Settings.CommitId}\" " +
-                                (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release -f net8.0 -o {Settings.NupkgPublishDir}");
-        }
-
         public static void GenerateSBOMManifestForNupkg()
         {
             Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
