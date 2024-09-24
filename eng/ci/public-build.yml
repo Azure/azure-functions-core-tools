@@ -13,6 +13,7 @@ pr:
     include:
     - v4.x
     - release_4.0
+    - feature/*
 
 trigger:
   batch: true
@@ -20,6 +21,7 @@ trigger:
     include:
     - v4.x
     - release_4.0
+    - feature/*
 
 resources:
   repositories:

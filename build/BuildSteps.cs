@@ -102,7 +102,7 @@ namespace Build
             Shell.Run("dotnet", $"pack {Settings.SrcProjectPath} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net6.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
+                                $"/p:TargetFramework=net8.0 " +  // without TargetFramework, the generated nuspec has incorrect path for the copy files operation.
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release --no-build");
@@ -116,8 +116,7 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                ExecuteDotnetPublish(outputPath, rid, "net6.0", skipLaunchingNet8ChildProcess: isMinVersion);
-
+                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: isMinVersion);
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
@@ -342,7 +341,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx");
         }
 
         public static void CopyBinariesToSign()
@@ -643,10 +642,10 @@ namespace Build
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:NoWorkers=\"true\" " +
-                                $"/p:TargetFramework=net6.0 " +
+                                $"/p:TargetFramework=net8.0 " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-c Release -f net6.0");
+                                $"-c Release -f net8.0");
         }
 
         public static void GenerateSBOMManifestForNupkg()
