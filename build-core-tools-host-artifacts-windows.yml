@@ -1,15 +1,15 @@
 jobs:
 
-- job: BuildFunctionsCustomHostWindows
-  displayName: '[Windows] Build FunctionsCustomHost'
+- job: BuildCoreToolsHostWindows
+  displayName: '[Windows] Build CoreToolsHost'
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
-      displayName: Publish FunctionsCustomHost packages
-      path: $(Build.ArtifactStagingDirectory)/_functionsCustomHostPackagesWindows
-      artifact: _functionsCustomHostPackagesWindows
+      displayName: Publish CoreToolsHost packages
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows
+      artifact: _coreToolsHostPackagesWindows
 
   steps:
   - task: UseDotNet@2
@@ -24,7 +24,7 @@ jobs:
       publishWebProjects: false
       zipAfterPublish: false
       arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows
-      workingDirectory: $(Build.SourcesDirectory)/host/src/FunctionsCustomHost
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-arm64)
@@ -32,8 +32,8 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows
-      workingDirectory: $(Build.SourcesDirectory)/host/src/FunctionsCustomHost
+      arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: CopyFiles@2
     displayName: Copy files
@@ -42,6 +42,12 @@ jobs:
       # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
       Contents: |
         func.exe
-        func.pdb
         nethost.dll
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_functionsCustomHostPackagesWindows
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows
+  
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish CoreToolsHost packages artifact'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows'
+      artifact: '_coreToolsHostPackagesWindows'
+      publishLocation: 'pipeline'

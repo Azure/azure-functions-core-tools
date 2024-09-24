@@ -3,7 +3,7 @@
 
 using System.Runtime.InteropServices;
 
-namespace FunctionsCustomHost
+namespace CoreToolsHost
 {
     static partial class HostFxr
     {

@@ -3,7 +3,7 @@
 
 using System.Globalization;
 
-namespace FunctionsCustomHost
+namespace CoreToolsHost
 {
     internal static class Logger
     {
@@ -13,7 +13,7 @@ namespace FunctionsCustomHost
         internal static void Log(string message)
         {
             var ts = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
-            Console.WriteLine($"[{ts}] [FunctionsCustomHost] {message}");
+            Console.WriteLine($"[{ts}] [CoreToolsHost] {message}");
         }
 
         internal static void LogVerbose(bool isVerbose, string message)

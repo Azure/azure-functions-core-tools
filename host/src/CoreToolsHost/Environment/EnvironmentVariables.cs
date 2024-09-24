@@ -1,15 +1,10 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-namespace FunctionsCustomHost;
+namespace CoreToolsHost;
 
 internal static class EnvironmentVariables
 {
-    /// <summary>
-    /// Set value to "1" for enabling additional trace logs in FunctionsCustomHost.
-    /// </summary>
-    internal const string EnableTraceLogs = "AZURE_FUNCTIONS_FUNCTIONCUSTOMHOST_TRACE";
-
     /// <summary>
     /// The worker runtime. Example value: "dotnet-isolated"
     /// </summary>

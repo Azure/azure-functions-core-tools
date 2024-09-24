@@ -3,7 +3,7 @@
 
 using System.Runtime.InteropServices;
 
-namespace FunctionsCustomHost
+namespace CoreToolsHost
 {
     internal class NetHost
     {

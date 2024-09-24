@@ -4,7 +4,7 @@
 
 using System.Text.Json;
 
-namespace FunctionsCustomHost
+namespace CoreToolsHost
 {
     internal class Program
     {
@@ -18,7 +18,7 @@ namespace FunctionsCustomHost
                     isVerbose = true;
                 }
 
-                Logger.LogVerbose(isVerbose, "Starting FunctionsCustomHost");
+                Logger.LogVerbose(isVerbose, "Starting CoreToolsHost");
 
                 using var appLoader = new AppLoader();
 
@@ -62,7 +62,7 @@ namespace FunctionsCustomHost
             }
             catch (Exception exception)
             {
-                Logger.Log($"An error occurred while running FunctionsCustomHost.{exception}");
+                Logger.Log($"An error occurred while running CoreToolsHost.{exception}");
             }
         }
 

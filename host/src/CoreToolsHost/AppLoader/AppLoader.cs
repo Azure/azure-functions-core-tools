@@ -3,7 +3,7 @@
 
 using System.Runtime.InteropServices;
 
-namespace FunctionsCustomHost
+namespace CoreToolsHost
 {
     // If having problems with the managed host, enable the following:
     // Environment.SetEnvironmentVariable("COREHOST_TRACE", "1");
