@@ -8,6 +8,7 @@ trigger:
     - release_4.0
     - release_3.0
     - release_4.0_hotfix
+    - feature/*
 
 resources:
   repositories:
