@@ -919,7 +919,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [InlineData("dotnet")]
         [InlineData("node")]
         [InlineData("javascript")]
-        public async Task Start_on_missing_Local_settings_json(string language)
+        public async Task start_on_missing_local_settings_json(string language)
         {
             await CliTester.Run(new RunConfiguration[]
             {
