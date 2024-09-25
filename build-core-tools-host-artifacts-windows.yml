@@ -15,7 +15,7 @@ jobs:
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
-    displayName: 'Install .NET 6.0 and 3.1'
+    displayName: 'Install .NET 9'
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-x64)
