@@ -15,8 +15,6 @@ trigger:
     include:
     - v4.x
     - release_4.0
-    - feature/*
-    - aibhandari/*
 
 resources:
   repositories:
