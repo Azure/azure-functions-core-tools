@@ -461,7 +461,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(10));
+                        await Task.Delay(TimeSpan.FromSeconds(5));
                     }
 
                     if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
@@ -489,7 +489,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(10));
+                        await Task.Delay(TimeSpan.FromSeconds(5));
                     }
 
                     if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
