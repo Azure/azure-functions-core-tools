@@ -1,7 +1,34 @@
-jobs:
+trigger:
+  branches:
+    include:
+    - feature/oop-host
+  paths:
+    include:
+      - ./host/src/**
 
+pr:
+  branches:
+    include:
+    - feature/oop-host
+  paths:
+    include:
+      - ./host/src/**
+
+resources:
+  repositories:
+    - repository: eng
+      type: git
+      name: engineering
+      ref: refs/tags/release
+
+jobs:
 - job: BuildCoreToolsHostWindows
   displayName: '[Windows] Build CoreToolsHost'
+  pool:
+    vmImage: 'windows-latest'
+
+  variables:
+  - template: /ci/variables/cfs.yml@eng
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
@@ -12,11 +39,10 @@ jobs:
       artifact: _coreToolsHostPackagesWindows
 
   steps:
-  - task: UseDotNet@2
-    displayName: Install .NET SDK from global.json
-    inputs:
-      useGlobalJson: true
-
+  - pwsh: |
+      Import-Module "./pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET 9'
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-x64)
     inputs:
@@ -39,7 +65,7 @@ jobs:
     displayName: Copy files (win-x64)
     inputs:
       SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
-      # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
+      # Publish output will include many other files. We only need func.exe & nethost.dll
       Contents: |
         func.exe
         nethost.dll
@@ -49,15 +75,15 @@ jobs:
     displayName: Copy files (win-arm64)
     inputs:
       SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
-      # Publish output will include many other files. We only need func.exe, pdb & nethost.dll
+      # Publish output will include many other files. We only need func.exe & nethost.dll
       Contents: |
         func.exe
         nethost.dll
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-arm64
-  
+
   - task: PublishPipelineArtifact@1
     displayName: 'Publish CoreToolsHost packages artifact'
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows'
-      artifact: '_coreToolsHostPackagesWindows'
+      artifact: 'drop-coretools-host-windows'
       publishLocation: 'pipeline'
