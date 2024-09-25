@@ -13,6 +13,7 @@ pr:
     include:
     - v4.x
     - release_4.0
+    - feature/*
 
 trigger:
   batch: true
@@ -20,6 +21,7 @@ trigger:
     include:
     - v4.x
     - release_4.0
+    - feature/*
 
 resources:
   repositories:
@@ -46,5 +48,11 @@ extends:
     stages:     
       - stage: BuildAndTest
         jobs:
-        - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
-
+          - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
+            parameters:
+              artifactTargetFramework: inproc6
+              jobTitle: BuildInproc6
+          - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
+            parameters:
+              artifactTargetFramework: inproc8
+              jobTitle: BuildInproc8

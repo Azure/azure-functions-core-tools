@@ -1,5 +1,9 @@
+parameters:
+  artifactTargetFramework: ''
+  jobTitle: ''
+
 jobs:
-- job: Default
+- job: ${{ parameters.jobTitle }}
   timeoutInMinutes: "180"
   pool:
     name: 1es-pool-azfunc-public
@@ -45,6 +49,7 @@ jobs:
       .\build.ps1
     env:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
+      ArtifactTargetFramework: ${{ parameters.artifactTargetFramework }}
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
