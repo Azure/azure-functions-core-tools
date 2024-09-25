@@ -15,7 +15,6 @@ trigger:
     include:
     - v4.x
     - release_4.0
-    - feature/*
 
 resources:
   repositories:
@@ -46,12 +45,6 @@ extends:
     stages:     
       - stage: BuildAndTest
         jobs:
-          - template: /eng/ci/templates/official/jobs/build-test.yml@self
-            parameters:
-              artifactTargetFramework: inproc6
-              jobTitle: BuildInproc6
-          - template: /eng/ci/templates/official/jobs/build-test.yml@self
-            parameters:
-              artifactTargetFramework: inproc8
-              jobTitle: BuildInproc8
-          - template: /eng/ci/templates/official/jobs/linux-package.yml@self
+        - template: /eng/ci/templates/official/jobs/build-test.yml@self
+        - template: /eng/ci/templates/official/jobs/linux-package.yml@self
+
