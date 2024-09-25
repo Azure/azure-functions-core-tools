@@ -33,7 +33,7 @@ jobs:
   steps:
   - pwsh: |
       Write-Host "Current Directory: $(Get-Location)"
-      Import-Module "../../pipelineUtilities.psm1" -Force
+      Import-Module "./pipelineUtilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 9'
 
