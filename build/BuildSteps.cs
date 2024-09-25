@@ -679,6 +679,55 @@ namespace Build
             Directory.Delete(Settings.SBOMManifestTelemetryDir, recursive: true);
         }
 
+        public static void UploadToStorage()
+        {
+            // Don't upload for public build.
+            if (Settings.IsPublicBuild)
+            {
+                ColoredConsole.WriteLine($"Skipping upload for public build.");
+                return;
+            }
+
+            ColoredConsole.WriteLine($"Going to run the UploadToStorage. Setting is {Settings.IsPublicBuild}");
+
+            
+            if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
+            {
+                var version = new Version(CurrentVersion);
+                var storageAccount = CloudStorageAccount.Parse(Settings.BuildArtifactsStorage);
+                var blobClient = storageAccount.CreateCloudBlobClient();
+                var container = blobClient.GetContainerReference("builds");
+                container.CreateIfNotExistsAsync().Wait();
+
+                container.SetPermissionsAsync(new BlobContainerPermissions
+                {
+                    PublicAccess = BlobContainerPublicAccessType.Blob
+                });
+
+                foreach (var file in Directory.GetFiles(Settings.OutputDir, "Azure.Functions.Cli.*", SearchOption.TopDirectoryOnly))
+                {
+                    var fileName = Path.GetFileName(file);
+                    ColoredConsole.Write($"Uploading {fileName}...");
+
+                    var versionedBlob = container.GetBlockBlobReference($"{version.ToString()}/{fileName}");
+                    var latestBlob = container.GetBlockBlobReference($"{version.Major}/latest/{fileName.Replace($".{version.ToString()}", string.Empty)}");
+                    versionedBlob.UploadFromFileAsync(file).Wait();
+                    latestBlob.StartCopyAsync(versionedBlob).Wait();
+
+                    ColoredConsole.WriteLine("Done");
+                }
+
+                var latestVersionBlob = container.GetBlockBlobReference($"{version.Major}/latest/version.txt");
+                latestVersionBlob.UploadTextAsync(version.ToString()).Wait();
+            }
+            else
+            {
+                var error = $"{nameof(Settings.BuildArtifactsStorage)} is null or empty. Can't run {nameof(UploadToStorage)} target";
+                ColoredConsole.Error.WriteLine(error.Red());
+                throw new Exception(error);
+            }
+        }
+
         public static void LogIntoAzure()
         {
             var directoryId = Environment.GetEnvironmentVariable("AZURE_DIRECTORY_ID");

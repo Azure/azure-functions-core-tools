@@ -33,6 +33,7 @@ namespace Build
                 .Then(DotnetPublishForNupkg)
                 .Then(DotnetPack)
                 .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
+                .Then(UploadToStorage, skip: !args.Contains("--ci"))
                 .Run();
         }
     }
