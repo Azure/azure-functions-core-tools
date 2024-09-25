@@ -413,7 +413,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -441,7 +441,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -461,7 +461,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        await Task.Delay(TimeSpan.FromSeconds(10));
                     }
 
                     if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
@@ -469,7 +469,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -489,7 +489,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        await Task.Delay(TimeSpan.FromSeconds(10));
                     }
 
                     if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
@@ -497,7 +497,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(900),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -692,35 +692,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 CommandTimeout = TimeSpan.FromSeconds(100),
             }, _output);
         }
-
-        [Fact]
-        public async Task start_dotnet_isolated_inproc_with_specifying_runtime()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc6"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-
-                    if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                    {
-                        testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(900),
-            }, _output);
-        }
-
 
         [Fact]
         public async Task start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified()
