@@ -18,12 +18,11 @@ extends:
       os: windows
     sdl:
       codeql:
-         compiled:
-           enabled: true
-         runSourceLanguagesInSourceAnalysis: true
+        compiled:
+          enabled: true
+        runSourceLanguagesInSourceAnalysis: true
 
 jobs:
-
 - job: BuildCoreToolsHostWindows
   displayName: '[Windows] Build CoreToolsHost'
 
