@@ -9,25 +9,25 @@ resources:
       name: engineering
       ref: refs/tags/release
 
-extends:
-  template: v1/1ES.Official.PipelineTemplate.yml@1es
-  parameters:
-    pool:
-      name: 1es-pool-azfunc
-      image: 1es-windows-2022
-      os: windows
-    sdl:
-      codeql:
-        compiled:
-          enabled: true
-        runSourceLanguagesInSourceAnalysis: true
-
 jobs:
 - job: BuildCoreToolsHostWindows
   displayName: '[Windows] Build CoreToolsHost'
 
   variables:
   - template: /ci/variables/cfs.yml@eng
+
+  extends:
+    template: v1/1ES.Official.PipelineTemplate.yml@1es
+    parameters:
+      pool:
+        name: 1es-pool-azfunc
+        image: 1es-windows-2022
+        os: windows
+      sdl:
+        codeql:
+          compiled:
+            enabled: true
+          runSourceLanguagesInSourceAnalysis: true
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
