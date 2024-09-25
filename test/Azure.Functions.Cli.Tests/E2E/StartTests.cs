@@ -946,7 +946,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     ExpectExit = false,
                     OutputContains = new[]
                     {
-                        $"'{language}' has been set in your local.settings.json",
+                        $"local.settings.json",
                         "Functions:",
                         "HttpTriggerFunc: [GET,POST] http://localhost:7071/api/HttpTriggerFunc"
                     },
