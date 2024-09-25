@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Colors.Net;
 using Colors.Net.StringColorExtensions;
 using Microsoft.WindowsAzure.Storage;
@@ -111,29 +110,23 @@ namespace Build
 
         public static void DotnetPublishForZips()
         {
-            // Get the unique rids, so that we can parallelize the publish process.
-            Dictionary<string, IList<string>> ridsToRuntimes = BuildRuntimeIdsToRuntimeMapping();
-            Parallel.ForEach(ridsToRuntimes.Keys, rid =>
+            foreach (var runtime in Settings.TargetRuntimes)
             {
-                // We can only parallize the rid level.
-                var runtimesInThisGroup = ridsToRuntimes[rid];
-                foreach (var runtime in runtimesInThisGroup)
+                var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
+                var outputPath = Path.Combine(Settings.OutputDir, runtime);
+                var rid = GetRuntimeId(runtime);
+
+                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: isMinVersion);
+                if (isMinVersion)
                 {
-                    var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
-                    var outputPath = Path.Combine(Settings.OutputDir, runtime);
-
-                    ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: isMinVersion);
-                    if (isMinVersion)
-                    {
-                        RemoveLanguageWorkers(outputPath);
-                    }
-
-                    // Publish net8 version of the artifact as well.
-                    var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
-                    ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
-                    RemoveLanguageWorkers(outputPathNet8);
+                    RemoveLanguageWorkers(outputPath);
                 }
-            });
+
+                // Publish net8 version of the artifact as well.
+                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
+                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
+                RemoveLanguageWorkers(outputPathNet8);
+            }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
@@ -472,12 +465,12 @@ namespace Build
         {
             string[] zipFiles = Directory.GetFiles(Settings.OutputDir, "*.zip");
 
-            Parallel.ForEach(zipFiles, zipFilePath =>
+            foreach (string zipFilePath in zipFiles)
             {
                 if (zipFilePath.Contains("osx"))
                 {
                     // sigcheck.exe does not work for mac signatures
-                    return;
+                    continue;
                 }
 
                 bool isSignedRuntime = Settings.SignInfo.RuntimesToSign.Any(r => zipFilePath.Contains(r));
@@ -495,7 +488,7 @@ namespace Build
                         throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
                     }
                 }
-            });
+            }
         }
 
         public static List<string> GetUnsignedBinaries(string targetDir)
@@ -835,31 +828,6 @@ namespace Build
             }
 
             return new PackageInfo(Name: parts[0], Version: parts[1]);
-        }
-
-        /// <summary>
-        /// Builds a dictionary of runtimeIds to runtimes.
-        /// Key will be rid and value will be an array of runtimes for that rid.
-        /// ex entry: "win-x64": ["win-x64", "min.win-x64"]
-        /// </summary>
-        private static Dictionary<string, IList<string>> BuildRuntimeIdsToRuntimeMapping()
-        {
-            var ridsToRuntimesMap = new Dictionary<string, IList<string>>();
-            foreach (var runtime in Settings.TargetRuntimes)
-            {
-                var rid = GetRuntimeId(runtime);
-
-                if (!ridsToRuntimesMap.ContainsKey(rid))
-                {
-                    ridsToRuntimesMap[rid] = new List<string> { runtime };
-                }
-                else
-                {
-                    ridsToRuntimesMap[rid].Add(runtime);
-                }
-            }
-
-            return ridsToRuntimesMap;
         }
     }
 }
