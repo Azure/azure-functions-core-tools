@@ -14,6 +14,9 @@ if (-not([bool]::TryParse($env:IsReleaseBuild, [ref] $isReleaseBuild)))
     throw "IsReleaseBuild can only be set to true or false."
 }
 
+$artifactTargetFramework = $env:ArtifactTargetFramework
+Write-Host "ArtifactTargetFramework: $artifactTargetFramework"
+
 if ($env:IntegrationBuildNumber)
 {
     if (-not ($env:IntegrationBuildNumber -like "PreRelease*-*"))
@@ -23,13 +26,13 @@ if ($env:IntegrationBuildNumber)
         throw $errorMessage
     }
 
-    $buildCommand = { dotnet run --integrationTests }
+    $buildCommand = "dotnet run --integrationTests --$artifactTargetFramework"
 }
 else
 {
-    $buildCommand = { dotnet run --ci }
+    $buildCommand = "dotnet run --ci --$artifactTargetFramework"
 }
 
 Write-Host "Running $buildCommand"
-& $buildCommand
+Invoke-Expression $buildCommand
 if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode)  }
