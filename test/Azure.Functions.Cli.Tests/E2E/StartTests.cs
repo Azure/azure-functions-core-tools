@@ -913,5 +913,61 @@ namespace Azure.Functions.Cli.Tests.E2E
                 _output.WriteLine(procOutput);
             }
         }
+
+        [Theory]
+        [InlineData("dotnet-isolated")]
+        [InlineData("dotnet")]
+        [InlineData("node")]
+        [InlineData("javascript")]
+        public async Task Start_on_missing_Local_settings_json(string language)
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"init . --worker-runtime {language}",
+                        $"new --template Httptrigger --name HttpTriggerFunc",
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
+                },
+                new RunConfiguration
+                {
+                    PreTest = (workingDir) =>
+                    {
+                       var LocalSettingsJson = Path.Combine(workingDir, "local.settings.json");
+                        File.Delete(LocalSettingsJson);
+                    },
+                    Commands = new[]
+                    {
+                        $"start --{language}",
+                    },
+                    ExpectExit = false,
+                    OutputContains = new[]
+                    {
+                        $"'{language}' has been set in your local.settings.json",
+                        "Functions:",
+                        "HttpTriggerFunc: [GET,POST] http://localhost:7071/api/HttpTriggerFunc"
+                    },
+                OutputDoesntContain = new string[]
+                    {
+                        "Initializing function HTTP routes"
+                    },
+                    Test = async (_, p) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTriggerFunc?name=Test");
+                            response.StatusCode.Should().Be(HttpStatusCode.OK);
+                            await Task.Delay(TimeSpan.FromSeconds(2));
+                            p.Kill();
+                        }
+                    }
+                }
+            }, _output);
+            
+        }
     }
 }

@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Common
             {
                 Values = new Dictionary<string, string>();
                 ConnectionStrings = new Dictionary<string, JToken>();
-                IsEncrypted = true;
+                IsEncrypted = false;
             }
         }
 

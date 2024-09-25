@@ -22,6 +22,10 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 return _currentWorkerRuntime;
             }
+            set
+            {
+                _currentWorkerRuntime = value;
+            }
         }
 
         public static WorkerRuntime CurrentWorkerRuntimeOrNone
