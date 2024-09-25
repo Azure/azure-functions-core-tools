@@ -12,7 +12,6 @@ jobs:
       artifact: _coreToolsHostPackagesWindows
 
   steps:
-
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
