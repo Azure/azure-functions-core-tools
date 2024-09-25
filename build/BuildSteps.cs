@@ -341,7 +341,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx --filter {TestingTraits.TraitName.Category}~{TestingTraits.TestCategory.FinalIntegration}");
         }
 
         public static void CopyBinariesToSign()
