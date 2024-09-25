@@ -32,7 +32,7 @@ jobs:
 
   steps:
   - pwsh: |
-      Import-Module "/../../pipelineUtilities.psm1" -Force
+      Import-Module "../../pipelineUtilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 9'
 
