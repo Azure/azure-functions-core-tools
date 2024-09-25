@@ -9,6 +9,7 @@ trigger:
     - release_3.0
     - release_4.0_hotfix
     - feature/*
+    - aibhandari/*
 
 resources:
   repositories:
