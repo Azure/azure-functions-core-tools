@@ -8,10 +8,14 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using FluentAssertions;
+using Moq;
 using NSubstitute;
 using Xunit;
+using YamlDotNet.Core;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
@@ -44,7 +48,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             exception.Should().NotBeNull();
             exception.Should().BeOfType<CliException>();
             exception.Message.Should().Contain($"Missing value for AzureWebJobsStorage in local.settings.json. " +
-                $"This is required for all triggers other than {string.Join(", ", Constants.TriggersWithoutStorage)}.");
+                $"This is required for all triggers other than {string.Join(", ", Common.Constants.TriggersWithoutStorage)}.");
         }
 
         [Fact]
@@ -184,6 +188,63 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
             }
 
             return fileSystem;
+        }
+
+        [Theory]
+        // In-proc target, in-proc 8 argument, project configured for .NET 8. Succeeds.
+        [InlineData(WorkerRuntime.dotnet, DotnetConstants.InProc8HostRuntime, true, false)]
+        // In-proc target, in-proc 8 argument, project NOT configured for .NET 8. Fails.
+        [InlineData(WorkerRuntime.dotnet, DotnetConstants.InProc8HostRuntime, false, true)]
+        // In-proc target, in-proc 6 argument, project NOT configured for .NET 8. Succeeds.
+        [InlineData(WorkerRuntime.dotnet, DotnetConstants.InProc6HostRuntime, false, false)]
+        // In-proc target,'default' argument, project configured for .NET 8. Fails.
+        [InlineData(WorkerRuntime.dotnet, "default", true, true)]
+        // Isolated target,'default' argument, project NOT configured for .NET 8. Succeeds.
+        [InlineData(WorkerRuntime.dotnetIsolated, "default", true, false)]
+        // Isolated target,'default' argument, project configured for .NET 8. Succeeds.
+        [InlineData(WorkerRuntime.dotnetIsolated, "default", false, false)]
+        // Isolated target,in-proc 8 argument, project configured for .NET 8. Fails.
+        [InlineData(WorkerRuntime.dotnetIsolated, DotnetConstants.InProc8HostRuntime, true, true)]
+        // Isolated target,in-proc 6 argument, project not configured for .NET 8. Fails.
+        [InlineData(WorkerRuntime.dotnetIsolated, DotnetConstants.InProc6HostRuntime, false, true)]
+        // Unsupported runtime targets.
+        [InlineData(WorkerRuntime.dotnetIsolated, "somevalue", false, true)]
+        [InlineData(WorkerRuntime.dotnet, "somevalue", false, true)]
+        // Non .NET worker runtimes.
+        [InlineData(WorkerRuntime.python, "default", false, false)]
+        [InlineData(WorkerRuntime.java, "default", false, false)]
+        [InlineData(WorkerRuntime.node, "default", false, false)]
+        [InlineData(WorkerRuntime.python, DotnetConstants.InProc6HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.java, DotnetConstants.InProc6HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.node, DotnetConstants.InProc6HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.python, DotnetConstants.InProc8HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.java, DotnetConstants.InProc8HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.node, DotnetConstants.InProc8HostRuntime, false, true)]
+        public async Task ValidateHostRuntimeAsync_MatchesExpectedResults(WorkerRuntime currentRuntime, string hostRuntimeArgument, bool validNet8Configuration, bool expectException)
+        {
+            try
+            {
+                Mock<IProcessManager> processManager = new();
+                Mock<ISecretsManager> secretsManager = new();
+
+                var startHostAction = new StartHostAction(secretsManager.Object, processManager.Object)
+                {
+                    HostRuntime = hostRuntimeArgument
+                };
+
+                await startHostAction.ValidateHostRuntimeAsync(currentRuntime, () => Task.FromResult(validNet8Configuration));
+            }
+            catch (CliException)
+            {
+                if (!expectException)
+                {
+                    throw;
+                }
+                
+                return;
+            }
+
+            Assert.False(expectException, "Expected validation failure.");
         }
 
         public void Dispose()
