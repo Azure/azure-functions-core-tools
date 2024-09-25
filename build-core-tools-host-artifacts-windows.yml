@@ -3,6 +3,9 @@ jobs:
 - job: BuildCoreToolsHostWindows
   displayName: '[Windows] Build CoreToolsHost'
 
+  variables:
+  - template: /ci/variables/cfs.yml@eng
+
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
