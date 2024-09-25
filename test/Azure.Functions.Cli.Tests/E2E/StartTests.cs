@@ -941,14 +941,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Commands = new[]
                     {
-                        $"start --{language}",
+                        $"start --{language} --port 7073",
                     },
                     ExpectExit = false,
                     OutputContains = new[]
                     {
                         $"local.settings.json",
                         "Functions:",
-                        "HttpTriggerFunc: [GET,POST] http://localhost:7071/api/HttpTriggerFunc"
+                        "HttpTriggerFunc: [GET,POST] http://localhost:7073/api/HttpTriggerFunc"
                     },
                 OutputDoesntContain = new string[]
                     {
@@ -956,7 +956,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (_, p) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073/") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTriggerFunc?name=Test");
