@@ -2,6 +2,8 @@ jobs:
 
 - job: BuildCoreToolsHostWindows
   displayName: '[Windows] Build CoreToolsHost'
+  pool:
+    name: '1es-pool-azfunc 8'
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
