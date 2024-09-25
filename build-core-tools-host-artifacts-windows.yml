@@ -3,6 +3,13 @@ jobs:
 - job: BuildCoreToolsHostWindows
   displayName: '[Windows] Build CoreToolsHost'
 
+  resources:
+    repositories:
+      - repository: eng
+        type: git
+        name: engineering
+        ref: refs/tags/release
+
   variables:
   - template: /ci/variables/cfs.yml@eng
 
