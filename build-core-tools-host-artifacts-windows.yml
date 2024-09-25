@@ -12,10 +12,11 @@ jobs:
       artifact: _coreToolsHostPackagesWindows
 
   steps:
-  - task: UseDotNet@2
-    displayName: Install .NET SDK from global.json
-    inputs:
-      useGlobalJson: true
+
+  - pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET 6.0 and 3.1'
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-x64)
