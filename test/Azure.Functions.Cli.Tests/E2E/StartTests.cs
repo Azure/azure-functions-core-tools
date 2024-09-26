@@ -60,7 +60,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task start_nodejs_v3()
         {
             await CliTester.Run(new RunConfiguration
@@ -97,7 +97,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task start_nodejs_with_inspect()
         {
             await CliTester.Run(new RunConfiguration
@@ -342,7 +342,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task start_displays_error_on_invalid_function_json()
         {
             var functionName = "HttpTriggerJS";
