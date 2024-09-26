@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
     {
         internal class TestCategory
         {
-            public const string FinalIntegration = "FinalIntegration";
+            public const string FinalIntegrationTests = "FinalIntegrationTests";
         }
 
         internal class TraitName

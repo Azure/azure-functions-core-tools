@@ -8,7 +8,7 @@ namespace Build
     {
         internal class TestCategory
         {
-            public const string FinalIntegration = "FinalIntegration";
+            public const string FinalIntegrationTests = "FinalIntegrationTests";
         }
 
         internal class TraitName
