@@ -640,7 +640,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/3644")]
+        [Theory]
         [InlineData("dotnet")]
         [InlineData("dotnet-isolated")]
         public async Task start_with_user_secrets(string language)
@@ -689,13 +689,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
                             { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-                            { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
+                            { "ConnectionStrings:MyQueueConn", "UseDevelopmentStorage=true" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
                     },
                     Commands = new[]
                     {
-                        "start --functions http1 --" + language,
+                        "start --functions queue1 --" + language,
                     },
                     ExpectExit = false,
                     OutputContains = new string[]
@@ -705,19 +705,28 @@ namespace Azure.Functions.Cli.Tests.E2E
                     CommandTimeout = TimeSpan.FromSeconds(300),
                     Test = async (workingDir, p) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        try
                         {
-                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                            var response = await client.GetAsync("/api/http1?name=Test");
-                            response.StatusCode.Should().Be(HttpStatusCode.OK);
-                            p.Kill();
+                            await QueueStorageHelper.InsertIntoQueue("myqueue-items", "hello world");
+
+                            // Give a second for the queue function to trigger
+                            await Task.Delay(1000);
+
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain("C# Queue trigger function processed: hello world");
+                            }
+                        }
+                        finally
+                        {
+                            p?.Kill();
                         }
                     }
                 }
             }, _output);
         }
 
-        [Fact(Skip = "Flaky test")]
+        [Fact]
         public async Task start_with_user_secrets_missing_storage()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
@@ -762,12 +771,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
                         Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {\""+ Constants.FunctionsWorkerRuntime + "\": \"dotnet\"} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
-                            { Constants.FunctionsWorkerRuntime, "dotnet" },
                             { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
@@ -784,7 +792,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact(Skip = "Flaky test")]
+        [Fact]
         public async Task start_with_user_secrets_missing_binding_setting()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
@@ -829,13 +837,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
                         Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {\""+ Constants.FunctionsWorkerRuntime + "\": \"dotnet\"} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
                             { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-                            { Constants.FunctionsWorkerRuntime, "dotnet" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
                     },
@@ -851,12 +858,18 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (workingDir, p) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        try
                         {
-                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                            var response = await client.GetAsync("/api/http1?name=Test");
-                            response.StatusCode.Should().Be(HttpStatusCode.OK);
-                            p.Kill();
+                            using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                            {
+                                (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                                var response = await client.GetAsync("/api/http1?name=Test");
+                                response.StatusCode.Should().Be(HttpStatusCode.OK);
+                            }
+                        }
+                        finally
+                        {
+                            p?.Kill();
                         }
                     }
                 }
