@@ -9,6 +9,7 @@ trigger:
     - release_3.0
     - release_4.0_hotfix
     - feature/*
+    - shkr/feature_inproc_ci_changes_0925_mirror_build_0926 
 
 resources:
   repositories:
