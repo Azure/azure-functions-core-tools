@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         private const string _serverNotReady = "Host was not ready after 10 seconds";
         public StartTests(ITestOutputHelper output) : base(output) { }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task start_nodejs()
         {
             await CliTester.Run(new RunConfiguration
@@ -237,7 +237,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output, startHost: true);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task start_loglevel_None_overrriden_in_host_json()
         {
             var functionName = "HttpTrigger";
@@ -571,7 +571,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task only_run_some_functions()
         {
             await CliTester.Run(new RunConfiguration
