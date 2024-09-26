@@ -393,7 +393,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public Task init_with_dotnet7Isolated_dockerfile()
         {
             return CliTester.Run(new RunConfiguration

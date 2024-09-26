@@ -1,5 +1,9 @@
+parameters:
+  artifactTargetFramework: ''
+  jobTitle: ''
+
 jobs:
-- job: Default
+- job: ${{ parameters.jobTitle }}
   condition: eq(variables['LinuxPackageBuildTag'], '')
   timeoutInMinutes: "180"
   pool:
@@ -84,6 +88,7 @@ jobs:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: $(IsReleaseBuild)
+      ArtifactTargetFramework: ${{ parameters.artifactTargetFramework }}
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
@@ -193,6 +198,7 @@ jobs:
       arguments: 'TestSignedArtifacts --signTest'
     displayName: 'Verify signed binaries'
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+
   - pwsh: |
       .\generateMsiFiles.ps1
     env:
@@ -250,10 +256,9 @@ jobs:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
   - task: 1ES.PublishPipelineArtifact@1
-    condition: succeeded()
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifactName: 'drop'
+      artifactName: 'drop-${{ parameters.artifactTargetFramework }}'
       artifactType: 'pipeline'
   - pwsh: |
       .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
