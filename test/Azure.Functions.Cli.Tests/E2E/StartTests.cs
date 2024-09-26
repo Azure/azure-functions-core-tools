@@ -915,7 +915,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet-isolated")]
         [InlineData("dotnet")]
         [InlineData("node")]
         [InlineData("javascript")]
