@@ -579,8 +579,7 @@ namespace Build
             foreach (var runtime in combinedRuntimesToSign)
             {
                 var runtimeId = GetRuntimeId(runtime);
-                // Remove the Net8ArtifactNameSuffix suffix if present
-                runtimeId = runtimeId.Replace(Net8ArtifactNameSuffix, "");
+
                 if (runtimeToGoEnv.TryGetValue(runtimeId, out var goEnv))
                 {
                     Environment.SetEnvironmentVariable("CGO_ENABLED", "0");
