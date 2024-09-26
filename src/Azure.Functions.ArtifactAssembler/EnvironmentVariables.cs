@@ -9,7 +9,7 @@ namespace Azure.Functions.ArtifactAssembler
         internal const string CoreToolsHostArtifactAlias = "CORETOOLS_HOST_ARTIFACT_ALIAS";
         internal const string InProc6ArtifactName = "IN_PROC6_ARTIFACT_NAME";
         internal const string InProc8ArtifactName = "IN_PROC8_ARTIFACT_NAME";
-        internal const string CoreToolsHostArtifactZipName = "CORETOOLS_HOST_ARTIFACT_NAME";
+        internal const string CoreToolsHostArtifactName = "CORETOOLS_HOST_ARTIFACT_NAME";
     }
 }
 

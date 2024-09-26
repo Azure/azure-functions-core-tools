@@ -39,7 +39,7 @@ namespace Azure.Functions.ArtifactAssembler
             _coreToolsHostArtifactDirectoryName = GetRequiredEnvironmentVariable(EnvironmentVariables.CoreToolsHostArtifactAlias);
             _inProc6ArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.InProc6ArtifactName);
             _inProc8ArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.InProc8ArtifactName);
-            _coreToolsHostArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.CoreToolsHostArtifactZipName);
+            _coreToolsHostArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.CoreToolsHostArtifactName);
 
             _rootWorkingDirectory = rootWorkingDirectory;
             _stagingDirectory = CreateStagingDirectory(_rootWorkingDirectory);
