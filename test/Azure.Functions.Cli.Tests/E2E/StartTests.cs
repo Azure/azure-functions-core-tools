@@ -532,7 +532,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Fact]
         [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.FinalIntegration)]
-        public async Task start_dotnet6_inproc_with_specifying_runtime()
+        public async Task start_dotnet6_inproc_with_specifying_runtime_e2e()
         {
             await CliTester.Run(new RunConfiguration
             {
