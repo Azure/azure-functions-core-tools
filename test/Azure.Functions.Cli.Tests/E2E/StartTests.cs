@@ -520,7 +520,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task start_minifiedTrue_dotnet6_inproc_with_specifying_runtime()
         {
-            var filePath = Path.Combine("artifactsconfig.json");
+            var filePath = Path.Combine("../../../../../", "artifactsconfig.json");
             string artifactsJsonContent = "{\"minifiedVersion\": true}";
             File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
 
