@@ -81,6 +81,10 @@ namespace Azure.Functions.ArtifactAssembler
                     _inProc8ExtractedRootDir = inProc8Task.Result;
                     _coreToolsHostExtractedRootDir = coreToolsHostTask.Result;
                 });
+
+            // Delete the downloaded directories
+            Directory.Delete(inProcArtifactDownloadDir, true);
+            Directory.Delete(coreToolsHostArtifactDownloadDir, true);
         }
 
         private static void EnsureArtifactDirectoryExist(string directoryExist)
@@ -152,7 +156,7 @@ namespace Azure.Functions.ArtifactAssembler
                 // consolidatedArtifactDirPath now contains custom core-tools host, in-proc6 and in-proc8 sub directories. Create a zip file.
                 var zipPath = Path.Combine(customHostTargetArtifactDir, $"{artifactDirName}.zip");
                 await Task.Run(() => FileUtilities.CreateZipFile(consolidatedArtifactDirPath, zipPath));
-                Console.WriteLine($"Created target runtime zip: {zipPath}");
+                Console.WriteLine($"Successfully created target runtime zip at: {zipPath}");
 
                 Directory.Delete(consolidatedArtifactDirPath, true);
             });

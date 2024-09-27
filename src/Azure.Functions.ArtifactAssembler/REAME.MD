@@ -1,7 +1,6 @@
 # Azure Functions Artifact Assembler
 
-This project is designed to assemble artifacts for Azure Functions, including custom core tools hosts and various versions of in-proc artifacts (to support .NET 6.0 and .NET 8.0 in-proc apps). It extracts, processes, and packages these artifacts into a format suitable for use with Visual Studio.
-
+This project is designed to assemble artifacts for Azure Functions, including custom core tools hosts and various versions of in-proc artifacts (to support .NET 6.0 and .NET 8.0 in-proc apps). It currently packages these artifacts for Visual Studio builds, but we plan to expand to other use cases in the future. It extracts, processes, and packages these artifacts into a format suitable for use with Visual Studio.
 ## Prerequisites
 
 - .NET 8 SDK
@@ -12,7 +11,7 @@ This project is designed to assemble artifacts for Azure Functions, including cu
 The following artifact folders are expected to be present in the root directory of the executable (when debugging locally, it will be `bin/debug/net8.0`):
 
 - A directory which contains `in-proc6` and `in-proc8` artifact directories (not zips).
-- A directory which contains the core tools host artifact directory (not zip).
+- A directory which contains the core tools custom host artifact directory (not zip).
 
 ## Environment Variables
 
