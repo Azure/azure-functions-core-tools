@@ -9,7 +9,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
-    internal class Executable
+    internal class Executable: IAsyncLifetime
     {
         private readonly string _arguments;
         private readonly string _exeName;
@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli.Common
         private readonly bool _visibleProcess;
         private readonly string _workingDirectory;
         private readonly IDictionary<string, string> _environmentVariables;
+        private bool _disposed;
 
         public Executable(
             string exeName,
@@ -98,12 +99,13 @@ namespace Azure.Functions.Cli.Common
             try
             {
                 Process.Start();
+
                 if (_streamOutput)
                 {
                     Process.BeginOutputReadLine();
                     Process.BeginErrorReadLine();
                 }
-                
+
                 if (!string.IsNullOrEmpty(stdIn))
                 {
                     Process.StandardInput.WriteLine(stdIn);
@@ -119,7 +121,7 @@ namespace Azure.Functions.Cli.Common
                 throw ex;
             }
 
-            if (timeout == null)
+            if (timeout is null)
             {
                 return await exitCodeTask;
             }
@@ -132,10 +134,33 @@ namespace Azure.Functions.Cli.Common
                 }
                 else
                 {
-                    Process.Kill();
+                    await DisposeAsync();
                     throw new Exception("Process didn't exit within specified timeout");
                 }
             }
+        }
+
+        public Task DisposeAsync()
+        {
+            if (!_disposed)
+            {
+                if (Process is not null)
+                {
+                    try
+                    {
+                        Process.Kill();
+                        Process.Dispose();
+                    }
+                    catch
+                    {
+                        // process may not have started
+                    }
+                }
+            }
+
+            _disposed = true;
+
+            return Task.CompletedTask;
         }
     }
 }
