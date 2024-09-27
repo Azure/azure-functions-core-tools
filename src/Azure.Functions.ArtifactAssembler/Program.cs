@@ -9,7 +9,7 @@ namespace Azure.Functions.ArtifactAssembler
         {
             try
             {
-                var currentWorkingDirectory = Environment.CurrentDirectory;             
+                var currentWorkingDirectory = Environment.CurrentDirectory;
                 var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory);
                 await artifactAssembler.AssembleArtifactsAsync();
 
