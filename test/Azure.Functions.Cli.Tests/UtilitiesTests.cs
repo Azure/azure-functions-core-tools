@@ -1,6 +1,8 @@
-﻿using Microsoft.Azure.WebJobs.Script.Configuration;
+﻿using Azure.Functions.Cli.Common;
+using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Xunit;
@@ -67,7 +69,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData(false)]
         public void Test_IsMinifiedVersion(bool expected)
         {
-            var filePath = Path.Combine("artifactsconfig.json");
+            var filePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
             string artifactsJsonContent = "{\"minifiedVersion\": "+expected.ToString().ToLower()+"}";
             File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
 

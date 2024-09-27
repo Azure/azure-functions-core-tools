@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,7 +15,8 @@ namespace Azure.Functions.Cli
     {
         public void Configure(IConfigurationBuilder builder)
         {
-            builder.AddJsonFile(Constants.ArtifactsConfigFileName, optional: true);        
+            var artifactsConfigFilePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
+            builder.AddJsonFile(artifactsConfigFilePath, optional: true);        
         }
     }
 }
