@@ -401,16 +401,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose"
                 },
                 ExpectExit = true,
+                ErrorContains = ["Failed to locate the inproc8 model host"],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-
-                    if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                    {
-                        testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
                     }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
@@ -429,24 +425,22 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7076 --verbose --runtime inproc8"
                 },
                 ExpectExit = true,
+                ErrorContains = ["Failed to locate the inproc8 model host"],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7076") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(2));
                     }
-
-                    if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                    {
-                        testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
-                    }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
-        [Fact]
-        public async Task start_dotnet6_inproc_without_specifying_runtime()
+        [Theory]
+        [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
+        [InlineData(false, "Failed to locate the inproc6 model host at")]
+        public async Task start_dotnet6_inproc_without_specifying_runtime(bool value, string message)
         {
             await CliTester.Run(new RunConfiguration
             {
@@ -457,24 +451,26 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose"
                 },
                 ExpectExit = false,
+                ErrorContains = [message],
                 Test = async (workingDir, p) =>
                 {
+                    var filePath = Path.Combine(workingDir, "artifactsconfig.json");
+                    string artifactsconfigContent = "{\"minifiedVersion\": " + value + "}}";
+                    await File.WriteAllTextAsync(filePath, artifactsconfigContent);
+
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(5));
-                    }
-
-                    if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                    {
-                        testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
                     }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
-        [Fact]
-        public async Task start_dotnet6_inproc_with_specifying_runtime()
+        [Theory]
+        [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
+        [InlineData(false, "Failed to locate the inproc6 model host at")]
+        public async Task start_dotnet6_inproc_with_specifying_runtime(bool value, string message)
         {
             await CliTester.Run(new RunConfiguration
             {
@@ -485,16 +481,16 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc6"
                 },
                 ExpectExit = false,
+                ErrorContains = [message],
                 Test = async (workingDir, p) =>
                 {
+                    var filePath = Path.Combine(workingDir, "artifactsconfig.json");
+                    string artifactsconfigContent = "{\"minifiedVersion\": "+value+"}}";
+                    await File.WriteAllTextAsync(filePath, artifactsconfigContent);
+
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(5));
-                    }
-
-                    if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                    {
-                        testOutputHelper.Output.Should().Contain($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.");
                     }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
