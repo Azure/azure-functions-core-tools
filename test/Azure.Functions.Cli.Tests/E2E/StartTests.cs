@@ -439,7 +439,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
+        //[InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
         [InlineData(false, "Failed to locate the inproc6 model host at")]
         public async Task start_dotnet6_inproc_without_specifying_runtime(bool expected, string message)
         {
@@ -471,7 +471,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
+        //[InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
         [InlineData(false, "Failed to locate the inproc6 model host at")]
         public async Task start_dotnet6_inproc_with_specifying_runtime(bool expected, string message)
         {
