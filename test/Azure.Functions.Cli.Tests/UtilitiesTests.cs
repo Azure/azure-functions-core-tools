@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
+using System.IO;
 using Xunit;
 
 namespace Azure.Functions.Cli.Tests
@@ -59,6 +60,17 @@ namespace Azure.Functions.Cli.Tests
         public void IsSystemLogCategory_Test(string inputCategory, bool expected)
         {
             Assert.Equal(expected, Utilities.IsSystemLogCategory(inputCategory));
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Test_IsMinifiedVersion(bool expected)
+        {
+            var filePath = Path.Combine("artifactsconfig.json");
+            string artifactsJsonContent = "{\"minifiedVersion\": "+expected.ToString().ToLower()+"}";
+            File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
+            Assert.Equal(expected, Utilities.IsMinifiedVersion());
         }
     }
 }

@@ -15,6 +15,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script.Description.DotNet.CSharp.Analyzers;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -440,8 +441,12 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
         [InlineData(false, "Failed to locate the inproc6 model host at")]
-        public async Task start_dotnet6_inproc_without_specifying_runtime(bool value, string message)
+        public async Task start_dotnet6_inproc_without_specifying_runtime(bool expected, string message)
         {
+            var filePath = Path.Combine("artifactsconfig.json");
+            string artifactsJsonContent = "{\"minifiedVersion\": " + expected.ToString().ToLower() + "}";
+            File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
@@ -454,10 +459,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = [message],
                 Test = async (workingDir, p) =>
                 {
-                    var filePath = Path.Combine(workingDir, "artifactsconfig.json");
-                    string artifactsconfigContent = "{\"minifiedVersion\": " + value + "}}";
-                    await File.WriteAllTextAsync(filePath, artifactsconfigContent);
-
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(5));
@@ -470,8 +471,12 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
         [InlineData(false, "Failed to locate the inproc6 model host at")]
-        public async Task start_dotnet6_inproc_with_specifying_runtime(bool value, string message)
+        public async Task start_dotnet6_inproc_with_specifying_runtime(bool expected, string message)
         {
+            var filePath = Path.Combine("artifactsconfig.json");
+            string artifactsJsonContent = "{\"minifiedVersion\": " + expected.ToString().ToLower() + "}";
+            File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
@@ -484,10 +489,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = [message],
                 Test = async (workingDir, p) =>
                 {
-                    var filePath = Path.Combine(workingDir, "artifactsconfig.json");
-                    string artifactsconfigContent = "{\"minifiedVersion\": "+value+"}}";
-                    await File.WriteAllTextAsync(filePath, artifactsconfigContent);
-
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(5));
