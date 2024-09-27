@@ -71,6 +71,7 @@ namespace Azure.Functions.Cli.Tests
             string artifactsJsonContent = "{\"minifiedVersion\": "+expected.ToString().ToLower()+"}";
             File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
             Assert.Equal(expected, Utilities.IsMinifiedVersion());
+            File.Delete(filePath);
         }
     }
 }

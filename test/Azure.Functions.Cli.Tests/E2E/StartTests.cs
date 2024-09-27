@@ -466,6 +466,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
+
+            File.Delete(filePath);
         }
 
         [Theory]
@@ -496,6 +498,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
+
+            File.Delete(filePath);
         }
 
         [Fact]
