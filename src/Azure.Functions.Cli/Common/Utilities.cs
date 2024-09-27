@@ -263,5 +263,33 @@ namespace Azure.Functions.Cli
             var configuration = builder.Build();
             return configuration;
         }
+
+        internal static bool IsMinifiedVersion()
+        {
+            var config = BuildArtifactsConfiguration();
+
+            try
+            {
+                var section = config.GetSection(Constants.MinifiedVersionConfigSectionName);
+
+                if (section.Exists())
+                {
+                    string value = section.Value;
+                    return bool.TryParse(value, out bool isValue) && isValue;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        internal static IConfigurationRoot BuildArtifactsConfiguration()
+        {
+            var configureBuilder = new ArtifactsConfigurationBuilder();
+            var configurationBuilder = new ConfigurationBuilder();
+            configureBuilder.Configure(configurationBuilder);
+            var root = configurationBuilder.Build();
+            return root;
+        }
+
     }
 }

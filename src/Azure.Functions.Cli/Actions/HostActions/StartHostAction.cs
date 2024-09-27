@@ -494,7 +494,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (!string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
-                    PrintMessageForInProcSdk();
+                    if (Utilities.IsMinifiedVersion())
+                    {
+                        ThrowIfInProc();
+                    }
+                    else
+                    {
+                        var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
+                        StartHostAsChildProcess(isNet8InProcSpecified);
+                    }
+
                     return true;
                 }
             }
@@ -513,7 +522,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
                 }
 
-                PrintMessageForInProcSdk();
+                if (Utilities.IsMinifiedVersion())
+                {
+                    ThrowIfInProc();
+                }
+                else
+                {
+                    StartHostAsChildProcess(shouldNet8InProcBeLaunched);
+                }
                 return true;
 
             }
@@ -570,9 +586,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             throw new CliException($"Invalid host runtime '{HostRuntime}'. Valid values are 'default', '{DotnetConstants.InProc8HostRuntime}', '{DotnetConstants.InProc6HostRuntime}'.");
         }
 
-        private void PrintMessageForInProcSdk()
+        private void ThrowIfInProc()
         {
-            Console.WriteLine($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}. Please update to the latest version. For more information, see: {DotnetConstants.InProcFunctionsDocsLink}");
+            throw new CliException($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}. Please update to the latest version. For more information, see: {DotnetConstants.InProcFunctionsDocsLink}");
         }
         private void PrintVerboseForHostSelection(bool isVerbose, string hostRuntime)
         {
