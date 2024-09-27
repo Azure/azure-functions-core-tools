@@ -257,19 +257,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                     ExpectExit = false,
                     Test = async (workingDir, p) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                         {
-                            using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                            {
-                                (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                                var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                                var result = await response.Content.ReadAsStringAsync();
-                                result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
-                            }
-                        }
-                        finally
-                        {
-                            p?.Kill();
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            var result = await response.Content.ReadAsStringAsync();
+                            p.Kill();
+                            result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
                         }
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
@@ -728,7 +722,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/3644")]
         [InlineData("dotnet")]
         [InlineData("dotnet-isolated")]
-        public async Task Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution(string language, string port)
+        public async Task Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution(string language)
         {
             await CliTester.Run(new RunConfiguration[]
             {
