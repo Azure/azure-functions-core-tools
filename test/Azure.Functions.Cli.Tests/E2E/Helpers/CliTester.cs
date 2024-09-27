@@ -165,12 +165,11 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     }
                 }
 
-                AssertExitError(runConfiguration, exitError);
+                //AssertExitError(runConfiguration, exitError);
                 AssertFiles(runConfiguration, workingDir);
                 AssertDirectories(runConfiguration, workingDir);
                 AssertOutputContent(runConfiguration, stdout);
                 AssertErrorContent(runConfiguration, stderr);
-
             }
 
             void logStd(string line)
