@@ -9,7 +9,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
-    internal class Executable: IAsyncLifetime
+    internal class Executable: IAsyncDisposable
     {
         private readonly string _arguments;
         private readonly string _exeName;
@@ -140,10 +140,11 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        public Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
+                _disposed = true;
                 if (Process is not null)
                 {
                     try
@@ -157,10 +158,6 @@ namespace Azure.Functions.Cli.Common
                     }
                 }
             }
-
-            _disposed = true;
-
-            return Task.CompletedTask;
         }
     }
 }
