@@ -20,5 +20,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         public Func<string, Process, Task> Test { get; set; }
         public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(40);
         public string CommandsStr => $"{string.Join(", ", Commands)}";
+        public bool WaitForRunningHostState = false;
+        public string HostProcessPort = "7071";
     }
 }

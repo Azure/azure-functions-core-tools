@@ -76,9 +76,9 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost)
         {
             var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
-
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
+
             foreach (var runConfiguration in runConfigurations)
             {
                 Task hostTask = startHost ? hostExe.RunAsync(logStd, logErr) : Task.Delay(runConfiguration.CommandTimeout);
@@ -120,9 +120,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     {
                         var exitCodeTask = exe.RunAsync(logStd, logErr);
 
-                        // We need to give time for the host to start up
-                        //TODO: implement a host check that is not time based
-                        await Task.Delay(5000);
+                        if (runConfiguration.WaitForRunningHostState)
+                        {
+                            await ProcessHelper.WaitForFunctionHostToStart(exe.Process, runConfiguration.HostProcessPort);
+                        }
 
                         try
                         {

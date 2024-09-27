@@ -14,62 +14,23 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         private static readonly Regex pidRegex = new Regex(@"LISTENING\s+(\d+)\s*$");
         private static string FunctionsHostUrl = "http://localhost:";
 
-        public static async Task WaitForFunctionHostToStart(Process funcProcess)
+        public static async Task WaitForFunctionHostToStart(Process funcProcess, string port)
         {
-            // Example usage:
-            // if (runConfiguration.WaitForHostToStart)
-            // {
-            //     await WaitForFunctionHostToStart(exe.Process);
-            // }
-
+            var url = FunctionsHostUrl += port;
             using var httpClient = new HttpClient();
-            Console.WriteLine("Waiting for host to be running...");
             await RetryHelper.RetryAsync(async () =>
             {
-                try
+                var response = await httpClient.GetAsync($"{url}/admin/host/status");
+                var content = await response.Content.ReadAsStringAsync();
+                var doc = JsonDocument.Parse(content);
+
+                if (doc.RootElement.TryGetProperty("state", out JsonElement value) && value.GetString() == "Running")
                 {
-                    var response = await httpClient.GetAsync($"{FunctionsHostUrl}/admin/host/status");
-                    var content = await response.Content.ReadAsStringAsync();
-                    var doc = JsonDocument.Parse(content);
-
-                    if (doc.RootElement.TryGetProperty("state", out JsonElement value) && value.GetString() == "Running")
-                    {
-                        Console.WriteLine($"  Current state: Running");
-                        return true;
-                    }
-
-                    Console.WriteLine($"  Current state: {value}");
-                    return false;
+                    return true;
                 }
-                catch
-                {
-                    if (funcProcess.HasExited)
-                    {
-                        // Something went wrong starting the host - check the logs
-                        Console.WriteLine($"  Current state: process exited - something may have gone wrong.");
-                        return false;
-                    }
 
-                    // Can get exceptions before host is running.
-                    Console.WriteLine($"  Current state: process starting");
-                    return false;
-                }
+                return false;
             });
-        }
-
-        public static void KillExistingFuncHosts()
-        {
-            foreach (var func in Process.GetProcessesByName("func"))
-            {
-                try
-                {
-                    func.Kill();
-                }
-                catch
-                {
-                    // Best effort
-                }
-            }
         }
 
         public static void TryKillProcessForPort(string port)
