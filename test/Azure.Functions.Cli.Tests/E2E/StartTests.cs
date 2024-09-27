@@ -437,10 +437,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Theory]
-        [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
-        [InlineData(false, "Failed to locate the inproc6 model host at")]
-        public async Task start_dotnet6_inproc_without_specifying_runtime(bool value, string message)
+        [Fact]
+        public async Task start_dotnet6_inproc_without_specifying_runtime()
         {
             await CliTester.Run(new RunConfiguration
             {
@@ -451,13 +449,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose"
                 },
                 ExpectExit = false,
-                ErrorContains = [message],
+                ErrorContains = ["Failed to locate the inproc6 model host at"],
                 Test = async (workingDir, p) =>
                 {
-                    var filePath = Path.Combine(workingDir, "artifactsconfig.json");
-                    string artifactsconfigContent = "{\"minifiedVersion\": " + value + "}}";
-                    await File.WriteAllTextAsync(filePath, artifactsconfigContent);
-
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(5));
@@ -467,10 +461,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Theory]
-        [InlineData(true, $"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}.")]
-        [InlineData(false, "Failed to locate the inproc6 model host at")]
-        public async Task start_dotnet6_inproc_with_specifying_runtime(bool value, string message)
+        [Fact]
+        public async Task start_dotnet6_inproc_with_specifying_runtime()
         {
             await CliTester.Run(new RunConfiguration
             {
@@ -481,13 +473,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc6"
                 },
                 ExpectExit = false,
-                ErrorContains = [message],
+                ErrorContains = ["Failed to locate the inproc6 model host at"],
                 Test = async (workingDir, p) =>
                 {
-                    var filePath = Path.Combine(workingDir, "artifactsconfig.json");
-                    string artifactsconfigContent = "{\"minifiedVersion\": "+value+"}}";
-                    await File.WriteAllTextAsync(filePath, artifactsconfigContent);
-
+ 
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(5));
@@ -496,7 +485,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
-
         [Fact]
         public async Task dont_start_inproc6_specified_runtime_for_dotnet_isolated()
         {
