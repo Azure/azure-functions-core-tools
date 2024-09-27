@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             var result = await response.Content.ReadAsStringAsync();
                             p.Kill();
                             await Task.Delay(TimeSpan.FromSeconds(2));
-                            result.Should().Be("Hello, Test. This HTTP triggered function executed Successfuly.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+                            result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                         }
                     },
                 }
@@ -297,6 +297,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    Test = async (_, p) =>
                    {
+                       //TODO: Replace with call to wait on host start
+                       await Task.Delay(5000);
                        p.Kill();
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300)
@@ -471,6 +473,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    Test = async (_, p) =>
                    {
+                       //TODO: Replace with call to wait on host start
+                       await Task.Delay(5000);
                        p.Kill();
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300)
@@ -517,6 +521,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (_, p) =>
                     {
+                        //TODO: Replace with call to wait on host start
+                        await Task.Delay(5000);
                         p.Kill();
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
@@ -560,6 +566,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    Test = async (_, p) =>
                    {
+                       //TODO: Replace with call to wait on host start
+                       await Task.Delay(5000);
                        p.Kill();
                    }
                }
@@ -600,6 +608,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    Test = async (_, p) =>
                    {
+                       //TODO: Replace with call to wait on host start
+                       await Task.Delay(5000);
                        p.Kill();
                    }
                },
@@ -644,6 +654,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    Test = async (_, p) =>
                    {
+                       //TODO: Replace with call to wait on host start
+                       await Task.Delay(5000);
                        p.Kill();
                    }
                },
