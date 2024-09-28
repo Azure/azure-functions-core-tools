@@ -115,7 +115,7 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: isMinVersion);
+                ExecuteDotnetPublish(outputPath, rid, "net8.0");
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
@@ -128,11 +128,10 @@ namespace Build
             }
         }
 
-        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework)
         {
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                $"/p:SkipInProcessHost=\"{skipLaunchingNet8ChildProcess}\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +

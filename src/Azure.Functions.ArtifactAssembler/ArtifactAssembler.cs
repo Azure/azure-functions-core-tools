@@ -103,8 +103,14 @@ namespace Azure.Functions.ArtifactAssembler
 
             var inProc6Task = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, InProc6DirectoryName));
             var inProc8Task = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, InProc8DirectoryName));
+
+            Directory.Delete(inProcArtifactDownloadDir, true);
+
             var coreToolsHostTask = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostArtifactDirPath, Path.Combine(_stagingDirectory, CoreToolsHostDirectoryName));
+            Directory.Delete(coreToolsHostArtifactDownloadDir, true);
+
             var outOfProcTask = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
+            Directory.Delete(outOfProcArtifactDownloadDir, true);
 
             /*
             await Task.WhenAll(inProc6Task, inProc8Task, coreToolsHostTask, outOfProcTask)
@@ -116,11 +122,6 @@ namespace Azure.Functions.ArtifactAssembler
                     _outOfProcExtractedRootDir = outOfProcTask.Result;
                 });
             */
-
-            // Delete the downloaded directories
-            Directory.Delete(inProcArtifactDownloadDir, true);
-            Directory.Delete(coreToolsHostArtifactDownloadDir, true);
-            Directory.Delete(outOfProcArtifactDownloadDir, true);
         }
 
         private static void EnsureArtifactDirectoryExist(string directoryExist)
