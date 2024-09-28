@@ -16,6 +16,7 @@ namespace Azure.Functions.Cli
         public void Configure(IConfigurationBuilder builder)
         {
             var artifactsConfigFilePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
+            Console.WriteLine($"In ArtifactsConfigurationBuilder : {artifactsConfigFilePath}");
             builder.AddJsonFile(artifactsConfigFilePath, optional: true);        
         }
     }
