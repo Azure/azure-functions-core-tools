@@ -498,11 +498,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     {
                         ThrowIfInProc();
                     }
-                    else
-                    {
-                        var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
-                        StartHostAsChildProcess(isNet8InProcSpecified);
-                    }
+
+                    var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
+                    StartHostAsChildProcess(isNet8InProcSpecified);
 
                     return true;
                 }
@@ -526,10 +524,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ThrowIfInProc();
                 }
-                else
-                {
-                    StartHostAsChildProcess(shouldNet8InProcBeLaunched);
-                }
+                
+                StartHostAsChildProcess(shouldNet8InProcBeLaunched);
+
                 return true;
 
             }

@@ -454,10 +454,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(5));
+                        await Task.Delay(TimeSpan.FromSeconds(2));
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(100),
             }, _output);
         }
 
@@ -479,10 +479,10 @@ namespace Azure.Functions.Cli.Tests.E2E
  
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(5));
+                        await Task.Delay(TimeSpan.FromSeconds(2));
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300),
+                CommandTimeout = TimeSpan.FromSeconds(100),
             }, _output);
         }
         [Fact]
