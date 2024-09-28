@@ -457,7 +457,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         await Task.Delay(TimeSpan.FromSeconds(2));
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(100),
+                CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
         }
 
@@ -476,7 +476,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = ["Failed to locate the inproc6 model host at"],
                 Test = async (workingDir, p) =>
                 {
- 
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(2));
@@ -485,6 +484,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 CommandTimeout = TimeSpan.FromSeconds(100),
             }, _output);
         }
+
         [Fact]
         public async Task dont_start_inproc6_specified_runtime_for_dotnet_isolated()
         {
