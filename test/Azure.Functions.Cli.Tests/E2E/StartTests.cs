@@ -439,8 +439,12 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task start_dotnet6_inproc_without_specifying_runtime()
+        public async Task start_minified_dotnet6_inproc_without_specifying_runtime()
         {
+            var filePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
+            string artifactsJsonContent = "{\"minifiedVersion\": true}";
+            File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
+
             await CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
@@ -453,10 +457,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                 ErrorContains = ["This version of the Azure Functions Core Tools requires your project to reference version"],
                 Test = async (workingDir, p) =>
                 {
-                    var filePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
-                    string artifactsJsonContent = "{\"minifiedVersion\": true}";
-                    await File.WriteAllTextAsync(filePath, artifactsJsonContent);
-
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                     {
                         await Task.Delay(TimeSpan.FromSeconds(10));
@@ -464,6 +464,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
             }, _output);
+
+            File.Delete(filePath);
         }
 
         [Fact]
