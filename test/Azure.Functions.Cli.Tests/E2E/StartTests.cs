@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,13 +11,11 @@ using Xunit.Abstractions;
 using System.Net.Sockets;
 using System.Net;
 using System.Diagnostics;
-using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
-using Microsoft.Azure.WebJobs.Script.Description.DotNet.CSharp.Analyzers;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
-    public class StartTests : BaseE2ETest
+    public class StartTests : BaseE2ETest, IAsyncLifetime
     {
         private const string _serverNotReady = "Host was not ready after 10 seconds";
         public StartTests(ITestOutputHelper output) : base(output) { }
@@ -45,7 +42,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     CommandTimeout = TimeSpan.FromMinutes(300),
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                         {
@@ -91,7 +88,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             "Initializing function HTTP routes",
                             "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
                     },
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                         {
@@ -137,7 +134,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             "Initializing function HTTP routes",
                             "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
                     },
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                         {
@@ -173,7 +170,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "start --build --port 7073"
                     },
                     ExpectExit = false,
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                         {
@@ -210,7 +207,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "start --port 7073 --verbose"
                     },
                     ExpectExit = false,
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                         {
@@ -255,7 +252,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "start --build --port 7073"
                     },
                     ExpectExit = false,
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
                         {
@@ -286,6 +283,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                },
                new RunConfiguration
                {
+                   WaitForRunningHostState = true,
                    Commands = new[]
                    {
                        "start --verbose --language-worker -- \"--inspect=5050\""
@@ -295,10 +293,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                    {
                        "Debugger listening on ws://127.0.0.1:5050"
                    },
-                   Test = async (_, p) =>
+                   Test = async (_, p, stdout) =>
                    {
-                       //TODO: Replace with call to wait on host start
-                       await Task.Delay(5000);
+                       await LogWatcher.WaitForLogOutput(stdout, "Debugger listening on", TimeSpan.FromSeconds(5));
                        p.Kill();
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300)
@@ -356,7 +353,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                        "new --template \"Http trigger\" --name HttpTrigger",
                        "settings add emptySetting EMPTY_VALUE",
                    },
-                   Test = async (workingDir, p) =>
+                   Test = async (workingDir, p, _) =>
                    {
                        var settingsFile = Path.Combine(workingDir, "local.settings.json");
                        var content = File.ReadAllText(settingsFile);
@@ -372,26 +369,15 @@ namespace Azure.Functions.Cli.Tests.E2E
                        "start --port 6543"
                    },
                    ExpectExit = false,
-                   Test = async (w, p) =>
+                   Test = async (w, p, _) =>
                    {
                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:6543/") })
                        {
-                           client.Timeout = TimeSpan.FromSeconds(2);
-                           for (var i = 0; i < 10; i++)
-                           {
-                               try
-                               {
-                                   var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                                   response.EnsureSuccessStatusCode();
-                                   break;
-                               }
-                               catch
-                               {
-                                   await Task.Delay(TimeSpan.FromSeconds(2));
-                               }
-                           }
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            response.EnsureSuccessStatusCode();
+                            p.Kill();
                        }
-                       p.Kill();
                    },
                    OutputDoesntContain = new string[]
                    {
@@ -425,7 +411,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                        "start --functions http2 http1"
                    },
                    ExpectExit = false,
-                   Test = async (workingDir, p) =>
+                   Test = async (workingDir, p, _) =>
                    {
                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                        {
@@ -462,6 +448,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                },
                new RunConfiguration
                {
+                   WaitForRunningHostState = true,
                    Commands = new[]
                    {
                        "start"
@@ -471,10 +458,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                    {
                        "Workers Directory set to"
                    },
-                   Test = async (_, p) =>
+                   Test = async (_, p, stdout) =>
                    {
-                       //TODO: Replace with call to wait on host start
-                       await Task.Delay(5000);
+                       await LogWatcher.WaitForLogOutput(stdout, "Workers Directory set to", TimeSpan.FromSeconds(5));
                        p.Kill();
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300)
@@ -496,7 +482,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "init . --worker-runtime node",
                         $"new --template Httptrigger --name {functionName}",
                     },
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         var filePath = Path.Combine(workingDir, "host.json");
                         string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\"}}}";
@@ -506,6 +492,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 new RunConfiguration
                 {
+                    WaitForRunningHostState = true,
                     Commands = new[]
                     {
                         "start"
@@ -519,10 +506,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "Initializing function HTTP routes"
                     },
-                    Test = async (_, p) =>
+                    Test = async (_, p, stdout) =>
                     {
-                        //TODO: Replace with call to wait on host start
-                        await Task.Delay(5000);
+                        await LogWatcher.WaitForLogOutput(stdout, "Initializing function HTTP routes", TimeSpan.FromSeconds(5));
                         p.Kill();
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
@@ -544,7 +530,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                        "init . --worker-runtime node -m v3",
                        $"new --template \"Http Trigger\" --name {functionName}",
                    },
-                   Test = async (workingDir, _) =>
+                   Test = async (workingDir, _, _) =>
                    {
                        var filePath = Path.Combine(workingDir, functionName, "function.json");
                        var functionJson = await File.ReadAllTextAsync(filePath);
@@ -555,6 +541,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                },
                new RunConfiguration
                {
+                   WaitForRunningHostState = true,
                    Commands = new[]
                    {
                        "start"
@@ -564,10 +551,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                    {
                        "The binding type(s) 'http2' were not found in the configured extension bundle. Please ensure the type is correct and the correct version of extension bundle is configured."
                    },
-                   Test = async (_, p) =>
+                   Test = async (_, p, stdout) =>
                    {
-                       //TODO: Replace with call to wait on host start
-                       await Task.Delay(5000);
+                       await LogWatcher.WaitForLogOutput(stdout, "The binding type(s) 'http2' were not found", TimeSpan.FromSeconds(5));
                        p.Kill();
                    }
                }
@@ -588,7 +574,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                        "init . --worker-runtime dotnet",
                        $"new --template Httptrigger --name {functionName}",
                    },
-                   Test = async (workingDir, p) =>
+                   Test = async (workingDir, p, _) =>
                    {
                        var filePath = Path.Combine(workingDir, "host.json");
                        string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
@@ -597,6 +583,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                },
                new RunConfiguration
                {
+                   WaitForRunningHostState = true,
                    Commands = new[]
                    {
                        "start"
@@ -606,10 +593,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                    {
                        "Host configuration applied."
                    },
-                   Test = async (_, p) =>
+                   Test = async (_, p, stdout) =>
                    {
-                       //TODO: Replace with call to wait on host start
-                       await Task.Delay(5000);
+                       await LogWatcher.WaitForLogOutput(stdout, "Host configuration applied", TimeSpan.FromSeconds(5));
                        p.Kill();
                    }
                },
@@ -630,7 +616,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                        "init . --worker-runtime dotnet",
                        $"new --template Httptrigger --name {functionName}",
                    },
-                   Test = async (workingDir, p) =>
+                   Test = async (workingDir, p, _) =>
                    {
                        var filePath = Path.Combine(workingDir, "host.json");
                        string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\", \"Host.Startup\": \"Information\"}}}";
@@ -639,6 +625,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                },
                new RunConfiguration
                {
+                   WaitForRunningHostState = true,
                    Commands = new[]
                    {
                        "start"
@@ -652,10 +639,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                    {
                        "Reading host configuration file"
                    },
-                   Test = async (_, p) =>
+                   Test = async (_, p, stdout) =>
                    {
-                       //TODO: Replace with call to wait on host start
-                       await Task.Delay(5000);
+                       await LogWatcher.WaitForLogOutput(stdout, "Reading host configuration file", TimeSpan.FromSeconds(5));
                        p.Kill();
                    }
                },
@@ -677,7 +663,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                        $"new --template Httptrigger --name {functionName}",
 
                    },
-                   Test = async (workingDir, p) =>
+                   Test = async (workingDir, p, _) =>
                    {
                        var filePath = Path.Combine(workingDir, "host.json");
                        string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
@@ -711,7 +697,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                        "init . --worker-runtime dotnet",
                        $"new --template Httptrigger --name {functionName}",
                    },
-                   Test = async (workingDir, p) =>
+                   Test = async (workingDir, p, _) =>
                    {
                        var hostJsonPath = Path.Combine(workingDir, "host.json");
                        File.Delete(hostJsonPath);
@@ -794,7 +780,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "Using for user secrets file configuration."
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                         {
@@ -940,7 +926,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "Warning: Cannot find value named 'ConnectionStrings:MyQueueConn' in local.settings.json or User Secrets that matches 'connection' property set on 'queueTrigger' in",
                         "You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets."
                     },
-                    Test = async (workingDir, p) =>
+                    Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
                         {
@@ -1003,6 +989,17 @@ namespace Azure.Functions.Cli.Tests.E2E
                 proc.WaitForExit();
                 _output.WriteLine(procOutput);
             }
+        }
+
+        public async Task InitializeAsync()
+        {
+            await Task.CompletedTask;
+        }
+
+        public async Task DisposeAsync()
+        {
+            ProcessHelper.TryKillProcessForPort("7071");
+            await Task.CompletedTask;
         }
     }
 }
