@@ -443,7 +443,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         {
             var filePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
             Console.WriteLine($"In Tests : {filePath}");
-            Assert.Equal(filePath, "abc");
+            Assert.Equal("abc", filePath);
             string artifactsJsonContent = "{\"minifiedVersion\": true}";
             File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
 
