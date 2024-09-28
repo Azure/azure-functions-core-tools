@@ -12,24 +12,32 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
     {
         private const string CommandExe = "cmd";
         private static readonly Regex pidRegex = new Regex(@"LISTENING\s+(\d+)\s*$");
-        private static string FunctionsHostUrl = "http://localhost:";
+        private static string FunctionsHostUrl = "http://localhost";
 
         public static async Task WaitForFunctionHostToStart(Process funcProcess, string port)
         {
-            var url = FunctionsHostUrl += port;
+            var url = $"{FunctionsHostUrl}:{port}";
             using var httpClient = new HttpClient();
+
             await RetryHelper.RetryAsync(async () =>
             {
-                var response = await httpClient.GetAsync($"{url}/admin/host/status");
-                var content = await response.Content.ReadAsStringAsync();
-                var doc = JsonDocument.Parse(content);
-
-                if (doc.RootElement.TryGetProperty("state", out JsonElement value) && value.GetString() == "Running")
+                try
                 {
-                    return true;
-                }
+                    var response = await httpClient.GetAsync($"{url}/admin/host/status");
+                    var content = await response.Content.ReadAsStringAsync();
+                    var doc = JsonDocument.Parse(content);
 
-                return false;
+                    if (doc.RootElement.TryGetProperty("state", out JsonElement value) && value.GetString() == "Running")
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+                catch
+                {
+                    return false;
+                }
             });
         }
 
