@@ -101,11 +101,12 @@ namespace Azure.Functions.ArtifactAssembler
             EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
             EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
 
-            var inProc6Task = MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, InProc6DirectoryName));
-            var inProc8Task = MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, InProc8DirectoryName));
-            var coreToolsHostTask = MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostArtifactDirPath, Path.Combine(_stagingDirectory, CoreToolsHostDirectoryName));
-            var outOfProcTask = MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
+            var inProc6Task = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, InProc6DirectoryName));
+            var inProc8Task = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, InProc8DirectoryName));
+            var coreToolsHostTask = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostArtifactDirPath, Path.Combine(_stagingDirectory, CoreToolsHostDirectoryName));
+            var outOfProcTask = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
 
+            /*
             await Task.WhenAll(inProc6Task, inProc8Task, coreToolsHostTask, outOfProcTask)
                 .ContinueWith(t =>
                 {
@@ -114,6 +115,7 @@ namespace Azure.Functions.ArtifactAssembler
                     _coreToolsHostExtractedRootDir = coreToolsHostTask.Result;
                     _outOfProcExtractedRootDir = outOfProcTask.Result;
                 });
+            */
 
             // Delete the downloaded directories
             Directory.Delete(inProcArtifactDownloadDir, true);
