@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData(false)]
         public void Test_IsMinifiedVersion(bool expected)
         {
-            var filePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
+            var filePath = Path.Combine(Constants.ArtifactsConfigFileName);
             string artifactsJsonContent = "{\"minifiedVersion\": "+expected.ToString().ToLower()+"}";
             File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
 

@@ -441,7 +441,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task start_minified_dotnet6_inproc_without_specifying_runtime()
         {
-            var filePath = Path.Combine(Environment.CurrentDirectory, Constants.ArtifactsConfigFileName);
+            var filePath = Path.Combine(Constants.ArtifactsConfigFileName);
             Console.WriteLine($"In Tests : {filePath}");
             Assert.Equal("abc", filePath);
             string artifactsJsonContent = "{\"minifiedVersion\": true}";
