@@ -11,14 +11,8 @@ namespace Azure.Functions.ArtifactAssembler
             {
                 var currentWorkingDirectory = Environment.CurrentDirectory;
                 var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory);
-                if (args.Contains("--visual-studio"))
-                {
-                    await artifactAssembler.AssembleArtifactsVisualStudioAsync();
-                }
-                else
-                {
-                    await artifactAssembler.AssembleArtifactsCliAsync();
-                }
+
+                await artifactAssembler.AssembleArtifactsAsync();
 
                 return 0;
             }

@@ -74,13 +74,14 @@ namespace Azure.Functions.ArtifactAssembler
             _stagingDirectory = CreateStagingDirectory(_rootWorkingDirectory);
         }
 
-        internal async Task AssembleArtifactsVisualStudioAsync()
+        internal async Task AssembleArtifactsAsync()
         {
             await ExtractDownloadedArtifactsAsync();
             await CreateVisualStudioCoreToolsAsync();
-            // await CreateCliCoreToolsAsync();
+            await CreateCliCoreToolsAsync();
         }
 
+        /*
         internal async Task AssembleArtifactsCliAsync()
         {
             var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
@@ -91,6 +92,7 @@ namespace Azure.Functions.ArtifactAssembler
             //await CreateVisualStudioCoreToolsAsync();
             await CreateCliCoreToolsAsync();
         }
+        */
 
         private static string GetRequiredEnvironmentVariable(string variableName)
         {
@@ -102,16 +104,17 @@ namespace Azure.Functions.ArtifactAssembler
         {
             var inProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _inProcArtifactDirectoryName);
             var coreToolsHostArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _coreToolsHostArtifactDirectoryName);
-            //var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
+            var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
 
             var inProc6ArtifactDirPath = Path.Combine(inProcArtifactDownloadDir, _inProc6ArtifactName);
             var inProc8ArtifactDirPath = Path.Combine(inProcArtifactDownloadDir, _inProc8ArtifactName);
             var coreToolsHostArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostArtifactName);
+            var outOfProcArtifactDirPath = Path.Combine(outOfProcArtifactDownloadDir, _outOfProcArtifactName);
 
             EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
             EnsureArtifactDirectoryExist(inProc8ArtifactDirPath);
             EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
-           // EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
+            EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
 
             _inProc6ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, InProc6DirectoryName));
             _inProc8ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, InProc8DirectoryName));
@@ -120,6 +123,9 @@ namespace Azure.Functions.ArtifactAssembler
 
             _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostArtifactDirPath, Path.Combine(_stagingDirectory, CoreToolsHostDirectoryName));
             Directory.Delete(coreToolsHostArtifactDownloadDir, true);
+
+            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
+            Directory.Delete(outOfProcArtifactDownloadDir, true);
         }
 
         private static void EnsureArtifactDirectoryExist(string directoryExist)
@@ -137,7 +143,7 @@ namespace Azure.Functions.ArtifactAssembler
             if (Directory.Exists(stagingDirectory))
             {
                 Console.WriteLine($"Directory already exists");
-                return stagingDirectory;
+                Directory.Delete(stagingDirectory, true );
             }
 
             Directory.CreateDirectory(stagingDirectory);
@@ -371,8 +377,6 @@ namespace Azure.Functions.ArtifactAssembler
 
             var zipFiles = Directory.GetFiles(zipSourceDir, "*.zip");
             Console.WriteLine($"{zipFiles.Length} zip files found in {zipSourceDir}");
-
-            // await Task.WhenAll(tasks);
 
             // Delete the zip files
             foreach (var zipFile in zipFiles)
