@@ -81,19 +81,6 @@ namespace Azure.Functions.ArtifactAssembler
             await CreateCliCoreToolsAsync();
         }
 
-        /*
-        internal async Task AssembleArtifactsCliAsync()
-        {
-            var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
-            var outOfProcArtifactDirPath = Path.Combine(outOfProcArtifactDownloadDir, _outOfProcArtifactName);
-            EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
-            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
-            Directory.Delete(outOfProcArtifactDownloadDir, true);
-            //await CreateVisualStudioCoreToolsAsync();
-            await CreateCliCoreToolsAsync();
-        }
-        */
-
         private static string GetRequiredEnvironmentVariable(string variableName)
         {
             return Environment.GetEnvironmentVariable(variableName)
@@ -237,7 +224,6 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (var artifactName in _cliArtifacts)
             {
-
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(outOfProcArtifactDirPath))
                 {
@@ -256,11 +242,10 @@ namespace Azure.Functions.ArtifactAssembler
                 var consolidatedArtifactDirPath = Path.Combine(cliCoreToolsTargetArtifactDir, outOfProcArtifactName);
                 Directory.CreateDirectory(consolidatedArtifactDirPath);
 
-                // Copy oop core tools
-                var coreToolsHostArtifactDirPath = Path.Combine(_outOfProcExtractedRootDir, outOfProcArtifactName);
-                EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
-                await Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
-                Directory.Delete(coreToolsHostArtifactDirPath, true);
+                // Copy oop core tools and delete old directory
+                EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
+                await Task.Run(() => FileUtilities.CopyDirectory(outOfProcArtifactDirPath, consolidatedArtifactDirPath));
+                Directory.Delete(outOfProcArtifactDirPath, true);
 
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(inProc8ArtifactDirPath))
@@ -279,7 +264,7 @@ namespace Azure.Functions.ArtifactAssembler
                 // Rename inproc8 directory to have the same version as the out-of-proc artifact before copying
                 string newInProc8ArtifactDirPath = RenameInProcDirectory(inProc8ArtifactDirPath, outOfProcVersion);
 
-                // Copy in-proc8 files
+                // Copy in-proc8 files and delete old directory
                 await Task.Run(() => FileUtilities.CopyDirectory(newInProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc8DirectoryName)));
                 Directory.Delete(newInProc8ArtifactDirPath, true);
 
@@ -289,13 +274,12 @@ namespace Azure.Functions.ArtifactAssembler
                 EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
                 string newInProc6ArtifactDirPath = RenameInProcDirectory(inProc6ArtifactDirPath, outOfProcVersion);
 
-                // Copy in-proc6 files
+                // Copy in-proc6 files and delete old directory
                 await Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc6DirectoryName)));
                 Directory.Delete(newInProc6ArtifactDirPath, true);
 
-                // await Task.WhenAll(inProc8CopyTask, inProc6CopyTask, outOfProcCopyTask);
-
-                // consolidatedArtifactDirPath now contains custom core-tools host, in-proc6 and in-proc8 sub directories. Create a zip file.
+                /*
+                // consolidatedArtifactDirPath now contains out-of-proc core tools, in-proc6 and in-proc8 sub directories. Create a zip file.
                 var zipPath = Path.Combine(cliCoreToolsTargetArtifactDir, $"{outOfProcArtifactName}.zip");
                 try
                 {
@@ -308,6 +292,7 @@ namespace Azure.Functions.ArtifactAssembler
                 Console.WriteLine($"Successfully created target runtime zip at: {zipPath}");
 
                 Directory.Delete(consolidatedArtifactDirPath, true);
+                */
             }
 
             // Delete the extracted directories
@@ -380,7 +365,7 @@ namespace Azure.Functions.ArtifactAssembler
             var zipFiles = Directory.GetFiles(zipSourceDir, "*.zip");
             Console.WriteLine($"{zipFiles.Length} zip files found in {zipSourceDir}");
 
-            // Delete the zip files
+            // Extract each zip file and delete
             foreach (var zipFile in zipFiles)
             {
                 var destinationDir = Path.Combine(extractDestinationDir, Path.GetFileNameWithoutExtension(zipFile));
