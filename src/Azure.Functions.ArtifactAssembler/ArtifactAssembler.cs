@@ -372,18 +372,14 @@ namespace Azure.Functions.ArtifactAssembler
             var zipFiles = Directory.GetFiles(zipSourceDir, "*.zip");
             Console.WriteLine($"{zipFiles.Length} zip files found in {zipSourceDir}");
 
-            var tasks = zipFiles.Select(async zipFile =>
-            {
-                var destinationDir = Path.Combine(extractDestinationDir, Path.GetFileNameWithoutExtension(zipFile));
-                Console.WriteLine($"Extracting {zipFile} to {destinationDir}");
-                await Task.Run(() => FileUtilities.ExtractToDirectory(zipFile, destinationDir));
-            });
-
-            await Task.WhenAll(tasks);
+            // await Task.WhenAll(tasks);
 
             // Delete the zip files
             foreach (var zipFile in zipFiles)
             {
+                var destinationDir = Path.Combine(extractDestinationDir, Path.GetFileNameWithoutExtension(zipFile));
+                Console.WriteLine($"Extracting {zipFile} to {destinationDir}");
+                await Task.Run(() => FileUtilities.ExtractToDirectory(zipFile, destinationDir));
                 File.Delete(zipFile);
             }
         }
