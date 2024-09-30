@@ -390,7 +390,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.FinalIntegrationTests)]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.RequiresNestedInProcArtifacts)]
         public async Task start_dotnet8_inproc_with_specifying_runtime_e2e()
         {
             await CliTester.Run(new RunConfiguration
@@ -426,7 +426,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.FinalIntegrationTests)]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.RequiresNestedInProcArtifacts)]
         public async Task start_dotnet8_inproc_without_specifying_runtime_e2e()
         {
             await CliTester.Run(new RunConfiguration
@@ -510,7 +510,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.FinalIntegrationTests)]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.RequiresNestedInProcArtifacts)]
         public async Task start_dotnet6_inproc_without_specifying_runtime_e2e()
         {
             await CliTester.Run(new RunConfiguration
@@ -567,7 +567,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.FinalIntegrationTests)]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.RequiresNestedInProcArtifacts)]
         public async Task start_dotnet6_inproc_with_specifying_runtime_e2e()
         {
             await CliTester.Run(new RunConfiguration

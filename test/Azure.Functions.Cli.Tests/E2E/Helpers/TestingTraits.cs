@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
     {
         internal class TestCategory
         {
-            public const string FinalIntegrationTests = "FinalIntegrationTests";
+            public const string RequiresNestedInProcArtifacts = "RequiresNestedInProcArtifacts";
         }
 
         internal class TraitName
