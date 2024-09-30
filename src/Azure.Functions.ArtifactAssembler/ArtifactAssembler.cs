@@ -86,7 +86,7 @@ namespace Azure.Functions.ArtifactAssembler
             var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
             var outOfProcArtifactDirPath = Path.Combine(outOfProcArtifactDownloadDir, _outOfProcArtifactName);
             EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
-            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDownloadDir, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
+            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
             Directory.Delete(outOfProcArtifactDownloadDir, true);
             //await CreateVisualStudioCoreToolsAsync();
             await CreateCliCoreToolsAsync();
@@ -136,7 +136,8 @@ namespace Azure.Functions.ArtifactAssembler
 
             if (Directory.Exists(stagingDirectory))
             {
-                Directory.Delete(stagingDirectory, true);
+                Console.WriteLine($"Directory already exists");
+                return stagingDirectory;
             }
 
             Directory.CreateDirectory(stagingDirectory);
