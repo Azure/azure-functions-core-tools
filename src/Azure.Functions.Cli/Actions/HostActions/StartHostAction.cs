@@ -496,7 +496,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     if (Utilities.IsMinifiedVersion())
                     {
-                        ThrowIfInProc();
+                        ThrowForInProc();
                     }
 
                     var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
@@ -522,7 +522,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (Utilities.IsMinifiedVersion())
                 {
-                    ThrowIfInProc();
+                    ThrowForInProc();
                 }
                 
                 StartHostAsChildProcess(shouldNet8InProcBeLaunched);
@@ -583,7 +583,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             throw new CliException($"Invalid host runtime '{HostRuntime}'. Valid values are 'default', '{DotnetConstants.InProc8HostRuntime}', '{DotnetConstants.InProc6HostRuntime}'.");
         }
 
-        private void ThrowIfInProc()
+        private void ThrowForInProc()
         {
             throw new CliException($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}. Please update to the latest version. For more information, see: {DotnetConstants.InProcFunctionsDocsLink}");
         }
