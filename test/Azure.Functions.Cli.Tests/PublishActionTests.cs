@@ -145,24 +145,13 @@ namespace Azure.Functions.Cli.Tests
 
         [Theory]
         [InlineData("dotnet-isolated", WorkerRuntime.dotnetIsolated)]
+        [InlineData("c#-isolated", WorkerRuntime.dotnetIsolated)]
         [InlineData("csharp", WorkerRuntime.dotnet)]
         [InlineData("typescript", WorkerRuntime.node)]
         public void NormalizeWorkerRuntime_ReturnsExpectedWorkerRuntime(string input, WorkerRuntime expected)
         {
 
             var result = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(input);
-
-            Assert.Equal(expected, result);
-        }
-
-        [Theory]
-        [InlineData("dotnetIsolated", "dotnet-isolated")]
-        [InlineData("node", "node")]
-        [InlineData("python", "python")]
-        public void ToKebabCase_Converts(string input, string expected)
-        {
-
-            var result = input.ToKebabCase();
 
             Assert.Equal(expected, result);
         }

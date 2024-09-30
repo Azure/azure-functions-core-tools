@@ -299,7 +299,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         }
                         else if (workerRuntime == WorkerRuntime.None)
                         {
-                            throw new ArgumentException($"Your local project is set to '{workerRuntime}' is not a valid option.");
+                            throw new ArgumentException($"Your local project is set to '{workerRuntime}' is not a valid option. Options are {WorkerRuntimeLanguageHelper.GetAvailableOptions()}");
                         }
                         else
                         {
