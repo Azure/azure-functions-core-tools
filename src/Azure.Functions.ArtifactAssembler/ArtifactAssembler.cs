@@ -74,14 +74,20 @@ namespace Azure.Functions.ArtifactAssembler
             _stagingDirectory = CreateStagingDirectory(_rootWorkingDirectory);
         }
 
-        internal async Task AssembleArtifactsAsync()
+        internal async Task AssembleArtifactsVisualStudioAsync()
         {
             await ExtractDownloadedArtifactsAsync();
             await CreateVisualStudioCoreToolsAsync();
+            // await CreateCliCoreToolsAsync();
+        }
+
+        internal async Task AssembleArtifactsCliAsync()
+        {
             var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
             var outOfProcArtifactDirPath = Path.Combine(outOfProcArtifactDownloadDir, _outOfProcArtifactName);
-            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
+            EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
             Directory.Delete(outOfProcArtifactDownloadDir, true);
+            //await CreateVisualStudioCoreToolsAsync();
             await CreateCliCoreToolsAsync();
         }
 
@@ -95,7 +101,7 @@ namespace Azure.Functions.ArtifactAssembler
         {
             var inProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _inProcArtifactDirectoryName);
             var coreToolsHostArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _coreToolsHostArtifactDirectoryName);
-            var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
+            //var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
 
             var inProc6ArtifactDirPath = Path.Combine(inProcArtifactDownloadDir, _inProc6ArtifactName);
             var inProc8ArtifactDirPath = Path.Combine(inProcArtifactDownloadDir, _inProc8ArtifactName);
@@ -104,6 +110,7 @@ namespace Azure.Functions.ArtifactAssembler
             EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
             EnsureArtifactDirectoryExist(inProc8ArtifactDirPath);
             EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
+           // EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
 
             _inProc6ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, InProc6DirectoryName));
             _inProc8ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, InProc8DirectoryName));
