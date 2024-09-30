@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
@@ -34,8 +35,9 @@ namespace Azure.Functions.Cli.Helpers
         };
 
         private static readonly IDictionary<string, WorkerRuntime> normalizeMap = availableWorkersRuntime
-            .Select(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = p.Key.ToString(), value = p.Key }))
-            .SelectMany(i => i)
+            .Where(p => p.Key != WorkerRuntime.None)
+            .SelectMany(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = !p.Value.Contains(p.Key.ToString().ToKebabCase()) ? p.Key.ToString().ToKebabCase() : null, value = p.Key }))
+            .Where(x => x.key != null)
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
 
         private static readonly IDictionary<WorkerRuntime, string> workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
@@ -207,6 +209,11 @@ namespace Azure.Functions.Cli.Helpers
         public static bool IsDotnetIsolated(WorkerRuntime worker)
         {
             return worker ==  WorkerRuntime.dotnetIsolated;
+        }
+
+        public static string ToKebabCase(this string input)
+        {
+            return Regex.Replace(input, "([a-z])([A-Z])", "$1-$2").ToLower();
         }
     }
 }

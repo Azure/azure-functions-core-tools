@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
@@ -140,6 +141,30 @@ namespace Azure.Functions.Cli.Tests
                 PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, specifiedVersion, false, _helperService));
 
             Assert.StartsWith($"The dotnet-version value of '{specifiedVersion}' is invalid.", exception.Message);
+        }
+
+        [Theory]
+        [InlineData("dotnet-isolated", WorkerRuntime.dotnetIsolated)]
+        [InlineData("csharp", WorkerRuntime.dotnet)]
+        [InlineData("typescript", WorkerRuntime.node)]
+        public void NormalizeWorkerRuntime_ReturnsExpectedWorkerRuntime(string input, WorkerRuntime expected)
+        {
+
+            var result = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(input);
+
+            Assert.Equal(expected, result);
+        }
+
+        [Theory]
+        [InlineData("dotnetIsolated", "dotnet-isolated")]
+        [InlineData("node", "node")]
+        [InlineData("python", "python")]
+        public void ToKebabCase_Converts(string input, string expected)
+        {
+
+            var result = input.ToKebabCase();
+
+            Assert.Equal(expected, result);
         }
 
         private class TestAzureHelperService : AzureHelperService

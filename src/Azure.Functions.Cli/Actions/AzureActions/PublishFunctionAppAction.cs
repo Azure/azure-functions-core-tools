@@ -297,6 +297,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to 'dotnet-isolated'"));
                             result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                         }
+                        else if (workerRuntime == WorkerRuntime.None)
+                        {
+                            throw new ArgumentException($"Your local project is set to '{workerRuntime}' is not a valid option.");
+                        }
                         else
                         {
                             throw new CliException($"Your Azure Function App has '{Constants.FunctionsWorkerRuntime}' set to '{azureWorkerRuntime}' while your local project is set to '{workerRuntime}'.\n"
