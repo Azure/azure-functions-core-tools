@@ -235,8 +235,9 @@ namespace Azure.Functions.ArtifactAssembler
             string outOfProcArtifactDirPath = string.Empty;
             string inProc8ArtifactDirPath = string.Empty;
 
-            var packTasks = _cliArtifacts.Select(async artifactName =>
+            foreach (var artifactName in _cliArtifacts)
             {
+
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(outOfProcArtifactDirPath))
                 {
@@ -258,7 +259,8 @@ namespace Azure.Functions.ArtifactAssembler
                 // Copy oop core tools
                 var coreToolsHostArtifactDirPath = Path.Combine(_outOfProcExtractedRootDir, outOfProcArtifactName);
                 EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
-                var outOfProcCopyTask = Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
+                await Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
+                Directory.Delete(coreToolsHostArtifactDirPath, true);
 
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(inProc8ArtifactDirPath))
@@ -278,7 +280,8 @@ namespace Azure.Functions.ArtifactAssembler
                 string newInProc8ArtifactDirPath = RenameInProcDirectory(inProc8ArtifactDirPath, outOfProcVersion);
 
                 // Copy in-proc8 files
-                var inProc8CopyTask = Task.Run(() => FileUtilities.CopyDirectory(newInProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc8DirectoryName)));
+                await Task.Run(() => FileUtilities.CopyDirectory(newInProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc8DirectoryName)));
+                Directory.Delete(newInProc8ArtifactDirPath, true);
 
                 // Rename inproc6 directory to have the same version as the out-of-proc artifact before copying
                 var inProcArtifactName = Path.GetFileName(inProc8ArtifactDirPath);
@@ -287,9 +290,10 @@ namespace Azure.Functions.ArtifactAssembler
                 string newInProc6ArtifactDirPath = RenameInProcDirectory(inProc6ArtifactDirPath, outOfProcVersion);
 
                 // Copy in-proc6 files
-                var inProc6CopyTask = Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc6DirectoryName)));
+                await Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc6DirectoryName)));
+                Directory.Delete(newInProc6ArtifactDirPath, true);
 
-                await Task.WhenAll(inProc8CopyTask, inProc6CopyTask, outOfProcCopyTask);
+                // await Task.WhenAll(inProc8CopyTask, inProc6CopyTask, outOfProcCopyTask);
 
                 // consolidatedArtifactDirPath now contains custom core-tools host, in-proc6 and in-proc8 sub directories. Create a zip file.
                 var zipPath = Path.Combine(cliCoreToolsTargetArtifactDir, $"{outOfProcArtifactName}.zip");
@@ -304,9 +308,7 @@ namespace Azure.Functions.ArtifactAssembler
                 Console.WriteLine($"Successfully created target runtime zip at: {zipPath}");
 
                 Directory.Delete(consolidatedArtifactDirPath, true);
-            });
-
-            await Task.WhenAll(packTasks);
+            }
 
             // Delete the extracted directories
             Directory.Delete(_inProc6ExtractedRootDir, true);
