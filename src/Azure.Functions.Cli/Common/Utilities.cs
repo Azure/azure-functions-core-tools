@@ -266,7 +266,9 @@ namespace Azure.Functions.Cli
 
         internal static bool IsMinifiedVersion()
         {
-            var config = BuildArtifactsConfiguration();
+            IConfigurationBuilder builder = new ConfigurationBuilder();
+            builder.AddJsonFile(Constants.ArtifactsConfigFileName, optional: true);
+            var config = builder.Build();
 
             try
             {
@@ -281,15 +283,5 @@ namespace Azure.Functions.Cli
             catch { }
             return false;
         }
-
-        internal static IConfigurationRoot BuildArtifactsConfiguration()
-        {
-            var configureBuilder = new ArtifactsConfigurationBuilder();
-            var configurationBuilder = new ConfigurationBuilder();
-            configureBuilder.Configure(configurationBuilder);
-            var root = configurationBuilder.Build();
-            return root;
-        }
-
     }
 }
