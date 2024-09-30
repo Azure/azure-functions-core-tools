@@ -8,5 +8,8 @@
         public const string EnableDeploymentTests = "ENABLE_DEPLOYMENT_TEST";
         public const string CodeQLBuild = "CODEQL_BUILD";
         public const string IsPublicBuild = "IsPublicBuild";
+
+        // Test Collections
+        public const string DurableE2ECollectionName = "DurableE2ETestCollection";
     }
 }

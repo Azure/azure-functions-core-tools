@@ -37,9 +37,9 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null, string workingDir = null, bool startHost = false) => Run(new[] { runConfiguration }, output, workingDir, startHost);
+        public static Task Run(RunConfiguration runConfiguration, ITestOutputHelper output = null, string workingDir = null) => Run(new[] { runConfiguration }, output, workingDir);
 
-        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null, bool startHost = false)
+        public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null)
         {
             string workingDirectory = workingDir ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
@@ -54,7 +54,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
             try
             {
-                await InternalRun(workingDirectory, runConfigurations, output, startHost);
+                await InternalRun(workingDirectory, runConfigurations, output);
             }
             finally
             {
@@ -73,15 +73,13 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost)
+        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output)
         {
-            var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
 
             foreach (var runConfiguration in runConfigurations)
             {
-                Task hostTask = startHost ? hostExe.RunAsync(logStd, logErr) : Task.Delay(runConfiguration.CommandTimeout);
                 stdout.Clear();
                 stderr.Clear();
                 var exitCode = 0;
@@ -100,14 +98,6 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         // default to func
                         _ => new Executable(_func, command, workingDirectory: workingDir)
                     };
-
-                    if (startHost && i == runConfiguration.Commands.Length - 1)
-                    {
-                        // Give the host time to handle the first requests before executing the final command
-                        logStd($"[{DateTime.Now}] Pausing to let the Functions host handle previous requests.");
-                        await Task.Delay(TimeSpan.FromSeconds(20));
-                        logStd($"[{DateTime.Now}] Resuming commands.");
-                    }
 
                     logStd($"Running: > {exe.Command}");
 
@@ -155,15 +145,6 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 if (runConfiguration.ExpectExit && runConfiguration.Test != null)
                 {
                     await runConfiguration.Test.Invoke(workingDir, null, null);
-                }
-
-                if (startHost)
-                {
-                    if (hostExe.Process?.HasExited == false)
-                    {
-                        logStd($"[{DateTime.Now}] Terminating the Functions host.");
-                        hostExe.Process.Kill();
-                    }
                 }
 
                 //AssertExitError(runConfiguration, exitError);

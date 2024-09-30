@@ -12,6 +12,7 @@ namespace Azure.Functions.Cli.Tests.E2E
     /// <summary>
     /// Class of E2E tests for Durable Functions
     /// </summary>
+    [Collection(E2ETestConstants.DurableE2ECollectionName)]
     public class DurableTests : BaseE2ETest
     {
         private static readonly string StorageConnectionString = Environment.GetEnvironmentVariable("DURABLE_STORAGE_CONNECTION");
@@ -46,8 +47,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: false);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -64,26 +64,40 @@ namespace Azure.Functions.Cli.Tests.E2E
             DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
-            await CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration[]
             {
-                Commands = new[]
+                new RunConfiguration
                 {
-                    $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}",
-                    $"durable get-history --id {instanceId} --task-hub-name {taskHubName}"
+                    WaitForRunningHostState = true,
+                    Commands = new[]
+                    {
+                        $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Host lock lease acquired by instance ID"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
                 },
-                OutputContains = new string[]
+                new RunConfiguration
                 {
-                    "Started 'Counter'",
-                    "OrchestratorStarted",
-                    "ExecutionStarted",
-                    "OrchestratorCompleted"
-                },
-                CommandTimeout = TimeSpan.FromMinutes(2)
+                    Commands = new[]
+                    {
+                        $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}",
+                        $"durable get-history --id {instanceId} --task-hub-name {taskHubName}"
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Started 'Counter'",
+                        "OrchestratorStarted",
+                        "ExecutionStarted",
+                        "OrchestratorCompleted"
+                    },
+                    CommandTimeout = TimeSpan.FromMinutes(2)
+                }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: true);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -110,8 +124,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: false);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -139,8 +152,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: false);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -168,8 +180,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 CommandTimeout = TimeSpan.FromSeconds(45)
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: true);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -185,21 +196,35 @@ namespace Azure.Functions.Cli.Tests.E2E
             DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
+            await CliTester.Run(new RunConfiguration[]
+{
+                new RunConfiguration
                 {
-                    $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}"
+                    WaitForRunningHostState = true,
+                    Commands = new[]
+                    {
+                        $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Host lock lease acquired by instance ID"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
                 },
-                OutputContains = new string[]
+                new RunConfiguration
                 {
-                    $"Raised event 'operation' to instance '{instanceId}'"
-                }
-            }, 
+                    Commands = new[]
+                    {
+                        $"durable raise-event --id {instanceId} --event-name operation --event-data add --task-hub-name {taskHubName}"
+                    },
+                    OutputContains = new string[]
+                    {
+                        $"Raised event 'operation' to instance '{instanceId}'"
+                    }
+                },
+            },
             _output, 
-            workingDir: WorkingDirPath,
-            startHost: false);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -226,23 +251,37 @@ namespace Azure.Functions.Cli.Tests.E2E
             string instanceId = $"{Guid.NewGuid():N}";
             string eventName = "parse";
 
-            await CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration[]
             {
-                Commands = new[]
+                new RunConfiguration
                 {
-                    $"durable start-new --function-name JsonInput --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable raise-event --id {instanceId} --event-name {eventName} --event-data @raiseEvent.json --task-hub-name {taskHubName}",
-                    $"durable get-runtime-status --id {instanceId}"
+                    WaitForRunningHostState = true,
+                    Commands = new[]
+                    {
+                        $"durable start-new --function-name JsonInput --id {instanceId} --task-hub-name {taskHubName}",
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Host lock lease acquired by instance ID"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
                 },
-                OutputContains = new string[]
+                new RunConfiguration
                 {
-                    $"Raised event '{eventName}' to instance '{instanceId}'",
-                    "\"OrchestrationStatus\": 0",
+                    Commands = new[]
+                    {
+                        $"durable raise-event --id {instanceId} --event-name {eventName} --event-data @raiseEvent.json --task-hub-name {taskHubName}",
+                        $"durable get-runtime-status --id {instanceId}"
+                    },
+                    OutputContains = new string[]
+                    {
+                        $"Raised event '{eventName}' to instance '{instanceId}'",
+                        "\"OrchestrationStatus\": 0",
+                    }
                 }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: true);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
 
@@ -260,24 +299,38 @@ namespace Azure.Functions.Cli.Tests.E2E
             DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
-            await CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration[]
             {
-                Commands = new[]
+                new RunConfiguration
                 {
-                    $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable raise-event --id {instanceId} --event-name operation --event-data baddata --task-hub-name {taskHubName}",
-                    $"durable rewind --id {instanceId} --task-hub-name {taskHubName}"
+                    WaitForRunningHostState = true,
+                    Commands = new[]
+                    {
+                        $"durable start-new --function-name Counter --input 3 --id {instanceId} --task-hub-name {taskHubName}",
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Host lock lease acquired by instance ID"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
                 },
-                OutputContains = new string[]
+                new RunConfiguration
                 {
-                    "Status before rewind: Failed",
-                    "Status after rewind:"
-                },
-                CommandTimeout = TimeSpan.FromSeconds(45)
+                    Commands = new[]
+                    {
+                        $"durable raise-event --id {instanceId} --event-name operation --event-data baddata --task-hub-name {taskHubName}",
+                        $"durable rewind --id {instanceId} --task-hub-name {taskHubName}"
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Status before rewind: Failed",
+                        "Status after rewind:"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
+                }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: true);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -294,6 +347,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             await CliTester.Run(new RunConfiguration
             {
+                WaitForRunningHostState = true,
                 Commands = new[]
                 {
                     $"durable start-new --function-name Counter --input 3 --task-hub-name {taskHubName}"
@@ -304,8 +358,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: false);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -332,22 +385,36 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             string instanceId = $"{Guid.NewGuid():N}";
 
-            await CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration[]
             {
-                Commands = new[]
+                new RunConfiguration
                 {
-                    $"durable start-new --function-name JsonInput --input @startnew.json --task-hub-name {taskHubName} --id {instanceId}",
-                    $"durable get-runtime-status --id {instanceId}"
+                    WaitForRunningHostState = true,
+                    Commands = new[]
+                    {
+                        $"durable start-new --function-name JsonInput --input @startnew.json --task-hub-name {taskHubName} --id {instanceId}",
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Host lock lease acquired by instance ID"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
                 },
-                OutputContains = new string[]
+                new RunConfiguration
                 {
-                    "Started 'JsonInput'",
-                    "\"OrchestrationStatus\": 0",
+                    Commands = new[]
+                    {
+                        $"durable get-runtime-status --id {instanceId}"
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Started 'JsonInput'",
+                        "\"OrchestrationStatus\": 0",
+                    }
                 }
             },
             _output,
-            workingDir: WorkingDirPath,
-            startHost: true);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
 
@@ -365,22 +432,36 @@ namespace Azure.Functions.Cli.Tests.E2E
             DurableHelper.SetTaskHubName(WorkingDirPath, taskHubName);
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, StorageConnectionString);
 
-            await CliTester.Run(new RunConfiguration
+            await CliTester.Run(new RunConfiguration[]
             {
-                Commands = new[]
+                new RunConfiguration
                 {
-                    $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}",
-                    $"durable terminate --id {instanceId} --task-hub-name {taskHubName}"
+                    WaitForRunningHostState = true,
+                    Commands = new[]
+                    {
+                        $"durable start-new --function-name Counter --id {instanceId} --task-hub-name {taskHubName}"
+                    },
+                    OutputContains = new string[]
+                    {
+                        "Host lock lease acquired by instance ID"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
                 },
-                OutputContains = new string[]
+                new RunConfiguration
                 {
-                    $"Successfully terminated '{instanceId}'"
-                },
-                CommandTimeout = TimeSpan.FromSeconds(45)
-            }, 
+                    Commands = new[]
+                    {
+                        $"durable terminate --id {instanceId} --task-hub-name {taskHubName}"
+                    },
+                    OutputContains = new string[]
+                    {
+                        $"Successfully terminated '{instanceId}'"
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(45)
+                }
+            },
             _output, 
-            workingDir: WorkingDirPath,
-            startHost: true);
+            workingDir: WorkingDirPath);
 
             Environment.SetEnvironmentVariable(DurableManager.DefaultConnectionStringKey, null);
         }
@@ -402,8 +483,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     File.WriteAllText(Path.Combine(workingDir, "host.json"), hostJsonContent);
                 }
             },
-            _output,
-            startHost: false);
+            _output);
         }
     }
 }
