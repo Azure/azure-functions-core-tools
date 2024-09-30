@@ -86,6 +86,7 @@ namespace Azure.Functions.ArtifactAssembler
             var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
             var outOfProcArtifactDirPath = Path.Combine(outOfProcArtifactDownloadDir, _outOfProcArtifactName);
             EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
+            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDownloadDir, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
             Directory.Delete(outOfProcArtifactDownloadDir, true);
             //await CreateVisualStudioCoreToolsAsync();
             await CreateCliCoreToolsAsync();
