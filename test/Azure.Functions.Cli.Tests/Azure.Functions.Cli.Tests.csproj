@@ -47,6 +47,6 @@
   </ItemGroup>
 
   <PropertyGroup>
-	  <RunSettingsFilePath>$(MSBuildProjectDirectory)\E2E\StartTests_default.runsettings</RunSettingsFilePath>
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)\E2E\StartTests_default.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 </Project>
