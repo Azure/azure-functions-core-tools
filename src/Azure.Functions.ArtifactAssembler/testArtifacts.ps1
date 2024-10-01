@@ -10,7 +10,6 @@ $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tes
 
 # Get the current directory
 $currentDirectory = Get-Location
-
 $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_requires_nested_inproc_artifacts.runsettings"
 
 # Loop through each subdirectory within the parent directory
