@@ -635,7 +635,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc6"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, inproc6, is not a valid host version for your project. The host runtime is only valid for the worker runtime dotnet"],
+                ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -659,7 +659,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc8"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, inproc8, is not a valid host version for your project. The host runtime is only valid for the worker runtime dotnet"],
+                ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -683,7 +683,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc8"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, inproc8, is not a valid host version for your project. For the inproc8 runtime, the FUNCTIONS_INPROC_NET8_ENABLED variable must be set while running a .NET 8 in-proc app."],
+                ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. For the 'inproc8' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -707,7 +707,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime default"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to dotnetIsolated."],
+                ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -731,7 +731,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime default"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to dotnetIsolated."],
+                ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -755,7 +755,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc6"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, inproc6, is not a valid host version for your project. For the inproc6 runtime, the FUNCTIONS_INPROC_NET8_ENABLED variable must not be set while running a .NET 6 in-proc app."],
+                ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. For the 'inproc6' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -779,7 +779,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc6"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, inproc6, is not a valid host version for your project. The runtime is only valid for dotnetIsolated and dotnet"],
+                ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -803,7 +803,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "start --port 7073 --verbose --runtime inproc8"
                 },
                 ExpectExit = false,
-                ErrorContains = ["The runtime host value passed in, inproc8, is not a valid host version for your project. The runtime is only valid for dotnetIsolated and dotnet"],
+                ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                 Test = async (workingDir, p) =>
                 {
                     using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
@@ -866,7 +866,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
+                            testOutputHelper.Output.Should().Contain("Selected default host.");
                         }
                     }
                 },
@@ -898,7 +898,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
+                            testOutputHelper.Output.Should().Contain("Selected default host.");
                         }
                     }
                 },
