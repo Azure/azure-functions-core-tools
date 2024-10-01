@@ -2,18 +2,9 @@ param (
     [string]$StagingDirectory
 )
 
-# Set the path to your test project (.csproj)
+# Set the path to test project (.csproj) and runtime settings
 $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
-
-# Set the parent directory containing the subdirectories
-#$parentDirectory = "bin\Debug\net8.0\staging\coretools-cli"
-
-# Get the current directory
-$currentDirectory = Get-Location
 $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_requires_nested_inproc_artifacts.runsettings"
-
-Write-Host "Test project path: $testProjectPath"
-Write-Host "Runtime settings: $runtimeSettings"
 
 dotnet build $testProjectPath
 
@@ -22,7 +13,7 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
     # Check if the subdirectory name includes 'win-x64'
     $subDir = $_.FullName
     Write-Host "Current directory: $subDir"
-    if ($subDir -like "*Cli.win-x64*") {    
+    if ($subDir -like "*win*") {    
         # Find func.exe in the subdirectory
         $funcExePath = Get-ChildItem -Path $subDir -Filter "func.exe" -ErrorAction SilentlyContinue
 
@@ -34,7 +25,7 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
         
             # Run dotnet test with the environment variable set
             Write-Host "Running 'dotnet test' on test project: $testProjectPath"
-            dotnet test $testProjectPath --no-build --settings $runtimeSettings
+            dotnet test $testProjectPath --no-build --settings $runtimeSettings --logger "console;verbosity=detailed"
         } else {
             Write-Host "No func.exe or func found in: $subDir"
         }
