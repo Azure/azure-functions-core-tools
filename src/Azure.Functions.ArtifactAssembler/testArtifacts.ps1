@@ -13,7 +13,7 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
     # Check if the subdirectory name includes 'win-x64'
     $subDir = $_.FullName
     Write-Host "Current directory: $subDir"
-    if ($subDir -like "*win*") {    
+    if ($subDir -like "*Cli.win*") {    
         # Find func.exe in the subdirectory
         $funcExePath = Get-ChildItem -Path $subDir -Filter "func.exe" -ErrorAction SilentlyContinue
 
