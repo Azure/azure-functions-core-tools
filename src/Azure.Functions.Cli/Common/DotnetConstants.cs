@@ -14,5 +14,7 @@ namespace Azure.Functions.Cli.Common
         public const string InProc6DirectoryName = "in-proc6";
         public const string InProc8HostRuntime = "inproc8";
         public const string InProc6HostRuntime = "inproc6";
+
+        public static readonly string[] ValidRuntimeValues = [InProc8HostRuntime, InProc6HostRuntime, "default"];
     }
 }
