@@ -10,8 +10,12 @@ $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tes
 
 # Get the current directory
 $currentDirectory = Get-Location
-Write-Host "Current directory: $currentDirectory"
 $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_requires_nested_inproc_artifacts.runsettings"
+
+Write-Host "Test project path: $testProjectPath"
+Write-Host "Runtime settings: $runtimeSettings"
+
+dotnet build $testProjectPath
 
 # Loop through each subdirectory within the parent directory
 Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
