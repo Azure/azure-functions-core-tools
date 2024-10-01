@@ -1,3 +1,7 @@
+param (
+    [string]$StagingDirectory
+)
+
 # Set the path to your test project (.csproj)
 $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
 
@@ -7,14 +11,10 @@ $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tes
 # Get the current directory
 $currentDirectory = Get-Location
 
-# Combine the current directory with the 'staging' subdirectory
-$stagingDirectory = Join-Path -Path $currentDirectory.Path -ChildPath "staging"
-
 $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_requires_nested_inproc_artifacts.runsettings"
 
-
 # Loop through each subdirectory within the parent directory
-Get-ChildItem -Path $stagingDirectory -Directory | ForEach-Object {
+Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
     # Check if the subdirectory name includes 'win-x64'
     $subDir = $_.FullName
     if ($subDir -like "*Cli.win-x64*") {    
