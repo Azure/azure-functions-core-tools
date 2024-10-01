@@ -24,6 +24,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         public StartTests(ITestOutputHelper output) : base(output) { }
 
         [Fact]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.UseInConsolidatedArtifactGeneration)]
         public async Task start_nodejs()
         {
             await CliTester.Run(new RunConfiguration
@@ -66,6 +67,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.UseInConsolidatedArtifactGeneration)]
         public async Task start_nodejs_with_specifying_runtime_default()
         {
             await CliTester.Run(new RunConfiguration
@@ -816,7 +818,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.RequiresNestedInProcArtifacts)]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.UseInConsolidatedArtifactGeneration)]
         public async Task start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified()
         {
             await CliTester.Run(new RunConfiguration
@@ -851,7 +853,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.RequiresNestedInProcArtifacts)]
+        [Trait(TestingTraits.TraitName.Category, TestingTraits.TestCategory.UseInConsolidatedArtifactGeneration)]
         public async Task start_dotnet_isolated_csharp_with_oop_host_without_runtime_specified()
         {
             await CliTester.Run(new RunConfiguration

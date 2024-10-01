@@ -11,6 +11,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         internal class TestCategory
         {
             public const string RequiresNestedInProcArtifacts = "RequiresNestedInProcArtifacts";
+            public const string UseInConsolidatedArtifactGeneration = "UseInConsolidatedArtifactGeneration";
         }
 
         internal class TraitName
