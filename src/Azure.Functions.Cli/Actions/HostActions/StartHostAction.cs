@@ -23,7 +23,6 @@ using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
-using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -357,42 +356,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
         /// <summary>
         /// Check local.settings.json to determine whether in-proc .NET8 is enabled.
         /// </summary>
-        private async Task<bool> IsInProcNet8Enabled()
+        private async Task<bool> IsInProcDotNet8Enabled()
         {
             var localSettingsJObject = await GetLocalSettingsJsonAsJObjectAsync();
-            var inProcNet8EnabledSettingValue = localSettingsJObject?["Values"]?[Constants.FunctionsInProcNet8Enabled]?.Value<string>();
-            var isInProcNet8Enabled = string.Equals("1", inProcNet8EnabledSettingValue);
+            var inProcDotNet8EnabledValue = localSettingsJObject?["Values"]?[Constants.InProcDotNet8EnabledSetting]?.Value<string>();
+            var isInProcDotNet8Enabled = string.Equals("1", inProcDotNet8EnabledValue, StringComparison.Ordinal);
 
             if (VerboseLogging == true)
             {
-                var message = isInProcNet8Enabled
-                    ? $"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json"
-                    : $"{Constants.FunctionsInProcNet8Enabled} app setting is not enabled in local.settings.json";
+                var message = isInProcDotNet8Enabled
+                    ? $"{Constants.InProcDotNet8EnabledSetting} app setting enabled in local.settings.json"
+                    : $"{Constants.InProcDotNet8EnabledSetting} app setting is not enabled in local.settings.json";
                 ColoredConsole.WriteLine(VerboseColor(message));
             }
 
-            return isInProcNet8Enabled;
-        }
-
-        // We launch the in-proc .NET8 application as a child process only if the SkipInProcessHost conditional compilation symbol is not defined.
-        // During build, we pass SkipInProcessHost=True only for artifacts used by our feed (we don't want to launch child process in that case).
-        private bool ShouldLaunchInProcNet8AsChildProcess()
-        {
-#if SkipInProcessHost
-            if (VerboseLogging == true)
-            {
-                ColoredConsole.WriteLine(VerboseColor("SkipInProcessHost compilation symbol is defined."));
-            }
-
-            return false;
-#else
-            if (VerboseLogging == true)
-            {
-                ColoredConsole.WriteLine(VerboseColor("SkipInProcessHost compilation symbol is not defined."));
-            }
-
-            return true;
-#endif
+            return isInProcDotNet8Enabled;
         }
 
         private async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
@@ -423,8 +401,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
             
-            // Return if we have already started a child process
-            if (await ShouldExitAfterDeterminingHostRuntime(isVerbose))
+            // Return if running is delegated to another version of Core Tools
+            if (await TryHandleInProcDotNetLaunchAsync())
             {
                 return;
             }
@@ -482,15 +460,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await runTask;
         }
 
-        private async Task<bool> ShouldExitAfterDeterminingHostRuntime(bool isVerbose)
+        private async Task<bool> TryHandleInProcDotNetLaunchAsync()
         {
-            var isInProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet;
-            
             // If --runtime param is set, handle runtime param logic; otherwise we infer the host to launch on startup
             if (HostRuntime is not null)
             {
                 // Validate host runtime passed in
-                await ValidateHostRuntime(isInProc, isVerbose);
+                await ValidateHostRuntimeAsync(GlobalCoreToolsSettings.CurrentWorkerRuntime);
 
                 if (!string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
@@ -498,82 +474,76 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     StartHostAsChildProcess(isNet8InProcSpecified);
                     return true;
                 }
+
+                return false;
             }
-            else if (isInProc)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
             {
                 // Infer host runtime by checking if .NET 8 is enabled
-                var shouldNet8InProcBeLaunched = await IsInProcNet8Enabled();
+                var isDotNet8Project = await IsInProcDotNet8Enabled();
 
-                if (shouldNet8InProcBeLaunched)
-                {
-                    PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc8HostRuntime);
-                }
-                // Otherwise start .NET 6 child process since we are running an inproc app
-                else
-                {
-                    PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
-                }
+                var selectedRuntime = isDotNet8Project
+                    ? DotnetConstants.InProc8HostRuntime
+                    : DotnetConstants.InProc6HostRuntime;
+                
+                PrintVerboseForHostSelection(selectedRuntime);
 
-                StartHostAsChildProcess(shouldNet8InProcBeLaunched);
+                StartHostAsChildProcess(isDotNet8Project);
+
                 return true;
-
             }
+
             // If the host runtime parameter is not set and the app is not in-proc, we should default to out-of-process host
-            PrintVerboseForHostSelection(isVerbose, "out-of-process");
+            PrintVerboseForHostSelection("out-of-process");
             return false;
         }
 
-        private async Task ValidateHostRuntime(bool isInProc, bool isVerbose)
+        internal async Task ValidateHostRuntimeAsync(WorkerRuntime currentWorkerRuntime,
+            Func<Task<bool>> validateDotNet8ProjectEnablement = null)
         {
-            var isOutOfProc = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated;
-            var isInProc6 = string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase);
-            var isInProc8 = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
+            validateDotNet8ProjectEnablement ??= IsInProcDotNet8Enabled;
 
-            // If we are running an .NET isolated app and the user specifies inproc6 or inproc8, throw an error
-            if (isOutOfProc && (isInProc8 || isInProc6))
+            void ThrowCliException(string suffix)
             {
-                throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The host runtime is only valid for the worker runtime {WorkerRuntime.dotnet}");
-            }
-            // If we are not running a .NET app and the user specifies inproc6 or inproc8, throw an error
-            if (!isOutOfProc && !isInProc && (isInProc8 || isInProc6))
-            {
-                throw new CliException($"The runtime host value passed in, {HostRuntime}, is not a valid host version for your project. The runtime is only valid for {WorkerRuntime.dotnetIsolated} and {WorkerRuntime.dotnet}");
+                throw new CliException($"The runtime argument value provided, '{HostRuntime}', is invalid. {suffix}");
             }
 
-            if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
+            if (DotnetConstants.ValidRuntimeValues.Contains(HostRuntime, StringComparer.OrdinalIgnoreCase) == false)
             {
-                if (isInProc)
-                {
-                    throw new CliException($"The runtime host value passed in, default, is not a valid host version for your project. For the default host runtime, the worker runtime must be set to {WorkerRuntime.dotnetIsolated}.");
-                }
-                PrintVerboseForHostSelection(isVerbose, "out-of-process");
-                return;
+                ThrowCliException($"Valid values are '{string.Join("', '", DotnetConstants.ValidRuntimeValues)}'.");
             }
-            else if (isInProc8)
+
+            var isInproc6ArgumentValue = string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase);
+            var isInproc8ArgumentValue = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
+
+            if (currentWorkerRuntime == WorkerRuntime.dotnet)
             {
-                if (!await IsInProcNet8Enabled())
+                if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc8HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc8HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must be set while running a .NET 8 in-proc app.");
+                    ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnetIsolated}'.");
                 }
-                PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc8HostRuntime);
-                return;
+
+                if (isInproc8ArgumentValue && !await validateDotNet8ProjectEnablement())
+                {
+                    ThrowCliException($"For the '{DotnetConstants.InProc8HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
+                }
+                else if (isInproc6ArgumentValue && await validateDotNet8ProjectEnablement())
+                {
+                    ThrowCliException($"For the '{DotnetConstants.InProc6HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
+                }
+
             }
-            else if (isInProc6)
+            else if (isInproc8ArgumentValue || isInproc6ArgumentValue)
             {
-                if (await IsInProcNet8Enabled())
-                {
-                    throw new CliException($"The runtime host value passed in, {DotnetConstants.InProc6HostRuntime}, is not a valid host version for your project. For the {DotnetConstants.InProc6HostRuntime} runtime, the {Constants.FunctionsInProcNet8Enabled} variable must not be set while running a .NET 6 in-proc app.");
-                }
-                PrintVerboseForHostSelection(isVerbose, DotnetConstants.InProc6HostRuntime);
-                return;
+                ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnet}'.");
             }
-            // Throw an exception if HostRuntime is set to none of the expected values
-            throw new CliException($"Invalid host runtime '{HostRuntime}'. Valid values are 'default', '{DotnetConstants.InProc8HostRuntime}', '{DotnetConstants.InProc6HostRuntime}'.");
+
+            PrintVerboseForHostSelection(HostRuntime);
         }
 
-        private void PrintVerboseForHostSelection(bool isVerbose, string hostRuntime)
+        private void PrintVerboseForHostSelection(string hostRuntime)
         {
-            if (isVerbose)
+            if (VerboseLogging.GetValueOrDefault())
             {
                 ColoredConsole.WriteLine(VerboseColor($"Selected {hostRuntime} host."));
             }
