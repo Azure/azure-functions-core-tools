@@ -8,6 +8,15 @@ using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Common;
+
+/* Unmerged change from project 'Azure.Functions.Cli.Tests (net8.0)'
+Before:
+using Colors.Net;
+After:
+using Azure.Functions.Cli.Tests.Extensions;
+using Colors.Net;
+*/
+using Azure.Functions.Cli.Tests.Extensions;
 using Colors.Net;
 using FluentAssertions;
 using NSubstitute;
@@ -15,6 +24,8 @@ using Xunit;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
+    [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.ActionTests)]
     public class StartHostActionTests : IDisposable
     {
         [SkippableFact]

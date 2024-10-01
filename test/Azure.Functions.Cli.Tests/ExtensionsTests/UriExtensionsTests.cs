@@ -13,6 +13,8 @@ using Xunit;
 
 namespace Azure.Functions.Cli.Tests
 {
+    [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.ExtensionTests)]
     public class UriExtensionsTests
     {
         [Theory]

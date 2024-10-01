@@ -1,6 +1,6 @@
 ﻿using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Tests.E2E;
-using Azure.Functions.Cli.Tests.E2E.Helpers;
+using Azure.Functions.Cli.Tests.E2ETests;
+using Azure.Functions.Cli.Tests.E2ETests.Helpers;
 using Microsoft.Azure.WebJobs.Script;
 using System;
 using System.IO;
@@ -10,6 +10,8 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.ExtensionsTests
 {
+    [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.ExtensionTests)]
     public class ExtensionBundleTests : BaseE2ETest
     {
         public ExtensionBundleTests(ITestOutputHelper output) : base(output) { }

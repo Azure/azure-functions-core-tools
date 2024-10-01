@@ -7,6 +7,8 @@ using Xunit;
 
 namespace Azure.Functions.Cli.Tests.ExtensionsTests
 {
+    [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.ExtensionTests)]
     public class TaskExtensionsTests
     {
         [Fact]

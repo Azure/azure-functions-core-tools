@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Actions.DurableActions;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using NSubstitute;
@@ -16,6 +15,8 @@ using System.IO.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
+    [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.ActionTests)]
     public class ResolveActionTests
     {
         [Theory]

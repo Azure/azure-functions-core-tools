@@ -1,15 +1,14 @@
-﻿using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Tests.E2E;
-using Azure.Functions.Cli.Tests.E2E.Helpers;
-using Microsoft.Azure.WebJobs.Script;
+﻿using Azure.Functions.Cli.Tests.E2ETests;
+using Azure.Functions.Cli.Tests.E2ETests.Helpers;
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.ExtensionsTests
 {
+    [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.ExtensionTests)]
     public class InstallExtensionsTests : BaseE2ETest
     {
         public InstallExtensionsTests(ITestOutputHelper output) : base(output) { }

@@ -7,6 +7,8 @@ using System.Runtime.InteropServices;
 
 namespace Azure.Functions.Cli.Tests.ExtensionsTests
 {
+    [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.ExtensionTests)]
     public class ProcessExtensionsTests
     {
         private volatile bool calledContinueWith = false;
