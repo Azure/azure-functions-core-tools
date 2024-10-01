@@ -10,12 +10,14 @@ $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tes
 
 # Get the current directory
 $currentDirectory = Get-Location
+Write-Host "Current directory: $currentDirectory"
 $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_requires_nested_inproc_artifacts.runsettings"
 
 # Loop through each subdirectory within the parent directory
 Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
     # Check if the subdirectory name includes 'win-x64'
     $subDir = $_.FullName
+    Write-Host "Current directory: $subDir"
     if ($subDir -like "*Cli.win-x64*") {    
         # Find func.exe in the subdirectory
         $funcExePath = Get-ChildItem -Path $subDir -Filter "func.exe" -ErrorAction SilentlyContinue
