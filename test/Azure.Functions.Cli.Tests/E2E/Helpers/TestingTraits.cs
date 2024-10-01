@@ -10,7 +10,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
     {
         internal class TestCategory
         {
+            // Tests with RequiresNestedInProcArtifacts label will not be run in the default scenario and only in the artifact consolidation pipeline
             public const string RequiresNestedInProcArtifacts = "RequiresNestedInProcArtifacts";
+
+            // Tests with UseInConsolidatedArtifactGeneration label will be used in the default scenario and in the artifact consolidation pipeline
             public const string UseInConsolidatedArtifactGeneration = "UseInConsolidatedArtifactGeneration";
         }
 
