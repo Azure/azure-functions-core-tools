@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.Tests.E2ETests
 {
     [Trait(TestTraits.Category, TestTraits.EndToEnd)]
+    [Trait(TestTraits.Group, TestTraits.FuncDeployTests)]
     public class DeploymentTests : BaseE2ETest, IClassFixture<StorageAccountManager>, IClassFixture<ServerFarmManager>, IClassFixture<FunctionAppManager>
     {
         private readonly StorageAccountManager _storageAccountManager;

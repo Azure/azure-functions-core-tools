@@ -1,0 +1,139 @@
+jobs:
+- job: Default
+  timeoutInMinutes: "180"
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  variables:
+    TestProject: test/Azure.Functions.Cli.Tests/Azure.Functions.Cli.Tests.csproj
+
+  steps:
+  - download: current
+    artifact: CoreToolsCLI
+    displayName: 'Download Core Tools CLI'
+
+  - pwsh: |
+      Get-ChildItem -Path "$(Pipeline.Workspace)\CoreToolsCLI"
+
+      $cliPath = "$(Pipeline.Workspace)\CoreToolsCLI\Azure.Functions.Cli.zip"
+      Expand-Archive $cliPath -DestinationPath $(Pipeline.Workspace)\CoreToolsCLI_Extracted
+    displayName: Extract CLI zip
+
+  - pwsh: . "tools/start-emulators.ps1" -NoWait
+    displayName: "Start emulators (NoWait)"
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+
+  - pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET 6.0 and 3.1'
+
+  - task: NuGetToolInstaller@1
+    inputs:
+      versionSpec:
+    displayName: Install Nuget tool
+
+  - task: DotNetCoreCLI@2
+    displayName: Build Test Project
+    inputs:
+      command: build
+      arguments: '-f net6.0'
+      projects: $(TestProject)
+
+  - pwsh: |
+        $funcPath = "$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe"
+
+        [System.Environment]::SetEnvironmentVariable("FUNC_PATH", $funcPath)
+        [System.Environment]::SetEnvironmentVariable("DURABLE_FUNCTION_PATH", "test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder")
+
+        # Check and set the DURABLE_STORAGE_CONNECTION environment variable if not already set
+        $durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION"
+        if (-not [System.Environment]::GetEnvironmentVariable($durableStorageConnectionVar)) {
+            [System.Environment]::SetEnvironmentVariable($durableStorageConnectionVar, "UseDevelopmentStorage=true")
+        }
+
+    displayName: Set up environment variables
+
+  - task: DotNetCoreCLI@2
+    displayName: "Action E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=ActionTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Extension E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=ExtensionTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Func Create E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=FuncCreateTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Func Deploy E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=FuncDeployTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Func Init E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=FuncInitTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Func List E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=FuncListTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Func Pack E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=FuncPackTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Func Settings E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=FuncSettingsTests" --no-build'
+      projects: $(TestProject)
+
+  - task: DotNetCoreCLI@2
+    displayName: "Func Start E2E Tests"
+    condition: succeededOrFailed()
+    inputs:
+      command: test
+      arguments: '-f net6.0 --logger trx --filter "Group=FuncStartTests" --no-build'
+      projects: $(TestProject)
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true
+    condition: succeededOrFailed()
