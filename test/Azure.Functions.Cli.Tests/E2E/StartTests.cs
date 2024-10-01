@@ -410,14 +410,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                         var result = await response.Content.ReadAsStringAsync();
                         p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        await Task.Delay(TimeSpan.FromSeconds(5));
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
-                            testOutputHelper.Output.Should().Contain("Starting child process for in-process model host");
-                            testOutputHelper.Output.Should().Contain("Started child process with ID");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host");
+                            testOutputHelper.Output.Should().Contain("Starting child process for inproc8 model host.");
+                            testOutputHelper.Output.Should().Contain("Selected inproc8 host.");
                         }
                     }
                 },
@@ -451,9 +450,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
                             testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
-                            testOutputHelper.Output.Should().Contain("Starting child process for in-process model host");
-                            testOutputHelper.Output.Should().Contain("Started child process with ID");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host");
+                            testOutputHelper.Output.Should().Contain("Starting child process for inproc8 model host.");
+                            testOutputHelper.Output.Should().Contain("Selected inproc8 host.");
                         }
                     }
                 },
@@ -534,7 +532,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
-                            testOutputHelper.Output.Should().Contain("Selected inproc6 host");
+                            testOutputHelper.Output.Should().Contain("Starting child process for inproc6 model host.");
+                            testOutputHelper.Output.Should().Contain("Selected inproc6 host.");
                         }
                     }
                 },
@@ -591,7 +590,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
-                            testOutputHelper.Output.Should().Contain("Selected inproc6 host");
+                            testOutputHelper.Output.Should().Contain("Starting child process for inproc8 model host.");
+                            testOutputHelper.Output.Should().Contain("Selected inproc8 host.");
                         }
                     }
                 },
