@@ -26,6 +26,15 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
             # Run dotnet test with the environment variable set
             Write-Host "Running 'dotnet test' on test project: $testProjectPath"
             dotnet test $testProjectPath --no-build --settings $runtimeSettings --logger "console;verbosity=detailed"
+
+            if ($LASTEXITCODE -ne 0) {
+                # If the exit code is non-zero, throw an error
+                Write-Host "Tests failed with exit code $LASTEXITCODE"
+                throw "dotnet test failed. Exiting with error."
+            } else {
+                # If the exit code is zero, tests passed
+                Write-Host "All tests passed successfully."
+            }
         } else {
             Write-Host "No func.exe or func found in: $subDir"
         }
