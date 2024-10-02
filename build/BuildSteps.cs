@@ -120,7 +120,7 @@ namespace Build
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
-                    CreateConfigurationFile();
+                    CreateConfigurationFile(outputPath);
                 }
 
                 // Publish net8 version of the artifact as well.
