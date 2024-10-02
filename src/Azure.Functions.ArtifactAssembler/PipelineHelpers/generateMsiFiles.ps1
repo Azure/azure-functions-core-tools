@@ -72,8 +72,5 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         {
             throw "$msiPath not found."
         }
-
-        Set-Location $baseDir
-        Get-ChildItem -Path $targetDir -Recurse | Remove-Item -Force -Recurse -ea SilentlyContinue
     }
 }
