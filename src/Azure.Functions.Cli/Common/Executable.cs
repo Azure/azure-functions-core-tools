@@ -9,7 +9,7 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
-    internal class Executable
+    internal class Executable : IAsyncDisposable
     {
         private readonly string _arguments;
         private readonly string _exeName;
@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli.Common
         private readonly bool _visibleProcess;
         private readonly string _workingDirectory;
         private readonly IDictionary<string, string> _environmentVariables;
+        private bool _disposed;
 
         public Executable(
             string exeName,
@@ -28,7 +29,7 @@ namespace Azure.Functions.Cli.Common
             string workingDirectory = null,
             IDictionary<string, string> environmentVariables = null)
         {
-            _exeName = exeName;
+            _exeName = exeName ?? throw new ArgumentNullException(nameof(exeName));
             _arguments = arguments;
             _streamOutput = streamOutput;
             _shareConsole = shareConsole;
@@ -94,46 +95,71 @@ namespace Azure.Functions.Cli.Common
                 };
                 Process.EnableRaisingEvents = true;
             }
-
             try
             {
                 Process.Start();
+
                 if (_streamOutput)
                 {
                     Process.BeginOutputReadLine();
                     Process.BeginErrorReadLine();
                 }
-                
+
                 if (!string.IsNullOrEmpty(stdIn))
                 {
                     Process.StandardInput.WriteLine(stdIn);
                     Process.StandardInput.Close();
                 }
-            }
-            catch (Win32Exception ex)
-            {
-                if (ex.Message == "The system cannot find the file specified")
-                {
-                    throw new FileNotFoundException(ex.Message, ex);
-                }
-                throw ex;
-            }
 
-            if (timeout == null)
-            {
-                return await exitCodeTask;
-            }
-            else
-            {
-                await Task.WhenAny(exitCodeTask, Task.Delay(timeout.Value));
-                if (exitCodeTask.IsCompleted)
+                if (timeout is null)
                 {
-                    return exitCodeTask.Result;
+                    return await exitCodeTask.ConfigureAwait(false);
                 }
                 else
                 {
-                    Process.Kill();
-                    throw new Exception("Process didn't exit within specified timeout");
+                    var completedTask = await Task.WhenAny(exitCodeTask, Task.Delay(timeout.Value)).ConfigureAwait(false);
+                    if (completedTask == exitCodeTask)
+                    {
+                        return await exitCodeTask.ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        throw new TimeoutException($"Process {_exeName} didn't exit within the specified timeout.");
+                    }
+                }
+            }
+            catch (Win32Exception ex) when (ex.Message.Contains("cannot find the file specified"))
+            {
+                throw new FileNotFoundException(ex.Message, ex);
+            }
+            finally
+            {
+                await DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true; // Mark as disposed
+
+            if (Process is not null)
+            {
+                try
+                {
+                    if (!Process.HasExited)
+                    {
+                        Process.Kill();
+                        await Process.WaitForExitAsync();
+                    }
+                }
+                finally
+                {
+                    Process.Dispose();
                 }
             }
         }
