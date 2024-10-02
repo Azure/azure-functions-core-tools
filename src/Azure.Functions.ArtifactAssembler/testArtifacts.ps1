@@ -10,10 +10,10 @@ dotnet build $testProjectPath
 
 # Loop through each subdirectory within the parent directory
 Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
-    # Check if the subdirectory name includes 'win-x64'
+    # Check if the subdirectory name includes 'win-x64 or win-x86'
     $subDir = $_.FullName
-    Write-Host "Current directory: $subDir"
-    if ($subDir -like "*Cli.win*") {    
+    if ($subDir -like "*Cli.win-x*") {
+        Write-Host "Current directory: $subDir"
         # Find func.exe in the subdirectory
         $funcExePath = Get-ChildItem -Path $subDir -Filter "func.exe" -ErrorAction SilentlyContinue
 
@@ -30,10 +30,10 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
             if ($LASTEXITCODE -ne 0) {
                 # If the exit code is non-zero, throw an error
                 Write-Host "Tests failed with exit code $LASTEXITCODE"
-                throw "dotnet test failed. Exiting with error."
+                throw "dotnet test failed within $subDir. Exiting with error."
             } else {
                 # If the exit code is zero, tests passed
-                Write-Host "All tests passed successfully."
+                Write-Host "All tests passed successfully within $subDir"
             }
         } else {
             Write-Host "No func.exe or func found in: $subDir"
