@@ -21,9 +21,13 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$buildDir = "$baseDir\..\..\build"
+$buildDir = "..\..\build"
+Write-Host "Build directory: $buildDir"
 $cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
+
+# Define the platforms to search for
+$platforms = @('x64', 'x86')
 
 # Generate MSI installers for Windows
 # TODO: add 'arm64' to the below array once a production-ready version of the WiX toolset supporting
@@ -31,7 +35,15 @@ $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVer
 Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
     # Check if the subdirectory name includes 'win-x64 or win-x86'
     $subDir = $_.FullName
-    if ($subDir -like "*Cli.win-x*") {
+    $matchedPlatform = $null
+    foreach ($platform in $platforms) {
+        if ($subDir -like "*Cli.win-$platform*") {
+            $matchedPlatform = $platform
+            break  # Exit loop once a platform match is found
+        }
+    }
+    # If a matching platform was found
+    if ($matchedPlatform) {
         $targetDir = $subDir
         Write-Host "Target directory: $targetDir"
 
@@ -42,15 +54,15 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         Set-Location $targetDir
 
         $masterWxsName = "funcinstall"
-        $fragmentName = "$platform-frag"
-        $msiName = "func-cli-$cliVersion-$platform"
+        $fragmentName = "$matchedPlatform-frag"
+        $msiName = "func-cli-$cliVersion-$matchedPlatform"
 
         $masterWxsPath = "$buildDir\$masterWxsName.wxs"
         $fragmentPath = "$buildDir\$fragmentName.wxs"
         $msiPath = "$artifactsPath\$msiName.msi"
 
         & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
-        & { candle -arch $platform -dPlatform="$platform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
+        & { candle -arch $matchedPlatform -dPlatform="$matchedPlatform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
         & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
     
         # Check that the .msi files are actually present
