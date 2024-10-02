@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Extensions;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -18,6 +19,7 @@ namespace Azure.Functions.Cli.Common
         private readonly bool _visibleProcess;
         private readonly string _workingDirectory;
         private readonly IDictionary<string, string> _environmentVariables;
+        private JobObjectRegistry _jobObjectRegistry;
         private bool _disposed;
 
         public Executable(
@@ -99,6 +101,13 @@ namespace Azure.Functions.Cli.Common
             {
                 Process.Start();
 
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    // Ensure child processes are cleaned up
+                    _jobObjectRegistry = new JobObjectRegistry();
+                    _jobObjectRegistry.Register(Process);
+                }
+
                 if (_streamOutput)
                 {
                     Process.BeginOutputReadLine();
@@ -145,8 +154,6 @@ namespace Azure.Functions.Cli.Common
                 return;
             }
 
-            _disposed = true; // Mark as disposed
-
             if (Process is not null)
             {
                 try
@@ -162,6 +169,10 @@ namespace Azure.Functions.Cli.Common
                     Process.Dispose();
                 }
             }
+
+            _jobObjectRegistry?.Dispose();
+
+            _disposed = true;
         }
     }
 }
