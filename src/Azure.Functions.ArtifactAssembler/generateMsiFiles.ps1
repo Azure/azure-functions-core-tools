@@ -21,7 +21,7 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$buildDir = "..\..\build"
+$buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
 $cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
