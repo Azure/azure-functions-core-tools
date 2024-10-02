@@ -32,7 +32,7 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
     # Check if the subdirectory name includes 'win-x64 or win-x86'
     $subDir = $_.FullName
     if ($subDir -like "*Cli.win-x*") {
-        $targetDir = Get-Location
+        $targetDir = $subDir
         Write-Host "Target directory: $targetDir"
 
         Copy-Item "$buildDir\icon.ico" -Destination $targetDir
