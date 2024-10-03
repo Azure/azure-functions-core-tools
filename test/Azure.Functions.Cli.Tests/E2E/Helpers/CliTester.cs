@@ -75,7 +75,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
         private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost)
         {
-            var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
+            await using var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
 
@@ -92,7 +92,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 {
                     var command = runConfiguration.Commands[i];
 
-                    var exe = command switch
+                    await using var exe = command switch
                     {
                         string cmd when cmd.StartsWith("dotnet", StringComparison.OrdinalIgnoreCase) =>
                             new Executable("dotnet", command.Substring(7), workingDirectory: workingDir),

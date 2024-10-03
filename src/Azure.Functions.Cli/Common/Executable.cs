@@ -141,10 +141,6 @@ namespace Azure.Functions.Cli.Common
             {
                 throw new FileNotFoundException(ex.Message, ex);
             }
-            finally
-            {
-                await DisposeAsync().ConfigureAwait(false);
-            }
         }
 
         public async ValueTask DisposeAsync()
