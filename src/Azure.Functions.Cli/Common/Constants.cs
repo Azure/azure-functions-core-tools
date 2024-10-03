@@ -26,6 +26,8 @@ namespace Azure.Functions.Cli.Common
         public const string HostJsonFileName = "host.json";
         public const string PackageJsonFileName = "package.json";
         public const string ProxiesJsonFileName = "proxies.json";
+        public const string ArtifactsConfigFileName = "artifactsconfig.json";
+        public const string MinifiedVersionConfigSectionName = "minifiedVersion";
         public const string ExtensionsCsProjFile = "extensions.csproj";
         public const string DefaultVEnvName = "worker_env";
         public const string ExternalPythonPackages = ".python_packages";
