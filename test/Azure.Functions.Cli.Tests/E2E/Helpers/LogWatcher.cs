@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         public static async Task WaitForLogOutput(StringBuilder stdout, string expectedOutput, TimeSpan timeout)
         {
             var tcs = new TaskCompletionSource<bool>();
-            var cancellationTokenSource = new CancellationTokenSource(timeout);
+            using var cancellationTokenSource = new CancellationTokenSource(timeout);
 
             if (stdout.ToString().Contains(expectedOutput))
             {

@@ -97,6 +97,7 @@ namespace Azure.Functions.Cli.Common
                 };
                 Process.EnableRaisingEvents = true;
             }
+
             try
             {
                 Process.Start();
@@ -126,16 +127,12 @@ namespace Azure.Functions.Cli.Common
                 }
                 else
                 {
-                    var completedTask = await Task.WhenAny(exitCodeTask, Task.Delay(timeout.Value)).ConfigureAwait(false);
-                    if (completedTask == exitCodeTask)
-                    {
-                        return await exitCodeTask.ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        throw new TimeoutException($"Process {_exeName} didn't exit within the specified timeout.");
-                    }
+                    return await exitCodeTask.WaitAsync(timeout.Value).ConfigureAwait(false);
                 }
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException($"Process {_exeName} didn't exit within the specified timeout.");
             }
             catch (Win32Exception ex) when (ex.Message.Contains("cannot find the file specified"))
             {
