@@ -27,7 +27,7 @@ $cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Ob
 Write-Host "Cli: $cli"
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 Write-Host "Build number: $cliVersion"
-Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]cliVersion"
+Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$cliVersion"
 
 # Define the platforms to search for
 $platforms = @('x64', 'x86')

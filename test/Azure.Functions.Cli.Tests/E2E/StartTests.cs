@@ -592,8 +592,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                         result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
                         if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
-                            testOutputHelper.Output.Should().Contain("Starting child process for inproc8 model host.");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host.");
+                            testOutputHelper.Output.Should().Contain("Starting child process for inproc6 model host.");
+                            testOutputHelper.Output.Should().Contain("Selected inproc6 host.");
                         }
                     }
                 },
