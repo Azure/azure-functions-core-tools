@@ -15,10 +15,10 @@ jobs:
     displayName: 'Download Core Tools CLI'
 
   - pwsh: |
-      Get-ChildItem -Path "$(Pipeline.Workspace)\CoreToolsCLI"
-
       $cliPath = "$(Pipeline.Workspace)\CoreToolsCLI\Azure.Functions.Cli.zip"
       Expand-Archive $cliPath -DestinationPath $(Pipeline.Workspace)\CoreToolsCLI_Extracted
+
+      Get-ChildItem -Path "$(Pipeline.Workspace)\CoreToolsCLI_Extracted"
     displayName: Extract CLI zip
 
   - pwsh: . "tools/start-emulators.ps1" -NoWait
@@ -45,20 +45,6 @@ jobs:
       arguments: '-f net6.0'
       projects: $(TestProject)
 
-  - pwsh: |
-        $funcPath = "$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe"
-
-        [System.Environment]::SetEnvironmentVariable("FUNC_PATH", $funcPath)
-        [System.Environment]::SetEnvironmentVariable("DURABLE_FUNCTION_PATH", "test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder")
-
-        # Check and set the DURABLE_STORAGE_CONNECTION environment variable if not already set
-        $durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION"
-        if (-not [System.Environment]::GetEnvironmentVariable($durableStorageConnectionVar)) {
-            [System.Environment]::SetEnvironmentVariable($durableStorageConnectionVar, "UseDevelopmentStorage=true")
-        }
-
-    displayName: Set up environment variables
-
   - task: DotNetCoreCLI@2
     displayName: "Action E2E Tests"
     condition: succeededOrFailed()
@@ -66,6 +52,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=ActionTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Extension E2E Tests"
@@ -74,6 +62,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=ExtensionTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Func Create E2E Tests"
@@ -82,6 +72,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=FuncCreateTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Func Deploy E2E Tests"
@@ -90,6 +82,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=FuncDeployTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Func Init E2E Tests"
@@ -98,6 +92,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=FuncInitTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Func List E2E Tests"
@@ -106,6 +102,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=FuncListTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Func Pack E2E Tests"
@@ -114,6 +112,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=FuncPackTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Func Settings E2E Tests"
@@ -122,6 +122,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=FuncSettingsTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: DotNetCoreCLI@2
     displayName: "Func Start E2E Tests"
@@ -130,6 +132,8 @@ jobs:
       command: test
       arguments: '-f net6.0 --logger trx --filter "Group=FuncStartTests" --no-build'
       projects: $(TestProject)
+    env:
+      FUNC_PATH: '$(Pipeline.Workspace)\CoreToolsCLI_Extracted\func.exe'
 
   - task: PublishTestResults@2
     inputs:
