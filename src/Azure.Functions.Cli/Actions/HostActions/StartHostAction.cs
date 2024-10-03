@@ -470,8 +470,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (!string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (Utilities.IsMinifiedVersion())
+                    {
+                        ThrowForInProc();
+                    }
+
                     var isNet8InProcSpecified = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
                     StartHostAsChildProcess(isNet8InProcSpecified);
+
                     return true;
                 }
 
@@ -487,6 +493,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     : DotnetConstants.InProc6HostRuntime;
                 
                 PrintVerboseForHostSelection(selectedRuntime);
+
+                if (Utilities.IsMinifiedVersion())
+                {
+                    ThrowForInProc();
+                }
 
                 StartHostAsChildProcess(isDotNet8Project);
 
@@ -541,6 +552,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             PrintVerboseForHostSelection(HostRuntime);
         }
 
+        private void ThrowForInProc()
+        {
+            throw new CliException($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}. Please update to the latest version. For more information, see: {DotnetConstants.InProcFunctionsDocsLink}");
+        }
         private void PrintVerboseForHostSelection(string hostRuntime)
         {
             if (VerboseLogging.GetValueOrDefault())
