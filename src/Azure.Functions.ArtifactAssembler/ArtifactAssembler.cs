@@ -130,7 +130,7 @@ namespace Azure.Functions.ArtifactAssembler
             if (Directory.Exists(stagingDirectory))
             {
                 Console.WriteLine($"Directory already exists");
-                Directory.Delete(stagingDirectory, true );
+                Directory.Delete(stagingDirectory, true);
             }
 
             Directory.CreateDirectory(stagingDirectory);
