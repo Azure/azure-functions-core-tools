@@ -24,10 +24,10 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 $buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
 $cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Object -First 1
-Write-Host "Cli: $cli"
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
-Write-Host "Build number: $cliVersion"
-Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$cliVersion"
+$buildNumberForZipFile = ($version -split "\.")[2]
+Write-Host "Build number: $buildNumberForZipFile"
+Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
 
 # Define the platforms to search for
 $platforms = @('x64', 'x86')
