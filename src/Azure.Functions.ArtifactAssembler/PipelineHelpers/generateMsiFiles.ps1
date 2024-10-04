@@ -25,7 +25,7 @@ $buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
 $cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
-$buildNumberForZipFile = ($version -split "\.")[2]
+$buildNumberForZipFile = ($cliVersion -split "\.")[2]
 Write-Host "Build number: $buildNumberForZipFile"
 Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
 

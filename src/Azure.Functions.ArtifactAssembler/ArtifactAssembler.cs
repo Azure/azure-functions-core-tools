@@ -277,22 +277,6 @@ namespace Azure.Functions.ArtifactAssembler
                 // Copy in-proc6 files and delete old directory
                 await Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc6DirectoryName)));
                 Directory.Delete(newInProc6ArtifactDirPath, true);
-
-                /*
-                // consolidatedArtifactDirPath now contains out-of-proc core tools, in-proc6 and in-proc8 sub directories. Create a zip file.
-                var zipPath = Path.Combine(cliCoreToolsTargetArtifactDir, $"{outOfProcArtifactName}.zip");
-                try
-                {
-                    await Task.Run(() => FileUtilities.CreateZipFile(consolidatedArtifactDirPath, zipPath));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.ToString());
-                }
-                Console.WriteLine($"Successfully created target runtime zip at: {zipPath}");
-
-                Directory.Delete(consolidatedArtifactDirPath, true);
-                */
             }
 
             // Delete the extracted directories
