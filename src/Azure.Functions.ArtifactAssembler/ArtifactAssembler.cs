@@ -291,7 +291,7 @@ namespace Azure.Functions.ArtifactAssembler
         private (string artifactDirectory, string version) GetArtifactDirectoryAndVersionNumber(string extractedRootDirectory, string artifactName)
         {
             var artifactDirPath = Directory.EnumerateDirectories(extractedRootDirectory)
-                                          .FirstOrDefault(dir => dir.Contains(artifactName));
+                                           .FirstOrDefault(dir => dir.Contains(artifactName));
             if (artifactDirPath == null)
             {
                 throw new InvalidOperationException($"Artifact directory '{artifactDirPath}' not found!");
