@@ -119,7 +119,6 @@ namespace Build
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
-                    CreateMinConfigurationFile(outputPath);
                 }
             }
 
@@ -767,13 +766,6 @@ namespace Build
                     Directory.Delete(path, recursive: true);
                 }
             }
-        }
-
-        private static void CreateMinConfigurationFile(string outputPath)
-        {
-            var filePath = Path.Combine(outputPath, "artifactsconfig.json");
-            string artifactsJsonContent = "{\"minifiedVersion\": true}";
-            File.WriteAllTextAsync(filePath, artifactsJsonContent).GetAwaiter().GetResult();
         }
 
         private static PackageInfo GetLatestPackageInfo(string name, string majorVersion, string source)

@@ -7,11 +7,6 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
-    <!--Starting with .NET 9, CET is enabled by default (https://github.com/dotnet/docs/issues/42600).
-    However, debugger support for CET was introduced in .NET 7, so we disable CET here to ensure
-    compatibility with the .NET 6 runtime. Otherwise, crashes may occur when debugging .NET 6 apps
-    in environments where CET is supported/enabled. -->
-    <CETCompat>false</CETCompat>
     <OptimizationPreference>Speed</OptimizationPreference>
     <AssemblyName>func</AssemblyName>
 	<IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>

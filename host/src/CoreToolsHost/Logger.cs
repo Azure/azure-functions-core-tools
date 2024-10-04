@@ -10,17 +10,17 @@ namespace CoreToolsHost
         /// <summary>
         /// Logs a message.
         /// </summary>
-        internal static void Log(string message, bool includeTimeStamp = true)
+        internal static void Log(string message)
         {
-            var timeStampPrefix = includeTimeStamp ? $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] " : string.Empty;
-            Console.WriteLine($"{timeStampPrefix}[CoreToolsHost] {message}");
+            var ts = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+            Console.WriteLine($"[{ts}] [CoreToolsHost] {message}");
         }
 
         internal static void LogVerbose(bool isVerbose, string message)
         {
             if (isVerbose)
             {
-                Log(message);
+                Console.WriteLine($"{message}");
             }
         }
     }
