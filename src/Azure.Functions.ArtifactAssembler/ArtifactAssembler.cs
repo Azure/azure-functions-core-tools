@@ -292,7 +292,7 @@ namespace Azure.Functions.ArtifactAssembler
         {
             var artifactDirPath = Directory.EnumerateDirectories(extractedRootDirectory)
                                            .FirstOrDefault(dir => dir.Contains(artifactName));
-            if (artifactDirPath == null)
+            if (artifactDirPath is null)
             {
                 throw new InvalidOperationException($"Artifact directory '{artifactDirPath}' not found!");
             }
