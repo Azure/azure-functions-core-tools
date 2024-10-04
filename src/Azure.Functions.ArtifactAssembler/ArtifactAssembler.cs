@@ -14,6 +14,7 @@ namespace Azure.Functions.ArtifactAssembler
         private const string VisualStudioOutputArtifactDirectoryName = "coretools-visualstudio";
         private const string _InProcOutputArtifactNameSuffix = "_inproc";
         private const string _coreToolsProductVersionPattern = @"(\d+\.\d+\.\d+)$";
+        private const string _artifactNameRegexPattern = @"^(.*?)(\d+\.\d+\.\d+)$";
         private const string OutOfProcDirectoryName = "out-of-proc";
         private const string CliOutputArtifactDirectoryName = "coretools-cli";
 
@@ -217,10 +218,10 @@ namespace Azure.Functions.ArtifactAssembler
             // Create a directory to store the assembled artifacts.
             var cliCoreToolsTargetArtifactDir = Path.Combine(_stagingDirectory, CliOutputArtifactDirectoryName);
             Directory.CreateDirectory(cliCoreToolsTargetArtifactDir);
-            string outOfProcVersion = string.Empty;
-            string inProcVersion = string.Empty;
-            string outOfProcArtifactDirPath = string.Empty;
-            string inProc8ArtifactDirPath = string.Empty;
+            string outOfProcVersion = string.Empty,
+                   inProcVersion = string.Empty,
+                   outOfProcArtifactDirPath = string.Empty,
+                   inProc8ArtifactDirPath = string.Empty;
 
             foreach (var artifactName in _cliArtifacts)
             {
@@ -303,27 +304,19 @@ namespace Azure.Functions.ArtifactAssembler
 
         private string RenameInProcDirectory(string oldArtifactDirPath, string newVersion)
         {
-            string pattern = @"^(.*?)(\d+\.\d+\.\d+)$";  // Capture everything before the version
-
-            Match match = Regex.Match(oldArtifactDirPath, pattern);
+            Match match = Regex.Match(oldArtifactDirPath, _artifactNameRegexPattern);
 
             if (!match.Success)
             {
                 throw new InvalidOperationException($"Unable to extract content before version number from '{oldArtifactDirPath}'.");
             }
 
-            var contentBeforeVersion = match.Groups[1];
-            var newDirectoryName =  $"{contentBeforeVersion}{newVersion}";
+            var artifactName = match.Groups[1];
+            var newDirectoryName =  $"{artifactName}{newVersion}";
 
             // Rename (move) the directory
-            try
-            {
-                Directory.Move(oldArtifactDirPath, newDirectoryName);
-            }
-            catch (Exception ex)
-            {
-                Console.Write(ex.ToString());
-            }
+            Directory.Move(oldArtifactDirPath, newDirectoryName);
+            
             return newDirectoryName;
 
         }
