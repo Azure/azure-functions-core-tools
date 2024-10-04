@@ -15,7 +15,7 @@ namespace Azure.Functions.ArtifactAssembler
         private const string _InProcOutputArtifactNameSuffix = "_inproc";
         private const string _coreToolsProductVersionPattern = @"(\d+\.\d+\.\d+)$";
         private const string _artifactNameRegexPattern = @"^(.*?)(\d+\.\d+\.\d+)$";
-        private const string OutOfProcDirectoryName = "out-of-proc";
+        private const string OutOfProcDirectoryName = "default";
         private const string CliOutputArtifactDirectoryName = "coretools-cli";
 
         /// <summary>
