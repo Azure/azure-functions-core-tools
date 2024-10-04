@@ -3,7 +3,7 @@ param (
 )
 
 # Get all directories in the staging directory
-$directories = Get-ChildItem -Path $StagingDir -Directory
+$directories = Get-ChildItem -Path $StagingDirectory -Directory
 
 # Iterate over each directory and create a zip file for each one
 foreach ($dir in $directories) {
