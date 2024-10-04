@@ -9,66 +9,57 @@ namespace CoreToolsHost
     internal class Program
     {
         static bool isVerbose = false;
+        
         static async Task Main(string[] args)
         {
+            isVerbose = args.Contains(DotnetConstants.Verbose);
+
+            Logger.LogVerbose(isVerbose, "Starting CoreToolsHost");
+
+            var localSettingsJson = await LocalSettingsJsonParser.GetLocalSettingsJsonAsJObjectAsync();
+
+            if (localSettingsJson is null)
+            {
+                Logger.LogVerbose(isVerbose, "No local.settings.json file was found");
+            }
+
+            bool projectOptsIntoDotnet8 = 
+                // local.settings.json must be the source of the configuration
+                localSettingsJson is not null && localSettingsJson.RootElement.TryGetProperty("Values", out JsonElement valuesElement)
+                // The runtime must be specified as "dotnet"
+                && ElementExistsWithValue(valuesElement, EnvironmentVariables.FunctionsWorkerRuntime, DotnetConstants.DotnetWorkerRuntime)
+                // The .NET 8 enablement configuration must be provided
+                && ElementExistsWithValue(valuesElement, EnvironmentVariables.FunctionsInProcNet8Enabled, "1");
+
+            Logger.LogVerbose(isVerbose, $"Loading .NET {(projectOptsIntoDotnet8 ? 8 : 6)} host");
+
             try
             {
-                isVerbose = args.Contains(DotnetConstants.Verbose);
-
-                Logger.LogVerbose(isVerbose, "Starting CoreToolsHost");
-
                 using var appLoader = new AppLoader();
-
-                var localSettingsJson = await LocalSettingsJsonParser.GetLocalSettingsJsonAsJObjectAsync();
-                localSettingsJson.RootElement.TryGetProperty("Values", out JsonElement valuesElement);
-                string workerRuntime = string.Empty;
-
-                if (valuesElement.TryGetProperty(EnvironmentVariables.FunctionsWorkerRuntime, out JsonElement workerRuntimeElement))
-                {
-                    workerRuntime = workerRuntimeElement.GetString();
-                }
-                
-                if (string.IsNullOrEmpty(workerRuntime))
-                {
-                    Logger.Log($"Environment variable '{EnvironmentVariables.FunctionsWorkerRuntime}' is not set.");
-                    return;
-                }
-
-                if (workerRuntime == DotnetConstants.DotnetWorkerRuntime)
-                {
-                    string isInProc8 = "";
-                    if (valuesElement.TryGetProperty(EnvironmentVariables.FunctionsInProcNet8Enabled, out JsonElement inProc8EnabledElement))
-                    {
-                        isInProc8 = inProc8EnabledElement.GetString();
-                    }
-
-                    // Load host assembly for .NET 8 in proc host
-                    if (!string.IsNullOrEmpty(isInProc8) && string.Equals("1", isInProc8))
-                    {
-                        Logger.LogVerbose(isVerbose, "Loading inproc8 host");
-                        LoadHostAssembly(appLoader, args, isNet8InProc: true);
-                    }
-                    else
-                    {
-                        // Load host assembly for .NET 6 in proc host
-                        Logger.LogVerbose(isVerbose, "Loading inproc6 host");
-                        LoadHostAssembly(appLoader, args, isNet8InProc: false);
-                    }
-                }
+                LoadHostAssembly(appLoader, args, projectOptsIntoDotnet8);
             }
             catch (Exception exception)
             {
-                Logger.Log($"An error occurred while running CoreToolsHost.{exception}");
+                Logger.Log($"An error occurred while running CoreToolsHost: {exception}");
+                Environment.Exit(1);
             }
+        }
+
+        private static bool ElementExistsWithValue(JsonElement element, string key, string value)
+        {
+            return !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value)
+                && element.TryGetProperty(key, out JsonElement property) 
+                && !string.IsNullOrEmpty(property.ToString()) 
+                && string.Equals(property.ToString(), value, StringComparison.OrdinalIgnoreCase);   
         }
 
         private static void LoadHostAssembly(AppLoader appLoader, string[] args, bool isNet8InProc)
         {
-            var currentDirectory = AppContext.BaseDirectory;
-            var executableName = DotnetConstants.ExecutableName;
+            string filePath = Path.Combine(
+                AppContext.BaseDirectory, // current directory
+                isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName,
+                DotnetConstants.ExecutableName);
 
-            string filePath = "";
-            filePath = Path.Combine(currentDirectory, isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName, executableName);
             Logger.LogVerbose(isVerbose, $"File path to load: {filePath}");
 
             appLoader.RunApplication(filePath, args);

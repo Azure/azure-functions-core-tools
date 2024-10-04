@@ -23,7 +23,7 @@ namespace CoreToolsHost
                 }
                 if (!string.IsNullOrEmpty(fileContent))
                 {
-                    var localSettingsJObject = JsonDocument.Parse(fileContent);
+                    var localSettingsJObject = JsonDocument.Parse(fileContent, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
                     return localSettingsJObject;
                 }
             }
