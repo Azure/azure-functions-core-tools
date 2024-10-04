@@ -1,8 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System.Diagnostics;
-
 namespace Azure.Functions.ArtifactAssembler
 {
     internal class Program
@@ -11,9 +9,10 @@ namespace Azure.Functions.ArtifactAssembler
         {
             try
             {
-                var currentWorkingDirectory = Environment.CurrentDirectory;
+                var currentWorkingDirectory = Environment.CurrentDirectory;             
                 var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory);
                 await artifactAssembler.AssembleArtifactsAsync();
+
                 return 0;
             }
             catch (Exception ex)
