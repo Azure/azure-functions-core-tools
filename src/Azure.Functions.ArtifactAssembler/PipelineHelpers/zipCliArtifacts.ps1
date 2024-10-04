@@ -13,7 +13,16 @@ foreach ($dir in $directories) {
     # Compress the directory into the zip file
     Compress-Archive -Path $dir.FullName -DestinationPath $zipFile -Force
     
-    Write-Host "Zipped: $($dir.FullName) -> $zipFile"
+    # Check if the zip file was successfully created
+    if (Test-Path -Path $zipFile) {
+        Write-Host "Zipped: $($dir.FullName) -> $zipFile"
+        
+        # Delete the original directory to free up space
+        Remove-Item -Path $dir.FullName -Recurse -Force
+        Write-Host "Deleted: $($dir.FullName) to free up space"
+    } else {
+        Write-Host "Failed to create zip for: $($dir.FullName)"
+    }
 }
 
 Write-Host "All directories zipped successfully!"
