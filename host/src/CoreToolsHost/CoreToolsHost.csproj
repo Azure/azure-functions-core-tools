@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
+    <CETCompat>false</CETCompat>
     <OptimizationPreference>Speed</OptimizationPreference>
     <AssemblyName>func</AssemblyName>
 	<IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
