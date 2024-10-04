@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }
             catch
             {
-                // Use default func host port if issue with getting available port
+                // Just use default func host port if we encounter any issues
                 _funcHostPort = 7071;
             }
 

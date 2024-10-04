@@ -78,35 +78,15 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        public static int GetAvailablePort(int minPort = 7000, int maxPort = 8000)
+        public static int GetAvailablePort()
         {
-            for (int port = minPort; port <= maxPort; port++)
+            using (TcpListener listener = new TcpListener(IPAddress.Loopback, 0))
             {
-                if (IsPortAvailable(port))
-                {
-                    return port;
-                }
-            }
-
-            throw new InvalidOperationException("No available ports found in the specified range.");
-        }
-
-        private static bool IsPortAvailable(int port)
-        {
-            bool isAvailable = true;
-
-            try
-            {
-                TcpListener listener = new TcpListener(IPAddress.Any, port);
                 listener.Start();
+                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
                 listener.Stop();
+                return port;
             }
-            catch (SocketException)
-            {
-                isAvailable = false;
-            }
-
-            return isAvailable;
         }
 
         private static string ExecuteCommand(string command)
