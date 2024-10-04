@@ -162,7 +162,7 @@ namespace Azure.Functions.ArtifactAssembler
 
         private async Task CreateVisualStudioCoreToolsAsync()
         {
-            Console.WriteLine($"Starting to assemble Visual Studio Core Tools artifacts");
+            Console.WriteLine("Starting to assemble Visual Studio Core Tools artifacts");
             // Create a directory to store the assembled artifacts.
             var customHostTargetArtifactDir = Path.Combine(_stagingDirectory, VisualStudioOutputArtifactDirectoryName);
             Directory.CreateDirectory(customHostTargetArtifactDir);
