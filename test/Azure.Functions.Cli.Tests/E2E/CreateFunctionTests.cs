@@ -402,5 +402,34 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
+        [Fact]
+        public async Task create_httpTrigger_configAuthLevel_powershell()
+        {
+            await CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    "init . --worker-runtime powershell",
+                    "new --template \"HttpTrigger\" --name MyHttpTriggerFunction --authlevel Anonymous -a"
+                },
+                CheckFiles = new FileResult[]
+                {
+                    new FileResult
+                    {
+                        Name = Path.Combine("MyHttpTriggerFunction", "function.json"),
+                        ContentContains = new []
+                        {
+                            "\"authLevel\": \"anonymous\"",
+                            "\"type\": \"httpTrigger\""
+                        }
+                    }
+                },
+                OutputContains = new[]
+                {
+                    "The function \"MyHttpTriggerFunction\" was created successfully from the \"HttpTrigger\" template."
+                }
+            }, _output);
+        }
     }
 }

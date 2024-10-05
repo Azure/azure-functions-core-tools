@@ -412,6 +412,24 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public Task init_with_dotnet9Isolated_dockerfile()
+        {
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[] { $"init . --worker-runtime dotnet-isolated --target-framework net9.0 --docker" },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated9.0" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" }
+            }, _output);
+        }
+
+        [Fact]
         public Task init_with_Dockerfile_for_csx()
         {
             return CliTester.Run(new RunConfiguration
@@ -875,6 +893,33 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("dotnet-isolated","4", "net6.0")]
+        [InlineData("dotnet-isolated", "4", "net7.0")]
+        [InlineData("dotnet-isolated","4", "net8.0")]
+        public Task init_docker_only_for_existing_project_TargetFramework(string workerRuntime, string version, string TargetFramework)
+        {
+           var TargetFrameworkstr = TargetFramework.Replace("net", string.Empty);
+            return CliTester.Run(new RunConfiguration
+            {
+                Commands = new[]
+                {
+                    $"init . --worker-runtime {workerRuntime} --target-framework {TargetFramework}",
+                    $"init . --docker-only",
+                },
+                CheckFiles = new[]
+                {
+                    new FileResult
+                    {
+                        Name = "Dockerfile",
+                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/{workerRuntime}:{version}-{workerRuntime}{TargetFrameworkstr}" }
+                    }
+                },
+                OutputContains = new[] { "Dockerfile" },
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
     }
