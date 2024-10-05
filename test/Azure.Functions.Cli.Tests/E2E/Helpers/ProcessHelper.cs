@@ -80,12 +80,17 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
         public static int GetAvailablePort()
         {
-            using (TcpListener listener = new TcpListener(IPAddress.Loopback, 0))
+            TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
+            try
             {
                 listener.Start();
                 int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                listener.Stop();
                 return port;
+            }
+            finally
+            {
+                listener.Stop();
+                listener.Server.Dispose();
             }
         }
 
