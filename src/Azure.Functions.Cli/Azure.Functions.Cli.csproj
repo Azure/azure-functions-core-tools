@@ -32,10 +32,6 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
   </PropertyGroup>
-  <!-- SkipInProcessHost build property will be True for artifacts used by VS feed -->
-  <PropertyGroup Condition="'$(SkipInProcessHost)' == 'True'">
-    <DefineConstants>SkipInProcessHost</DefineConstants>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
