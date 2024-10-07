@@ -47,11 +47,10 @@ namespace CoreToolsHost
 
         private static bool ElementExistsWithValue(JsonElement element, string key, string value)
         {
-
             return !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value)
                 && element.TryGetProperty(key, out JsonElement property) 
-                && !string.IsNullOrEmpty(property.GetString()) 
-                && property.GetString() == value;
+                && !string.IsNullOrEmpty(property.ToString()) 
+                && property.ToString() == value;
         }
 
         private static void LoadHostAssembly(AppLoader appLoader, string[] args, bool isNet8InProc)
