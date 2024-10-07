@@ -21,22 +21,21 @@ namespace Azure.Functions.Cli
             {
                 ColoredConsole.WriteLine($"{Constants.CliVersion}");
                 Environment.Exit(ExitCodes.Success);
+                return;
             }
-            else
+
+            FirstTimeCliExperience();
+            SetupGlobalExceptionHandler();
+            SetCoreToolsEnvironmentVariables(args);
+            _container = InitializeAutofacContainer();
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+
+            Console.CancelKeyPress += (s, e) =>
             {
-                FirstTimeCliExperience();
-                SetupGlobalExceptionHandler();
-                SetCoreToolsEnvironmentVariables(args);
-                _container = InitializeAutofacContainer();
-                AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+                _container.Resolve<IProcessManager>()?.KillChildProcesses();
+            };
 
-                Console.CancelKeyPress += (s, e) =>
-                {
-                    _container.Resolve<IProcessManager>()?.KillChildProcesses();
-                };
-
-                ConsoleApp.Run<Program>(args, _container);
-            }
+            ConsoleApp.Run<Program>(args, _container);
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
