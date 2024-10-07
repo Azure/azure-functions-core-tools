@@ -16,7 +16,6 @@ namespace Build
 {
     public static class BuildSteps
     {
-        private const string Net8ArtifactNameSuffix = "_net8";
         private static readonly string _wwwroot = Environment.ExpandEnvironmentVariables(@"%HOME%\site\wwwroot");
         private static IntegrationTestBuildManifest _integrationManifest;
 
@@ -116,17 +115,12 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                ExecuteDotnetPublish(outputPath, rid, "net8.0", skipLaunchingNet8ChildProcess: isMinVersion);
+                ExecuteDotnetPublish(outputPath, rid, "net8.0");
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
                     CreateMinConfigurationFile(outputPath);
                 }
-
-                // Publish net8 version of the artifact as well.
-                var outputPathNet8 = BuildNet8ArtifactFullPath(runtime);
-                ExecuteDotnetPublish(outputPathNet8, rid, "net8.0", skipLaunchingNet8ChildProcess: true);
-                RemoveLanguageWorkers(outputPathNet8);
             }
 
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
@@ -135,18 +129,10 @@ namespace Build
             }
         }
 
-        private static string BuildNet8ArtifactFullPath(string runtime)
-        {
-            return Path.Combine(Settings.OutputDir, BuildNet8ArtifactDirectory(runtime));
-        }
-
-        private static string BuildNet8ArtifactDirectory(string runtime) => $"{runtime}{Net8ArtifactNameSuffix}";
-
-        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, bool skipLaunchingNet8ChildProcess)
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework)
         {
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
-                                $"/p:SkipInProcessHost=\"{skipLaunchingNet8ChildProcess}\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +
@@ -568,11 +554,6 @@ namespace Build
                 var zipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}.{version}.zip");
                 CreateZipFromArtifact(artifactPath, zipPath);
 
-                // Zip the .net8 version as well.
-                var net8Path = BuildNet8ArtifactFullPath(runtime);
-                var net8ZipPath = Path.Combine(Settings.OutputDir, $"Azure.Functions.Cli.{runtime}{Net8ArtifactNameSuffix}.{version}.zip");
-                CreateZipFromArtifact(net8Path, net8ZipPath);
-
 
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
                 // the ./generateMsiFiles.ps1 script
@@ -581,7 +562,6 @@ namespace Build
                     try
                     {
                         Directory.Delete(artifactPath, recursive: true);
-                        Directory.Delete(net8Path, recursive: true);
                     }
                     catch (Exception ex)
                     {
@@ -615,7 +595,7 @@ namespace Build
             Directory.CreateDirectory(Settings.SBOMManifestTelemetryDir);
             // Generate the SBOM manifest for each artifactDirectory
 
-            var allArtifactDirectories = Settings.TargetRuntimes.Concat(Settings.TargetRuntimes.Select(r => BuildNet8ArtifactDirectory(r)));
+            var allArtifactDirectories = Settings.TargetRuntimes.Concat(Settings.TargetRuntimes);
 
             foreach (var artifactDirectory in allArtifactDirectories)
             {
@@ -700,17 +680,15 @@ namespace Build
         private static IEnumerable<string> GetAllTargetRuntimes()
         {
             var targetRuntimes = Settings.TargetRuntimes;
-            var net8Runtimes = targetRuntimes.Select(r => BuildNet8ArtifactDirectory(r));
 
-            return targetRuntimes.Concat(net8Runtimes);
+            return targetRuntimes;
         }
 
         private static IEnumerable<string> GetAllRuntimesToSign()
         {
             var runtimeToSign = Settings.SignInfo.RuntimesToSign;
-            var net8Runtimes = runtimeToSign.Select(r => BuildNet8ArtifactDirectory(r));
 
-            return runtimeToSign.Concat(net8Runtimes);
+            return runtimeToSign;
         }
 
         public static void AddGoZip()
@@ -728,8 +706,6 @@ namespace Build
             foreach (var runtime in combinedRuntimesToSign)
             {
                 var runtimeId = GetRuntimeId(runtime);
-                // Remove the Net8ArtifactNameSuffix suffix if present
-                runtimeId = runtimeId.Replace(Net8ArtifactNameSuffix, "");
                 if (runtimeToGoEnv.TryGetValue(runtimeId, out var goEnv))
                 {
                     Environment.SetEnvironmentVariable("CGO_ENABLED", "0");
