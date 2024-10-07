@@ -208,12 +208,12 @@ namespace Azure.Functions.ArtifactAssembler
             });
 
             await Task.WhenAll(packTasks);
-            Console.WriteLine($"Finished assembling Visual Studio Core Tools artifacts");
+            Console.WriteLine("Finished assembling Visual Studio Core Tools artifacts");
         }
 
         private async Task CreateCliCoreToolsAsync()
         {
-            Console.WriteLine($"Starting to assemble CLI Core Tools artifacts");
+            Console.WriteLine("Starting to assemble CLI Core Tools artifacts");
 
             // Create a directory to store the assembled artifacts.
             var cliCoreToolsTargetArtifactDir = Path.Combine(_stagingDirectory, CliOutputArtifactDirectoryName);
@@ -286,7 +286,7 @@ namespace Azure.Functions.ArtifactAssembler
             Directory.Delete(_coreToolsHostExtractedRootDir, true);
             Directory.Delete(_outOfProcExtractedRootDir, true);
 
-            Console.WriteLine($"Finished assembling CLI Core Tools artifacts");
+            Console.WriteLine("Finished assembling CLI Core Tools artifacts");
         }
 
         private (string artifactDirectory, string version) GetArtifactDirectoryAndVersionNumber(string extractedRootDirectory, string artifactName)
@@ -335,7 +335,7 @@ namespace Azure.Functions.ArtifactAssembler
         {
             if (!Directory.Exists(zipSourceDir))
             {
-                Console.WriteLine($"Directory {zipSourceDir} does not exist.");
+                Console.WriteLine("Directory {zipSourceDir} does not exist.");
                 return;
             }
 
