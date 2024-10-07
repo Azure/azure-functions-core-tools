@@ -23,18 +23,19 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 # Get runtime version
 $buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
-$cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Object -First 1
-$cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
-$directory = Get-ChildItem -Path $ArtifactsPath -Directory | Select-Object -First 1
+$cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse |
+    Where-Object { 
+        # Get the parent directory of func.dll
+        $parentDir = Split-Path $_.FullName -Parent
 
-# Extract the last 4 digits from the directory name
-if ($directory.Name -match "\d{4}$") {
-    $buildNumberForZipFile = $matches[0]
-    Write-Host "Build number: $buildNumberForZipFile"
-    Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
-} else {
-    Write-Output "Did not find build number."
-}
+        # Ensure that the func.dll is not inside inproc6 or inproc8
+        (Split-Path $parentDir -Parent) -eq $ArtifactsPath
+    } |
+    Select-Object -First 1 # Only get the first matching func.dll
+$cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
+$buildNumberForZipFile = ($cliVersion -split "\.")[2]
+Write-Host "Build number: $buildNumberForZipFile"
+Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
 
 # Define the platforms to search for
 $platforms = @('x64', 'x86')
@@ -65,7 +66,7 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
 
         $masterWxsName = "funcinstall"
         $fragmentName = "$matchedPlatform-frag"
-        $msiName = "func-cli-$buildNumberForZipFile-$matchedPlatform"
+        $msiName = "func-cli-$cliVersion-$matchedPlatform"
 
         $masterWxsPath = "$buildDir\$masterWxsName.wxs"
         $fragmentPath = "$buildDir\$fragmentName.wxs"
