@@ -23,6 +23,8 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 # Get runtime version
 $buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
+$cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Object -First 1
+$cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 $directory = Get-ChildItem -Path $ArtifactsPath -Directory | Select-Object -First 1
 
 # Extract the last 4 digits from the directory name
@@ -70,7 +72,7 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         $msiPath = "$artifactsPath\$msiName.msi"
 
         & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
-        & { candle -arch $matchedPlatform -dPlatform="$matchedPlatform" -dSource='.' -dProductVersion="$buildNumberForZipFile" $masterWxsPath $fragmentPath }
+        & { candle -arch $matchedPlatform -dPlatform="$matchedPlatform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
         & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
     
         # Check that the .msi files are actually present
