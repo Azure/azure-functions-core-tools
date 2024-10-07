@@ -21,13 +21,16 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$buildDir = "$baseDir\..\..\build"
-Write-Host "Build directory: $buildDir"
-$cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse | Select-Object -First 1
-$cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
-$buildNumberForZipFile = ($cliVersion -split "\.")[2]
-Write-Host "Build number: $buildNumberForZipFile"
-Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
+$directory = Get-ChildItem -Path $ArtifactsPath -Directory | Select-Object -First 1
+
+# Extract the last 4 digits from the directory name
+if ($directory.Name -match "\d{4}$") {
+    $buildNumberForZipFile = $matches[0]
+    Write-Host "Build number: $buildNumberForZipFile"
+    Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
+} else {
+    Write-Output "Did not find build number."
+}
 
 # Define the platforms to search for
 $platforms = @('x64', 'x86')
