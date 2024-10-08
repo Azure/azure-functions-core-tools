@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -14,9 +16,9 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         private static readonly Regex pidRegex = new Regex(@"LISTENING\s+(\d+)\s*$");
         private static string FunctionsHostUrl = "http://localhost";
 
-        public static async Task WaitForFunctionHostToStart(Process funcProcess, string port)
+        public static async Task WaitForFunctionHostToStart(Process funcProcess, int port)
         {
-            var url = $"{FunctionsHostUrl}:{port}";
+            var url = $"{FunctionsHostUrl}:{port.ToString()}";
             using var httpClient = new HttpClient();
 
             await RetryHelper.RetryAsync(async () =>
@@ -41,7 +43,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             });
         }
 
-        public static void TryKillProcessForPort(string port)
+        public static void TryKillProcessForPort(int port)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -73,6 +75,22 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             if (killResult == null)
             {
                 Console.WriteLine($"Unable to kill the process (PID: {pid}) running on port '{port}'");
+            }
+        }
+
+        public static int GetAvailablePort()
+        {
+            TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
+            try
+            {
+                listener.Start();
+                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                return port;
+            }
+            finally
+            {
+                listener.Stop();
+                listener.Server.Dispose();
             }
         }
 

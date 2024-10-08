@@ -17,15 +17,23 @@ namespace Azure.Functions.Cli.Tests.E2E
 {
     public class StartTests : BaseE2ETest, IAsyncLifetime
     {
-        private int _port;
+        private int _funcHostPort;
         private const string _serverNotReady = "Host was not ready after 10 seconds";
 
         public StartTests(ITestOutputHelper output) : base(output) { }
 
         public async Task InitializeAsync()
         {
-            // Set as default port for majority of tests
-            _port = 7071;
+            try
+            {
+                _funcHostPort = ProcessHelper.GetAvailablePort();
+            }
+            catch
+            {
+                // Just use default func host port if we encounter any issues
+                _funcHostPort = 7071;
+            }
+
             await Task.CompletedTask;
         }
 
@@ -47,13 +55,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start"
+                        $"start --port {_funcHostPort}"
                     },
                     ExpectExit = false,
                     CommandTimeout = TimeSpan.FromMinutes(300),
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -84,13 +92,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start"
+                        $"start --port {_funcHostPort}"
                     },
                     ExpectExit = false,
                     OutputContains = new[]
                     {
                         "Functions:",
-                        "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
+                        $"HttpTrigger: [GET,POST] http://localhost:{_funcHostPort}/api/HttpTrigger"
                     },
                     OutputDoesntContain = new string[]
                     {
@@ -99,7 +107,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -130,13 +138,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "start"
+                        $"start --port {_funcHostPort}"
                     },
                     ExpectExit = false,
                     OutputContains = new[]
                     {
                         "Functions:",
-                        "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
+                        $"HttpTrigger: [GET,POST] http://localhost:{_funcHostPort}/api/HttpTrigger"
                     },
                     OutputDoesntContain = new string[]
                     {
@@ -145,7 +153,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -162,8 +170,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task Start_InProc_SuccessfulFunctionExecution()
         {
-            _port = 7073;
-
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
@@ -176,15 +182,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 new RunConfiguration
                 {
-                    HostProcessPort = "7073",
                     Commands = new[]
                     {
-                        "start --build --port 7073"
+                        $"start --build --port {_funcHostPort}"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -202,8 +207,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task Start_InProc_Net8_SuccessfulFunctionExecution()
         {
-            _port = 7073;
-
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
@@ -216,15 +219,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 new RunConfiguration
                 {
-                    HostProcessPort = "7073",
                     Commands = new[]
                     {
-                        "start --port 7073 --verbose"
+                        $"start --port {_funcHostPort} --verbose"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -248,8 +250,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
         {
-            _port = 7073;
-
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
@@ -264,15 +264,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                 },
                 new RunConfiguration
                 {
-                    HostProcessPort = "7073",
                     Commands = new[]
                     {
-                        "start --build --port 7073"
+                        $"start --build --port {_funcHostPort}"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -302,9 +301,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                new RunConfiguration
                {
                    WaitForRunningHostState = true,
+                   HostProcessPort = _funcHostPort,
                    Commands = new[]
                    {
-                       "start --verbose --language-worker -- \"--inspect=5050\""
+                       $"start --port {_funcHostPort} --verbose --language-worker -- \"--inspect=5050\""
                    },
                    ExpectExit = false,
                    OutputContains = new[]
@@ -324,7 +324,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task Start_PortInUse_FailsWithExpectedError()
         {
-           var tcpListner = new TcpListener(IPAddress.Any, 8081);
+           var tcpListner = new TcpListener(IPAddress.Any, _funcHostPort);
            try
            {
                tcpListner.Start();
@@ -341,14 +341,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    new RunConfiguration
                    {
-                       HostProcessPort = "8081",
                        Commands = new[]
                        {
-                           "start --port 8081"
+                            $"start --port {_funcHostPort}"
                        },
                        ExpectExit = true,
                        ExitInError = true,
-                       ErrorContains = new[] { "Port 8081 is unavailable" },
+                       ErrorContains = new[] { $"Port {_funcHostPort} is unavailable" },
                        CommandTimeout = TimeSpan.FromSeconds(300)
                    }
                }, _output);
@@ -362,8 +361,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task Start_EmptyEnvVars_HandledAsExpected()
         {
-            _port = 6543;
-
            await CliTester.Run(new RunConfiguration[]
            {
                new RunConfiguration
@@ -385,15 +382,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                },
                new RunConfiguration
                {
-                   HostProcessPort = "6543",
                    Commands = new[]
                    {
-                       "start --port 6543"
+                        $"start --port {_funcHostPort}"
                    },
                    ExpectExit = false,
                    Test = async (w, p, _) =>
                    {
-                       using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:6543/") })
+                       using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                        {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
@@ -430,12 +426,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                {
                    Commands = new[]
                    {
-                       "start --functions http2 http1"
+                       $"start --functions http2 http1 --port {_funcHostPort}"
                    },
                    ExpectExit = false,
                    Test = async (workingDir, p, _) =>
                    {
-                       using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                       using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                        {
                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                            var response = await client.GetAsync("/api/http1?name=Test");
@@ -471,9 +467,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                new RunConfiguration
                {
                    WaitForRunningHostState = true,
+                   HostProcessPort = _funcHostPort,
                    Commands = new[]
                    {
-                       "start"
+                       $"start --port {_funcHostPort}"
                    },
                    ExpectExit = false,
                    OutputContains = new[]
@@ -515,9 +512,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                 new RunConfiguration
                 {
                     WaitForRunningHostState = true,
+                    HostProcessPort = _funcHostPort,
                     Commands = new[]
                     {
-                        "start"
+                        $"start --port {_funcHostPort}"
                     },
                     ExpectExit = false,
                     OutputContains = new []
@@ -564,9 +562,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                new RunConfiguration
                {
                    WaitForRunningHostState = true,
+                   HostProcessPort = _funcHostPort,
                    Commands = new[]
                    {
-                       "start"
+                       $"start --port {_funcHostPort}"
                    },
                    ExpectExit = false,
                    OutputContains = new []
@@ -606,9 +605,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                new RunConfiguration
                {
                    WaitForRunningHostState = true,
+                   HostProcessPort = _funcHostPort,
                    Commands = new[]
                    {
-                       "start"
+                       $"start --port {_funcHostPort}"
                    },
                    ExpectExit = false,
                    OutputContains = new []
@@ -648,9 +648,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                new RunConfiguration
                {
                    WaitForRunningHostState = true,
+                   HostProcessPort = _funcHostPort,
                    Commands = new[]
                    {
-                       "start"
+                       $"start --port {_funcHostPort}"
                    },
                    ExpectExit = false,
                    OutputContains = new []
@@ -696,7 +697,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                {
                    Commands = new[]
                    {
-                       "start"
+                       $"start --port {_funcHostPort}"
                    },
                    ExpectExit = true,
                    ExitInError = true,
@@ -730,7 +731,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                {
                    Commands = new[]
                    {
-                       "start"
+                       $"start --port {_funcHostPort}"
                    },
                    ExpectExit = true,
                    ExitInError = true,
@@ -794,7 +795,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Commands = new[]
                     {
-                        "start --functions http1 --" + language,
+                        $"start --functions http1 --{language} --port {_funcHostPort}",
                     },
                     ExpectExit = false,
                     OutputContains = new string[]
@@ -804,7 +805,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     CommandTimeout = TimeSpan.FromSeconds(300),
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/http1?name=Test");
@@ -873,7 +874,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Commands = new[]
                     {
-                        "start --functions http1 --csharp",
+                        $"start --functions http1 --csharp --port {_funcHostPort}",
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
                     ExpectExit = true,
@@ -940,7 +941,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Commands = new[]
                     {
-                        "start --functions http1 --csharp",
+                        $"start --functions http1 --csharp --port {_funcHostPort}",
                     },
                     ExpectExit = false,
                     OutputContains = new[]
@@ -950,7 +951,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (workingDir, p, _) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
                             var response = await client.GetAsync("/api/http1?name=Test");
@@ -1015,7 +1016,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         public async Task DisposeAsync()
         {
-            ProcessHelper.TryKillProcessForPort(_port.ToString());
+            ProcessHelper.TryKillProcessForPort(_funcHostPort);
             await Task.CompletedTask;
         }
     }
