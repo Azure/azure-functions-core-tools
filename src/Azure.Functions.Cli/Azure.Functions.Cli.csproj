@@ -293,6 +293,7 @@
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
   </ItemGroup>
+  <!-- System.Text.Json is a transitive dependency that we need to explicitly add -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
     <PackageReference Include="System.Text.Json" Version="6.0.10" />
   </ItemGroup>
