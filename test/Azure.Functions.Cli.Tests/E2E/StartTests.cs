@@ -740,7 +740,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Theory]
         [InlineData("dotnet")]
-        [InlineData("dotnet-isolated")]
+        // [InlineData("dotnet-isolated")] Skip due to dotnet error on x86: https://github.com/Azure/azure-functions-core-tools/issues/3873
         public async Task Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution(string language)
         {
             await CliTester.Run(new RunConfiguration[]
