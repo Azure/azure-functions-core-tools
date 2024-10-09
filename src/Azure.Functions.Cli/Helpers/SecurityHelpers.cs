@@ -121,6 +121,10 @@ namespace Azure.Functions.Cli.Helpers
             return new X509Certificate2($"{certFileNames}certificate.pfx", DEFAULT_PASSWORD);
         }
 
+        // Suppressing CodeQL warning because this code is only used to validate blob content. Not used to encrypt any secrets
+        // blobClient only provides md5 string for validation. We cannot replace that unless they provide something else for validation
+        // TODO: Find out if 
+#pragma warning disable CodeQL.SM02196
         public static string CalculateMd5(Stream stream)
         {
             using (var md5 = MD5.Create())
@@ -131,6 +135,8 @@ namespace Azure.Functions.Cli.Helpers
                 return base64String;
             }
         }
+#pragma warning restore CodeQL.SM02196
+
 
         public static string CalculateMd5(string file)
         {
