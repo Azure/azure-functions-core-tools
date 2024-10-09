@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
@@ -297,6 +297,13 @@
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
 
     <!-- Transitive dependency -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+  <!-- System.Text.Json is a transitive dependency that we need to explicitly add -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <PackageReference Include="System.Text.Json" Version="6.0.10" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
