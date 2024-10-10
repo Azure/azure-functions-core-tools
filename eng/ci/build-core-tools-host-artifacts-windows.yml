@@ -2,17 +2,6 @@ trigger:
   branches:
     include:
     - feature/*
-  paths:
-    include:
-      - ./host/src/**
-
-pr:
-  branches:
-    include:
-    - feature/*
-  paths:
-    include:
-      - ./host/src/**
 
 resources:
   repositories:
