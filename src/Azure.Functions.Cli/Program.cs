@@ -4,14 +4,26 @@ using Autofac;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
 
 namespace Azure.Functions.Cli
 {
     internal class Program
     {
         static IContainer _container;
+        private readonly static string[] _versionArgs = new[] { "version", "v" };
+
         internal static void Main(string[] args)
         {
+            // Check for version arg up front and prioritize speed over all else
+            // Tools like VS Code may call this often and we want their UI to be responsive
+            if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
+            {
+                ColoredConsole.WriteLine($"{Constants.CliVersion}");
+                Environment.Exit(ExitCodes.Success);
+                return;
+            }
+
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
