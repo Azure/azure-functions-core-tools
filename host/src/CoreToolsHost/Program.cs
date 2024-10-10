@@ -12,6 +12,7 @@ namespace CoreToolsHost
         
         static async Task Main(string[] args)
         {
+            // test
             isVerbose = args.Contains(DotnetConstants.Verbose);
 
             Logger.LogVerbose(isVerbose, "Starting CoreToolsHost");
