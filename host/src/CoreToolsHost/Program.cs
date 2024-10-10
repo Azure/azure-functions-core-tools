@@ -8,7 +8,6 @@ namespace CoreToolsHost
 {
     internal class Program
     {
-        // test
         static bool isVerbose = false;
         
         static async Task Main(string[] args)
