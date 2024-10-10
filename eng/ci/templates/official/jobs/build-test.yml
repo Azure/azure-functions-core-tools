@@ -4,7 +4,7 @@ jobs:
   timeoutInMinutes: "180"
   pool:
     name: 1es-pool-azfunc
-    image: 1es-windows-2022 
+    image: 1es-windows-2022
     os: windows
 
   variables:
@@ -12,6 +12,8 @@ jobs:
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
   steps:
+  - pwsh: . "tools/start-emulators.ps1" -NoWait
+    displayName: "Start emulators (NoWait)"
   - pwsh: |
       $simulateReleaseBuild = $null
       if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
@@ -89,7 +91,7 @@ jobs:
   - pwsh: |
       .\check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
-  
+
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll)'
@@ -174,7 +176,7 @@ jobs:
               "ToolVersion" : "1.0"
           }
         ]
-  
+
   - pwsh: |
       .\repackageBinaries.ps1
     displayName: Repackage signed binaries
@@ -200,7 +202,7 @@ jobs:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
     displayName: 'Generate MSI files'
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
-  
+
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'MSI Code Signing'
