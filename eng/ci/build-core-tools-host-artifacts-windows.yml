@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - feature/oop-host
+    - feature/*
   paths:
     include:
       - ./host/src/**
@@ -9,7 +9,7 @@ trigger:
 pr:
   branches:
     include:
-    - feature/oop-host
+    - feature/*
   paths:
     include:
       - ./host/src/**
