@@ -2,10 +2,6 @@ trigger:
   branches:
     include:
     - feature/*
-    - aibhandari/*
-  paths:
-    include:
-      - ./host/src/**
 
 resources:
   repositories:
