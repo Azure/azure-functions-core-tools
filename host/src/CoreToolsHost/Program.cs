@@ -50,7 +50,7 @@ namespace CoreToolsHost
             return !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value)
                 && element.TryGetProperty(key, out JsonElement property) 
                 && !string.IsNullOrEmpty(property.ToString()) 
-                && property.ToString() == value;
+                && string.Equals(property.ToString(), value, StringComparison.OrdinalIgnoreCase);   
         }
 
         private static void LoadHostAssembly(AppLoader appLoader, string[] args, bool isNet8InProc)
