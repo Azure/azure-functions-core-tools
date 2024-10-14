@@ -1,7 +1,14 @@
+pr: none
+
 trigger:
   branches:
     include:
-    - feature/*
+    - feature/oop-host
+  paths:
+    include:
+      - /host/src/*
+      - /host/src/*/*
+      - /host/src/*/*/*
 
 resources:
   repositories:
