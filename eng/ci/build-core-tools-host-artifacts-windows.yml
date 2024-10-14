@@ -12,6 +12,10 @@ trigger:
 
 resources:
   repositories:
+    - repository: 1es
+      type: git
+      name: 1ESPipelineTemplates/1ESPipelineTemplates
+      ref: refs/tags/release
     - repository: eng
       type: git
       name: engineering
