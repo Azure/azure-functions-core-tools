@@ -132,8 +132,6 @@ namespace Build
             }
         }
 
-
-
         public static void ExtractZipToDirectory(string zipFile, string to)
         {
             ZipFile.ExtractToDirectory(zipFile, to);
