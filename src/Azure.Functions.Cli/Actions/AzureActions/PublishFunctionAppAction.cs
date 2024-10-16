@@ -275,6 +275,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 workerRuntimeStr = functionApp.FunctionAppConfig.runtime.name;
             }
 
+            if (workerRuntime != WorkerRuntime.None) 
+            { 
+                throw new CliException($"Worker runtime is not set. Please set a valid runtime using {Constants.FunctionsWorkerRuntime}");
+            }
+
             if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr) || 
                 (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr))))
             {
@@ -296,10 +301,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             // TODO: Revisit this before GA
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to 'dotnet-isolated'"));
                             result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
-                        }
-                        else if (workerRuntime == WorkerRuntime.None)
-                        {
-                            throw new ArgumentException($"Your local project is set to '{workerRuntime}' is not a valid option. Options are {WorkerRuntimeLanguageHelper.GetAvailableOptions()}");
                         }
                         else
                         {

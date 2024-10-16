@@ -131,7 +131,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (string.IsNullOrWhiteSpace(workerRuntime))
             {
-                throw new ArgumentNullException(nameof(workerRuntime), "worker runtime can't be empty");
+                throw new ArgumentNullException(nameof(workerRuntime), "Worker runtime cannot be null or empty.");
             }
             else if (normalizeMap.ContainsKey(workerRuntime))
             {
@@ -206,11 +206,6 @@ namespace Azure.Functions.Cli.Helpers
         public static bool IsDotnetIsolated(WorkerRuntime worker)
         {
             return worker ==  WorkerRuntime.dotnetIsolated;
-        }
-
-        internal static string GetAvailableOptions()
-        {
-            return string.Join(", ", normalizeMap.Keys.Where(k => !string.Equals(k, "None", StringComparison.OrdinalIgnoreCase)));
         }
     }
 }

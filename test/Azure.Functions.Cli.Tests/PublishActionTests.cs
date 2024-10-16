@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.AzureActions;
@@ -153,6 +154,37 @@ namespace Azure.Functions.Cli.Tests
             var result = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(input);
 
             Assert.Equal(expected, result);
+        }
+
+        [Theory]
+        [InlineData("invalid-runtime")]
+        [InlineData("unknown")]
+        [InlineData("dotnet-isol")]
+        [InlineData("c-sharp")]
+        [InlineData("")]
+        [InlineData(null)]
+        public void NormalizeWorkerRuntime_InvalidInput(string inputString)
+        {
+            if (string.IsNullOrWhiteSpace(inputString))
+            {
+                var exception = Assert.Throws<ArgumentNullException>(() => WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(inputString));
+                Assert.StartsWith($"Worker runtime cannot be null or empty.", exception.Message);
+                Assert.Equal("workerRuntime", exception.ParamName);
+            }
+            else 
+            { 
+                var exception = Assert.Throws<ArgumentException>(() => WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(inputString));
+                Assert.Equal($"Worker runtime '{inputString}' is not a valid option. Options are {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}", exception.Message);
+            }
+        }
+
+        [Fact]
+        public void ValidateFunctionAppPublish_ThrowException_WhenWorkerRuntimeIsNone()
+        {
+            GlobalCoreToolsSettings.SetWorkerRuntime(WorkerRuntime.None);
+
+            var ex = Assert.Throws<InvalidOperationException>(() => GlobalCoreToolsSettings.CurrentWorkerRuntime);
+            Assert.Equal($"Worker runtime cannot be '{WorkerRuntime.None}'. Please set a valid runtime.", ex.Message);
         }
 
         private class TestAzureHelperService : AzureHelperService
