@@ -13,6 +13,13 @@ function main() {
     funcProc.on('exit', code => {
         process.exit(code);
     });
+
+    const exitHandler = (code) => {
+        funcProc.kill(code);
+    }
+
+    process.on('SIGINT', exitHandler);
+    process.on('SIGTERM', exitHandler);
 }
 
 main();
