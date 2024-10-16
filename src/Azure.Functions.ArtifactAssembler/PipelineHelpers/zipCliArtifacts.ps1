@@ -20,7 +20,7 @@ foreach ($dir in $directories) {
     $zipFile = "$StagingDirectory\$zipFileName"
     
     # Compress the directory into the zip file
-    Compress-Archive -Path $dir.FullName -DestinationPath $zipFile -Force
+    Compress-Archive -Path (Join-Path $dir.FullName "*") -DestinationPath $zipFile -Force
     
     # Check if the zip file was successfully created
     if (Test-Path -Path $zipFile) {
