@@ -95,7 +95,7 @@ winget install Microsoft.Azure.FunctionsCoreTools -v 3.0.3904
 #### Homebrew:
 
 ##### v4
-    
+
 ```bash
 brew tap azure/functions
 brew install azure-functions-core-tools@4
@@ -211,7 +211,7 @@ sudo apt-get install azure-functions-core-tools-2
     Using your preferred tool, unzip the downloaded release. To unzip into an `azure-functions-cli` directory using the `unzip` tool, run this command from the directory containing the downloaded release zip:
 
     ```bash
-    unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip
+    unzip -d azure-functions-cli Azure.Functions.Cli.linux-*.*.zip
     ```
 
 3. Make the `func` command executable
