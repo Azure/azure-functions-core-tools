@@ -10,7 +10,7 @@ $stagingCoreToolsVisualStudio = Join-Path $StagingDirectory "coretools-visualstu
 $oopVersion = (Get-ChildItem $stagingCoreToolsCli | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)$", '$1'
 
 # Get inProc Artifact Version
-$inProcVersion = (Get-ChildItem $stagingCoreToolsVisualStudio | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$", '$1'
+$inProcVersion = (Get-ChildItem $stagingCoreToolsVisualStudio -Filter "*.zip" | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)\.zip$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)\.zip$", '$1'
 
 # Get the current release number from ADO
 $releaseNumber = $env:RELEASE_RELEASEID
