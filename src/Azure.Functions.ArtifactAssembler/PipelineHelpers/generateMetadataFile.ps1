@@ -13,7 +13,7 @@ $oopVersion = (Get-ChildItem $stagingCoreToolsCli | Where-Object { $_.Name -matc
 $inProcVersion = (Get-ChildItem $stagingCoreToolsVisualStudio -Filter "*.zip" | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)\.zip$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)\.zip$", '$1'
 
 # Get the current release number from ADO
-$releaseNumberFull = $env:RELEASE_RELEASEID
+$releaseNumberFull = $env:RELEASE_RELEASENAME
 $releaseNumber = ($releaseNumberFull -replace '\D', '')
 
 # Create the JSON file
