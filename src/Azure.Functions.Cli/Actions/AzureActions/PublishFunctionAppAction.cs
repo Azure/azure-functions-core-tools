@@ -275,7 +275,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 workerRuntimeStr = functionApp.FunctionAppConfig.runtime.name;
             }
 
-            if (workerRuntime != WorkerRuntime.None) 
+            if (workerRuntime == WorkerRuntime.None) 
             { 
                 throw new CliException($"Worker runtime is not set. Please set a valid runtime using {Constants.FunctionsWorkerRuntime}");
             }
