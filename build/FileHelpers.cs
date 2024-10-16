@@ -119,7 +119,15 @@ namespace Build
             {
                 foreach (ZipArchiveEntry file in archive.Entries)
                 {
-                    file.ExtractToFile(Path.Combine(to, file.FullName), overwrite: true);
+                    string destFileName = Path.GetFullPath(Path.Combine(to, file.FullName));
+                    string fullDestDirPath = Path.GetFullPath(to + Path.DirectorySeparatorChar);
+
+                    if (!destFileName.StartsWith(fullDestDirPath))
+                    {
+                        throw new System.InvalidOperationException("Entry is outside the target dir: " + destFileName);
+                    }
+
+                    file.ExtractToFile(destFileName, overwrite: true);
                 }
             }
         }
