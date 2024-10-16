@@ -29,3 +29,8 @@ $jsonOutputPath = Join-Path $StagingDirectory "metadata.json"
 $metadata | ConvertTo-Json | Set-Content -Path $jsonOutputPath
 
 Write-Host "Metadata file generated successfully at $jsonOutputPath"
+
+# Read and print the JSON content
+$jsonContent = Get-Content -Path $jsonOutputPath
+Write-Host "Contents of metadata.json:"
+Write-Host $jsonContent
