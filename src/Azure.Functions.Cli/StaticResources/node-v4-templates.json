@@ -614,5 +614,131 @@
       "enabledInTryMode": false,
       "userPrompt": []
     }
+  },
+  {
+    "id": "OpenAI-Chat-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, input, output } = require('@azure/functions');\r\n\r\nconst CHAT_STORAGE_CONNECTION_SETTING = 'AzureWebJobsStorage';\r\nconst COLLECTION_NAME = 'ChatState';\r\n\r\nconst chatBotCreateOutput = output.generic({\r\n    type: 'assistantCreate',\r\n});\r\napp.http('CreateChatBot', {\r\n    methods: ['PUT'],\r\n    route: 'chats/{chatID}',\r\n    authLevel: 'function',\r\n    extraOutputs: [chatBotCreateOutput],\r\n    handler: async (request, context) => {\r\n        const chatID = request.params.chatID;\r\n        const inputJson = await request.json();\r\n        context.log(`Creating chat ${chatID} from input parameters ${JSON.stringify(inputJson)}`);\r\n        const createRequest = {\r\n            id: chatID,\r\n            instructions: inputJson.instructions,\r\n            chatStorageConnectionSetting: CHAT_STORAGE_CONNECTION_SETTING,\r\n            collectionName: COLLECTION_NAME,\r\n        };\r\n        context.extraOutputs.set(chatBotCreateOutput, createRequest);\r\n        return { status: 202, jsonBody: { chatId: chatID } };\r\n    },\r\n});\r\n\r\nconst assistantQueryInput = input.generic({\r\n    type: 'assistantQuery',\r\n    id: '{chatId}',\r\n    timestampUtc: '{Query.timestampUTC}',\r\n    chatStorageConnectionSetting: CHAT_STORAGE_CONNECTION_SETTING,\r\n    collectionName: COLLECTION_NAME,\r\n});\r\napp.http('GetChatState', {\r\n    methods: ['GET'],\r\n    route: 'chats/{chatID}',\r\n    authLevel: 'function',\r\n    extraInputs: [assistantQueryInput],\r\n    handler: async (_, context) => {\r\n        const chatState = context.extraInputs.get(assistantQueryInput);\r\n        return { status: 200, jsonBody: chatState };\r\n    },\r\n});\r\n\r\nconst assistantPostInput = input.generic({\r\n    type: 'assistantPost',\r\n    id: '{chatID}',\r\n    model: 'gpt-3.5-turbo',\r\n    userMessage: '{Query.message}',\r\n    chatStorageConnectionSetting: CHAT_STORAGE_CONNECTION_SETTING,\r\n    collectionName: COLLECTION_NAME,\r\n});\r\napp.http('PostUserResponse', {\r\n    methods: ['POST'],\r\n    route: 'chats/{chatID}',\r\n    authLevel: 'function',\r\n    extraInputs: [assistantPostInput],\r\n    handler: async (_, context) => {\r\n        const chatState = context.extraInputs.get(assistantPostInput);\r\n        const content = chatState.recentMessages[0].content;\r\n        return {\r\n            status: 200,\r\n            body: content,\r\n            headers: {\r\n                'Content-Type': 'text/plain',\r\n            },\r\n        };\r\n    },\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "openAIChat",
+      "description": "OpenAI Chat",
+      "name": "OpenAI Chat",
+      "language": "JavaScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OpenAI-Chat-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, HttpRequest, input, InvocationContext, output } from '@azure/functions';\r\n\r\nconst CHAT_STORAGE_CONNECTION_SETTING = 'AzureWebJobsStorage';\r\nconst COLLECTION_NAME = 'ChatState';\r\n\r\nconst chatBotCreateOutput = output.generic({\r\n    type: 'assistantCreate',\r\n});\r\napp.http('CreateChatBot', {\r\n    methods: ['PUT'],\r\n    route: 'chats/{chatID}',\r\n    authLevel: 'function',\r\n    extraOutputs: [chatBotCreateOutput],\r\n    handler: async (request: HttpRequest, context: InvocationContext) => {\r\n        const chatID = request.params.chatID;\r\n        const inputJson: any = await request.json();\r\n        context.log(`Creating chat ${chatID} from input parameters ${JSON.stringify(inputJson)}`);\r\n        const createRequest = {\r\n            id: chatID,\r\n            instructions: inputJson.instructions,\r\n            chatStorageConnectionSetting: CHAT_STORAGE_CONNECTION_SETTING,\r\n            collectionName: COLLECTION_NAME,\r\n        };\r\n        context.extraOutputs.set(chatBotCreateOutput, createRequest);\r\n        return { status: 202, jsonBody: { chatId: chatID } };\r\n    },\r\n});\r\n\r\nconst assistantQueryInput = input.generic({\r\n    type: 'assistantQuery',\r\n    id: '{chatId}',\r\n    timestampUtc: '{Query.timestampUTC}',\r\n    chatStorageConnectionSetting: CHAT_STORAGE_CONNECTION_SETTING,\r\n    collectionName: COLLECTION_NAME,\r\n});\r\napp.http('GetChatState', {\r\n    methods: ['GET'],\r\n    route: 'chats/{chatID}',\r\n    authLevel: 'function',\r\n    extraInputs: [assistantQueryInput],\r\n    handler: async (_, context) => {\r\n        const chatState: any = context.extraInputs.get(assistantQueryInput);\r\n        return { status: 200, jsonBody: chatState };\r\n    },\r\n});\r\n\r\nconst assistantPostInput = input.generic({\r\n    type: 'assistantPost',\r\n    id: '{chatID}',\r\n    model: 'gpt-3.5-turbo',\r\n    userMessage: '{Query.message}',\r\n    chatStorageConnectionSetting: CHAT_STORAGE_CONNECTION_SETTING,\r\n    collectionName: COLLECTION_NAME,\r\n});\r\napp.http('PostUserResponse', {\r\n    methods: ['POST'],\r\n    route: 'chats/{chatID}',\r\n    authLevel: 'function',\r\n    extraInputs: [assistantPostInput],\r\n    handler: async (_, context) => {\r\n        const chatState: any = context.extraInputs.get(assistantPostInput);\r\n        const content = chatState.recentMessages[0].content;\r\n        return {\r\n            status: 200,\r\n            body: content,\r\n            headers: {\r\n                'Content-Type': 'text/plain',\r\n            },\r\n        };\r\n    },\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "openAIChat",
+      "description": "OpenAI Chat",
+      "name": "OpenAI Chat",
+      "language": "TypeScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OpenAI-Embeddings-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, input } = require('@azure/functions');\r\n\r\nconst embeddingsHttpInput = input.generic({\r\n    input: '{RawText}',\r\n    inputType: 'RawText',\r\n    type: 'embeddings',\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('generateEmbeddings', {\r\n    methods: ['POST'],\r\n    route: 'embeddings',\r\n    authLevel: 'function',\r\n    extraInputs: [embeddingsHttpInput],\r\n    handler: async (request, context) => {\r\n        const requestBody = await request.json();\r\n        const response = context.extraInputs.get(embeddingsHttpInput);\r\n\r\n        context.log(\r\n            `Received ${response.count} embedding(s) for input text containing ${requestBody.RawText.length} characters.`\r\n        );\r\n\r\n        // TODO: Store the embeddings into a database or other storage.\r\n\r\n        return { status: 202 };\r\n    },\r\n});\r\n\r\nconst embeddingsFilePathInput = input.generic({\r\n    input: '{FilePath}',\r\n    inputType: 'FilePath',\r\n    type: 'embeddings',\r\n    maxChunkLength: 512,\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('getEmbeddingsFilePath', {\r\n    methods: ['POST'],\r\n    route: 'embeddings-from-file',\r\n    authLevel: 'function',\r\n    extraInputs: [embeddingsFilePathInput],\r\n    handler: async (request, context) => {\r\n        const requestBody = await request.json();\r\n        const response = context.extraInputs.get(embeddingsFilePathInput);\r\n\r\n        context.log(`Received ${response.count} embedding(s) for input file ${requestBody.FilePath}.`);\r\n\r\n        // TODO: Store the embeddings into a database or other storage.\r\n\r\n        return { status: 202 };\r\n    },\r\n});\r\n\r\nconst embeddingsUrlInput = input.generic({\r\n    input: '{Url}',\r\n    inputType: 'Url',\r\n    type: 'embeddings',\r\n    maxChunkLength: 512,\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('getEmbeddingsUrl', {\r\n    methods: ['POST'],\r\n    route: 'embeddings-from-url',\r\n    authLevel: 'function',\r\n    extraInputs: [embeddingsUrlInput],\r\n    handler: async (request, context) => {\r\n        const requestBody = await request.json();\r\n        const response = context.extraInputs.get(embeddingsUrlInput);\r\n\r\n        context.log(`Received ${response.count} embedding(s) for input url ${requestBody.Url}.`);\r\n\r\n        // TODO: Store the embeddings into a database or other storage.\r\n\r\n        return { status: 202 };\r\n    },\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "openAIEmbeddings",
+      "description": "OpenAI Embeddings",
+      "name": "OpenAI Embeddings",
+      "language": "JavaScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OpenAI-Embeddings-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, input } from '@azure/functions';\r\n\r\ninterface EmbeddingsHttpRequest {\r\n    RawText?: string;\r\n}\r\n\r\nconst embeddingsHttpInput = input.generic({\r\n    input: '{RawText}',\r\n    inputType: 'RawText',\r\n    type: 'embeddings',\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('generateEmbeddings', {\r\n    methods: ['POST'],\r\n    route: 'embeddings',\r\n    authLevel: 'function',\r\n    extraInputs: [embeddingsHttpInput],\r\n    handler: async (request, context) => {\r\n        const requestBody: EmbeddingsHttpRequest = await request.json();\r\n        const response: any = context.extraInputs.get(embeddingsHttpInput);\r\n\r\n        context.log(\r\n            `Received ${response.count} embedding(s) for input text containing ${requestBody.RawText.length} characters.`\r\n        );\r\n\r\n        // TODO: Store the embeddings into a database or other storage.\r\n\r\n        return { status: 202 };\r\n    },\r\n});\r\n\r\ninterface EmbeddingsFilePath {\r\n    FilePath?: string;\r\n}\r\n\r\nconst embeddingsFilePathInput = input.generic({\r\n    input: '{FilePath}',\r\n    inputType: 'FilePath',\r\n    type: 'embeddings',\r\n    maxChunkLength: 512,\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('getEmbeddingsFilePath', {\r\n    methods: ['POST'],\r\n    route: 'embeddings-from-file',\r\n    authLevel: 'function',\r\n    extraInputs: [embeddingsFilePathInput],\r\n    handler: async (request, context) => {\r\n        const requestBody: EmbeddingsFilePath = await request.json();\r\n        const response: any = context.extraInputs.get(embeddingsFilePathInput);\r\n\r\n        context.log(`Received ${response.count} embedding(s) for input file ${requestBody.FilePath}.`);\r\n\r\n        // TODO: Store the embeddings into a database or other storage.\r\n\r\n        return { status: 202 };\r\n    },\r\n});\r\n\r\ninterface EmbeddingsUrlPath {\r\n    Url?: string;\r\n}\r\n\r\nconst embeddingsUrlInput = input.generic({\r\n    input: '{Url}',\r\n    inputType: 'Url',\r\n    type: 'embeddings',\r\n    maxChunkLength: 512,\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('getEmbeddingsUrl', {\r\n    methods: ['POST'],\r\n    route: 'embeddings-from-url',\r\n    authLevel: 'function',\r\n    extraInputs: [embeddingsUrlInput],\r\n    handler: async (request, context) => {\r\n        const requestBody: EmbeddingsUrlPath = await request.json();\r\n        const response: any = context.extraInputs.get(embeddingsUrlInput);\r\n\r\n        context.log(`Received ${response.count} embedding(s) for input url ${requestBody.Url}.`);\r\n\r\n        // TODO: Store the embeddings into a database or other storage.\r\n\r\n        return { status: 202 };\r\n    },\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "openAIEmbeddings",
+      "description": "OpenAI Embeddings",
+      "name": "OpenAI Embeddings",
+      "language": "TypeScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OpenAI-TextCompletion-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { app, input } = require('@azure/functions');\r\n\r\n// This OpenAI completion input requires a {name} binding value.\r\nconst openAICompletionInput = input.generic({\r\n    prompt: 'Who is {name}?',\r\n    maxTokens: '100',\r\n    type: 'textCompletion',\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('whois', {\r\n    methods: ['GET'],\r\n    route: 'whois/{name}',\r\n    authLevel: 'function',\r\n    extraInputs: [openAICompletionInput],\r\n    handler: async (_request, context) => {\r\n        var response = context.extraInputs.get(openAICompletionInput);\r\n        return { body: response.content.trim() };\r\n    },\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "openAITextCompletion",
+      "description": "OpenAI Text Completion",
+      "name": "OpenAI Text Completion",
+      "language": "JavaScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OpenAI-TextCompletion-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { app, input } from '@azure/functions';\r\n\r\n// This OpenAI completion input requires a {name} binding value.\r\nconst openAICompletionInput = input.generic({\r\n    prompt: 'Who is {name}?',\r\n    maxTokens: '100',\r\n    type: 'textCompletion',\r\n    model: 'gpt-3.5-turbo',\r\n});\r\n\r\napp.http('whois', {\r\n    methods: ['GET'],\r\n    route: 'whois/{name}',\r\n    authLevel: 'function',\r\n    extraInputs: [openAICompletionInput],\r\n    handler: async (_request, context) => {\r\n        const response: any = context.extraInputs.get(openAICompletionInput);\r\n        return { body: response.content.trim() };\r\n    },\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "openAITextCompletion",
+      "description": "OpenAI Text Completion",
+      "name": "OpenAI Text Completion",
+      "language": "TypeScript",
+      "triggerType": "httpTrigger",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_api"
+      ],
+      "categoryStyle": "http",
+      "enabledInTryMode": true,
+      "userPrompt": []
+    }
   }
 ]
