@@ -26,7 +26,6 @@ namespace Azure.Functions.Cli
         private readonly string[] _args;
         private readonly IEnumerable<TypeAttributePair> _actionAttributes;
         private readonly string[] _helpArgs = new[] { "help", "h", "?" };
-        private readonly string[] _versionArgs = new[] { "version", "v" };
         private readonly TelemetryEvent _telemetryEvent;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
@@ -208,15 +207,6 @@ namespace Azure.Functions.Cli
         /// </summary>
         internal IAction Parse()
         {
-            if (_args.Length == 1 && _versionArgs.Any(va => _args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
-            {
-                _telemetryEvent.CommandName = "version";
-                _telemetryEvent.IActionName = null;
-                _telemetryEvent.Parameters = new List<string>();
-                _telemetryEvent.IsSuccessful = true;
-                ColoredConsole.WriteLine($"{Constants.CliVersion}");
-                return null;
-            }
             // If there is no args are passed, display help.
             // If args are passed and any it matched any of the strings in _helpArgs with a "-" then display help.
             // Otherwise, continue parsing.
@@ -387,14 +377,14 @@ namespace Azure.Functions.Cli
             {
                 // TODO: we can probably display help here as well.
                 // This happens for actions that expect an ordered untyped options.
-                ColoredConsole.Error.WriteLine(ex.Message);
+
                 // If we matched the action, we can log the invoke command
                 _telemetryEvent.CommandName = invokeCommand.ToString();
                 _telemetryEvent.IActionName = action.GetType().Name;
                 _telemetryEvent.Parameters = new List<string>();
                 _telemetryEvent.ParseError = true;
                 _telemetryEvent.IsSuccessful = false;
-                return null;
+                throw;
             }
         }
 

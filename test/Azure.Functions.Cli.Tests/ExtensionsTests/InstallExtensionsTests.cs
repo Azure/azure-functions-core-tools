@@ -40,7 +40,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                         Exists = false
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 

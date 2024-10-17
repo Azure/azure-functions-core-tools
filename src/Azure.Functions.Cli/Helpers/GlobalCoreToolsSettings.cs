@@ -11,13 +11,14 @@ namespace Azure.Functions.Cli.Helpers
     {
         private static WorkerRuntime _currentWorkerRuntime;
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
+
         public static WorkerRuntime CurrentWorkerRuntime
         {
             get
             {
                 if (_currentWorkerRuntime == WorkerRuntime.None)
                 {
-                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--csharp, --javascript, --typescript, --java, --python, --powershell, --custom]"));
+                    ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--dotnet-isolated, --dotnet, --javascript, --typescript, --java, --python, --powershell, --custom]"));
                 }
                 return _currentWorkerRuntime;
             }
@@ -76,7 +77,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     _currentWorkerRuntime = WorkerRuntime.powershell;
                 }
-                else if(args.Contains("--custom"))
+                else if (args.Contains("--custom"))
                 {
                     _currentWorkerRuntime = WorkerRuntime.custom;
                 }

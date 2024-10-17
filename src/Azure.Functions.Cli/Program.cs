@@ -1,23 +1,47 @@
 ﻿using System;
 using System.Linq;
 using Autofac;
-using Colors.Net;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
-using static Azure.Functions.Cli.Common.OutputTheme;
+using Colors.Net;
 
 namespace Azure.Functions.Cli
 {
     internal class Program
     {
+        static IContainer _container;
+        private readonly static string[] _versionArgs = new[] { "version", "v" };
+
         internal static void Main(string[] args)
         {
+            // Check for version arg up front and prioritize speed over all else
+            // Tools like VS Code may call this often and we want their UI to be responsive
+            if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
+            {
+                ColoredConsole.WriteLine($"{Constants.CliVersion}");
+                Environment.Exit(ExitCodes.Success);
+                return;
+            }
+
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
-            ConsoleApp.Run<Program>(args, InitializeAutofacContainer());
+            _container = InitializeAutofacContainer();
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+
+            Console.CancelKeyPress += (s, e) =>
+            {
+                _container.Resolve<IProcessManager>()?.KillChildProcesses();
+            };
+
+            ConsoleApp.Run<Program>(args, _container);
+        }
+
+        private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            var processManager = _container.Resolve<IProcessManager>();
+            processManager?.KillChildProcesses();
         }
 
         private static void SetupGlobalExceptionHandler()
@@ -67,7 +91,8 @@ namespace Azure.Functions.Cli
                 .ExternallyOwned();
 
             builder.RegisterType<ProcessManager>()
-                .As<IProcessManager>();
+                .As<IProcessManager>()
+                .SingleInstance();
 
             builder.RegisterType<SecretsManager>()
                 .As<ISecretsManager>();

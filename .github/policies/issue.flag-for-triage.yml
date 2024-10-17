@@ -1,0 +1,52 @@
+name: Flag for triage
+description: Add triage labels and default assignments to issues
+resource: repository
+configuration:
+  resourceManagementConfiguration:
+    eventResponderTasks:
+
+    - description: Add needs triage label to new issues
+      if:
+      - payloadType: Issues
+      - and:
+        - isAction:
+            action: Opened
+        - not:
+            isAssignedToSomeone
+      then:
+      - addLabel:
+          label: 'Needs: Triage (Functions)'
+
+    - description: Add needs attention label to reopened issues
+      if:
+      - payloadType: Issues
+      - and:
+        - isAction:
+            action: Reopened
+        - not:
+            hasLabel: 'Needs: Attention :wave:'
+      then:
+      - addLabel:
+          label: 'Needs: Attention :wave:'
+
+    - description: Assign issues when marked for triage or when attention needed again
+      if:
+      - payloadType: Issues
+      - isAction:
+          action: Labeled
+      - not:
+          isAssignedToSomeone
+      - or:
+        - labelAdded:
+            label: 'Needs: Triage (Functions)'
+        - labelAdded:
+            label: 'Needs: Attention :wave:'
+      then:
+      - assignIcmUsers:
+          teamId: 114785
+          primary: true
+          secondary: false
+      triggerOnOwnActions: true
+
+onFailure: 
+onSuccess: 

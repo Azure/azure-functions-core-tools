@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ContainerApps.Models;
 using Azure.Functions.Cli.Extensions;
+using Azure.Functions.Cli.StacksApi;
 using Colors.Net;
 using Microsoft.Azure.AppService.Middleware;
 using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
@@ -422,7 +423,36 @@ namespace Azure.Functions.Cli.Helpers
             site.Kind = armSite.kind;
             site.Sku = armSite.properties.sku;
             site.SiteName = armSite.name;
+            site.FunctionAppConfig = armSite.properties.functionAppConfig;
             return site;
+        }
+
+        public static async Task<bool> UpdateFlexRuntime(Site site, string runtimeName, string runtimeValue, string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.WebsitesApiVersion}");
+            var functionAppJson = await ArmHttpAsyncForFlex(HttpMethod.Get, url, accessToken);
+            dynamic functionApp = JsonConvert.DeserializeObject(functionAppJson);
+            var runtimeConfig = functionApp?.properties?.functionAppConfig?.runtime;
+
+            if (runtimeConfig == null)
+            {
+                return false;
+            }
+
+            runtimeConfig.name = runtimeName;
+            runtimeConfig.version = runtimeValue;
+
+            url = new Uri($"{managementURL}{site.SiteId}?api-version={ArmUriTemplates.FlexApiVersion}");
+            var result = await ArmHttpAsyncForFlex(new HttpMethod("PUT"), url, accessToken, functionApp);
+            return true;
+        }
+
+        private static async Task<string> ArmHttpAsyncForFlex(HttpMethod method, Uri uri, string accessToken, object payload = null)
+        {
+            var response = await ArmClient.HttpInvoke(method, uri, accessToken, payload, retryCount: 3);
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadAsStringAsync();
         }
 
         private static async Task<T> ArmHttpAsync<T>(HttpMethod method, Uri uri, string accessToken, object payload = null)
@@ -463,6 +493,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<HttpResult<Dictionary<string, string>, string>> UpdateFunctionAppAppSettings(Site site, string accessToken, string managementURL)
         {
             var url = new Uri($"{managementURL}{site.SiteId}/config/AppSettings?api-version={ArmUriTemplates.WebsitesApiVersion}");
+
             var response = await ArmClient.HttpInvoke(HttpMethod.Put, url, accessToken, new { properties = site.AzureAppSettings });
             if (response.IsSuccessStatusCode)
             {
@@ -673,6 +704,44 @@ namespace Azure.Functions.Cli.Helpers
             else
             {
                 return (null, null);
+            }
+        }
+
+        public static async Task<FunctionsStacks> GetFunctionsStacks(string accessToken, string managementURL)
+        {
+            var url = new Uri($"{managementURL}/providers/Microsoft.Web/functionAppStacks?api-version={ArmUriTemplates.FunctionsStacksApiVersion}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<FunctionsStacks>(content);
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static async Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string accessToken, string managementURL, string runtime, string region)
+        {
+            // API only supports dotnet as runtime. The dotnet-isolated is part of the dotnet for this API.
+            if (runtime.Equals("dotnet-isolated", StringComparison.OrdinalIgnoreCase))
+            {
+                runtime = "dotnet";
+            }
+
+            var url = new Uri($"{managementURL}//providers/Microsoft.Web/locations/{region}/functionAppStacks?api-version={ArmUriTemplates.FlexFunctionsStacksApiVersion}&removeHiddenStacks=true&removeDeprecatedStacks=true&stack={runtime}");
+            var response = await ArmClient.HttpInvoke(HttpMethod.Get, url, accessToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<FlexFunctionsStacks>(content);
+            }
+            else
+            {
+                return null;
             }
         }
     }

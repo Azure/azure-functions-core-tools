@@ -98,6 +98,7 @@ https.get(options, response => {
                     if (os.platform() === 'linux' || os.platform() === 'darwin') {
                         fs.chmodSync(`${installPath}/func`, 0o755);
                         fs.chmodSync(`${installPath}/gozip`, 0o755);
+                        fs.chmodSync(`${installPath}/in-proc8/func`, 0o755);
                     }
                 });
             });

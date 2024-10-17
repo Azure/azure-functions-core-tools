@@ -53,5 +53,7 @@ namespace Azure.Functions.Cli.Arm.Models
         {
             SiteId = siteId;
         }
+
+        public FunctionAppConfig FunctionAppConfig { get; set; }
     }
 }

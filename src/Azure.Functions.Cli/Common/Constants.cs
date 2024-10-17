@@ -44,6 +44,7 @@ namespace Azure.Functions.Cli.Common
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
         public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
         public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
+        public const string ScmDoBuildDuringDeployment = "SCM_DO_BUILD_DURING_DEPLOYMENT";
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";
         public const string WebsiteContentAzureFileConnectionString = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING";
         public const string WebsiteContentShared = "WEBSITE_CONTENTSHARE";
@@ -57,7 +58,6 @@ namespace Azure.Functions.Cli.Common
         public const string AuthLevelErrorMessage = "Unable to configure Authorization level. The selected template does not use Http Trigger";
         public const string HttpTriggerTemplateName = "HttpTrigger";
         public const string PowerShellWorkerDefaultVersion = "7.2";
-        public const string EnableWorkerIndexing = "EnableWorkerIndexing";
         public const string UserSecretsIdElementName = "UserSecretsId";
         public const string TargetFrameworkElementName = "TargetFramework";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
@@ -70,6 +70,7 @@ namespace Azure.Functions.Cli.Common
         public const string CoreToolsVersionsFeedUrl = "https://functionscdn.azureedge.net/public/cli-feed-v4.json";
         public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
         public const string GetFunctionNameParamId = "trigger-functionName";
+        public const string HttpTriggerAuthLevelParamId = "httpTrigger-authLevel";
         public const string GetFileNameParamId = "app-selectedFileName";
         public const string GetBluePrintFileNameParamId = "blueprint-fileName";
         public const string GetBluePrintExistingFileNameParamId = "blueprint-existingFileName";
@@ -88,7 +89,11 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionAppFailedToDeployOnContainerAppsMessage = "Failed to deploy function app to Container Apps.";
         public const string LocalSettingsJsonFileName = "local.settings.json";
         public const string EnableWorkerIndexEnvironmentVariableName = "FunctionsHostingConfig__WORKER_INDEXING_ENABLED";
-
+        public const string Dotnet = "dotnet";
+        public const string FunctionsInProcNet8Enabled = "FUNCTIONS_INPROC_NET8_ENABLED";
+        public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
+        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
+        // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
 
 
         public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);

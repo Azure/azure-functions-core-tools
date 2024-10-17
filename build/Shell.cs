@@ -25,7 +25,7 @@ namespace Build
 
             if (exitcode != 0)
             {
-                throw new Exception($"{program} Exit Code == {exitcode}");
+                throw new Exception($"{program} {arguments} Exit Code == {exitcode}");
             }
         }
 

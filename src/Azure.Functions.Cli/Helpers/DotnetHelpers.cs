@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
@@ -25,7 +26,47 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        public async static Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
+        /// <summary>
+        /// Function that determines TargetFramework of a project even when it's defined outside of the .csproj file,
+        /// e.g. in Directory.Build.props
+        /// </summary>
+        /// <param name="projectDirectory">Directory containing the .csproj file</param>
+        /// <param name="projectFilename">Name of the .csproj file</param>
+        /// <returns>Target framework, e.g. net8.0</returns>
+        /// <exception cref="CliException"></exception>
+        public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = null)
+        {
+            EnsureDotnet();
+            if (projectFilename == null) 
+            {
+                var projectFilePath = ProjectHelpers.FindProjectFile(projectDirectory);
+                if (projectFilePath != null)
+                {
+                    projectFilename = Path.GetFileName(projectFilePath);
+                }
+            }
+            var exe = new Executable(
+                "dotnet",
+                $"build {projectFilename} -getproperty:TargetFramework",
+                workingDirectory: projectDirectory,
+                environmentVariables: new Dictionary<string, string>
+                {
+                    // https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables
+                    ["DOTNET_NOLOGO"] = "1",  // do not write disclaimer to stdout
+                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1", // just in case
+                });
+
+            StringBuilder output = new();
+            var exitCode = await exe.RunAsync(o => output.Append(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+            if (exitCode != 0)
+            {
+                throw new CliException($"Can not determine target framework for dotnet project at ${projectDirectory}");
+            }
+
+            return output.ToString();
+        }
+
+        public static async Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
             await TemplateOperation(async () =>
             {
@@ -86,9 +127,11 @@ namespace Azure.Functions.Cli.Helpers
         private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
         {
             "blobtrigger" => "blob",
+            "eventgridblobtrigger" => "eventgridblob",
             "cosmosdbtrigger" => "cosmos",
             "durablefunctionsorchestration" => "durable",
             "eventgridtrigger" => "eventgrid",
+            "eventgridcloudeventtrigger" => "eventgridcloudevent",
             "eventhubtrigger" => "eventhub",
             "httptrigger" => "http",
             "iothubtrigger" => "iothub",
@@ -114,6 +157,7 @@ namespace Azure.Functions.Cli.Helpers
                     "QueueTrigger",
                     "HttpTrigger",
                     "BlobTrigger",
+                    "EventGridBlobTrigger",
                     "TimerTrigger",
                     "EventHubTrigger",
                     "ServiceBusQueueTrigger",
@@ -140,6 +184,7 @@ namespace Azure.Functions.Cli.Helpers
                 "ServiceBusQueueTrigger",
                 "ServiceBusTopicTrigger",
                 "EventGridTrigger",
+                "EventGridCloudEventTrigger",
                 "CosmosDBTrigger",
                 "IotHubTrigger",
                 "DaprPublishOutputBinding",
@@ -151,8 +196,9 @@ namespace Azure.Functions.Cli.Helpers
         public static bool CanDotnetBuild()
         {
             EnsureDotnet();
-            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
-            var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").ToList();
+            // dotnet build will only search for .csproj files within the current directory (when no .csproj file is passed), so we limit our search to that directory only
+            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
+            var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
             // If the project name is extensions only then is extensions.csproj a valid csproj file
             if (!Path.GetFileName(Environment.CurrentDirectory).Equals("extensions"))
             {
