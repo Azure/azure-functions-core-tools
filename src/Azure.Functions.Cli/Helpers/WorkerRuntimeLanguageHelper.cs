@@ -34,8 +34,7 @@ namespace Azure.Functions.Cli.Helpers
         };
 
         private static readonly IDictionary<string, WorkerRuntime> normalizeMap = availableWorkersRuntime
-            .Select(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = p.Key.ToString(), value = p.Key }))
-            .SelectMany(i => i)
+            .SelectMany(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = p.Key.ToString(), value = p.Key }))
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
 
         private static readonly IDictionary<WorkerRuntime, string> workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
@@ -132,7 +131,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (string.IsNullOrWhiteSpace(workerRuntime))
             {
-                throw new ArgumentNullException(nameof(workerRuntime), "worker runtime can't be empty");
+                throw new ArgumentNullException(nameof(workerRuntime), "Worker runtime cannot be null or empty.");
             }
             else if (normalizeMap.ContainsKey(workerRuntime))
             {
