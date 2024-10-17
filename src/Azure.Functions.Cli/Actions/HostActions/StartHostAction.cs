@@ -728,23 +728,25 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
+        
         private void CheckSettingFunctionWorkerRuntime()
         {
-            var setting = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
-            if (setting == null)
+            var workerRuntimeSettingValue = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            if (workerRuntimeSettingValue is not null)
             {
-                if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.None)
-                {
-                    SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
-                    IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
-                    string workerRuntimedisplay = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
-                    GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimedisplay)).Key;
-
-                }
-                var workerRuntime = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(GlobalCoreToolsSettings.CurrentWorkerRuntime);
-                _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, workerRuntime);
-                ColoredConsole.WriteLine(WarningColor($"'{workerRuntime}' has been set in your local.settings.json"));
+                return;
             }
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.None)
+            {
+                SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
+                IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
+                string workerRuntimeDisplay = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimeDisplay)).Key;
+            }
+
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(GlobalCoreToolsSettings.CurrentWorkerRuntime);
+            _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, workerRuntime);
+            ColoredConsole.WriteLine(WarningColor($"'{workerRuntime}' has been set in your local.settings.json"));
         }
 
     }
