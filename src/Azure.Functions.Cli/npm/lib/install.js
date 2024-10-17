@@ -5,6 +5,7 @@ const url = require('url');
 const HttpsProxyAgent = require('https-proxy-agent');
 const https = require('https');
 const version = require('../package.json').version;
+const consolidatedBuildId = "4.0." + require('../package.json').consolidatedBuildId;
 const chalk = require('chalk');
 const path = require('path');
 const fs = require('fs');
@@ -41,7 +42,7 @@ if (os.platform() === 'win32') {
 }
 
 const fileName = 'Azure.Functions.Cli.' + platform + '.' + version + '.zip';
-const endpoint = 'https://functionscdn.azureedge.net/public/' + version + '/' + fileName;
+const endpoint = 'https://functionscdn.azureedge.net/public/' + consolidatedBuildId + '/' + fileName;
 console.log('attempting to GET %j', endpoint);
 const options = url.parse(endpoint);
 // npm config preceed system environment
@@ -99,6 +100,7 @@ https.get(options, response => {
                         fs.chmodSync(`${installPath}/func`, 0o755);
                         fs.chmodSync(`${installPath}/gozip`, 0o755);
                         fs.chmodSync(`${installPath}/in-proc8/func`, 0o755);
+                        fs.chmodSync(`${installPath}/in-proc6/func`, 0o755);
                     }
                 });
             });
