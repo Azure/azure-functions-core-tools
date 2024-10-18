@@ -1,0 +1,23 @@
+trigger:
+  branches:
+    include:
+    # Below branches are examples for Azure/azure-functions-host. Replace with appropriate branches for your repository.
+    # Keep this set limited as appropriate (don't mirror individual user branches).
+    - v4.x
+    - v3.x
+    - release_4.0
+    - release_3.0
+    - release_4.0_hotfix
+
+resources:
+  repositories:
+  - repository: eng
+    type: git
+    name: engineering
+    ref: refs/tags/release
+
+variables:
+  - template: ci/variables/cfs.yml@eng
+
+extends:
+  template: ci/code-mirror.yml@eng

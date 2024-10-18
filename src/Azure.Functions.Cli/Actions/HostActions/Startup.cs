@@ -3,6 +3,7 @@ using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Azure.WebJobs.Script;
@@ -72,6 +73,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
                     .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
             }
+
+            services.AddSingleton<IAuthorizationHandler, CoreToolsAuthorizationHandler>();
 
             services.AddWebJobsScriptHostAuthorization();
 

@@ -6,5 +6,7 @@
         public const string TestResourceGroupNameWindows = "TEST_RESOURCE_GROUP_NAME_WINDOWS";
         public const string TestResourceGroupNameLinux = "TEST_RESOURCE_GROUP_NAME_LINUX";
         public const string EnableDeploymentTests = "ENABLE_DEPLOYMENT_TEST";
+        public const string CodeQLBuild = "CODEQL_BUILD";
+        public const string IsPublicBuild = "IsPublicBuild";
     }
 }

@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization;
+using Microsoft.Azure.WebJobs.Script.Description;
 
 namespace Azure.Functions.Cli.Actions.HostActions.WebHost.Security
 {
@@ -31,6 +34,16 @@ namespace Azure.Functions.Cli.Actions.HostActions.WebHost.Security
             AuthenticateResult result = AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name));
 
             return Task.FromResult(result);
+        }
+    }
+
+    public class CoreToolsAuthorizationHandler : AuthorizationHandler<FunctionAuthorizationRequirement, FunctionDescriptor>
+    {
+        protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, FunctionAuthorizationRequirement requirement, FunctionDescriptor resource)
+        {
+            context.Succeed(requirement);
+
+            return Task.CompletedTask;
         }
     }
 }

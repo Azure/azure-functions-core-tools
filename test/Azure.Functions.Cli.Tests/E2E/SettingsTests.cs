@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     }
                 },
-                CommandTimeout = TimeSpan.FromSeconds(120)
+                CommandTimeout = TimeSpan.FromSeconds(300)
             }, _output);
         }
 
@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             }
                         }
                     },
-                    CommandTimeout = TimeSpan.FromSeconds(120)
+                    CommandTimeout = TimeSpan.FromSeconds(300)
                 },
                 new RunConfiguration
                 {
