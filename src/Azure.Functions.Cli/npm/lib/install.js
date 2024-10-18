@@ -35,7 +35,11 @@ if (os.platform() === 'win32') {
         platform = 'osx-x64';
     }
 } else if (os.platform() === 'linux') {
-    platform = 'linux-x64';
+    if (os.arch() === 'arm64') {
+        platform = 'linux-arm64';
+    } else {
+        platform = 'linux-x64';
+    }
 } else {
     throw Error('platform ' + os.platform() + ' isn\'t supported');
 }
