@@ -35,7 +35,7 @@ namespace Azure.Functions.Cli.Helpers
         /// <param name="projectFilename">Name of the .csproj file</param>
         /// <returns>Target framework, e.g. net8.0</returns>
         /// <exception cref="CliException"></exception>
-        public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = null, string targetLanguage = "")
+        public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = null)
         {
             EnsureDotnet();
             if (projectFilename == null) 
