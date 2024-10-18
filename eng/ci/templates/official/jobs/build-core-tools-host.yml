@@ -7,9 +7,10 @@ jobs:
     os: windows
 
   steps:
-  - pwsh: |
-      Import-Module "./pipelineUtilities.psm1" -Force
   - task: UseDotNet@2
+    inputs:
+      version: 9.x
+      includePreviewVersions: true
     displayName: Install .NET
 
   - task: DotnetCoreCLI@2
