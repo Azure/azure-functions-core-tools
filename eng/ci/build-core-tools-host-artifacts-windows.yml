@@ -6,9 +6,7 @@ trigger:
     - feature/oop-host
   paths:
     include:
-      - /host/src/*
-      - /host/src/*/*
-      - /host/src/*/*/*
+      - /host/src/**
 
 resources:
   repositories:

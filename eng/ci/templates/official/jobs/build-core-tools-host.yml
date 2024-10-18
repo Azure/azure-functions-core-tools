@@ -9,6 +9,8 @@ jobs:
   steps:
   - task: UseDotNet@2
     displayName: Install .NET
+    inputs:
+      version: 9.x
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-x64)
