@@ -30,7 +30,6 @@ namespace Azure.Functions.ArtifactAssembler
 
         /// <summary>
         /// The artifacts for which we want to pack out-of-proc core tools with it (along with inproc6 and inproc8 directories).
-        /// This dictionary contains the artifact name and the corresponding runtime identifier value.
         /// </summary>
         private readonly string[] _cliArtifacts =
         {
@@ -247,6 +246,12 @@ namespace Azure.Functions.ArtifactAssembler
                 EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
                 await Task.Run(() => FileUtilities.CopyDirectory(outOfProcArtifactDirPath, consolidatedArtifactDirPath));
                 Directory.Delete(outOfProcArtifactDirPath, true);
+
+                // If we are currently on the minified version of the artifacts, we do not want the inproc6/inproc8 subfolders
+                if (artifactName.Contains("min.win"))
+                {
+                    continue;
+                }
 
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(inProc8ArtifactDirPath))
