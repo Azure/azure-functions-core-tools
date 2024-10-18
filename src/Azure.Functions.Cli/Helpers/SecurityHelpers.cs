@@ -121,6 +121,9 @@ namespace Azure.Functions.Cli.Helpers
             return new X509Certificate2($"{certFileNames}certificate.pfx", DEFAULT_PASSWORD);
         }
 
+
+        // CodeQL [SM02196] intent is to validate blob content. Not used to encrypt any secrets
+        // blobClient only provides md5 string for validation. We cannot replace that unless they provide something else for validation
         public static string CalculateMd5(Stream stream)
         {
             using (var md5 = MD5.Create())
