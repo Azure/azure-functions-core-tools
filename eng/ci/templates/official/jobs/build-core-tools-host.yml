@@ -35,30 +35,10 @@ jobs:
       arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
-  - task: CopyFiles@2
-    displayName: Copy files (win-x64)
-    inputs:
-      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
-      # Publish output will include many other files. We only need func.exe & nethost.dll
-      Contents: |
-        func.exe
-        nethost.dll
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-x64
-
-  - task: CopyFiles@2
-    displayName: Copy files (win-arm64)
-    inputs:
-      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
-      # Publish output will include many other files. We only need func.exe & nethost.dll
-      Contents: |
-        func.exe
-        nethost.dll
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-arm64
-
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll) (win-arm64)'
-      folderPath: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-arm64'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/windows/win-arm64'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
@@ -88,7 +68,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll) (win-x64)'
-      folderPath: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-x64'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/windows/win-x64'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
@@ -114,6 +94,26 @@ jobs:
               "ToolVersion": "1.0"
             }
         ]
+
+  - task: CopyFiles@2
+    displayName: Copy files (win-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
+      # Publish output will include many other files. We only need func.exe & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-x64
+
+  - task: CopyFiles@2
+    displayName: Copy files (win-arm64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
+      # Publish output will include many other files. We only need func.exe & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackagesWindows/win-arm64
  
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
