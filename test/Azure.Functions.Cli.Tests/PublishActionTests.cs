@@ -183,7 +183,7 @@ namespace Azure.Functions.Cli.Tests
         {
             GlobalCoreToolsSettings.SetWorkerRuntime(WorkerRuntime.None);
 
-            var ex = Assert.Throws<InvalidOperationException>(() => GlobalCoreToolsSettings.CurrentWorkerRuntime);
+            var ex = Assert.Throws<CliException>(() => GlobalCoreToolsSettings.CurrentWorkerRuntime);
             Assert.Equal($"Worker runtime cannot be '{WorkerRuntime.None}'. Please set a valid runtime.", ex.Message);
         }
 
