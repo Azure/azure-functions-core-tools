@@ -122,8 +122,8 @@ jobs:
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
       artifact: drop-coretools-host
       
-- job: BuildCoreToolsHostLinuxAndMac
-  displayName: '[Linux/Mac] Build CoreToolsHost'
+- job: BuildCoreToolsHostLinux
+  displayName: '[Linux] Build CoreToolsHost'
   pool:
     name: 1es-pool-azfunc
     image: 1es-ubuntu-22.04
@@ -149,25 +149,6 @@ jobs:
       arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/linux-x64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
-  - task: DotnetCoreCLI@2
-    displayName: Dotnet Publish (osx-x64)
-    inputs:
-      command: publish
-      publishWebProjects: false
-      zipAfterPublish: false
-      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/osx-x64 --self-contained
-      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
-
-  - task: DotnetCoreCLI@2
-    displayName: Dotnet Publish (osx-arm64)
-    inputs:
-      command: publish
-      publishWebProjects: false
-      zipAfterPublish: false
-      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/osx-arm64 --self-contained
-      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
-
- 
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll) (linux-x64)'
@@ -197,6 +178,59 @@ jobs:
               "ToolVersion": "1.0"
             }
         ]
+
+  - task: CopyFiles@2
+    displayName: Copy files (linux-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
+      # Publish output will include many other files. We only need func.exe & nethost.dll
+      Contents: |
+        func.exe
+        nethost.dll
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
+      artifact: drop-coretools-host
+
+- job: BuildCoreToolsHostMac
+  displayName: '[Mac] Build CoreToolsHost'
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-ubuntu-22.04
+    os: osx
+
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 9.x
+      includePreviewVersions: true
+    displayName: Install .NET 9
+  - task: UseDotNet@2
+    inputs:
+      version: 6.x
+    displayName: Install .NET 6
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (osx-x64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/osx-x64 --self-contained
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (osx-arm64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/osx-arm64 --self-contained
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - template: ci/sign-files.yml@eng
     parameters:
@@ -257,16 +291,6 @@ jobs:
               "ToolVersion": "1.0"
             }
         ]
-
-  - task: CopyFiles@2
-    displayName: Copy files (linux-x64)
-    inputs:
-      SourceFolder: $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
-      # Publish output will include many other files. We only need func.exe & nethost.dll
-      Contents: |
-        func.exe
-        nethost.dll
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
  
   - task: CopyFiles@2
     displayName: Copy files (osx-x64)
