@@ -106,7 +106,8 @@ namespace Azure.Functions.Cli.Kubernetes
             int? maxReplicas = null,
             string keysSecretCollectionName = null,
             bool mountKeysAsContainerVolume = false,
-            KedaVersion? kedaVersion = null)
+            KedaVersion? kedaVersion = null,
+            IDictionary<string, string> keySecretsAnnotations = null)
         {
             IKubernetesResource scaledObject = null;
             var result = new List<IKubernetesResource>();
@@ -224,7 +225,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 resultantFunctionKeys = GetFunctionKeys(currentImageFuncKeys, await GetExistingFunctionKeys(keysSecretCollectionName, @namespace));
                 if (resultantFunctionKeys.Any())
                 {
-                    result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, resultantFunctionKeys));
+                    result.Insert(resourceIndex, GetSecret(keysSecretCollectionName, @namespace, resultantFunctionKeys, annotations: keySecretsAnnotations));
                     resourceIndex++;
                 }
 
@@ -642,7 +643,7 @@ namespace Azure.Functions.Cli.Kubernetes
             };
         }
 
-        private static SecretsV1 GetSecret(string name, string @namespace, IDictionary<string, string> secrets)
+        private static SecretsV1 GetSecret(string name, string @namespace, IDictionary<string, string> secrets, IDictionary<string, string> annotations = null)
         {
             return new SecretsV1
             {
@@ -651,7 +652,8 @@ namespace Azure.Functions.Cli.Kubernetes
                 Metadata = new ObjectMetadataV1
                 {
                     Name = name,
-                    Namespace = @namespace
+                    Namespace = @namespace,
+                    Annotations = annotations
                 },
                 Data = secrets.ToDictionary(k => k.Key, v => Convert.ToBase64String(Encoding.UTF8.GetBytes(v.Value)))
             };
