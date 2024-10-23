@@ -585,7 +585,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task PreRunConditions()
         {
-            CheckSettingFunctionWorkerRuntime();
+            EnsureWorkerRuntimeIsSet();
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python)
             {
                 var pythonVersion = await PythonHelpers.GetEnvironmentPythonVersion();
@@ -729,7 +729,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
         
-        private void CheckSettingFunctionWorkerRuntime()
+        private void EnsureWorkerRuntimeIsSet()
         {
             var workerRuntimeSettingValue = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
             if (workerRuntimeSettingValue is not null)
