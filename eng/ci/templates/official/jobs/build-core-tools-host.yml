@@ -146,37 +146,24 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/linux-x64 --self-contained
+      arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - template: ci/sign-files.yml@eng
     parameters:
-      displayName: 'Authenticode signing (dll) (linux-x64)'
-      folderPath: '$(Build.SourcesDirectory)/pkg_output/linux/linux-x64'
+      displayName: 'Sign'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/linux/win-arm64'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
         [
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolSign",
-              "Parameters": {
-                "OpusName": "Microsoft",
-                "OpusInfo": "http://www.microsoft.com",
-                "FileDigest": "/fd \"SHA256\"",
-                "PageHash": "/NPH",
-                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-              },
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            },
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolVerify",
-              "Parameters": {},
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            }
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "signtool.exe",
+            "toolVersion": "1.0"
+          }
         ]
 
   - task: CopyFiles@2
@@ -201,7 +188,7 @@ jobs:
   pool:
     name: 1es-pool-azfunc
     image: 1es-ubuntu-22.04
-    os: osx
+    os: macOS
 
   steps:
   - task: UseDotNet@2
@@ -220,7 +207,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/osx-x64 --self-contained
+      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-x64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: DotnetCoreCLI@2
@@ -229,67 +216,41 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/osx-arm64 --self-contained
+      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - template: ci/sign-files.yml@eng
     parameters:
-      displayName: 'Authenticode signing (dll) (osx-x64)'
+      displayName: 'Sign'
       folderPath: '$(Build.SourcesDirectory)/pkg_output/osx/osx-x64'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
         [
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolSign",
-              "Parameters": {
-                "OpusName": "Microsoft",
-                "OpusInfo": "http://www.microsoft.com",
-                "FileDigest": "/fd \"SHA256\"",
-                "PageHash": "/NPH",
-                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-              },
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            },
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolVerify",
-              "Parameters": {},
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            }
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "signtool.exe",
+            "toolVersion": "1.0"
+          }
         ]
 
   - template: ci/sign-files.yml@eng
     parameters:
-      displayName: 'Authenticode signing (dll) (osx-arm64)'
+      displayName: 'Sign'
       folderPath: '$(Build.SourcesDirectory)/pkg_output/osx/osx-arm64'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
         [
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolSign",
-              "Parameters": {
-                "OpusName": "Microsoft",
-                "OpusInfo": "http://www.microsoft.com",
-                "FileDigest": "/fd \"SHA256\"",
-                "PageHash": "/NPH",
-                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-              },
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            },
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolVerify",
-              "Parameters": {},
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            }
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "signtool.exe",
+            "toolVersion": "1.0"
+          }
         ]
  
   - task: CopyFiles@2
