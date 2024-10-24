@@ -148,7 +148,6 @@ jobs:
         python3 -m venv publish-env
         source publish-env/bin/activate
         pip install -r requirements.txt
-        apt-get install fakeroot
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
 
   - task: DotnetCoreCLI@2
@@ -229,23 +228,6 @@ jobs:
       zipAfterPublish: false
       arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
-
-  - template: ci/sign-files.yml@eng
-    parameters:
-      displayName: 'Sign'
-      folderPath: '$(Build.SourcesDirectory)/pkg_output/osx/osx-x64'
-      pattern: '*.dll, *.exe'
-      signType: inline
-      inlineOperation: |
-        [
-          {
-            "keyCode": "CP-450779-Pgp",
-            "operationSetCode": "LinuxSign",
-            "parameters": [],
-            "toolName": "signtool.exe",
-            "toolVersion": "1.0"
-          }
-        ]
 
   - template: ci/sign-files.yml@eng
     parameters:
