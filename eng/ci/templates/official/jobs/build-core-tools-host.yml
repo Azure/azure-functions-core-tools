@@ -164,7 +164,7 @@ jobs:
     parameters:
       displayName: 'Sign'
       folderPath: '/mnt/vss/_work/1/s/pkg_output/linux/linux-x64'
-      pattern: '*.dll, *.exe'
+      pattern: '*.deb'
       signType: inline
       inlineOperation: |
         [
