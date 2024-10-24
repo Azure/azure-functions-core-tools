@@ -147,7 +147,7 @@ jobs:
         cd publish-scripts
         python3 -m venv publish-env
         source publish-env/bin/activate
-        pip install -r requirements.txt
+        sudo pip install -r requirements.txt
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
 
   - task: DotnetCoreCLI@2
