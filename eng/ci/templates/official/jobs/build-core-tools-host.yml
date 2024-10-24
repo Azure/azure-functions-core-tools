@@ -163,7 +163,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
-      folderPath: '$(Build.SourcesDirectory)/pkg_output/linux/win-arm64'
+      folderPath: '/mnt/vss/_work/1/s/pkg_output/linux/linux-x64'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
