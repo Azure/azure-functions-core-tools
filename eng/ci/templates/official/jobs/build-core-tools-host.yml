@@ -148,6 +148,7 @@ jobs:
         python3 -m venv publish-env
         source publish-env/bin/activate
         sudo pip install -r requirements.txt
+        sudo apt-get install fakeroot
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
 
   - task: DotnetCoreCLI@2
