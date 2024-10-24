@@ -198,7 +198,7 @@ jobs:
   displayName: '[Mac] Build CoreToolsHost'
   pool:
     name: Azure Pipelines
-    image: 1es-ubuntu-22.04
+    image: 'macOS-latest'
     os: macOS
 
   steps:
