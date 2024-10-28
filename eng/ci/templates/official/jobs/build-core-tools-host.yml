@@ -139,6 +139,10 @@ jobs:
     inputs:
       version: 6.x
     displayName: Install .NET 6
+  - task: UseDotNet@2
+    inputs:
+      version: 4.x
+    displayName: Install .NET 4
 
   - task: Bash@3
     inputs:
