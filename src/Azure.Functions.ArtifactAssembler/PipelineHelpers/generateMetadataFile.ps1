@@ -16,11 +16,15 @@ $inProcVersion = (Get-ChildItem $stagingCoreToolsVisualStudio -Filter "*.zip" | 
 $releaseNumberFull = $env:RELEASE_RELEASENAME
 $releaseNumber = ($releaseNumberFull -replace '\D', '')
 
+# Get commit id
+$commitId = $env:BUILD_SOURCEVERSION
+
 # Create the JSON file
 $metadata = @{
     defaultArtifactVersion = $oopVersion
     inProcArtifactVersion = $inProcVersion
     consolidatedBuildId = $releaseNumber
+    commitId = $commitId
 }
 
 # Set the output path for the JSON file in the StagingDirectory
