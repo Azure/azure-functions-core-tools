@@ -561,6 +561,8 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython310;
                     case 11:
                         return StaticResources.DockerfilePython311;
+                    case 12:
+                        return StaticResources.DockerfilePython312;
                 }
             }
             return StaticResources.DockerfilePython37;
