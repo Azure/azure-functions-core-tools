@@ -149,6 +149,8 @@ jobs:
         source publish-env/bin/activate
         sudo pip install -r requirements.txt
         sudo apt-get install fakeroot
+        export PATH="$PATH:/mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.1/net462"
+        chmod +x /mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.1/net462/esrpcli.exe
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
 
   - task: DotnetCoreCLI@2
