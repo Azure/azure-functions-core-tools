@@ -75,30 +75,6 @@ jobs:
       arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
-  - template: ci/sign-files.yml@eng
-    parameters:
-      displayName: 'Sign'
-      folderPath: '/mnt/vss/_work/1/s/pkg_output/linux/linux-x64'
-      pattern: '*.deb'
-      signType: inline
-      inlineOperation: |
-        [
-          {
-            "keyCode": "CP-450779-Pgp",
-            "operationSetCode": "LinuxSign",
-            "parameters": [],
-            "toolName": "signtool.exe",
-            "toolVersion": "1.0"
-          }
-        ]
-
-  templateContext:
-    outputParentDirectory: $(Build.ArtifactStagingDirectory)
-    outputs:
-    - output: pipelineArtifact
-      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-host
-
 - job: BuildCoreToolsHostMac
   displayName: '[Mac] Build CoreToolsHost'
   pool:
