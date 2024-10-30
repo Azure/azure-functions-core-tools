@@ -12,7 +12,7 @@ def main(*args):
     packageNamePostfix = ""
     
     print(f"args: {args}  {len(args)}")
-    if (len(args) >= 3):
+    if (len(args) >= 4):
         packageNamePostfix = "-" + args[2]
     
     constants.PACKAGENAME = constants.PACKAGENAME + packageNamePostfix
