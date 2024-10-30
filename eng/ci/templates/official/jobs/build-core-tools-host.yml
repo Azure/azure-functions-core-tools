@@ -144,17 +144,17 @@ jobs:
   - task: DownloadPipelineArtifact@2
     inputs:
       artifact: 'drop-coretools-windows-host'
-      path: '$(Build.ArtifactStagingDirectory)/pkg_output/windows'
+      path: '$(Build.SourcesDirectory)/pkg_output/windows'
 
   - task: DownloadPipelineArtifact@2
     inputs:
       artifact: 'drop-coretools-osx-host'
-      path: '$(Build.ArtifactStagingDirectory)/pkg_output/osx'
+      path: '$(Build.SourcesDirectory)/pkg_output/osx'
 
   - task: DownloadPipelineArtifact@2
     inputs:
       artifact: 'drop-coretools-linux-host'
-      path: '$(Build.ArtifactStagingDirectory)/pkg_output/linux'
+      path: '$(Build.SourcesDirectory)/pkg_output/linux'
 
   - template: ci/sign-files.yml@eng
     parameters:
