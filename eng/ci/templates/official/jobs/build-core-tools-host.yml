@@ -39,7 +39,7 @@ jobs:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
-      path: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
+      path: $(Build.SourcesDirectory)/pkg_output/windows
       artifact: drop-coretools-windows-host
       
 - job: BuildCoreToolsHostLinux
@@ -73,7 +73,7 @@ jobs:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
-      path: $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
+      path: $(Build.SourcesDirectory)/pkg_output/linux
       artifact: drop-coretools-linux-host
 
 - job: BuildCoreToolsHostMac
@@ -116,7 +116,7 @@ jobs:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
-      path: $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64
+      path: $(Build.SourcesDirectory)/pkg_output/osx
       artifact: drop-coretools-osx-host
 
 - job: SignCoreToolsFilesAndCopy
