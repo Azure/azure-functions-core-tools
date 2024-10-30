@@ -34,6 +34,13 @@ jobs:
       zipAfterPublish: false
       arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
+      artifact: drop-coretools-windows-host
       
 - job: BuildCoreToolsHostLinux
   displayName: '[Linux] Build CoreToolsHost'
@@ -62,6 +69,13 @@ jobs:
       arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
+      artifact: drop-coretools-linux-host
+
 - job: BuildCoreToolsHostMac
   displayName: '[Mac] Build CoreToolsHost'
   pool:
@@ -80,18 +94,6 @@ jobs:
       version: 6.x
     displayName: Install .NET 6
 
-  - task: Bash@3
-    inputs:
-      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
-      script: |
-        cd publish-scripts
-        python3 -m venv publish-env
-        source publish-env/bin/activate
-        sudo pip install -r requirements.txt
-        sudo apt-get install fakeroot
-        export PATH="/Users/runner/work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.1/net462/esrpcli.exe"
-      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
-
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (osx-x64)
     inputs:
@@ -109,6 +111,13 @@ jobs:
       zipAfterPublish: false
       arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64
+      artifact: drop-coretools-osx-host
 
 - job: SignCoreToolsFilesAndCopy
   displayName: 'Sign Core tools files'
@@ -131,6 +140,21 @@ jobs:
     inputs:
       version: 6.x
     displayName: Install .NET 6
+
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: 'drop-coretools-windows-host'
+      path: '$(Build.ArtifactStagingDirectory)/pkg_output/windows'
+
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: 'drop-coretools-osx-host'
+      path: '$(Build.ArtifactStagingDirectory)/pkg_output/osx'
+
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: 'drop-coretools-linux-host'
+      path: '$(Build.ArtifactStagingDirectory)/pkg_output/linux'
 
   - template: ci/sign-files.yml@eng
     parameters:
@@ -331,6 +355,13 @@ jobs:
         func
         nethost.dll
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
+
+  - task: DeleteFiles@1
+    displayName: 'Cleanup build artifacts'
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)/pkg_output'
+      Contents: '**/*'
+      removeSourceFolder: false
  
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
