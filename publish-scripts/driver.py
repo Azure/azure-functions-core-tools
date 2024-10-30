@@ -17,6 +17,10 @@ def main(*args):
     
     constants.PACKAGENAME = constants.PACKAGENAME + packageNamePostfix
     print(f"constants.PACKAGENAME: {constants.PACKAGENAME}")
+
+    constants.CONSOLIDATED_BUILD_ID = args[2]  # New argument for consolidatedBuildId
+    print(f"Consolidated Build ID: {constants.CONSOLIDATED_BUILD_ID}")  # Print the new argument
+
     constants.VERSION = args[1]
     constants.DRIVERROOTDIR = os.path.dirname(os.path.abspath(__file__))
     platformSystem = platform.system()
