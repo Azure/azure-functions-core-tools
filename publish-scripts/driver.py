@@ -10,7 +10,6 @@ def main(*args):
     # assume follow semantic versioning 2.0.0
     
     packageNamePostfix = ""
-    consolidatedBuildId = ""
     
     print(f"args: {args}  {len(args)}")
     if (len(args) >= 3):
