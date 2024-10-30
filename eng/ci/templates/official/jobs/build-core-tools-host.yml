@@ -219,8 +219,8 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll) (linux-x64)'
-      folderPath: '/mnt/vss/_work/1/s/pkg_output/linux/linux-x64'
-      pattern: '*.dll, *.deb'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/linux/linux-x64'
+      pattern: 'func'
       signType: inline
       inlineOperation: |
         [
@@ -249,8 +249,8 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll) (osx-64)'
-      folderPath: '/mnt/vss/_work/1/s/pkg_output/osx/osx-x64'
-      pattern: '*.dll, *.deb'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/osx/osx-x64'
+      pattern: 'func'
       signType: inline
       inlineOperation: |
         [
@@ -279,8 +279,8 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll) (osx-arm64)'
-      folderPath: '/mnt/vss/_work/1/s/pkg_output/osx/osx-arm64'
-      pattern: '*.dll, *.deb'
+      folderPath: '$(Build.SourcesDirectory)/pkg_output/osx/osx-arm64'
+      pattern: 'func'
       signType: inline
       inlineOperation: |
         [
@@ -333,7 +333,7 @@ jobs:
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func
-        nethost.dll
+        nethost.h
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-x64
 
   - task: CopyFiles@2
@@ -343,7 +343,7 @@ jobs:
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func
-        nethost.dll
+        nethost.h
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-x64
 
   - task: CopyFiles@2
@@ -353,7 +353,7 @@ jobs:
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func
-        nethost.dll
+        nethost.h
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
 
   - task: DeleteFiles@1
