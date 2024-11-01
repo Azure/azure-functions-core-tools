@@ -7,17 +7,6 @@ namespace Azure.Functions.ArtifactAssembler
 {
     internal sealed class ArtifactAssembler
     {
-        private const string StagingDirName = "staging";
-        private const string InProc8DirectoryName = "in-proc8";
-        private const string InProc6DirectoryName = "in-proc6";
-        private const string CoreToolsHostDirectoryName = "host";
-        private const string VisualStudioOutputArtifactDirectoryName = "coretools-visualstudio";
-        private const string _InProcOutputArtifactNameSuffix = "_inproc";
-        private const string _coreToolsProductVersionPattern = @"(\d+\.\d+\.\d+)$";
-        private const string _artifactNameRegexPattern = @"^(.*?)(\d+\.\d+\.\d+)$";
-        private const string OutOfProcDirectoryName = "default";
-        private const string CliOutputArtifactDirectoryName = "coretools-cli";
-
         /// <summary>
         /// The artifacts for which we want to pack a custom host with it.
         /// This dictionary contains the artifact name and the corresponding runtime identifier value.
@@ -103,15 +92,15 @@ namespace Azure.Functions.ArtifactAssembler
             EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
             EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
 
-            _inProc6ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, InProc6DirectoryName));
-            _inProc8ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, InProc8DirectoryName));
+            _inProc6ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, Constants.InProc6DirectoryName));
+            _inProc8ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, Constants.InProc8DirectoryName));
 
             Directory.Delete(inProcArtifactDownloadDir, true);
 
-            _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostArtifactDirPath, Path.Combine(_stagingDirectory, CoreToolsHostDirectoryName));
+            _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
             Directory.Delete(coreToolsHostArtifactDownloadDir, true);
 
-            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, OutOfProcDirectoryName));
+            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, Constants.OutOfProcDirectoryName));
             Directory.Delete(outOfProcArtifactDownloadDir, true);
         }
 
@@ -125,7 +114,7 @@ namespace Azure.Functions.ArtifactAssembler
 
         private static string CreateStagingDirectory(string rootWorkingDirectory)
         {
-            var stagingDirectory = Path.Combine(rootWorkingDirectory, StagingDirName);
+            var stagingDirectory = Path.Combine(rootWorkingDirectory, Constants.StagingDirName);
 
             if (Directory.Exists(stagingDirectory))
             {
@@ -151,7 +140,7 @@ namespace Azure.Functions.ArtifactAssembler
         // Example output: 4.0.6353
         private static string GetCoreToolsProductVersion(string artifactDirectoryName)
         {
-            var match = Regex.Match(artifactDirectoryName, _coreToolsProductVersionPattern);
+            var match = Regex.Match(artifactDirectoryName, Constants.CoreToolsProductVersionPattern);
             if (match.Success)
             {
                 return match.Value;
@@ -164,7 +153,7 @@ namespace Azure.Functions.ArtifactAssembler
         {
             Console.WriteLine("Starting to assemble Visual Studio Core Tools artifacts");
             // Create a directory to store the assembled artifacts.
-            var customHostTargetArtifactDir = Path.Combine(_stagingDirectory, VisualStudioOutputArtifactDirectoryName);
+            var customHostTargetArtifactDir = Path.Combine(_stagingDirectory, Constants.VisualStudioOutputArtifactDirectoryName);
             Directory.CreateDirectory(customHostTargetArtifactDir);
 
             var packTasks = _customHostArtifacts.Keys.Select(async artifactName =>
@@ -178,17 +167,17 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Create a new directory to store the custom host with in-proc8 and in-proc6 files.
                 var artifactDirName = Path.GetFileName(inProc8ArtifactDirPath);
-                var consolidatedArtifactDirName = $"{artifactName}{_InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
+                var consolidatedArtifactDirName = $"{artifactName}{Constants.InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
                 var consolidatedArtifactDirPath = Path.Combine(customHostTargetArtifactDir, consolidatedArtifactDirName);
                 Directory.CreateDirectory(consolidatedArtifactDirPath);
 
                 // Copy in-proc8 files
-                var inProc8CopyTask = Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc8DirectoryName)));
+                var inProc8CopyTask = Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
 
                 // Copy in-proc6 files
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
                 EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
-                var inProc6CopyTask = Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc6DirectoryName)));
+                var inProc6CopyTask = Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
 
                 // Copy core-tools-host files
                 var rid = GetRuntimeIdentifierForArtifactName(artifactName);
@@ -215,7 +204,7 @@ namespace Azure.Functions.ArtifactAssembler
             Console.WriteLine("Starting to assemble CLI Core Tools artifacts");
 
             // Create a directory to store the assembled artifacts.
-            var cliCoreToolsTargetArtifactDir = Path.Combine(_stagingDirectory, CliOutputArtifactDirectoryName);
+            var cliCoreToolsTargetArtifactDir = Path.Combine(_stagingDirectory, Constants.CliOutputArtifactDirectoryName);
             Directory.CreateDirectory(cliCoreToolsTargetArtifactDir);
             string outOfProcVersion = string.Empty,
                    inProcVersion = string.Empty,
@@ -271,7 +260,7 @@ namespace Azure.Functions.ArtifactAssembler
                 string newInProc8ArtifactDirPath = RenameInProcDirectory(inProc8ArtifactDirPath, outOfProcVersion);
 
                 // Copy in-proc8 files and delete old directory
-                await Task.Run(() => FileUtilities.CopyDirectory(newInProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc8DirectoryName)));
+                await Task.Run(() => FileUtilities.CopyDirectory(newInProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
                 Directory.Delete(newInProc8ArtifactDirPath, true);
 
                 // Rename inproc6 directory to have the same version as the out-of-proc artifact before copying
@@ -281,7 +270,7 @@ namespace Azure.Functions.ArtifactAssembler
                 string newInProc6ArtifactDirPath = RenameInProcDirectory(inProc6ArtifactDirPath, outOfProcVersion);
 
                 // Copy in-proc6 files and delete old directory
-                await Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, InProc6DirectoryName)));
+                await Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
                 Directory.Delete(newInProc6ArtifactDirPath, true);
             }
 
@@ -309,7 +298,7 @@ namespace Azure.Functions.ArtifactAssembler
 
         private string RenameInProcDirectory(string oldArtifactDirPath, string newVersion)
         {
-            Match match = Regex.Match(oldArtifactDirPath, _artifactNameRegexPattern);
+            Match match = Regex.Match(oldArtifactDirPath, Constants.ArtifactNameRegexPattern);
 
             if (!match.Success)
             {
