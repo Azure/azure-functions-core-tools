@@ -220,7 +220,7 @@ jobs:
     parameters:
       displayName: 'Authenticode signing (dll) (linux-x64)'
       folderPath: '$(Build.SourcesDirectory)/pkg_output/linux/linux-x64'
-      pattern: 'func'
+      pattern: '*.h'
       signType: inline
       inlineOperation: |
         [
@@ -250,7 +250,7 @@ jobs:
     parameters:
       displayName: 'Authenticode signing (dll) (osx-64)'
       folderPath: '$(Build.SourcesDirectory)/pkg_output/osx/osx-x64'
-      pattern: 'func'
+      pattern: '*.h'
       signType: inline
       inlineOperation: |
         [
@@ -280,7 +280,7 @@ jobs:
     parameters:
       displayName: 'Authenticode signing (dll) (osx-arm64)'
       folderPath: '$(Build.SourcesDirectory)/pkg_output/osx/osx-arm64'
-      pattern: 'func'
+      pattern: '*.h'
       signType: inline
       inlineOperation: |
         [
