@@ -221,7 +221,7 @@ jobs:
       displayName: 'Authenticode signing (dll) (linux-x64)'
       folderPath: '$(Build.SourcesDirectory)/pkg_output/linux/linux-x64'
       pattern: '*.h'
-      signType: inline
+      signType: dll
       inlineOperation: |
         [
             {
