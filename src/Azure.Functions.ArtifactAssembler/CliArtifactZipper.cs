@@ -12,6 +12,7 @@ namespace Azure.Functions.ArtifactAssembler
         {
             _rootWorkingDirectory = rootWorkingDirectory;
         }
+
         internal void ZipCliArtifacts()
         {
             string stagingDirectory = Path.Combine(_rootWorkingDirectory, Constants.StagingDirName, Constants.CliOutputArtifactDirectoryName);
