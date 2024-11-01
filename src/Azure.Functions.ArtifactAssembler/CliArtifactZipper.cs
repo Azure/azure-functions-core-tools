@@ -17,33 +17,12 @@ namespace Azure.Functions.ArtifactAssembler
             string stagingDirectory = Path.Combine(_rootWorkingDirectory, Constants.StagingDirName, Constants.CliOutputArtifactDirectoryName);
 
             // Get all directories in the staging directory
-            var directories = Directory.GetDirectories(stagingDirectory);
+            var directories = Directory.EnumerateDirectories(stagingDirectory);
 
             foreach (var dir in directories)
             {
-                string workersPath = Path.Combine(dir, "workers");
-
-                // Ensure 'workers' directory exists
-                if (!Directory.Exists(workersPath))
-                {
-                    Directory.CreateDirectory(workersPath);
-                    Console.WriteLine($"Created missing 'workers' directory in {dir}");
-                }
-                else
-                {
-                    Console.WriteLine($"'workers' directory already exists in {dir}");
-                }
-
-                // Add placeholder file if 'workers' directory is empty
-                if (Directory.GetFiles(workersPath).Length == 0 && Directory.GetDirectories(workersPath).Length == 0)
-                {
-                    File.WriteAllText(Path.Combine(workersPath, "placeholder.txt"), "Placeholder file");
-                    Console.WriteLine($"Created placeholder file in empty 'workers' directory in {dir}");
-                }
-                else
-                {
-                    Console.WriteLine($"'workers' directory is not empty in {dir}");
-                }
+                // Create worker directory if it doesn't already exist
+                CreateWorkerDirectoryIfDoesNotExist(dir);
 
                 // Define zip file path and name
                 string zipFileName = $"{new DirectoryInfo(dir).Name}.zip";
@@ -52,7 +31,6 @@ namespace Azure.Functions.ArtifactAssembler
                 // Compress directory into zip file
                 ZipFile.CreateFromDirectory(dir, zipFilePath, CompressionLevel.Optimal, includeBaseDirectory: false);
                 Console.WriteLine($"Zipped: {dir} -> {zipFilePath}");
-                
 
                 // Verify zip creation and delete original directory to free up space
                 if (File.Exists(zipFilePath))
@@ -68,7 +46,33 @@ namespace Azure.Functions.ArtifactAssembler
             }
 
             Console.WriteLine("All directories zipped successfully!");
+        }
 
+        internal void CreateWorkerDirectoryIfDoesNotExist(string dir)
+        {
+            string workersPath = Path.Combine(dir, "workers");
+
+            // Ensure 'workers' directory exists
+            if (!Directory.Exists(workersPath))
+            {
+                Directory.CreateDirectory(workersPath);
+                Console.WriteLine($"Created missing 'workers' directory in {dir}");
+            }
+            else
+            {
+                Console.WriteLine($"'workers' directory already exists in {dir}");
+            }
+
+            // Add placeholder file if 'workers' directory is empty
+            if (Directory.GetFiles(workersPath).Length == 0 && Directory.GetDirectories(workersPath).Length == 0)
+            {
+                File.WriteAllText(Path.Combine(workersPath, "placeholder.txt"), "Placeholder file");
+                Console.WriteLine($"Created placeholder file in empty 'workers' directory in {dir}");
+            }
+            else
+            {
+                Console.WriteLine($"'workers' directory is not empty in {dir}");
+            }
         }
     }
 }
