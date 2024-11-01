@@ -140,7 +140,7 @@ namespace Azure.Functions.ArtifactAssembler
         // Example output: 4.0.6353
         private static string GetCoreToolsProductVersion(string artifactDirectoryName)
         {
-            var match = Regex.Match(artifactDirectoryName, Constants._coreToolsProductVersionPattern);
+            var match = Regex.Match(artifactDirectoryName, Constants.CoreToolsProductVersionPattern);
             if (match.Success)
             {
                 return match.Value;
@@ -167,7 +167,7 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Create a new directory to store the custom host with in-proc8 and in-proc6 files.
                 var artifactDirName = Path.GetFileName(inProc8ArtifactDirPath);
-                var consolidatedArtifactDirName = $"{artifactName}{Constants._InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
+                var consolidatedArtifactDirName = $"{artifactName}{Constants.InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
                 var consolidatedArtifactDirPath = Path.Combine(customHostTargetArtifactDir, consolidatedArtifactDirName);
                 Directory.CreateDirectory(consolidatedArtifactDirPath);
 
@@ -298,7 +298,7 @@ namespace Azure.Functions.ArtifactAssembler
 
         private string RenameInProcDirectory(string oldArtifactDirPath, string newVersion)
         {
-            Match match = Regex.Match(oldArtifactDirPath, Constants._artifactNameRegexPattern);
+            Match match = Regex.Match(oldArtifactDirPath, Constants.ArtifactNameRegexPattern);
 
             if (!match.Success)
             {

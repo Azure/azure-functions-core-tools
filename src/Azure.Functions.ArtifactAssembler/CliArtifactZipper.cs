@@ -1,20 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
 using System.IO.Compression;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Azure.Functions.ArtifactAssembler
 {
-    internal class CliArtifactZipper
+    internal sealed class CliArtifactZipper
     {
         private readonly string _rootWorkingDirectory;
         public CliArtifactZipper(string rootWorkingDirectory)
         {
             _rootWorkingDirectory = rootWorkingDirectory;
-
         }
         internal void ZipCliArtifacts()
         {
