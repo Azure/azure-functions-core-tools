@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Tests.E2E.Helpers
@@ -17,8 +18,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
         public string[] OutputDoesntContain { get; set; } = Array.Empty<string>();
         public string[] ErrorDoesntContain { get; set; } = Array.Empty<string>();
         public Action<string> PreTest { get; set; }
-        public Func<string, Process, Task> Test { get; set; }
+        public Func<string, Process, StringBuilder, Task> Test { get; set; }
         public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(40);
         public string CommandsStr => $"{string.Join(", ", Commands)}";
+        public bool WaitForRunningHostState { get; set; } = false;
+        public int HostProcessPort { get; set; } = 7071;
     }
 }

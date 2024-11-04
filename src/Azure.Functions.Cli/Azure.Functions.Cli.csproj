@@ -106,6 +106,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.11">
       <LogicalName>$(AssemblyName).Dockerfile.python3.11</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.12">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.12</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.javascript">
       <LogicalName>$(AssemblyName).Dockerfile.javascript</LogicalName>
     </EmbeddedResource>
@@ -269,7 +272,7 @@
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.2" />
     <PackageReference Include="Azure.Identity" Version="1.11.4" />
-    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.6.0" />
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="AccentedCommandLineParser" Version="2.0.0" />
     <PackageReference Include="DotNetZip" Version="1.16.0" />
@@ -282,9 +285,11 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
     <PackageReference Include="System.Formats.Asn1" Version="6.0.1" />
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
+
+    <!-- Transitive dependency -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
     <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.16.0" />
