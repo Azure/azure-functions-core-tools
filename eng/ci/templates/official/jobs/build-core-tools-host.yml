@@ -69,6 +69,36 @@ jobs:
       arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64 --self-contained
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
+      script: |
+        cd publish-scripts
+        python3 -m venv publish-env
+        source publish-env/bin/activate
+        sudo pip install -r requirements.txt
+        sudo apt-get install fakeroot
+        export PATH="$PATH:/mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.1/net462"
+        chmod +x /mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.1/net462/esrpcli.exe
+      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Sign'
+      folderPath: '/mnt/vss/_work/1/s/pkg_output/linux/linux-x64'
+      pattern: 'func'
+      signType: inline
+      inlineOperation: |
+        [
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "sign",
+            "toolVersion": "1.0"
+          }
+        ]
+
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
@@ -220,8 +250,31 @@ jobs:
     parameters:
       displayName: 'Authenticode signing (dll) (linux-x64)'
       folderPath: '$(Build.SourcesDirectory)/pkg_output/linux/linux-x64'
-      pattern: '*.h'
-      signType: dll
+      pattern: 'func'
+      signType: inline
+      inlineOperation: |
+        [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+        ]
 
   - template: ci/sign-files.yml@eng
     parameters:
