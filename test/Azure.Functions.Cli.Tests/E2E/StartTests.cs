@@ -264,7 +264,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
         public async Task Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime()
         {
             await CliTester.Run(new RunConfiguration[]
@@ -307,7 +307,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
         public async Task Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime()
         {
             await CliTester.Run(new RunConfiguration[]
@@ -660,7 +660,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
         public async Task Start_InProc_Net6_SuccessfulFunctionExecution_WithSpecifyingRuntime()
         {
             await CliTester.Run(new RunConfiguration[]
@@ -703,7 +703,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
         public async Task Start_InProc_Net6_SuccessfulFunctionExecution_WithoutSpecifyingRuntime()
         {
             await CliTester.Run(new RunConfiguration[]
@@ -1258,6 +1258,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
            var functionName = "HttpTriggerCSharp";
@@ -1301,6 +1302,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
         {
            var functionName = "HttpTriggerCSharp";
@@ -1348,6 +1350,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_InvalidHostJson_FailsWithExpectedError()
         {
            var functionName = "HttpTriggerCSharp";
@@ -1383,6 +1386,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_MissingHostJson_FailsWithExpectedError()
         {
            var functionName = "HttpTriggerCSharp";
@@ -1499,6 +1503,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
@@ -1569,6 +1574,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
