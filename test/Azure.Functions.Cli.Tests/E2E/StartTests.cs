@@ -1593,7 +1593,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime dotnet-isolated",
+                        "init . --worker-runtime dotnet",
                         "new --template \"Http trigger\" --name http1",
                         "new --template \"Queue trigger\" --name queue1"
                     },
