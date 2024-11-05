@@ -254,12 +254,10 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 new RunConfiguration
                 {
-                    // TODO: Remove dotnet add package step once the worker package is available in public feed
                     Commands = new[]
                     {
                         "init . --worker-runtime dotnet-isolated --target-framework net9.0",
-                        "new --template Httptrigger --name HttpTrigger",
-                        "dotnet add package Microsoft.Azure.Functions.Worker.Sdk --version 1.18.0-preview1-20240723.1 --source https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsTempStaging/nuget/v3/index.json"
+                        "new --template Httptrigger --name HttpTrigger"
                     },
                 },
                 new RunConfiguration
@@ -740,9 +738,9 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Theory(Skip = "https://github.com/Azure/azure-functions-core-tools/issues/3644")]
+        [Theory]
         [InlineData("dotnet")]
-        [InlineData("dotnet-isolated")]
+        // [InlineData("dotnet-isolated")] Skip due to dotnet error on x86: https://github.com/Azure/azure-functions-core-tools/issues/3873
         public async Task Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution(string language)
         {
             await CliTester.Run(new RunConfiguration[]
@@ -789,13 +787,15 @@ namespace Azure.Functions.Cli.Tests.E2E
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
                             { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-                            { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
+                            { "ConnectionStrings:MyQueueConn", "UseDevelopmentStorage=true" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
                     },
+                    WaitForRunningHostState = true,
+                    HostProcessPort = _funcHostPort,
                     Commands = new[]
                     {
-                        $"start --functions http1 --{language} --port {_funcHostPort}",
+                        $"start --build --port {_funcHostPort}",
                     },
                     ExpectExit = false,
                     OutputContains = new string[]
@@ -803,21 +803,24 @@ namespace Azure.Functions.Cli.Tests.E2E
                         "Using for user secrets file configuration."
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
-                    Test = async (workingDir, p, _) =>
+                    Test = async (_, p, stdout) =>
                     {
-                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
+                        await QueueStorageHelper.InsertIntoQueue("myqueue-items", "hello world");
+
+                        await LogWatcher.WaitForLogOutput(stdout, "C# Queue trigger function processed: hello world", TimeSpan.FromSeconds(10));
+
+                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                         {
-                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                            var response = await client.GetAsync("/api/http1?name=Test");
-                            response.StatusCode.Should().Be(HttpStatusCode.OK);
-                            p.Kill();
+                            testOutputHelper.Output.Should().Contain("C# Queue trigger function processed: hello world");
                         }
+
+                        p.Kill();
                     }
                 }
             }, _output);
         }
 
-        [Fact(Skip = "Flaky test")]
+        [Fact]
         public async Task Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
@@ -862,13 +865,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
                         Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {\""+ Constants.FunctionsWorkerRuntime + "\": \"dotnet\"} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
-                            { Constants.FunctionsWorkerRuntime, "dotnet" },
-                            { "ConnectionStrings:MyQueueConn", "DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=GMuzNHjlB3S9itqZJHHCnRkrokLkcSyW7yK9BRbGp0ENePunLPwBgpxV1Z/pVo9zpem/2xSHXkMqTHHLcx8XRA==EndpointSuffix=core.windows.net" },
+                            { "ConnectionStrings:MyQueueConn", "UseDevelopmentStorage=true" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
                     },
@@ -879,12 +881,16 @@ namespace Azure.Functions.Cli.Tests.E2E
                     CommandTimeout = TimeSpan.FromSeconds(300),
                     ExpectExit = true,
                     ExitInError = true,
-                    ErrorContains = new[] { "Missing value for AzureWebJobsStorage in local.settings.json and User Secrets. This is required for all triggers other than httptrigger, kafkatrigger. You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets." },
+                    OutputContains = new[]
+                    {
+                        "Missing value for AzureWebJobsStorage in local.settings.json. This is required for all triggers other than httptrigger, kafkatrigger, orchestrationTrigger, activityTrigger, entityTrigger",
+                        "A host error has occurred during startup operation"
+                    }
                 }
             }, _output);
         }
 
-        [Fact(Skip = "Flaky test")]
+        [Fact]
         public async Task Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError()
         {
             string AzureWebJobsStorageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
@@ -929,16 +935,17 @@ namespace Azure.Functions.Cli.Tests.E2E
                         var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
                         Assert.True(File.Exists(queueCodePath));
                         _output.WriteLine($"Writing to file {localSettingsPath}");
-                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {} }");
+                        File.WriteAllText(localSettingsPath, "{ \"IsEncrypted\": false, \"Values\": {\""+ Constants.FunctionsWorkerRuntime + "\": \"dotnet\"} }");
 
                         // init and set user secrets
                         Dictionary<string, string> userSecrets = new Dictionary<string, string>()
                         {
                             { Constants.AzureWebJobsStorage, "UseDevelopmentStorage=true" },
-                            { Constants.FunctionsWorkerRuntime, "dotnet" },
                         };
                         SetUserSecrets(workingDir, userSecrets);
                     },
+                    WaitForRunningHostState = true,
+                    HostProcessPort = _funcHostPort,
                     Commands = new[]
                     {
                         $"start --functions http1 --csharp --port {_funcHostPort}",
@@ -946,10 +953,10 @@ namespace Azure.Functions.Cli.Tests.E2E
                     ExpectExit = false,
                     OutputContains = new[]
                     {
-                        "Warning: Cannot find value named 'ConnectionStrings:MyQueueConn' in local.settings.json or User Secrets that matches 'connection' property set on 'queueTrigger' in",
-                        "You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json or User Secrets."
+                        "Warning: Cannot find value named 'ConnectionStrings:MyQueueConn' in local.settings.json that matches 'connection' property set on 'queueTrigger' in",
+                        "You can run 'func azure functionapp fetch-app-settings <functionAppName>' or specify a connection string in local.settings.json."
                     },
-                    Test = async (workingDir, p, _) =>
+                    Test = async (_, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
                         {
