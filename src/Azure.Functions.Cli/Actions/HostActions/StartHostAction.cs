@@ -728,6 +728,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
         }
+
         private void EnsureWorkerRuntimeIsSet()
         {
             var workerRuntimeSettingValue = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
@@ -735,6 +736,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 return;
             }
+
             if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.None)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
