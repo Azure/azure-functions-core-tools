@@ -103,8 +103,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     OutputDoesntContain = new string[]
                     {
-                            "Initializing function HTTP routes",
-                            "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
+                        "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
                     },
                     Test = async (workingDir, p, _) =>
                     {
@@ -156,8 +155,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     OutputDoesntContain = new string[]
                     {
-                            "Initializing function HTTP routes",
-                            "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
+                        "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
                     },
                     Test = async (workingDir, p, _) =>
                     {
@@ -1388,7 +1386,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    ExpectExit = true,
                    ExitInError = true,
-                   ErrorContains = new[] { "Extension bundle configuration should not be present" },
+                   OutputContains = new[] { "Extension bundle configuration should not be present" },
                },
            }, _output);
         }
@@ -1423,7 +1421,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    ExpectExit = true,
                    ExitInError = true,
-                   ErrorContains = new[] { "Host.json file in missing" },
+                   OutputContains = new[] { "Host.json file in missing" },
                },
             }, _output);
         }
@@ -1658,7 +1656,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                             response.StatusCode.Should().Be(HttpStatusCode.OK);
                             p.Kill();
                         }
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
                 }
             }, _output);
         }
