@@ -585,6 +585,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task PreRunConditions()
         {
+            EnsureWorkerRuntimeIsSet();
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python)
             {
                 var pythonVersion = await PythonHelpers.GetEnvironmentPythonVersion();
@@ -726,6 +727,27 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 ? await SecurityHelpers.GetOrCreateCertificate(CertPath, CertPassword)
                 : null;
             return (new Uri($"{protocol}://0.0.0.0:{Port}"), new Uri($"{protocol}://localhost:{Port}"), cert);
+        }
+
+        private void EnsureWorkerRuntimeIsSet()
+        {
+            var workerRuntimeSettingValue = _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
+            if (workerRuntimeSettingValue is not null)
+            {
+                return;
+            }
+
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.None)
+            {
+                SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
+                IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
+                string workerRuntimeDisplay = SelectionMenuHelper.DisplaySelectionWizard(workerRuntimeToDisplayString.Values);
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = workerRuntimeToDisplayString.FirstOrDefault(wr => wr.Value.Equals(workerRuntimeDisplay)).Key;
+            }
+
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(GlobalCoreToolsSettings.CurrentWorkerRuntime);
+            _secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, workerRuntime);
+            ColoredConsole.WriteLine(WarningColor($"'{workerRuntime}' has been set in your local.settings.json"));
         }
     }
 }
