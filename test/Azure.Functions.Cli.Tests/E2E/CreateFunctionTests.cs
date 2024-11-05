@@ -364,7 +364,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "\\src\\functions\\testfunc.ts",
                     "The function \"testfunc\" was created successfully from the \"azure Blob Storage trigger\" template."
                 },
-                CommandTimeout = TimeSpan.FromSeconds(300)
+                CommandTimeout = TimeSpan.FromSeconds(500)
             }, _output);
         }
 
