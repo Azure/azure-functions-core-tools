@@ -1664,6 +1664,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("dotnet")]
         [InlineData("node")]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_MissingLocalSettingsJson_SuccessfulFunctionExecution(string language)
         {
             await CliTester.Run(new RunConfiguration[]
