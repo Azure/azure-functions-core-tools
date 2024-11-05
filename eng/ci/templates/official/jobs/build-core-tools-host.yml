@@ -149,7 +149,7 @@ jobs:
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func
-        libnethost.so
+        libnethost.dylib
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-x64
 
   - task: CopyFiles@2
@@ -159,7 +159,7 @@ jobs:
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func
-        libnethost.so
+        libnethost.dylib
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
 
   templateContext:
