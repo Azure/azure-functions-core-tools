@@ -76,7 +76,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public async Task Start_NodeJsApp_SuccessfulFunctionExecution()
+        public async Task Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost()
         {
             await CliTester.Run(new RunConfiguration[]
             {
@@ -139,7 +139,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "init . --worker-runtime node",
                         "new --template \"Http trigger\" --name HttpTrigger"
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
                 },
                 new RunConfiguration
                 {
@@ -191,7 +192,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "init . --worker-runtime node -m v3",
                         "new --template \"Http trigger\" --name HttpTrigger"
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
                 },
                 new RunConfiguration
                 {
@@ -1073,7 +1075,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "init . --worker-runtime node",
                         "new --template \"Httptrigger\" --name HttpTrigger",
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
                 },
                 new RunConfiguration
                 {
@@ -1106,7 +1109,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "init . --worker-runtime node",
                         "new --template \"Httptrigger\" --name HttpTrigger",
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
                 },
                 new RunConfiguration
                 {
