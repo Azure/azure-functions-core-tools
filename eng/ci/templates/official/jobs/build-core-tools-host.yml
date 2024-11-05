@@ -38,7 +38,7 @@ jobs:
   - task: CopyFiles@2
     displayName: Copy files (win-x64)
     inputs:
-      SourceFolder: $(Build.SourcesDirectory)/pkg_output/win/win-x64
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-x64
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func.exe
@@ -48,7 +48,7 @@ jobs:
   - task: CopyFiles@2
     displayName: Copy files (win-arm64)
     inputs:
-      SourceFolder: $(Build.SourcesDirectory)/pkg_output/win/win-arm64
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func.exe
@@ -60,7 +60,7 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-host
+      artifact: drop-coretools-windows-host
       
 - job: BuildCoreToolsHostLinux
   displayName: '[Linux] Build CoreToolsHost'
@@ -104,7 +104,7 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-host
+      artifact: drop-coretools-linux-host
 
 - job: BuildCoreToolsHostMac
   displayName: '[Mac] Build CoreToolsHost'
@@ -167,4 +167,4 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-host
+      artifact: drop-coretools-mac-host
