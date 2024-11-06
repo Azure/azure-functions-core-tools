@@ -145,6 +145,14 @@ namespace Azure.Functions.ArtifactAssembler
         {
             await Task.Run(() => FileUtilities.CopyDirectory(artifactZipPath, destinationDirectory));
             await ExtractZipFilesInDirectoryAsync(artifactZipPath, destinationDirectory);
+
+            // Delete additional files that are not needed
+            var filesToBeDeleted = Directory.GetFiles(destinationDirectory);
+            Console.WriteLine($"{filesToBeDeleted.Length} files found in {destinationDirectory}");
+            foreach(var file in filesToBeDeleted)
+            {
+                File.Delete(file);
+            }
             return destinationDirectory;
         }
 
@@ -224,6 +232,7 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (var artifactName in _cliArtifacts)
             {
+                Console.WriteLine($"Starting to assemble {artifactName}");
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(outOfProcArtifactDirPath))
                 {
@@ -250,6 +259,7 @@ namespace Azure.Functions.ArtifactAssembler
                 // If we are currently on the minified version of the artifacts, we do not want the inproc6/inproc8 subfolders
                 if (artifactName.Contains("min.win"))
                 {
+                    Console.WriteLine($"Finished assembling {artifactName}");
                     continue;
                 }
 
@@ -283,6 +293,8 @@ namespace Azure.Functions.ArtifactAssembler
                 // Copy in-proc6 files and delete old directory
                 await Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
                 Directory.Delete(newInProc6ArtifactDirPath, true);
+
+                Console.WriteLine($"Finished assembling {artifactName}");
             }
 
             // Delete the extracted directories
