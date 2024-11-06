@@ -22,17 +22,10 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         public StartTests(ITestOutputHelper output) : base(output) { }
 
-<<<<<<< HEAD
         public async Task InitializeAsync()
-=======
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
-        public async Task start_nodejs()
->>>>>>> feature/oop-host
         {
             try
             {
-<<<<<<< HEAD
                 _funcHostPort = ProcessHelper.GetAvailablePort();
             }
             catch
@@ -42,185 +35,11 @@ namespace Azure.Functions.Cli.Tests.E2E
             }
 
             await Task.CompletedTask;
-=======
-                Commands = new[]
-                {
-                    "init . --worker-runtime node",
-                    "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose"
-                },
-                ExpectExit = false,
-                OutputContains = new[]
-                {
-                    "Functions:",
-                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
-                },
-                OutputDoesntContain = new string[]
-                {
-                        "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
-                },
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        result.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
-        public async Task start_nodejs_with_specifying_runtime_default()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime node",
-                    "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose --runtime default"
-                },
-                ExpectExit = false,
-                OutputContains = new[]
-                {
-                    "Functions:",
-                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
-                },
-                OutputDoesntContain = new string[]
-                {
-                        "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
-                },
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        result.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected default host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
->>>>>>> feature/oop-host
         }
 
         [Fact]
         public async Task Start_PowershellApp_SuccessfulFunctionExecution()
         {
-<<<<<<< HEAD
-=======
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime node -m v3",
-                    "new --template \"Http trigger\" --name HttpTrigger",
-                    "start"
-                },
-                ExpectExit = false,
-                OutputContains = new[]
-                {
-                    "Functions:",
-                    "HttpTrigger: [GET,POST] http://localhost:7071/api/HttpTrigger"
-                },
-                OutputDoesntContain = new string[]
-                {
-                        "Initializing function HTTP routes",
-                        "Content root path:" // ASPNETCORE_SUPPRESSSTATUSMESSAGES is set to true by default
-                },
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7071/") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact(Skip="Flaky test")]
-        public async Task start_nodejs_with_inspect()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime node",
-                    "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose --language-worker -- \"--inspect=5050\""
-                },
-                ExpectExit = false,
-                OutputContains = new[]
-                {
-                    "Debugger listening on ws://127.0.0.1:5050"
-                },
-                Test = async (_, p) =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(15));
-                    p.Kill();
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300)
-            }, _output);
-
-        }
-
-        [Fact]
-        public async Task start_nodejs_loglevel_overrriden_in_settings()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime node",
-                    "settings add AzureFunctionsJobHost__logging__logLevel__Default Debug",
-                    "new --template \"Http trigger\" --name HttpTrigger",
-                    "start --verbose"
-                },
-                ExpectExit = false,
-                OutputContains = new[]
-                {
-                    "Workers Directory set to"
-                },
-                Test = async (_, p) =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(15));
-                    p.Kill();
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact(Skip="Flaky test")]
-        public async Task start_loglevel_overrriden_in_host_json()
-        {
-            var functionName = "HttpTriggerCSharp";
-
->>>>>>> feature/oop-host
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
@@ -256,13 +75,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-<<<<<<< HEAD
         [Fact]
         public async Task Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost()
-=======
-        [Fact(Skip = "Flaky test")]
-        public async Task start_loglevel_overrriden_in_host_json_category_filter()
->>>>>>> feature/oop-host
         {
             await CliTester.Run(new RunConfiguration[]
             {
@@ -581,8 +395,8 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task Start_WithInspect_DebuggerIsStarted()
         {
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -612,19 +426,19 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300)
                }
-            }, _output);
+           }, _output);
         }
 
         [Fact]
         public async Task Start_PortInUse_FailsWithExpectedError()
         {
-            var tcpListner = new TcpListener(IPAddress.Any, _funcHostPort);
-            try
-            {
-                tcpListner.Start();
+           var tcpListner = new TcpListener(IPAddress.Any, _funcHostPort);
+           try
+           {
+               tcpListner.Start();
 
-                await CliTester.Run(new RunConfiguration[]
-                {
+               await CliTester.Run(new RunConfiguration[]
+               {
                    new RunConfiguration
                    {
                        Commands = new[]
@@ -645,19 +459,19 @@ namespace Azure.Functions.Cli.Tests.E2E
                        ErrorContains = new[] { $"Port {_funcHostPort} is unavailable" },
                        CommandTimeout = TimeSpan.FromSeconds(300)
                    }
-                }, _output);
-            }
-            finally
-            {
-                tcpListner.Stop();
-            }
+               }, _output);
+           }
+           finally
+           {
+               tcpListner.Stop();
+           }
         }
 
         [Fact]
         public async Task Start_EmptyEnvVars_HandledAsExpected()
         {
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -698,14 +512,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300),
                }
-            }, _output);
+           }, _output);
         }
 
         [Fact]
         public async Task Start_FunctionsStartArgument_OnlySelectedFunctionsRun()
         {
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -742,14 +556,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300)
                }
-            }, _output);
+           }, _output);
         }
 
         [Fact]
         public async Task Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue()
         {
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -780,7 +594,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300)
                }
-            }, _output);
+           }, _output);
         }
 
         [Fact]
@@ -1047,573 +861,12 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
                 },
-<<<<<<< HEAD
-=======
-            }, _output, startHost: true);
-        }
-
-        [Fact(Skip="Flakey test")]
-        public async Task start_dotnet_csharp()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --build --port 7073"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
->>>>>>> feature/oop-host
             }, _output);
         }
 
         [Fact]
         public async Task DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated()
         {
-<<<<<<< HEAD
-=======
-            await CliTester.Run(new RunConfiguration
-            {
-                // TODO: Remove dotnet add package step once the worker package is available in public feed
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet-isolated --target-framework net9.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "dotnet add package Microsoft.Azure.Functions.Worker.Sdk --version 1.18.0-preview1-20240723.1 --source https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsTempStaging/nuget/v3/index.json",
-                    "start --build --port 7073"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task start_dotnet8_inproc_with_specifying_runtime_e2e()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net8.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7070 --verbose --runtime inproc8"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7070") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(5));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            // testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
-                            testOutputHelper.Output.Should().Contain("Starting child process for inproc8 model host.");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task start_dotnet8_inproc_without_specifying_runtime_e2e()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net8.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7070 --verbose"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7070") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            // testOutputHelper.Output.Should().Contain($"{Constants.FunctionsInProcNet8Enabled} app setting enabled in local.settings.json");
-                            testOutputHelper.Output.Should().Contain("Starting child process for inproc8 model host.");
-                            testOutputHelper.Output.Should().Contain("Selected inproc8 host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task start_dotnet8_inproc_without_specifying_runtime()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net8.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose"
-                },
-                ExpectExit = true,
-                ErrorContains = ["Failed to locate the inproc8 model host"],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task start_dotnet8_inproc_with_specifying_runtime()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net8.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7076 --verbose --runtime inproc8"
-                },
-                ExpectExit = true,
-                ErrorContains = ["Failed to locate the inproc8 model host"],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7076") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task start_dotnet6_inproc_without_specifying_runtime_e2e()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("Starting child process for inproc6 model host.");
-                            testOutputHelper.Output.Should().Contain("Selected inproc6 host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(900),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task start_dotnet6_inproc_without_specifying_runtime()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose"
-                },
-                ExpectExit = false,
-                ErrorContains = ["Failed to locate the inproc6 model host at"],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task start_dotnet6_inproc_with_specifying_runtime_e2e()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc6"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("Starting child process for inproc6 model host.");
-                            testOutputHelper.Output.Should().Contain("Selected inproc6 host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(900),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task start_dotnet6_inproc_with_specifying_runtime()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc6"
-                },
-                ExpectExit = false,
-                ErrorContains = ["Failed to locate the inproc6 model host at"],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_inproc6_specified_runtime_for_dotnet_isolated()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet-isolated",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc6"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_inproc8_specified_runtime_for_dotnet_isolated()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet-isolated",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc8"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_inproc8_specified_runtime_for_dotnet_inproc6_app()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc8"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. For the 'inproc8' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_default_specified_runtime_for_dotnet_inproc6_app()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net6.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime default"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_default_specified_runtime_for_dotnet_inproc8_app()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net8.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime default"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_inproc6_specified_runtime_for_dotnet_inproc8_app()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet --target-framework net8.0",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc6"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. For the 'inproc6' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_inproc6_specified_runtime_for_non_dotnet_app()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime node",
-                    "new --template \"Httptrigger\" --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc6"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task dont_start_inproc8_specified_runtime_for_non_dotnet_app()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime node",
-                    "new --template \"Httptrigger\" --name HttpTrigger",
-                    "start --port 7073 --verbose --runtime inproc8"
-                },
-                ExpectExit = false,
-                ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(100),
-            }, _output);
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
-        public async Task start_dotnet_isolated_csharp_with_oop_host_with_runtime_specified()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet-isolated",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7080 --runtime default --verbose"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7080") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected default host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
-        public async Task start_dotnet_isolated_csharp_with_oop_host_without_runtime_specified()
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime dotnet-isolated",
-                    "new --template Httptrigger --name HttpTrigger",
-                    "start --port 7073 --verbose"
-                },
-                ExpectExit = false,
-                Test = async (workingDir, p) =>
-                {
-                    using (var client = new HttpClient() { BaseAddress = new Uri("http://localhost:7073") })
-                    {
-                        (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                        var response = await client.GetAsync("/api/HttpTrigger?name=Test");
-                        var result = await response.Content.ReadAsStringAsync();
-                        p.Kill();
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-                        result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
-
-                        if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
-                        {
-                            testOutputHelper.Output.Should().Contain("4.10");
-                            testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
-                        }
-                    }
-                },
-                CommandTimeout = TimeSpan.FromSeconds(300),
-            }, _output);
-        }
-
-        [Fact]
-        public async Task start_displays_error_on_invalid_function_json()
-        {
-            var functionName = "HttpTriggerJS";
-
->>>>>>> feature/oop-host
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
@@ -1677,13 +930,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-<<<<<<< HEAD
         [Fact]
         public async Task DontStart_InProc8_SpecifiedRuntime_ForDotnet6InProc()
-=======
-        [Fact(Skip="Flaky test")]
-        public async Task start_displays_error_on_invalid_host_json()
->>>>>>> feature/oop-host
         {
             await CliTester.Run(new RunConfiguration[]
             {
@@ -1715,14 +963,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-<<<<<<< HEAD
         [Fact]
         public async Task DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet6InProc()
-=======
-
-        [Fact(Skip="Dependent on .NET6")]
-        public async Task start_displays_error_on_missing_host_json()
->>>>>>> feature/oop-host
         {
             await CliTester.Run(new RunConfiguration[]
             {
@@ -1979,10 +1221,10 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public async Task Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError()
         {
-            var functionName = "HttpTriggerJS";
+           var functionName = "HttpTriggerJS";
 
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -2018,17 +1260,17 @@ namespace Azure.Functions.Cli.Tests.E2E
                        p.Kill();
                    }
                }
-            }, _output);
+           }, _output);
         }
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
-            var functionName = "HttpTriggerCSharp";
+           var functionName = "HttpTriggerCSharp";
 
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -2062,17 +1304,17 @@ namespace Azure.Functions.Cli.Tests.E2E
                        p.Kill();
                    }
                },
-            }, _output);
+           }, _output);
         }
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
         {
-            var functionName = "HttpTriggerCSharp";
+           var functionName = "HttpTriggerCSharp";
 
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -2110,17 +1352,17 @@ namespace Azure.Functions.Cli.Tests.E2E
                        p.Kill();
                    }
                },
-            }, _output);
+           }, _output);
         }
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_InvalidHostJson_FailsWithExpectedError()
         {
-            var functionName = "HttpTriggerCSharp";
+           var functionName = "HttpTriggerCSharp";
 
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -2146,17 +1388,17 @@ namespace Azure.Functions.Cli.Tests.E2E
                    ExitInError = true,
                    OutputContains = new[] { "Extension bundle configuration should not be present" },
                },
-            }, _output);
+           }, _output);
         }
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_MissingHostJson_FailsWithExpectedError()
         {
-            var functionName = "HttpTriggerCSharp";
+           var functionName = "HttpTriggerCSharp";
 
-            await CliTester.Run(new RunConfiguration[]
-            {
+           await CliTester.Run(new RunConfiguration[]
+           {
                new RunConfiguration
                {
                    Commands = new[]
@@ -2181,7 +1423,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                    ExitInError = true,
                    OutputContains = new[] { "Host.json file in missing" },
                },
-             }, _output);
+            }, _output);
         }
 
         [Theory]
