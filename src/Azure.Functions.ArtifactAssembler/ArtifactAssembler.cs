@@ -169,7 +169,7 @@ namespace Azure.Functions.ArtifactAssembler
             var customHostTargetArtifactDir = Path.Combine(_stagingDirectory, Constants.VisualStudioOutputArtifactDirectoryName);
             Directory.CreateDirectory(customHostTargetArtifactDir);
 
-            var packTasks = _customHostArtifacts.Keys.Select(async artifactName =>
+            foreach (string artifactName in _customHostArtifacts.Keys)
             {
                 var inProc8ArtifactDirPath = Directory.EnumerateDirectories(_inProc8ExtractedRootDir)
                                           .FirstOrDefault(dir => dir.Contains(artifactName));
@@ -185,20 +185,21 @@ namespace Azure.Functions.ArtifactAssembler
                 Directory.CreateDirectory(consolidatedArtifactDirPath);
 
                 // Copy in-proc8 files
-                var inProc8CopyTask = Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
+                await Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
+                Directory.Delete(inProc8ArtifactDirPath, true);
 
                 // Copy in-proc6 files
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
                 EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
-                var inProc6CopyTask = Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                Directory.Delete(inProc6ArtifactDirPath, true);
 
                 // Copy core-tools-host files
                 var rid = GetRuntimeIdentifierForArtifactName(artifactName);
                 var coreToolsHostArtifactDirPath = Path.Combine(_coreToolsHostExtractedRootDir, rid);
                 EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
-                var coreToolsHostCopyTask = Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
-
-                await Task.WhenAll(inProc8CopyTask, inProc6CopyTask, coreToolsHostCopyTask);
+                await Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
+                Directory.Delete(coreToolsHostArtifactDirPath, true);
 
                 // consolidatedArtifactDirPath now contains custom core-tools host, in-proc6 and in-proc8 sub directories. Create a zip file.
                 var zipPath = Path.Combine(customHostTargetArtifactDir, $"{consolidatedArtifactDirName}.zip");
@@ -206,9 +207,8 @@ namespace Azure.Functions.ArtifactAssembler
                 Console.WriteLine($"Successfully created target runtime zip at: {zipPath}");
 
                 Directory.Delete(consolidatedArtifactDirPath, true);
-            });
+            }
 
-            await Task.WhenAll(packTasks);
             Console.WriteLine("Finished assembling Visual Studio Core Tools artifacts");
         }
 
