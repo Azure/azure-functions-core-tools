@@ -60,7 +60,7 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-windows-host
+      artifact: drop-coretools-host-windows
       
 - job: BuildCoreToolsHostLinux
   displayName: '[Linux] Build CoreToolsHost'
@@ -104,7 +104,7 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-linux-host
+      artifact: drop-coretools-host-linux
 
 - job: BuildCoreToolsHostMac
   displayName: '[Mac] Build CoreToolsHost'
@@ -150,6 +150,7 @@ jobs:
       Contents: |
         func
         libnethost.dylib
+        libnethost.a
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-x64
 
   - task: CopyFiles@2
@@ -160,6 +161,7 @@ jobs:
       Contents: |
         func
         libnethost.dylib
+        libnethost.a
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
 
   templateContext:
@@ -167,4 +169,4 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-mac-host
+      artifact: drop-coretools-host-mac
