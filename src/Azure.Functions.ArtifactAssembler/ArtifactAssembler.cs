@@ -148,8 +148,7 @@ namespace Azure.Functions.ArtifactAssembler
             await ExtractZipFilesInDirectoryAsync(artifactZipPath, destinationDirectory);
 
             // Delete additional files that are not needed
-            var filesToBeDeleted = Directory.GetFiles(destinationDirectory);
-            Console.WriteLine($"{filesToBeDeleted.Length} files found in {destinationDirectory}");
+            var filesToBeDeleted = Directory.EnumerateFiles(destinationDirectory);
             foreach (var file in filesToBeDeleted)
             {
                 File.Delete(file);
@@ -162,7 +161,6 @@ namespace Azure.Functions.ArtifactAssembler
         // Example output: 4.0.6353
         private static string GetCoreToolsProductVersion(string artifactDirectoryName)
         {
-            Console.WriteLine("Artifact directory name that is being compared: " + artifactDirectoryName);
             var match = Regex.Match(artifactDirectoryName, Constants.CoreToolsProductVersionPattern);
             if (match.Success)
             {
@@ -194,13 +192,15 @@ namespace Azure.Functions.ArtifactAssembler
                 var consolidatedArtifactDirPath = Path.Combine(customHostTargetArtifactDir, consolidatedArtifactDirName);
                 Directory.CreateDirectory(consolidatedArtifactDirPath);
 
-                // Copy in-proc8 files
+                // Copy in-proc8 files and delete directory after
                 await Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
+                Directory.Delete(inProc8ArtifactDirPath, true);
 
-                // Copy in-proc6 files
+                // Copy in-proc6 files and delete directory after
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
                 EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
                 await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                Directory.Delete(inProc6ArtifactDirPath, true);
 
                 // Copy core-tools-host files
                 var rid = GetRuntimeIdentifierForArtifactName(artifactName);
@@ -265,7 +265,8 @@ namespace Azure.Functions.ArtifactAssembler
                 // If we are currently on the minified version of the artifacts, we do not want the inproc6/inproc8 subfolders
                 if (artifactName.Contains("min.win"))
                 {
-                    Console.WriteLine($"Finished assembling {artifactName}");
+                    Console.WriteLine($"Finished assembling {consolidatedArtifactDirPath}");
+                    Console.WriteLine();
                     continue;
                 }
 
@@ -299,12 +300,14 @@ namespace Azure.Functions.ArtifactAssembler
                 Console.WriteLine($"Copied files from {inProc8ArtifactDirPath} => {inProc8FinalDestination}");
 
                 Console.WriteLine($"Finished assembling {consolidatedArtifactDirPath}");
+                Console.WriteLine();
             }
 
             // Delete the extracted directories
             Directory.Delete(_outOfProcExtractedRootDir, true);
 
             Console.WriteLine("Finished assembling CLI Core Tools artifacts");
+            Console.WriteLine();
         }
 
         private (string artifactDirectory, string version) GetArtifactDirectoryAndVersionNumber(string extractedRootDirectory, string artifactName)
