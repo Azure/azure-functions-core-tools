@@ -169,4 +169,4 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-host-mac
+      artifact: drop-coretools-host-osx
