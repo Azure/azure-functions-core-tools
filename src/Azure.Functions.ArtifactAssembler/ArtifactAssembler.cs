@@ -162,6 +162,7 @@ namespace Azure.Functions.ArtifactAssembler
         // Example output: 4.0.6353
         private static string GetCoreToolsProductVersion(string artifactDirectoryName)
         {
+            Console.WriteLine("Artifact directory name that is being compared: " + artifactDirectoryName);
             var match = Regex.Match(artifactDirectoryName, Constants.CoreToolsProductVersionPattern);
             if (match.Success)
             {
@@ -180,6 +181,7 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (string artifactName in _visualStudioArtifacts.Keys)
             {
+                Console.WriteLine("Value of _inProc8ExtractedDir: " + _inProc8ExtractedRootDir);
                 var inProc8ArtifactDirPath = Directory.EnumerateDirectories(_inProc8ExtractedRootDir)
                                           .FirstOrDefault(dir => dir.Contains(artifactName));
                 if (inProc8ArtifactDirPath == null)
