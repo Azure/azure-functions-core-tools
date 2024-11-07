@@ -17,11 +17,6 @@ namespace Azure.Functions.ArtifactAssembler
                     var zipCliArtifacts = new CliArtifactZipper(currentWorkingDirectory);
                     zipCliArtifacts.ZipCliArtifacts();
                 }
-                else if (args.Length > 0 && args[0].Equals("visual-studio", StringComparison.OrdinalIgnoreCase))
-                {
-                    var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory);
-                    await artifactAssembler.AssembleArtifactsAsync(true);
-                }
                 else
                 {
                     var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory);
