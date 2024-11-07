@@ -215,6 +215,11 @@ namespace Azure.Functions.ArtifactAssembler
                 Directory.Delete(consolidatedArtifactDirPath, true);
             }
 
+            // Delete directories
+            Directory.Delete(_inProc6ExtractedRootDir, true);
+            Directory.Delete(_inProc8ExtractedRootDir, true);
+            Directory.Delete(_coreToolsHostExtractedRootDir, true);
+
             Console.WriteLine("Finished assembling Visual Studio Core Tools artifacts");
         }
 
