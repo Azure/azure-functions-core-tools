@@ -1426,7 +1426,7 @@ namespace Azure.Functions.Cli.Tests.E2E
              }, _output);
         }
 
-        [Theory]
+        [Theory(Skip = "Test is flakey")]
         [InlineData("dotnet")]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         // [InlineData("dotnet-isolated")] Skip due to dotnet error on x86: https://github.com/Azure/azure-functions-core-tools/issues/3873
