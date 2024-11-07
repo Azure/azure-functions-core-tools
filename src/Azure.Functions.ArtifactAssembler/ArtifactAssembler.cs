@@ -70,11 +70,17 @@ namespace Azure.Functions.ArtifactAssembler
             _stagingDirectory = CreateStagingDirectory(_rootWorkingDirectory);
         }
 
-        internal async Task AssembleArtifactsAsync()
+        internal async Task AssembleArtifactsAsync(bool isVisualStudioGeneration=false)
         {
-            await ExtractDownloadedArtifactsAsync();
-            await CreateVisualStudioCoreToolsAsync();
-            await CreateCliCoreToolsAsync();
+            await ExtractDownloadedArtifactsAsync(isVisualStudioGeneration);
+            if (isVisualStudioGeneration)
+            {
+                await CreateVisualStudioCoreToolsAsync();
+            }
+            else
+            {
+                await CreateCliCoreToolsAsync();
+            }
         }
 
         private static string GetRequiredEnvironmentVariable(string variableName)
@@ -83,38 +89,44 @@ namespace Azure.Functions.ArtifactAssembler
                 ?? throw new InvalidDataException($"The `{variableName}` environment variable value is missing!");
         }
 
-        private async Task ExtractDownloadedArtifactsAsync()
+        private async Task ExtractDownloadedArtifactsAsync(bool isVisualStudioGeneration)
         {
             var inProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _inProcArtifactDirectoryName);
             var coreToolsHostArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _coreToolsHostArtifactDirectoryName);
-            var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
 
             var inProc6ArtifactDirPath = Path.Combine(inProcArtifactDownloadDir, _inProc6ArtifactName);
             var inProc8ArtifactDirPath = Path.Combine(inProcArtifactDownloadDir, _inProc8ArtifactName);
-            var coreToolsHostWindowsArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostWindowsArtifactName);
-            var coreToolsHostLinuxArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostLinuxArtifactName);
-            var coreToolsHostMacArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostMacArtifactName);
-            var outOfProcArtifactDirPath = Path.Combine(outOfProcArtifactDownloadDir, _outOfProcArtifactName);
 
             EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
             EnsureArtifactDirectoryExist(inProc8ArtifactDirPath);
-            EnsureArtifactDirectoryExist(coreToolsHostWindowsArtifactDirPath);
-            EnsureArtifactDirectoryExist(coreToolsHostLinuxArtifactDirPath);
-            EnsureArtifactDirectoryExist(coreToolsHostMacArtifactDirPath);
-            EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
+
+            if (isVisualStudioGeneration)
+            {
+                var coreToolsHostWindowsArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostWindowsArtifactName);
+                var coreToolsHostLinuxArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostLinuxArtifactName);
+                var coreToolsHostMacArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostMacArtifactName);
+                EnsureArtifactDirectoryExist(coreToolsHostWindowsArtifactDirPath);
+                EnsureArtifactDirectoryExist(coreToolsHostLinuxArtifactDirPath);
+                EnsureArtifactDirectoryExist(coreToolsHostMacArtifactDirPath);
+                
+                _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostWindowsArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
+                await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostLinuxArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
+                await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostMacArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
+                Directory.Delete(coreToolsHostArtifactDownloadDir, true);
+            }
+            else
+            {
+                var outOfProcArtifactDownloadDir = Path.Combine(_rootWorkingDirectory, _outOfProcArtifactDirectoryName);
+                var outOfProcArtifactDirPath = Path.Combine(outOfProcArtifactDownloadDir, _outOfProcArtifactName);
+                EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
+                _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, Constants.OutOfProcDirectoryName));
+                Directory.Delete(outOfProcArtifactDownloadDir, true);
+            }
 
             _inProc6ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, Constants.InProc6DirectoryName));
             _inProc8ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, Constants.InProc8DirectoryName));
 
             Directory.Delete(inProcArtifactDownloadDir, true);
-
-            _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostWindowsArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
-            await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostLinuxArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
-            await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostMacArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
-            Directory.Delete(coreToolsHostArtifactDownloadDir, true);
-
-            _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, Constants.OutOfProcDirectoryName));
-            Directory.Delete(outOfProcArtifactDownloadDir, true);
         }
 
         private static void EnsureArtifactDirectoryExist(string directoryExist)
