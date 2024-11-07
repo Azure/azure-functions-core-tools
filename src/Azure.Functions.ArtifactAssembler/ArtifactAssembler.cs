@@ -181,7 +181,6 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (string artifactName in _visualStudioArtifacts.Keys)
             {
-                Console.WriteLine("Value of _inProc8ExtractedDir: " + _inProc8ExtractedRootDir);
                 var inProc8ArtifactDirPath = Directory.EnumerateDirectories(_inProc8ExtractedRootDir)
                                           .FirstOrDefault(dir => dir.Contains(artifactName));
                 if (inProc8ArtifactDirPath == null)
@@ -240,7 +239,6 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (var artifactName in _cliArtifacts)
             {
-                Console.WriteLine($"Starting to assemble {artifactName}");
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(outOfProcArtifactDirPath))
                 {
@@ -285,22 +283,22 @@ namespace Azure.Functions.ArtifactAssembler
                     inProc8ArtifactDirPath = Path.Combine(_inProc8ExtractedRootDir, artifactNameWithVersion);
                 }
 
-                // Rename inproc8 directory to have the same version as the out-of-proc artifact before copying
-                string newInProc8ArtifactDirPath = RenameInProcDirectory(inProc8ArtifactDirPath, outOfProcVersion);
-
-                // Copy in-proc8 files and delete old directory
-                await Task.Run(() => FileUtilities.CopyDirectory(newInProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
+                // Copy in-proc8 files
+                var inProc8FinalDestination = Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName);
+                await Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
+                Console.WriteLine($"Copied files from {inProc8ArtifactDirPath} => {inProc8FinalDestination}");
 
                 // Rename inproc6 directory to have the same version as the out-of-proc artifact before copying
                 var inProcArtifactName = Path.GetFileName(inProc8ArtifactDirPath);
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, inProcArtifactName);
                 EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
-                string newInProc6ArtifactDirPath = RenameInProcDirectory(inProc6ArtifactDirPath, outOfProcVersion);
 
-                // Copy in-proc6 files and delete old directory
-                await Task.Run(() => FileUtilities.CopyDirectory(newInProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                // Copy in-proc6 files
+                var inProc6FinalDestination = Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName);
+                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                Console.WriteLine($"Copied files from {inProc8ArtifactDirPath} => {inProc8FinalDestination}");
 
-                Console.WriteLine($"Finished assembling {artifactName}");
+                Console.WriteLine($"Finished assembling {consolidatedArtifactDirPath}");
             }
 
             // Delete the extracted directories
@@ -320,25 +318,6 @@ namespace Azure.Functions.ArtifactAssembler
 
             var version = GetCoreToolsProductVersion(artifactDirPath);
             return (artifactDirPath, version);
-        }
-
-        private string RenameInProcDirectory(string oldArtifactDirPath, string newVersion)
-        {
-            Match match = Regex.Match(oldArtifactDirPath, Constants.ArtifactNameRegexPattern);
-
-            if (!match.Success)
-            {
-                throw new InvalidOperationException($"Unable to extract content before version number from '{oldArtifactDirPath}'.");
-            }
-
-            var artifactName = match.Groups[1];
-            var newDirectoryName = $"{artifactName}{newVersion}";
-
-            // Rename (move) the directory
-            Directory.Move(oldArtifactDirPath, newDirectoryName);
-
-            return newDirectoryName;
-
         }
 
         private string GetRuntimeIdentifierForArtifactName(string artifactName)
