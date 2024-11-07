@@ -23,7 +23,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-x64 --self-contained
+      arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-x64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: DotnetCoreCLI@2
@@ -32,7 +32,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64 --self-contained
+      arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - template: ci/sign-files.yml@eng
@@ -146,7 +146,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64 --self-contained
+      arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: CopyFiles@2
@@ -190,7 +190,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-x64 --self-contained
+      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-x64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: DotnetCoreCLI@2
@@ -199,7 +199,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64 --self-contained
+      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: CopyFiles@2
