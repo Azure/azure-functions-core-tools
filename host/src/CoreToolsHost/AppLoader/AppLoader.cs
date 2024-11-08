@@ -23,6 +23,7 @@ namespace CoreToolsHost
         internal int RunApplication(string? assemblyPath, string[] commandLineArgs)
         {
             ArgumentNullException.ThrowIfNull(assemblyPath, nameof(assemblyPath));
+            Console.WriteLine($"Assembly path: {assemblyPath}. File Exist:{File.Exists(assemblyPath)}");
 
             unsafe
             {
@@ -31,22 +32,6 @@ namespace CoreToolsHost
                     size = sizeof(NetHost.get_hostfxr_parameters),
                     assembly_path = GetCharArrayPointer(assemblyPath)
                 };
-
-                // Convert to IntPtr first
-                IntPtr ptr = new IntPtr(parameters.assembly_path);
-
-                // Convert IntPtr to string (ANSI)
-                string paramAssemblyPath = Marshal.PtrToStringAnsi(ptr);
-                Console.WriteLine($"Value of assembly path: {paramAssemblyPath}");
-                Console.WriteLine("Does assembly path exist: " + File.Exists(paramAssemblyPath));
-
-                IntPtr dotnetRootPtr = new IntPtr(parameters.dotnet_root);
-
-                string paramAssemblyPathDotnetRoot = Marshal.PtrToStringAnsi(dotnetRootPtr);
-                Console.WriteLine($"Value of dotnetRoot: {paramAssemblyPathDotnetRoot}");
-                Console.WriteLine("Does dotnetRoot exist: " + File.Exists(paramAssemblyPathDotnetRoot));
-
-                Console.WriteLine($"Size of params: {parameters.size}");
 
                 isVerbose = commandLineArgs.Contains(DotnetConstants.Verbose);
 
