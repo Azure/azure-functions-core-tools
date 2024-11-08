@@ -27,7 +27,6 @@ namespace CoreToolsHost
         {
             char[] buffer = new char[200];
             int bufferSize = buffer.Length;
-            Console.WriteLine("Does file exist: " + File.Exists("./in-proc6/func.dll"));
 
             int rc = get_hostfxr_path(buffer, ref bufferSize, parameters);
 
