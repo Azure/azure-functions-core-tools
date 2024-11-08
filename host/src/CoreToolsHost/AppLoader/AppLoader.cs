@@ -32,6 +32,14 @@ namespace CoreToolsHost
                     assembly_path = GetCharArrayPointer(assemblyPath)
                 };
 
+                // Convert to IntPtr first
+                IntPtr ptr = new IntPtr(parameters.assembly_path);
+
+                // Convert IntPtr to string (ANSI)
+                string paramAssemblyPath = Marshal.PtrToStringAnsi(ptr);
+                Console.WriteLine($"Value of assembly path: {paramAssemblyPath}");
+                Console.WriteLine("Does assembly path exist: " + File.Exists(paramAssemblyPath));
+
                 isVerbose = commandLineArgs.Contains(DotnetConstants.Verbose);
 
                 var hostfxrFullPath = NetHost.GetHostFxrPath(&parameters);
