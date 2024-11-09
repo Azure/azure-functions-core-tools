@@ -123,6 +123,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string CalculateMd5(Stream stream)
         {
+            // CodeQL [SM02196] Our intent is to validate the blob content. BlobClient only provides MD5 string for validation. We cannot replace that unless something else is provided for validation. We are using MD5 for integrity of blob content and not for security purposes.
             using (var md5 = MD5.Create())
             {
                 var hash = md5.ComputeHash(stream);
