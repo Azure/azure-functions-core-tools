@@ -157,7 +157,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                 }
 
-                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName }, { HttpTriggerAuthLevelParamId, AuthorizationLevel?.ToString() } };
+                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName }, { HttpTriggerAuthLevelParamId, AuthorizationLevel?.ToString().ToUpper() } };
                 var jobName = "appendToFile";
                 if (FileName != PySteinFunctionAppPy)
                 {
