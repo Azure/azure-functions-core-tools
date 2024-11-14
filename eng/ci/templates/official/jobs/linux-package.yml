@@ -19,13 +19,14 @@ jobs:
         pip install -r requirements.txt
         apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
-        python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
-        python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
+        sudo python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
+        sudo python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
     env:
-      linuxBuildNumber: $(LinuxPackageBuildTag)      
+      linuxBuildNumber: $(LinuxPackageBuildTag)
+      consolidatedBuildId: $(ConsolidatedBuildId)      
   - pwsh: |
       echo $env:LinuxPackageAccountName
       $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
