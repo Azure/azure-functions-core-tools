@@ -17,7 +17,7 @@ jobs:
         python3 -m venv publish-env
         source publish-env/bin/activate
         pip install -r requirements.txt
-        apt-get install fakeroot
+        sudo apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
         sudo python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
         sudo python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
