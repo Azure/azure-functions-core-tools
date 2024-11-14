@@ -1,6 +1,6 @@
 jobs:
 - job: LinuxPackage
-  condition: ne(variables['LinuxPackageBuildTag'], '')
+  condition: and(ne(variables['LinuxPackageBuildTag'], ''), ne(variables['ConsolidatedBuildId'], ''))
   timeoutInMinutes: "120"
   pool:
     name: 1es-pool-azfunc
@@ -19,8 +19,8 @@ jobs:
         pip install -r requirements.txt
         apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
-        python driver.py "$linuxBuildNumber" "$major_version"
-        python driver.py "$linuxBuildNumber"
+        python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
+        python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
