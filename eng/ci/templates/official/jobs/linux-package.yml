@@ -19,11 +19,11 @@ jobs:
 
         pip install -r requirements.txt
         pip install wget
-        
+
         sudo apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
-        sudo python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
-        sudo python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
+        python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
+        python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
