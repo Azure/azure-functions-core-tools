@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="E2E\TestProject\test-net8\.vscode\extensions.json" />
     <Content Include="xunit.runner.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -43,10 +44,15 @@
     <None Include="..\..\NuGet.Config" Link="NuGet.Config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="E2E\TestProject\test-net8\test-net8.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Azure.Functions.Cli\Azure.Functions.Cli.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="E2E\TestProject\test-net8\bin\Debug\net8.0\" />
   </ItemGroup>
 
   <PropertyGroup>
