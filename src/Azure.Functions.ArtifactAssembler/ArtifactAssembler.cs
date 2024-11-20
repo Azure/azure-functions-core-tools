@@ -202,6 +202,10 @@ namespace Azure.Functions.ArtifactAssembler
                 await Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
                 Directory.Delete(coreToolsHostArtifactDirPath, true);
 
+                var zipPath = Path.Combine(customHostTargetArtifactDir, $"{consolidatedArtifactDirName}");
+                Directory.CreateDirectory(zipPath);
+                await Task.Run(() => FileUtilities.CopyDirectory(customHostTargetArtifactDir, zipPath));
+
                 // consolidatedArtifactDirPath now contains custom core-tools host, in-proc6 and in-proc8 sub directories. Create a zip file.
                 //var zipPath = Path.Combine(customHostTargetArtifactDir, $"{consolidatedArtifactDirName}.zip");
                 //await Task.Run(() => FileUtilities.CreateZipFile(consolidatedArtifactDirPath, zipPath));
