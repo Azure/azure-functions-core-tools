@@ -12,7 +12,8 @@ dotnet build $testProjectPath
 Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
     # Check if the subdirectory name includes 'win-x64 or win-x86'
     $subDir = $_.FullName
-    if ($subDir -like "*Cli.min.win-x*") {
+    Write-Host "name of current file: $subDir"
+    if ($subDir -like "*win-x*") {
         Write-Host "Current directory: $subDir"
         # Find func.exe in the subdirectory
         $funcExePath = Get-ChildItem -Path $subDir -Filter "func.exe" -ErrorAction SilentlyContinue
