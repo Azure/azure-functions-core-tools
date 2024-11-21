@@ -1,9 +1,7 @@
 ﻿using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Interfaces;
@@ -11,9 +9,6 @@ using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using static Colors.Net.StringStaticMethods;
-using Azure.Functions.Cli.Helpers;
-using Microsoft.Identity.Client;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
