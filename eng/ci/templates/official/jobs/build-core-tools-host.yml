@@ -262,7 +262,7 @@ jobs:
   - task: CopyFiles@2
     displayName: Copy files (osx-x64)
     inputs:
-      SourceFolder: $(Build.SourcesDirectory)/drop-coretools-host-osx/osx-x64
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/osx/osx-x64
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func
@@ -273,7 +273,7 @@ jobs:
   - task: CopyFiles@2
     displayName: Copy files (osx-arm64)
     inputs:
-      SourceFolder: $(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64
       # Publish output will include many other files. We only need func & nethost.dll
       Contents: |
         func
