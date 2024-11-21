@@ -57,8 +57,6 @@ jobs:
       testResultsFiles: '**/*.trx'
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Artifact: TestFiles'
-    inputs:
-      PathtoPublish: '$(Build.SourcesDirectory)/**/ZippedOnWindows.zip'
-      ArtifactName: 'TestFiles'
+  - output: pipelineArtifact
+    targetPath: $(Build.SourcesDirectory)/**/ZippedOnWindows.zip
+    artifactName: TestFiles
