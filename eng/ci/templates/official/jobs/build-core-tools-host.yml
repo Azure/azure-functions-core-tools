@@ -316,8 +316,8 @@ jobs:
       inlineOperation: |
         [
           {
-            "KeyCode": "CP-401337-Apple",
-            "OperationCode": "MacAppDeveloperSign",
+            "KeyCode": "CP-233029-Apple",
+            "OperationCode": "MacAppThirdPartySign",
             "ToolName": "sign",
             "ToolVersion": "1.0",
             "Parameters": {}
