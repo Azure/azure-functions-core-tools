@@ -360,7 +360,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        $"start --port {_funcHostPort} --verbose --dotnet-isolated"
+                        $"start --port {_funcHostPort} --verbose"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
@@ -368,10 +368,13 @@ namespace Azure.Functions.Cli.Tests.E2E
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
                         {
                             (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            var response = await client.GetAsync("/api/Function1?name=Test");
                             var result = await response.Content.ReadAsStringAsync();
                             p.Kill();
-                            result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+                            if (result != "Hello, Test. This HTTP triggered function executed successfully.")
+                            {
+                                throw new Exception("response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.");
+                            }
 
                             if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                             {
