@@ -121,7 +121,7 @@ jobs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
       artifact: drop-coretools-host-windows
-      
+
 - job: BuildCoreToolsHostLinux
   displayName: '[Linux] Build CoreToolsHost'
   pool:
@@ -135,14 +135,6 @@ jobs:
       version: 9.x
       includePreviewVersions: true
     displayName: Install .NET 9
-  - task: UseDotNet@2
-    inputs:
-      version: 6.x
-    displayName: Install .NET 6
-  - task: UseDotNet@2
-    inputs:
-      version: 8.x
-    displayName: Install .NET 8
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (linux-x64)
@@ -152,36 +144,6 @@ jobs:
       zipAfterPublish: false
       arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
-
-  - task: Bash@3
-    inputs:
-      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
-      script: |
-        cd publish-scripts
-        python3 -m venv publish-env
-        source publish-env/bin/activate
-        sudo pip install -r requirements.txt
-        sudo apt-get install fakeroot
-        export PATH="$PATH:/mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.3/net462"
-        chmod +x /mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.3/net462/esrpcli.exe
-      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
-
-  - template: ci/sign-files.yml@eng
-    parameters:
-      displayName: 'Sign'
-      folderPath: '/mnt/vss/_work/1/s/pkg_output/linux/linux-x64'
-      pattern: 'func'
-      signType: inline
-      inlineOperation: |
-        [
-          {
-            "keyCode": "CP-450779-Pgp",
-            "operationSetCode": "LinuxSign",
-            "parameters": [],
-            "toolName": "sign",
-            "toolVersion": "1.0"
-          }
-        ]
 
   - task: CopyFiles@2
     displayName: Copy files (linux-x64)
@@ -199,6 +161,72 @@ jobs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
       artifact: drop-coretools-host-linux
+      
+- job: SignCoreToolsHostLinux
+  displayName: '[Linux] Sign CoreToolsHost'
+  dependsOn: BuildCoreToolsHostLinux
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-ubuntu-22.04
+    os: linux
+
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 8.x
+    displayName: Install .NET 8
+
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: drop-coretools-host-linux
+      path: $(Build.SourcesDirectory)/drop-coretools-host-linux
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
+      script: |
+        cd publish-scripts
+        python3 -m venv publish-env
+        source publish-env/bin/activate
+        sudo pip install -r requirements.txt
+        sudo apt-get install fakeroot
+        export PATH="$PATH:/mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.3/net462"
+        chmod +x /mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.3/net462/esrpcli.exe
+      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
+
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Sign'
+      folderPath: '/mnt/vss/_work/1/s/drop-coretools-host-linux
+      pattern: 'func'
+      signType: inline
+      inlineOperation: |
+        [
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "sign",
+            "toolVersion": "1.0"
+          }
+        ]
+
+  - task: CopyFiles@2
+    displayName: Copy files (linux-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/drop-coretools-host-linux
+      # Publish output will include many other files. We only need func & nethost.dll
+      Contents: |
+        func
+        libnethost.so
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
+      artifact: drop-coretools-host-linux-new
 
 - job: BuildCoreToolsHostMac
   displayName: '[Mac] Build CoreToolsHost'
