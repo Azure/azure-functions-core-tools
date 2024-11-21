@@ -197,7 +197,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
-      folderPath: '/mnt/vss/_work/1/s/drop-coretools-host-linux
+      folderPath: '/mnt/vss/_work/1/s/drop-coretools-host-linux'
       pattern: 'func'
       signType: inline
       inlineOperation: |
