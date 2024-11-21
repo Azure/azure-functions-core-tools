@@ -57,3 +57,8 @@ jobs:
       testResultsFiles: '**/*.trx'
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: drop'
+    inputs:
+      PathtoPublish: '$(Build.SourcesDirectory)/**/ZippedOnWindows.zip'
+      ArtifactName: 'TestFiles'
