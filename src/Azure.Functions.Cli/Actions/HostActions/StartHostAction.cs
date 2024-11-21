@@ -737,7 +737,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 return;
             }
 
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.None)
+            var environmentRuntimeSettingValue = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            if (environmentRuntimeSettingValue is not null)
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(environmentRuntimeSettingValue);
+            }
+
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.None)
             {
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("worker runtime");
                 IDictionary<WorkerRuntime, string> workerRuntimeToDisplayString = WorkerRuntimeLanguageHelper.GetWorkerToDisplayStrings();
