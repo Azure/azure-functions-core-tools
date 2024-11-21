@@ -58,7 +58,7 @@ jobs:
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
   - task: PublishBuildArtifacts@1
-    displayName: 'Publish Artifact: drop'
+    displayName: 'Publish Artifact: TestFiles'
     inputs:
       PathtoPublish: '$(Build.SourcesDirectory)/**/ZippedOnWindows.zip'
       ArtifactName: 'TestFiles'
