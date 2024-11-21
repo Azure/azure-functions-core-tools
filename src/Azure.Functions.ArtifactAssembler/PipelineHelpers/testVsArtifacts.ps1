@@ -6,6 +6,9 @@ param (
 $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
 $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact_consolidation_visualstudio.runsettings"
 
+$env:FUNCTIONS_WORKER_RUNTIME = "dotnet"
+$env:FUNCTIONS_INPROC_NET8_ENABLED = "1"
+
 dotnet build $testProjectPath
 
 # Loop through each subdirectory within the parent directory
