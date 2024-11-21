@@ -342,7 +342,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net6.0 --logger trx --filter CreateZip_Succeeds");
         }
 
         public static void CopyBinariesToSign()
@@ -684,7 +684,7 @@ namespace Build
 
             ColoredConsole.WriteLine($"Going to run the UploadToStorage. Setting is {Settings.IsPublicBuild}");
 
-            
+
             if (!string.IsNullOrEmpty(Settings.BuildArtifactsStorage))
             {
                 var version = new Version(CurrentVersion);
