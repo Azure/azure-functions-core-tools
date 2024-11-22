@@ -354,7 +354,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public async Task Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution_WithSpecifyingRuntime()
         {
-            bool shouldExitInError = false;
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
@@ -372,9 +371,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                             var response = await client.GetAsync("/api/Function1?name=Test");
                             var result = await response.Content.ReadAsStringAsync();
                             p.Kill();
+
                             if (result != "Hello, Test. This HTTP triggered function executed successfully.")
                             {
-                                shouldExitInError = true;
                                 throw new Exception("idk");
                             }
 
@@ -386,10 +385,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
-                },
-                new RunConfiguration
-                {
-                    ExitInError = shouldExitInError
                 }
             }, _output, "../../../E2E/TestProject/TestNet8InProcProject");
 
