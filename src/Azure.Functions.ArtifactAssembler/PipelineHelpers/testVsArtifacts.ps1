@@ -5,12 +5,11 @@ param (
 # Set the path to test project (.csproj) and runtime settings
 $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
 
-[System.Environment]::SetEnvironmentVariable("FUNCTIONS_INPROC_NET8_ENABLED", "1", "Process")
 [System.Environment]::SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet", "Process")
 
 dotnet build $testProjectPath
 
-Set-Location "..\..\test\Azure.Functions.Cli.Tests\E2E\TestProject\TestNet8InProcProject"
+#Set-Location "..\..\test\Azure.Functions.Cli.Tests\E2E\TestProject\TestNet8InProcProject"
 
 # Loop through each subdirectory within the parent directory
 Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {

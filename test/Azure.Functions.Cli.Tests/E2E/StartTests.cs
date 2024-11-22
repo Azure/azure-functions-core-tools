@@ -360,7 +360,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        $"start --port {_funcHostPort} --verbose --dotnet-isolated"
+                        $"start --port {_funcHostPort} --verbose --dotnet"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
@@ -375,14 +375,48 @@ namespace Azure.Functions.Cli.Tests.E2E
 
                             if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                             {
-                                testOutputHelper.Output.Should().Contain("Starting child process for inproc8 model host.");
-                                testOutputHelper.Output.Should().Contain("Selected inproc8 host.");
+                                testOutputHelper.Output.Should().Contain("Loading .NET 8 host");
                             }
                         }
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
                 }
             }, _output, "../../../E2E/TestProject/TestNet8InProcProject");
+
+        }
+
+        [Fact]
+        [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
+        public async Task Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution_WithSpecifyingRuntime()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --port {_funcHostPort} --verbose --dotnet"
+                    },
+                    ExpectExit = false,
+                    Test = async (workingDir, p, _) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/Function1?name=Test");
+                            var result = await response.Content.ReadAsStringAsync();
+                            p.Kill();
+                            result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain("Loading .NET 6 host");
+                            }
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300),
+                }
+            }, _output, "../../../E2E/TestProject/TestNet6InProcProject");
 
         }
 
