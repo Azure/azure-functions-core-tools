@@ -371,11 +371,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             var response = await client.GetAsync("/api/Function1?name=Test");
                             var result = await response.Content.ReadAsStringAsync();
                             p.Kill();
-
-                            if (result != "Hello, Test. This HTTP triggered function executed successfully.")
-                            {
-                                throw new Exception("idk");
-                            }
+                            result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
 
                             if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                             {
