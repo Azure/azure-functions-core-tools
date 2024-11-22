@@ -133,10 +133,13 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         catch (Exception e)
                         {
                             logErr($"Error while running test: {e.Message}");
+                            // Throw an error if working directory was passed in
+                            // For some reason, tests don't fail with the working directory not being the default one so we need this specification
                             if(wasWorkingDirPassedIn)
                             {
-                                exitCode = 1;
+                                exitError = true;
                             }
+                            
                         }
                         finally
                         {
@@ -171,7 +174,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     }
                 }
 
-                // AssertExitError(runConfiguration, exitError);
+                AssertExitError(runConfiguration, exitError);
                 AssertFiles(runConfiguration, workingDir);
                 AssertDirectories(runConfiguration, workingDir);
                 AssertOutputContent(runConfiguration, stdout);
