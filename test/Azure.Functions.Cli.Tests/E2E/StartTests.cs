@@ -1115,6 +1115,66 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         }
 
+        [Fact]
+        public async Task Start_MissingLocalSettingsJson_SetWithEnvVar_SuccessfulFunctionExecution()
+        {
+            try
+            {
+                Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
+
+                await CliTester.Run(new RunConfiguration[]
+                {
+                    new RunConfiguration
+                    {
+                        Commands = new[]
+                        {
+                            $"init . --worker-runtime dotnet-isolated",
+                            $"new --template Httptrigger --name HttpTriggerFunc",
+                        },
+                        CommandTimeout = TimeSpan.FromSeconds(300),
+                    },
+                    new RunConfiguration
+                    {
+                        PreTest = (workingDir) =>
+                        {
+                        var LocalSettingsJson = Path.Combine(workingDir, "local.settings.json");
+                            File.Delete(LocalSettingsJson);
+                        },
+                        Commands = new[]
+                        {
+                            $"start --port {_funcHostPort}",
+                        },
+                        ExpectExit = false,
+                        OutputContains = new[]
+                        {
+                            $"local.settings.json",
+                            "Functions:",
+                            $"HttpTriggerFunc: [GET,POST] http://localhost:{_funcHostPort}/api/HttpTriggerFunc"
+                        },
+                        OutputDoesntContain = new string[]
+                        {
+                            "Initializing function HTTP routes"
+                        },
+                        Test = async (_, p,_) =>
+                        {
+                            using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
+                            {
+                                (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                                var response = await client.GetAsync("/api/HttpTriggerFunc?name=Test");
+                                response.StatusCode.Should().Be(HttpStatusCode.OK);
+                                await Task.Delay(TimeSpan.FromSeconds(2));
+                                p.Kill();
+                            }
+                        }
+                    }
+                }, _output);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
+            }
+        }
+
         private async Task<bool> WaitUntilReady(HttpClient client)
         {
             for (var limit = 0; limit < 10; limit++)
