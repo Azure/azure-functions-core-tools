@@ -9,6 +9,8 @@ $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact
 
 $env:FUNCTIONS_WORKER_RUNTIME = "dotnet"
 $env:FUNCTIONS_INPROC_NET8_ENABLED = "1"
+Write-Host "##vso[task.setvariable variable=FUNCTIONS_INPROC_NET8_ENABLED;isOutput=false]1"
+Write-Host "##vso[task.setvariable variable=FUNCTIONS_WORKER_RUNTIME;isOutput=false]dotnet"
 
 dotnet build $testProjectPath
 dotnet build $net8InProcApp
