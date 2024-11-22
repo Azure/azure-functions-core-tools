@@ -11,6 +11,7 @@ namespace CoreToolsHost
     {
         internal static async Task<JsonDocument> GetLocalSettingsJsonAsJObjectAsync()
         {
+            Console.WriteLine($"Current directory: {Environment.CurrentDirectory}");
             var fullPath = Path.Combine(Environment.CurrentDirectory, "local.settings.json");
 
             if (File.Exists(fullPath))
