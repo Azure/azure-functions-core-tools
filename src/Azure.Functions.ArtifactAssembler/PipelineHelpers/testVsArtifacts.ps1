@@ -4,19 +4,13 @@ param (
 
 # Set the path to test project (.csproj) and runtime settings
 $testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
-$net8InProcApp = "..\..\test\Azure.Functions.Cli.Tests\E2E\TestProject\TestNet8InProcProject"
-$runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact_consolidation_visualstudio.runsettings"
-
-$env:FUNCTIONS_WORKER_RUNTIME = "dotnet"
-$env:FUNCTIONS_INPROC_NET8_ENABLED = "1"
-Write-Host "##vso[task.setvariable variable=FUNCTIONS_INPROC_NET8_ENABLED;isOutput=false]1"
-Write-Host "##vso[task.setvariable variable=FUNCTIONS_WORKER_RUNTIME;isOutput=false]dotnet"
 
 [System.Environment]::SetEnvironmentVariable("FUNCTIONS_INPROC_NET8_ENABLED", "1", "Process")
 [System.Environment]::SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet", "Process")
 
 dotnet build $testProjectPath
-dotnet build $net8InProcApp
+
+ Set-Location "..\..\..\test\Azure.Functions.Cli.Tests\E2E\TestProject\TestNet8InProcProject"
 
 # Loop through each subdirectory within the parent directory
 Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
@@ -37,7 +31,7 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
         
             # Run dotnet test with the environment variable set
             Write-Host "Running 'dotnet test' on test project: $testProjectPath"
-            dotnet test $testProjectPath --no-build --settings $runtimeSettings --logger "console;verbosity=detailed"
+            dotnet test "..\..\..\Azure.Functions.Cli.Tests.csproj" --no-build --settings "..\..\StartTests_artifact_consolidation_visualstudio.runsettings" --logger "console;verbosity=detailed"
 
             if ($LASTEXITCODE -ne 0) {
                 # If the exit code is non-zero, throw an error

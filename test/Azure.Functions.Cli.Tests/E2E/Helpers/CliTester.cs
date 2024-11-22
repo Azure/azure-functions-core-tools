@@ -41,6 +41,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
         public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null, bool startHost = false)
         {
+            bool wasWorkingDirPassedIn = (workingDir != null);
             string workingDirectory = workingDir ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
             bool cleanupDirectory = string.IsNullOrEmpty(workingDir);
@@ -54,7 +55,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
             try
             {
-                await InternalRun(workingDirectory, runConfigurations, output, startHost);
+                await InternalRun(workingDirectory, runConfigurations, output, startHost, wasWorkingDirPassedIn);
             }
             finally
             {
@@ -73,7 +74,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost)
+        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost, bool wasWorkingDirPassedIn)
         {
             await using var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
             var stdout = new StringBuilder();
@@ -132,6 +133,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         catch (Exception e)
                         {
                             logErr($"Error while running test: {e.Message}");
+                            if(wasWorkingDirPassedIn)
+                            {
+                                exitCode = 1;
+                            }
                         }
                         finally
                         {
