@@ -361,7 +361,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        $"start --port {_funcHostPort} --verbose"
+                        $"start --port {_funcHostPort} --verbose --dotnet-isolated"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
