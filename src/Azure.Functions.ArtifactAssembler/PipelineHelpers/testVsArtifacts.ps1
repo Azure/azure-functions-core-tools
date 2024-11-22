@@ -12,6 +12,9 @@ $env:FUNCTIONS_INPROC_NET8_ENABLED = "1"
 Write-Host "##vso[task.setvariable variable=FUNCTIONS_INPROC_NET8_ENABLED;isOutput=false]1"
 Write-Host "##vso[task.setvariable variable=FUNCTIONS_WORKER_RUNTIME;isOutput=false]dotnet"
 
+[System.Environment]::SetEnvironmentVariable("FUNCTIONS_INPROC_NET8_ENABLED", "1", "Process")
+[System.Environment]::SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet", "Process")
+
 dotnet build $testProjectPath
 dotnet build $net8InProcApp
 
