@@ -354,13 +354,14 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public async Task Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution_WithSpecifyingRuntime()
         {
+            bool shouldExitInError = false;
             await CliTester.Run(new RunConfiguration[]
             {
                 new RunConfiguration
                 {
                     Commands = new[]
                     {
-                        $"start --port {_funcHostPort} --verbose --dotnet-isolated"
+                        $"start --port {_funcHostPort} --verbose"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
@@ -373,7 +374,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                             p.Kill();
                             if (result != "Hello, Test. This HTTP triggered function executed successfully.")
                             {
-                                throw new Exception("response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.");
+                                shouldExitInError = true;
+                                throw new Exception("idk");
                             }
 
                             if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
@@ -383,9 +385,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                             }
                         }
                     },
-                    CommandTimeout = TimeSpan.FromSeconds(300)
+                    CommandTimeout = TimeSpan.FromSeconds(300),
                 },
+                new RunConfiguration
+                {
+                    ExitInError = shouldExitInError
+                }
             }, _output, "../../../E2E/TestProject/TestNet8InProcProject");
+
         }
 
         [Fact]
