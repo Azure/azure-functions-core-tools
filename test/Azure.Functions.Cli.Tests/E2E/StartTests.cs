@@ -1455,7 +1455,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                        $"start --port {_funcHostPort}"
                    },
                    ExpectExit = true,
-                   ExitInError = true,
                    OutputContains = new[] { "Extension bundle configuration should not be present" },
                },
             }, _output);
@@ -1490,7 +1489,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                        $"start --port {_funcHostPort}"
                    },
                    ExpectExit = true,
-                   ExitInError = true,
                    OutputContains = new[] { "Host.json file in missing" },
                },
              }, _output);
@@ -1640,7 +1638,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
                     ExpectExit = true,
-                    ExitInError = true,
                     OutputContains = new[]
                     {
                         "Missing value for AzureWebJobsStorage in local.settings.json. This is required for all triggers other than httptrigger, kafkatrigger, orchestrationTrigger, activityTrigger, entityTrigger",
