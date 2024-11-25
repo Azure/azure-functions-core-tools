@@ -15,9 +15,7 @@ namespace Azure.Functions.ArtifactAssembler
         {
             { "Azure.Functions.Cli.min.win-x64", "win-x64" },
             { "Azure.Functions.Cli.min.win-arm64", "win-arm64" },
-            { "Azure.Functions.Cli.linux-x64", "linux-x64" },
-            { "Azure.Functions.Cli.osx-x64", "osx-x64" },
-            { "Azure.Functions.Cli.osx-arm64", "osx-arm64" }
+            { "Azure.Functions.Cli.linux-x64", "linux-x64" }
         };
 
         /// <summary>
@@ -43,7 +41,6 @@ namespace Azure.Functions.ArtifactAssembler
         private readonly string _inProc8ArtifactName;
         private readonly string _coreToolsHostWindowsArtifactName;
         private readonly string _coreToolsHostLinuxArtifactName;
-        private readonly string _coreToolsHostMacArtifactName;
         private readonly string _outOfProcArtifactName;
         private readonly string _rootWorkingDirectory;
         private readonly string _stagingDirectory;
@@ -63,7 +60,6 @@ namespace Azure.Functions.ArtifactAssembler
             _inProc8ArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.InProc8ArtifactName);
             _coreToolsHostWindowsArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.CoreToolsHostWindowsArtifactName);
             _coreToolsHostLinuxArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.CoreToolsHostLinuxArtifactName);
-            _coreToolsHostMacArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.CoreToolsHostOsxArtifactName);
             _outOfProcArtifactName = GetRequiredEnvironmentVariable(EnvironmentVariables.OutOfProcArtifactName);
 
             _rootWorkingDirectory = rootWorkingDirectory;
@@ -95,14 +91,12 @@ namespace Azure.Functions.ArtifactAssembler
 
             var coreToolsHostWindowsArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostWindowsArtifactName);
             var coreToolsHostLinuxArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostLinuxArtifactName);
-            var coreToolsHostMacArtifactDirPath = Path.Combine(coreToolsHostArtifactDownloadDir, _coreToolsHostMacArtifactName);
 
             EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
             EnsureArtifactDirectoryExist(inProc8ArtifactDirPath);
             EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
             EnsureArtifactDirectoryExist(coreToolsHostWindowsArtifactDirPath);
             EnsureArtifactDirectoryExist(coreToolsHostLinuxArtifactDirPath);
-            EnsureArtifactDirectoryExist(coreToolsHostMacArtifactDirPath);
 
             _inProc6ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc6ArtifactDirPath, Path.Combine(_stagingDirectory, Constants.InProc6DirectoryName));
             _inProc8ExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(inProc8ArtifactDirPath, Path.Combine(_stagingDirectory, Constants.InProc8DirectoryName));
@@ -111,7 +105,6 @@ namespace Azure.Functions.ArtifactAssembler
 
             _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostWindowsArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
             await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostLinuxArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
-            await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostMacArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
             Directory.Delete(coreToolsHostArtifactDownloadDir, true);
 
             _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, Constants.OutOfProcDirectoryName));
