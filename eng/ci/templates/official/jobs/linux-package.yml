@@ -1,6 +1,6 @@
 jobs:
 - job: LinuxPackage
-  condition: ne(variables['LinuxPackageBuildTag'], '')
+  condition: and(ne(variables['LinuxPackageBuildTag'], ''), ne(variables['ConsolidatedBuildId'], ''))
   timeoutInMinutes: "120"
   pool:
     name: 1es-pool-azfunc
@@ -16,16 +16,20 @@ jobs:
         cd publish-scripts
         python3 -m venv publish-env
         source publish-env/bin/activate
+
         pip install -r requirements.txt
-        apt-get install fakeroot
+        pip install wget
+
+        sudo apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
-        python driver.py "$linuxBuildNumber" "$major_version"
-        python driver.py "$linuxBuildNumber"
+        python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
+        python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
         export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
     env:
-      linuxBuildNumber: $(LinuxPackageBuildTag)      
+      linuxBuildNumber: $(LinuxPackageBuildTag)
+      consolidatedBuildId: $(ConsolidatedBuildId)      
   - pwsh: |
       echo $env:LinuxPackageAccountName
       $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])

@@ -6,6 +6,7 @@ trigger:
   branches:
     include:
     - v4.x
+    - feature/oop-host
 
 resources:
   repositories:
