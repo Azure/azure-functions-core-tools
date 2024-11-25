@@ -10,8 +10,6 @@ $runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact
 
 dotnet build $testProjectPath
 
-#Set-Location "..\..\test\Azure.Functions.Cli.Tests\E2E\TestProject\TestNet8InProcProject"
-
 # Loop through each subdirectory within the parent directory
 Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
     $subDir = $_.FullName

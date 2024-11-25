@@ -5,8 +5,6 @@
     <AssemblyName>Azure.Functions.Cli.Tests</AssemblyName>
     <RootNamespace>Azure.Functions.Cli.Tests</RootNamespace>
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
-	  <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-	  <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Resources\**" />
