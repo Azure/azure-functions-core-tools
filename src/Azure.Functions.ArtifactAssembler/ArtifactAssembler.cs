@@ -69,7 +69,6 @@ namespace Azure.Functions.ArtifactAssembler
         internal async Task AssembleArtifactsAsync()
         {
             await ExtractDownloadedArtifactsAsync();
-            await CreateVisualStudioCoreToolsAsync();
             await CreateCliCoreToolsAsync();
             await CreateVisualStudioCoreToolsAsync();
         }
