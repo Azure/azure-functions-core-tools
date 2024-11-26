@@ -75,7 +75,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task Start_NodeJsApp_SuccessfulFunctionExecution()
         {
             await CliTester.Run(new RunConfiguration[]
@@ -122,7 +122,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task Start_NodeJsApp_V3_SuccessfulFunctionExecution()
         {
             await CliTester.Run(new RunConfiguration[]
@@ -335,7 +335,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                    {
                        Commands = new[]
                        {
-                           "init . --worker-runtime node",
+                           "init . --worker-runtime dotnet",
                            "new --template \"Http Trigger\" --name HttpTrigger"
                        },
                        CommandTimeout = TimeSpan.FromSeconds(300)
@@ -368,7 +368,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                {
                    Commands = new[]
                    {
-                       "init . --worker-runtime node",
+                       "init . --worker-runtime dotnet",
                        "new --template \"Http trigger\" --name HttpTrigger",
                        "settings add emptySetting EMPTY_VALUE",
                    },
@@ -451,7 +451,7 @@ namespace Azure.Functions.Cli.Tests.E2E
            }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue()
         {
            await CliTester.Run(new RunConfiguration[]
@@ -489,7 +489,7 @@ namespace Azure.Functions.Cli.Tests.E2E
            }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             var functionName = "HttpTrigger";
@@ -538,7 +538,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
         public async Task Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError()
         {
            var functionName = "HttpTriggerJS";
@@ -976,7 +976,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Theory]
         [InlineData("dotnet")]
-        [InlineData("node")]
+        //[InlineData("node")]
         public async Task Start_MissingLocalSettingsJson_SuccessfulFunctionExecution(string language)
         {
             await CliTester.Run(new RunConfiguration[]

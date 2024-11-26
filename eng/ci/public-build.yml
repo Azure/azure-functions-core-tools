@@ -3,7 +3,7 @@ schedules:
   displayName: Nightly Build
   branches:
     include:
-      - v4.x
+      - in-proc
   always: true
 
 name: $(Build.SourceBranchName)_$(Build.Reason)
@@ -11,17 +11,15 @@ name: $(Build.SourceBranchName)_$(Build.Reason)
 pr:
   branches:
     include:
-    - v4.x
     - release_4.0
-    - feature/*
+    - in-proc
 
 trigger:
   batch: true
   branches:
     include:
-    - v4.x
     - release_4.0
-    - feature/*
+    - in-proc
 
 resources:
   repositories:

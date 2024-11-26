@@ -45,9 +45,6 @@ jobs:
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
   - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
-  - pwsh: |
       .\build.ps1
     env:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -56,6 +53,9 @@ jobs:
       IsPublicBuild: true
       IsCodeqlBuild: false
     displayName: 'Executing build script'
+  - pwsh: |
+      .\check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
