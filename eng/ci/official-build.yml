@@ -15,6 +15,7 @@ trigger:
     include:
     - release_4.0
     - main
+    - in-proc
 
 resources:
   repositories:

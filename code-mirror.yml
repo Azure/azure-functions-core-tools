@@ -8,6 +8,7 @@ trigger:
     - release_3.0
     - release_4.0_hotfix
     - main
+    - in-proc
 
 resources:
   repositories:

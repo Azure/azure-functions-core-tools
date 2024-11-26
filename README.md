@@ -3,6 +3,7 @@
 |Branch|Status|
 |---|---|
 |main|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=main)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=main)|
+|in-proc|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=in-proc)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=in-proc)|
 |v3.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=v3.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=v3.x)|
 |dev|[![Build Status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=dev)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=dev)
 |v1.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/azure-functions-core-tools?branchName=v1.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build/latest?definitionId=11&branchName=v1.x)|

@@ -13,6 +13,7 @@ pr:
     include:
     - release_4.0
     - main
+    - in-proc
 
 trigger:
   batch: true
@@ -20,6 +21,7 @@ trigger:
     include:
     - release_4.0
     - main
+    - in-proc
 
 resources:
   repositories:
