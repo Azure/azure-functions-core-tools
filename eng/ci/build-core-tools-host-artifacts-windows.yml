@@ -3,7 +3,7 @@ pr: none
 trigger:
   branches:
     include:
-    - feature/oop-host
+    - main
   paths:
     include:
       - /host/src/**
