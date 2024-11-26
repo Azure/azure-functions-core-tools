@@ -114,13 +114,13 @@ jobs:
         func.exe
         nethost.dll
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-arm64
-
+ 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-host-windows
+      artifact: drop-coretools-host-windows  
 
 - job: BuildCoreToolsHostLinux
   displayName: '[Linux] Build CoreToolsHost'

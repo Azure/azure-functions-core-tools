@@ -15,3 +15,4 @@ namespace Azure.Functions.ArtifactAssembler
         internal const string OutOfProcArtifactName = "OUT_OF_PROC_ARTIFACT_NAME";
     }
 }
+
