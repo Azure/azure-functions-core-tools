@@ -284,7 +284,8 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Disabling oop test from in-proc branch for now. Need to revisit to determine these can be removed from this branch")]
+
         public async Task Start_WithInspect_DebuggerIsStarted()
         {
            await CliTester.Run(new RunConfiguration[]
