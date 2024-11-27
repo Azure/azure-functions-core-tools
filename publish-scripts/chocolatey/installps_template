@@ -40,7 +40,7 @@ $packageArgs = @{
 Install-ChocolateyZipPackage @packageArgs
 
 # only symlink for func.exe
-$files = Get-ChildItem $toolsDir -include *.exe -recurse
+$files = Get-ChildItem $toolsDir -include *.exe 
 foreach ($file in $files) {
   if (!$file.Name.Equals("func.exe")) {
     #generate an ignore file
