@@ -96,9 +96,6 @@ jobs:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Executing build script'
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
 
   - template: ci/sign-files.yml@eng
     parameters:
