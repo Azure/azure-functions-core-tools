@@ -332,7 +332,6 @@ namespace Build
                 "YamlDotNet.dll",
                 "Marklio.Metadata.dll",
                 "Microsoft.Azure.Cosmos.Table.dll",
-                "Microsoft.Azure.DocumentDB.Core.dll",
                 "Microsoft.Azure.Storage.Blob.dll",
                 "Microsoft.Azure.Storage.Common.dll",
                 "Microsoft.Azure.Storage.File.dll",
