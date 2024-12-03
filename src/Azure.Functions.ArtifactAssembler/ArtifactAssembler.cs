@@ -15,7 +15,9 @@ namespace Azure.Functions.ArtifactAssembler
         {
             { "Azure.Functions.Cli.min.win-x64", "win-x64" },
             { "Azure.Functions.Cli.min.win-arm64", "win-arm64" },
-            { "Azure.Functions.Cli.linux-x64", "linux-x64" }
+            { "Azure.Functions.Cli.linux-x64", "linux-x64" },
+            { "Azure.Functions.Cli.osx-x64", "osx-x64" },
+            { "Azure.Functions.Cli.osx-arm64", "osx-arm64" }
         };
 
         /// <summary>

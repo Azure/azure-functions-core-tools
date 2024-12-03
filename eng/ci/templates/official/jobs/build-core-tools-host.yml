@@ -226,3 +226,68 @@ jobs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
       artifact: drop-coretools-host-linux-signed
+
+- job: BuildCoreToolsHostMac
+  displayName: '[Mac] Build CoreToolsHost'
+  pool:
+    name: Azure Pipelines
+    image: 'macOS-latest'
+    os: macOS
+
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 9.x
+      includePreviewVersions: true
+    displayName: Install .NET 9
+  - task: UseDotNet@2
+    inputs:
+      version: 6.x
+    displayName: Install .NET 6
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (osx-x64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-x64 --self-contained
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+
+  - task: DotnetCoreCLI@2
+    displayName: Dotnet Publish (osx-arm64)
+    inputs:
+      command: publish
+      publishWebProjects: false
+      zipAfterPublish: false
+      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64 --self-contained
+      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+
+  - task: CopyFiles@2
+    displayName: Copy files (osx-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/osx/osx-x64
+      # Publish output will include many other files. We only need func & nethost.dll
+      Contents: |
+        func
+        libnethost.dylib
+        libnethost.a
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-x64
+
+  - task: CopyFiles@2
+    displayName: Copy files (osx-arm64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64
+      # Publish output will include many other files. We only need func & nethost.dll
+      Contents: |
+        func
+        libnethost.dylib
+        libnethost.a
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
+      artifact: drop-coretools-host-mac
