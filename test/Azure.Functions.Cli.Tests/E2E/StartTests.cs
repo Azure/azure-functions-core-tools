@@ -360,7 +360,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        $"start --port {_funcHostPort} --verbose --dotnet"
+                        $"start --port {_funcHostPort} --verbose"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
@@ -395,7 +395,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        $"start --port {_funcHostPort} --verbose --dotnet"
+                        $"start --port {_funcHostPort} --verbose"
                     },
                     ExpectExit = false,
                     Test = async (workingDir, p, _) =>
