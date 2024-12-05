@@ -56,10 +56,10 @@ namespace Azure.Functions.Cli.Helpers
                     releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
                 }
 
-                var latestCoreToolsReleaseVersion = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsReleaseNumber;
+                var latestReleaseZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.coreToolsReleaseZipfile;
 
-                if (!string.IsNullOrEmpty(latestCoreToolsReleaseVersion) &&
-                    Constants.CliVersion != latestCoreToolsReleaseVersion)
+                if (!string.IsNullOrEmpty(latestReleaseZipFile) &&
+                    !latestReleaseZipFile.Contains($"{Constants.CliVersion}.zip"))
                 {
                     return true;
                 }
@@ -184,6 +184,28 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
+            public string coreToolsReleaseZipfile
+            {
+                get
+                {
+                    var downloadLink = ReleaseDetail?.DownloadLink;
+                    if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
+                    {
+                        return string.Empty;
+                    }
+
+                    Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
+
+                    if (uri.Segments.Length < 4)
+                    {
+                        return string.Empty;
+                    }
+
+                    return uri.Segments[3];
+
+                }
+            }
+
         }
 
         private class ReleaseDetail
