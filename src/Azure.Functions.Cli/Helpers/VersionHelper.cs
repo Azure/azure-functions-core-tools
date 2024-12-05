@@ -56,10 +56,10 @@ namespace Azure.Functions.Cli.Helpers
                     releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
                 }
 
-                var latestReleaseZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.coreToolsReleaseZipfile;
+                var latestCoreToolsReleaseZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsReleaseZipfile;
 
-                if (!string.IsNullOrEmpty(latestReleaseZipFile) &&
-                    !latestReleaseZipFile.Contains($"{Constants.CliVersion}.zip"))
+                if (!string.IsNullOrEmpty(latestCoreToolsReleaseZipFile) &&
+                    !latestCoreToolsReleaseZipFile.Contains($"{Constants.CliVersion}.zip"))
                 {
                     return true;
                 }
@@ -184,7 +184,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
-            public string coreToolsReleaseZipfile
+            public string CoreToolsReleaseZipfile
             {
                 get
                 {
