@@ -648,7 +648,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 ColoredConsole.WriteLine(GetLogMessage("Syncing triggers..."));
                 HttpResponseMessage response = null;
                 // This SyncTriggers function calls the endpoint for linux syncTriggers
-                response = await AzureHelper.SyncTriggers(functionApp, AccessToken, ManagementURL);
+                if (string.IsNullOrEmpty(SyncAccessToken))
+                {
+                    SyncAccessToken = AccessToken;
+                }
+                response = await AzureHelper.SyncTriggers(functionApp, SyncAccessToken, ManagementURL);
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorMessage = $"Error calling sync triggers ({response.StatusCode}). ";
