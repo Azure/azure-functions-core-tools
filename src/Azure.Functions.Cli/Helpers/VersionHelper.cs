@@ -56,10 +56,10 @@ namespace Azure.Functions.Cli.Helpers
                     releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
                 }
 
-                var latestCoreToolsReleaseVersion = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsReleaseNumber;
+                var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
 
-                if (!string.IsNullOrEmpty(latestCoreToolsReleaseVersion) &&
-                    Constants.CliVersion != latestCoreToolsReleaseVersion)
+                if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
+                    !latestCoreToolsAssemblyZipFile.Contains($"{Constants.CliVersion}.zip"))
                 {
                     return true;
                 }
@@ -159,7 +159,7 @@ namespace Azure.Functions.Cli.Helpers
             public bool Hidden { get; set; }
         }
 
-        private class ReleaseSummary
+        internal class ReleaseSummary
         {
             public string Release { get; set; }
 
@@ -184,15 +184,37 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
+            public string CoreToolsAssemblyZipFile
+            {
+                get
+                {
+                    var downloadLink = ReleaseDetail?.DownloadLink;
+                    if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
+                    {
+                        return string.Empty;
+                    }
+
+                    Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
+
+                    if (uri.Segments.Length < 4)
+                    {
+                        return string.Empty;
+                    }
+
+                    return uri.Segments[3];
+
+                }
+            }
+
         }
 
-        private class ReleaseDetail
+        internal class ReleaseDetail
         {
             [JsonProperty("coreTools")]
             public IList<CoreToolsRelease> ReleaseList { get; set; }
         }
 
-        private class CoreToolsRelease
+        internal class CoreToolsRelease
         {
             [JsonProperty("OS")]
             public string Os { get; set; }
