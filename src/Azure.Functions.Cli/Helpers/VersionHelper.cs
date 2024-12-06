@@ -56,10 +56,10 @@ namespace Azure.Functions.Cli.Helpers
                     releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
                 }
 
-                var latestCoreToolsReleaseZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsReleaseZipfile;
+                var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
 
-                if (!string.IsNullOrEmpty(latestCoreToolsReleaseZipFile) &&
-                    !latestCoreToolsReleaseZipFile.Contains($"{Constants.CliVersion}.zip"))
+                if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
+                    !latestCoreToolsAssemblyZipFile.Contains($"{Constants.CliVersion}.zip"))
                 {
                     return true;
                 }
@@ -159,7 +159,7 @@ namespace Azure.Functions.Cli.Helpers
             public bool Hidden { get; set; }
         }
 
-        private class ReleaseSummary
+        internal class ReleaseSummary
         {
             public string Release { get; set; }
 
@@ -184,7 +184,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
-            public string CoreToolsReleaseZipfile
+            public string CoreToolsAssemblyZipFile
             {
                 get
                 {
@@ -208,13 +208,13 @@ namespace Azure.Functions.Cli.Helpers
 
         }
 
-        private class ReleaseDetail
+        internal class ReleaseDetail
         {
             [JsonProperty("coreTools")]
             public IList<CoreToolsRelease> ReleaseList { get; set; }
         }
 
-        private class CoreToolsRelease
+        internal class CoreToolsRelease
         {
             [JsonProperty("OS")]
             public string Os { get; set; }
