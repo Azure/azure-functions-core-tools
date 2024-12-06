@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             var result = releaseSummary.CoreToolsAssemblyZipFile;
 
-            Assert.Equal("assemblyfile.zip", result);  // We expect the segment "assembly.zip" based on the provided URL
+            result.Should().Be("assemblyfile.zip"); // We expect the segment "assemblyfile.zip" based on the provided URL
         }
 
         [Fact]
@@ -48,7 +48,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             var result = releaseSummary.CoreToolsAssemblyZipFile;
 
-            Assert.Equal(string.Empty, result);  // There are fewer than 4 segments, so the result should be empty
+            result.Should().Be(string.Empty); // There are fewer than 4 segments, so the result should be empty
         }
 
         [Fact]
@@ -57,9 +57,9 @@ namespace Azure.Functions.Cli.Tests.E2E
             var releaseDetail = new CoreToolsRelease { DownloadLink = null };
             var releaseSummary = new ReleaseSummary { ReleaseDetail = releaseDetail };
 
-            var result = releaseSummary.CoreToolsAssemblyZipFile;
+            var result = releaseSummary.CoreToolsAssemblyZipFile; // The result should be empty when there is no link
 
-            Assert.Equal(string.Empty, result);  // The result should be empty when there is no link
+            result.Should().Be(string.Empty);
         }
     }
 }
