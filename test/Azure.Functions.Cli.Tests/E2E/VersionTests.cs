@@ -57,9 +57,9 @@ namespace Azure.Functions.Cli.Tests.E2E
             var releaseDetail = new CoreToolsRelease { DownloadLink = null };
             var releaseSummary = new ReleaseSummary { ReleaseDetail = releaseDetail };
 
-            var result = releaseSummary.CoreToolsAssemblyZipFile; // The result should be empty when there is no link
+            var result = releaseSummary.CoreToolsAssemblyZipFile; 
 
-            result.Should().Be(string.Empty);
+            result.Should().Be(string.Empty); // The result should be empty when there is no link
         }
     }
 }
