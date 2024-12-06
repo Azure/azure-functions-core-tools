@@ -352,7 +352,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
-        public async Task Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution_WithSpecifyingRuntime()
+        public async Task Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
         {
             await CliTester.Run(new RunConfiguration[]
             {
@@ -387,7 +387,7 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
-        public async Task Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution_WithSpecifyingRuntime()
+        public async Task Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution()
         {
             await CliTester.Run(new RunConfiguration[]
             {
