@@ -393,6 +393,131 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        public async Task Start_DotnetIsolated_AuthLevel_Function()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet-isolated",
+                        "new --template Httptrigger --name HttpTrigger --authlevel function"
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --build --port {_funcHostPort} --verbose"
+                    },
+                    ExpectExit = false,
+                    Test = async (workingDir, p, _) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            var result = await response.Content.ReadAsStringAsync();
+                            p.Kill();
+                            result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
+
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain("4.10");
+                                testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
+                            }
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task Start_DotnetIsolated_AuthLevel_Anonymous_EnableAuth()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet-isolated",
+                        "new --template Httptrigger --name HttpTrigger --authlevel anonymous"
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --build --port {_funcHostPort} --verbose --enableAuth"
+                    },
+                    ExpectExit = false,
+                    Test = async (workingDir, p, _) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            var result = await response.Content.ReadAsStringAsync();
+                            p.Kill();
+                            result.Should().Be("Welcome to Azure Functions!", because: "response from default function should be 'Welcome to Azure Functions!'");
+
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain("4.10");
+                                testOutputHelper.Output.Should().Contain("Selected out-of-process host.");
+                            }
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                }
+            }, _output);
+        }
+
+        [Fact]
+        public async Task Start_DotnetIsolated_AuthLevel_Function_EnableAuth()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet-isolated",
+                        "new --template Httptrigger --name HttpTrigger --authlevel function"
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --port {_funcHostPort} --verbose --enableAuth"
+                    },
+                    ExpectExit = false,
+                    Test = async (workingDir, p, _) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            var result = await response.Content.ReadAsStringAsync();
+                            p.Kill();
+                            result.Should().BeEmpty();
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain("\"status\": \"401\"");
+                            }
+                   
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(200)
+                }
+            }, _output);
+        }
+
+        [Fact]
         public async Task Start_WithInspect_DebuggerIsStarted()
         {
             await CliTester.Run(new RunConfiguration[]
