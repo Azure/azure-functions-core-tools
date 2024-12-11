@@ -74,7 +74,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
             }
 
-            services.AddSingleton<IAuthorizationHandler, CoreToolsAuthorizationHandler>();
+            // Only set up authorization handler which bypasses all local auth if enableAuth param is not set 
+            if (!_enableAuth)
+            {
+                services.AddSingleton<IAuthorizationHandler, CoreToolsAuthorizationHandler>();
+            }
 
             services.AddWebJobsScriptHostAuthorization();
 
