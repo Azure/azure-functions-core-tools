@@ -328,7 +328,7 @@ jobs:
             "ToolVersion": "1.0",
             "Parameters": {}
           }
-     ]
+        ]
 
   - task: CopyFiles@2
     displayName: Copy files (osx-arm64)
