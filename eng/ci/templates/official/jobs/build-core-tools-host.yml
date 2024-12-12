@@ -318,8 +318,6 @@ jobs:
         cd publish-scripts
         python3 -m venv publish-env
         source publish-env/bin/activate
-        sudo pip install -r requirements.txt
-        sudo apt-get install fakeroot
         export PATH="$PATH:/Users/runner/work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.4/net462/esrpcli.exe"
   - template: ci/sign-files.yml@eng
     parameters:
