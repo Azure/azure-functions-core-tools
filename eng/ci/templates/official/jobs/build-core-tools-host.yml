@@ -294,6 +294,7 @@ jobs:
 
 - job: SignCoreToolsHostMac
   displayName: '[Mac] Sign CoreToolsHost'
+  dependsOn: BuildCoreToolsHostMac
   pool:
     name: Azure Pipelines
     image: 'macOS-latest'
