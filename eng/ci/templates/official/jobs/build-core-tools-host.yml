@@ -245,18 +245,6 @@ jobs:
       version: 6.x
     displayName: Install .NET 6
 
-   - task: Bash@3
-     inputs:
-      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
-      script: |
-        cd publish-scripts
-        python3 -m venv publish-env
-        source publish-env/bin/activate
-        sudo pip install -r requirements.txt
-        sudo apt-get install fakeroot
-        export PATH="$PATH:/Users/runner/work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.4/net462/esrpcli.exe"
-      bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
-
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (osx-x64)
     inputs:
@@ -326,6 +314,13 @@ jobs:
     inputs:
       artifact: drop-coretools-host-osx
       path: $(Build.SourcesDirectory)/drop-coretools-host-osx
+  - script: |
+        cd publish-scripts
+        python3 -m venv publish-env
+        source publish-env/bin/activate
+        sudo pip install -r requirements.txt
+        sudo apt-get install fakeroot
+        export PATH="$PATH:/Users/runner/work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.4/net462/esrpcli.exe"
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
