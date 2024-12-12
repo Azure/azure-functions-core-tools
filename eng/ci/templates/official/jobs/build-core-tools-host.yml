@@ -290,4 +290,60 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: drop-coretools-host-mac
+      artifact: drop-coretools-host-osx
+
+- job: SignCoreToolsHostMac
+  displayName: '[Mac] Sign CoreToolsHost'
+  pool:
+    name: Azure Pipelines
+    image: 'macOS-latest'
+    os: macOS
+
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 9.x
+      includePreviewVersions: true
+    displayName: Install .NET 9
+  - task: UseDotNet@2
+    inputs:
+      version: 6.x
+    displayName: Install .NET 6
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: drop-coretools-host-osx
+      path: $(Build.SourcesDirectory)/drop-coretools-host-osx
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Sign'
+      folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64'
+      pattern: 'func, libnethost.dylib, libnethost.a'
+      signType: inline
+      inlineOperation: |
+        [
+          {
+            "KeyCode": "CP-233029-Apple",
+            "OperationCode": "MacAppThirdPartySign",
+            "ToolName": "sign",
+            "ToolVersion": "1.0",
+            "Parameters": {}
+          }
+     ]
+
+  - task: CopyFiles@2
+    displayName: Copy files (osx-arm64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64
+      # Publish output will include many other files. We only need func & libnethost.so
+      Contents: |
+        func
+        libnethost.dylib
+        libnethost.a
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
+
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+    - output: pipelineArtifact
+      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
+      artifact: drop-coretools-host-osx-signed
