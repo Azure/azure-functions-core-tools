@@ -14,7 +14,8 @@ jobs:
   - task: DockerInstaller@0
     inputs:
         dockerVersion: '27.4.0' 
-  - pwsh: |     
+  - pwsh: |
+     & where docker.exe  
      Get-ChildItem -Path "$env:ProgramFiles\Docker\Docker\" -Recurse -Filter *.exe | Foreach-Object { Write-Host $_.FullName }
      & docker desktop version     
      & docker version     
