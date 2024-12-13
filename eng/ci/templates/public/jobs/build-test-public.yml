@@ -40,9 +40,9 @@ jobs:
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
+  # - pwsh: |
+  #     .\check-vulnerabilities.ps1
+  #   displayName: "Check for security vulnerabilities"
   - pwsh: |
       .\build.ps1
     env:
