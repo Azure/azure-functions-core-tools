@@ -303,11 +303,6 @@ jobs:
   steps:
   - task: UseDotNet@2
     inputs:
-      version: 9.x
-      includePreviewVersions: true
-    displayName: Install .NET 9
-  - task: UseDotNet@2
-    inputs:
       version: 6.x
     displayName: Install .NET 6
   - task: DownloadPipelineArtifact@2
