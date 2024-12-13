@@ -14,11 +14,16 @@ jobs:
   - task: DockerInstaller@0
     inputs:
         dockerVersion: '27.4.0' 
-  - pwsh: |     
-     & docker desktop version
-     & docker desktop engine ls
-     & docker version  
-     & $Env:ProgramFiles\Docker\Docker\DockerCli.exe -SwitchLinuxEngine
+  - pwsh: |
+     $ErrorActionPreference = 'SilentlyContinue';
+     try { Restart-Service com.docker.service; } catch { }
+     $dockerDesktop = "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe";
+     try { Start-Process -FilePath "$dockerDesktop"; } catch { }
+     $ErrorActionPreference = 'Stop'; # reset state
+     Start-Sleep 240;
+     DockerCli -SwitchLinuxEngine  
+     & docker desktop version     
+     & docker version     
      & docker version
   - pwsh: . "tools/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
