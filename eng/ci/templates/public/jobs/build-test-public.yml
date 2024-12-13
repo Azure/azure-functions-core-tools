@@ -57,7 +57,3 @@ jobs:
       testResultsFiles: '**/*.trx'
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
-  - task: 1ES.PublishPipelineArtifact@1
-    inputs:
-      targetPath: $(Build.SourcesDirectory)/**/ZippedOnWindows.zip
-      artifactName: TestFiles
