@@ -121,7 +121,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                     await DockerHelpers.DockerBuild(resolvedImageName, Environment.CurrentDirectory);
                 }
                 // This needs to be fixed to run after the build.
-                triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+                //triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
+                triggers = await GetTriggersLocalFiles();
             }
             else
             {
@@ -209,6 +210,11 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         private async Task<TriggersPayload> GetTriggersLocalFiles()
         {
             var functionsPath = Environment.CurrentDirectory;
+            var pythonFunctionFile = Path.Combine(functionsPath, "function_app.py");
+            if (FileSystemHelpers.FileExists(pythonFunctionFile))
+            {
+                await FunctionMetadataGenerator.GenerateFunctionsMetadata(functionsPath);
+            }
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
                 GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
             {
@@ -220,7 +226,9 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
             }
 
-            var functionsJsons = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated
+            var useMetadata = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated || IsWorkerIndexingEnabled();
+
+            var functionsJsons = useMetadata
                 ? ReadFunctionsMetadata(functionsPath)
                 : ReadFunctionJsons(functionsPath);
 
@@ -231,6 +239,19 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 HostJson = hostJson,
                 FunctionsJson = functionsJsons
             };
+        }
+
+        private static bool IsWorkerIndexingEnabled()
+        {
+            var localSettingsPath = Path.Combine(Environment.CurrentDirectory, "local.settings.json");
+            if (FileSystemHelpers.FileExists(localSettingsPath))
+            {
+                var localSettingsContents = FileSystemHelpers.ReadAllTextFromFile(localSettingsPath);
+                var localSettingsJson = JsonConvert.DeserializeObject<JObject>(localSettingsContents);
+                var featureFlags = localSettingsJson["Values"]?["AzureWebJobsFeatureFlags"]?.ToString();
+                return featureFlags?.Contains("EnableWorkerIndexing") ?? false;
+            }
+            return false;
         }
 
         private static Dictionary<string, JObject> ReadFunctionsMetadata(string functionsPath)
