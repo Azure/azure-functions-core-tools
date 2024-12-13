@@ -310,6 +310,11 @@ jobs:
       artifact: drop-coretools-host-osx
       path: $(Build.SourcesDirectory)/drop-coretools-host-osx
   - script: |
+      echo "Zipping the osx-arm64 directory before signing"
+      cd $(Build.SourcesDirectory)/drop-coretools-host-osx
+      zip -r osx-arm64.zip osx-arm64
+      echo "Created zip file: osx-arm64.zip"
+  - script: |
         cd publish-scripts
         python3 -m venv publish-env
         source publish-env/bin/activate
@@ -318,14 +323,14 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
-      folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64'
+      folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip'
       pattern: 'func, libnethost.dylib, libnethost.a'
       signType: inline
       inlineOperation: |
         [
           {
-            "KeyCode": "CP-233029-Apple",
-            "OperationCode": "MacAppThirdPartySign",
+            "KeyCode": "CP-401337-Apple",
+            "OperationCode": "MacAppDeveloperSign",
             "ToolName": "sign",
             "ToolVersion": "1.0",
             "Parameters": {}
