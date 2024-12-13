@@ -313,7 +313,7 @@ jobs:
       echo "Zipping the osx-arm64 directory before signing"
       cd $(Build.SourcesDirectory)/drop-coretools-host-osx
       zip -r osx-arm64.zip osx-arm64
-      echo "Created zip file: osx-arm64.zip"
+      echo "Zip file created at: $(pwd)/osx-arm64.zip"
   - script: |
         cd publish-scripts
         python3 -m venv publish-env
@@ -324,7 +324,7 @@ jobs:
     parameters:
       displayName: 'Sign'
       folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip'
-      pattern: 'func, libnethost.dylib, libnethost.a'
+      pattern: ''
       signType: inline
       inlineOperation: |
         [
