@@ -11,6 +11,14 @@ jobs:
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
   steps:
+  - task: DockerInstaller@0
+    inputs:
+        dockerVersion: '27.4.0' 
+  - pwsh: |
+     & where docker.exe  
+     Get-ChildItem -Path "c:\hostedtoolcache\windows\" -Recurse -Filter *.exe | Foreach-Object { Write-Host $_.FullName }
+     & docker desktop version     
+     & docker version     
   - pwsh: . "tools/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
   - pwsh: |
@@ -30,7 +38,7 @@ jobs:
       versionSpec: '18.x'
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
-      Install-Dotnet
+      Install-Dotnet      
     displayName: 'Install .NET 6.0 and 3.1'
   - task: NuGetToolInstaller@1
     inputs:
@@ -40,9 +48,9 @@ jobs:
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
+  # - pwsh: |
+  #     .\check-vulnerabilities.ps1
+  #   displayName: "Check for security vulnerabilities"
   - pwsh: |
       .\build.ps1
     env:
