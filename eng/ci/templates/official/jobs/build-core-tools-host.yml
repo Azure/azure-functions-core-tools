@@ -338,10 +338,14 @@ jobs:
           }
         ]
 
+  - script: |
+      mkdir -p "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64"
+      unzip "$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip" -d "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64"
+
   - task: CopyFiles@2
     displayName: Copy files (osx-arm64)
     inputs:
-      SourceFolder: $(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64
+      SourceFolder: $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64
       # Publish output will include many other files. We only need func & libnethost.so
       Contents: |
         func
