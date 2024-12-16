@@ -314,7 +314,10 @@ jobs:
       cd $(Build.SourcesDirectory)/drop-coretools-host-osx
       zip -r osx-arm64.zip osx-arm64
       echo "Zip file created at: $(pwd)/osx-arm64.zip"
-      echo "Test: $(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip"
+
+      echo "Zipping the osx-x64 directory before signing"
+      zip -r osx-x64.zip osx-x64
+      echo "Zip file created at: $(pwd)/osx-x64.zip"
   - script: |
         cd publish-scripts
         python3 -m venv publish-env
@@ -325,7 +328,7 @@ jobs:
     parameters:
       displayName: 'Sign'
       folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx'
-      pattern: 'osx-arm64.zip'
+      pattern: '*.zip'
       signType: inline
       inlineOperation: |
         [
@@ -341,6 +344,7 @@ jobs:
   - script: |
       mkdir -p "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed"
       unzip "$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip" -d "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed"
+      unzip "$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-x64.zip" -d "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed"
 
   - task: CopyFiles@2
     displayName: Copy files (osx-arm64)
@@ -353,8 +357,25 @@ jobs:
         libnethost.a
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
 
-  - script: |
-      codesign -v $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64/func
+  - task: CopyFiles@2
+    displayName: Copy files (osx-x64)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-x64
+      # Publish output will include many other files. We only need func & libnethost.so
+      Contents: |
+        func
+        libnethost.dylib
+        libnethost.a
+      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-x64
+  
+   - script: |
+       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-x64/func
+       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-x64/libnethost.dylib
+       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-x64/libnethost.a
+
+       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64/func
+       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64/libnethost.dylib
+       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64/libnethost.a
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
