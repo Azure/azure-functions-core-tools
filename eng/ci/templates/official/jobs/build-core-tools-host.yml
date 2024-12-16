@@ -324,7 +324,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
-      folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip'
+      folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx'
       pattern: '**/func, **/libnethost.dylib, **/libnethost.a'
       signType: inline
       inlineOperation: |
