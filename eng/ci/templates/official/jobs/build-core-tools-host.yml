@@ -325,7 +325,7 @@ jobs:
     parameters:
       displayName: 'Sign'
       folderPath: '$(Build.SourcesDirectory)/drop-coretools-host-osx'
-      pattern: 'osx-arm64.zip/**'
+      pattern: 'osx-arm64.zip'
       signType: inline
       inlineOperation: |
         [
