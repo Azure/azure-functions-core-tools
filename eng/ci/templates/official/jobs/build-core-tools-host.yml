@@ -354,7 +354,6 @@ jobs:
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
 
   - script: |
-      codesign -v $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64
       codesign -v $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/osx-arm64/func
 
   templateContext:
