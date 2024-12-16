@@ -339,8 +339,8 @@ jobs:
         ]
 
   - script: |
-      mkdir -p "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64"
-      unzip "$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip" -d "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64"
+      mkdir -p "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed"
+      unzip "$(Build.SourcesDirectory)/drop-coretools-host-osx/osx-arm64.zip" -d "$(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed"
 
   - task: CopyFiles@2
     displayName: Copy files (osx-arm64)
