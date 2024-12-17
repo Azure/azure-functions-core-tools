@@ -161,10 +161,10 @@ namespace Azure.Functions.Cli.Helpers
 
         internal class ReleaseSummary
         {
-            public ReleaseSummary(string _Release, CoreToolsRelease _ReleaseDetail)
+            public ReleaseSummary(string release, CoreToolsRelease releaseDetail)
             {
-                Release = _Release;
-                ReleaseDetail = _ReleaseDetail;
+                Release = release;
+                ReleaseDetail = releaseDetail;
 
                 if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
                 {
