@@ -164,7 +164,6 @@ namespace Azure.Functions.Cli.Helpers
             public ReleaseSummary(string _Release, CoreToolsRelease _ReleaseDetail)
             {
                 Release = _Release;
-
                 ReleaseDetail = _ReleaseDetail;
 
                 if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
@@ -174,11 +173,8 @@ namespace Azure.Functions.Cli.Helpers
                 else
                 {
                     Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
-
                     CoreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)); ;
                 }
-
-
             }
             public string Release { get; set; }
 
