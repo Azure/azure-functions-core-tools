@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     var jProperty = (Newtonsoft.Json.Linq.JProperty)item;
                     var releaseDetail = JsonConvert.DeserializeObject<ReleaseDetail>(jProperty.Value.ToString());
-                    releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
+                    releaseList.Add(new ReleaseSummary(jProperty.Name, releaseDetail.ReleaseList.FirstOrDefault()));
                 }
 
                 var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
@@ -161,6 +161,25 @@ namespace Azure.Functions.Cli.Helpers
 
         internal class ReleaseSummary
         {
+            public ReleaseSummary(string _Release, CoreToolsRelease _ReleaseDetail)
+            {
+                Release = _Release;
+
+                ReleaseDetail = _ReleaseDetail;
+
+                if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
+                {
+                    CoreToolsAssemblyZipFile = string.Empty;
+                }
+                else
+                {
+                    Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
+
+                    CoreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)); ;
+                }
+
+
+            }
             public string Release { get; set; }
 
             public string CoreToolsReleaseNumber
@@ -184,27 +203,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
-            public string CoreToolsAssemblyZipFile
-            {
-                get
-                {
-                    var downloadLink = ReleaseDetail?.DownloadLink;
-                    if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
-                    {
-                        return string.Empty;
-                    }
-
-                    Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
-
-                    if (uri.Segments.Length < 4)
-                    {
-                        return string.Empty;
-                    }
-
-                    return uri.Segments[3];
-
-                }
-            }
+            public string CoreToolsAssemblyZipFile { get; set; }
 
         }
 

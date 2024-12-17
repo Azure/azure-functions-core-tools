@@ -30,9 +30,9 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Fact]
         public void CoreToolsAssemblyZipFile_ShouldParseCorrectSegment_WhenValidDownloadLinkIsProvided()
         {
-            var fakeDownloadLink = "https://example.com/public/coretoolnumber/assemblyfile.zip";
+            var fakeDownloadLink = "https://example.com/public/coretoolnumber/V4/assemblyfile.zip";
             var releaseDetail = new CoreToolsRelease { DownloadLink = fakeDownloadLink };
-            var releaseSummary = new ReleaseSummary { ReleaseDetail = releaseDetail };
+            var releaseSummary = new ReleaseSummary ("V4",releaseDetail);
 
             var result = releaseSummary.CoreToolsAssemblyZipFile;
 
@@ -40,22 +40,10 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public void CoreToolsAssemblyZipFile_ShouldReturnEmpty_WhenDownloadLinkHasLessThanFourSegments()
-        {
-            var fakeDownloadLink = "https://example.com/path/to/";
-            var releaseDetail = new CoreToolsRelease { DownloadLink = fakeDownloadLink };
-            var releaseSummary = new ReleaseSummary { ReleaseDetail = releaseDetail };
-
-            var result = releaseSummary.CoreToolsAssemblyZipFile;
-
-            result.Should().Be(string.Empty); // There are fewer than 4 segments, so the result should be empty
-        }
-
-        [Fact]
         public void CoreToolsAssemblyZipFile_ShouldReturnEmpty_WhenDownloadLinkIsNull()
         {
             var releaseDetail = new CoreToolsRelease { DownloadLink = null };
-            var releaseSummary = new ReleaseSummary { ReleaseDetail = releaseDetail };
+            var releaseSummary = new ReleaseSummary("V4", releaseDetail);
 
             var result = releaseSummary.CoreToolsAssemblyZipFile; 
 
