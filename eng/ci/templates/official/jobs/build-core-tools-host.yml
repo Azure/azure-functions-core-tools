@@ -371,11 +371,9 @@ jobs:
   - script: |
       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-x64/func
       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-x64/libnethost.dylib
-      codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-x64/libnethost.a
 
       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64/func
       codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64/libnethost.dylib
-      codesign -v $(Build.SourcesDirectory)/drop-coretools-host-osx-unzip-signed/osx-arm64/libnethost.a
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
