@@ -173,7 +173,7 @@ namespace Azure.Functions.Cli.Helpers
                 else
                 {
                     Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
-                    CoreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)); ;
+                    CoreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
                 }
             }
             public string Release { get; set; }
