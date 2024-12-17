@@ -48,11 +48,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Azure.Functions.Cli\Azure.Functions.Cli.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="E2E\TestProject\" />
-  </ItemGroup>
-
+	
   <PropertyGroup>
     <RunSettingsFilePath>$(MSBuildProjectDirectory)\E2E\StartTests_default.runsettings</RunSettingsFilePath>
   </PropertyGroup>
