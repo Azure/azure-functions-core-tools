@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 var client = new System.Net.Http.HttpClient
                 {
-                    Timeout = TimeSpan.FromSeconds(1)
+                    Timeout = TimeSpan.FromSeconds(5)
                 };
                 var response = await client.GetAsync(Constants.CoreToolsVersionsFeedUrl);
                 var content = await response.Content.ReadAsStringAsync();
@@ -161,6 +161,7 @@ namespace Azure.Functions.Cli.Helpers
 
         internal class ReleaseSummary
         {
+            private readonly string _CoreToolsAssemblyZipFile;
             public ReleaseSummary(string release, CoreToolsRelease releaseDetail)
             {
                 Release = release;
@@ -168,12 +169,12 @@ namespace Azure.Functions.Cli.Helpers
 
                 if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
                 {
-                    CoreToolsAssemblyZipFile = string.Empty;
+                    _CoreToolsAssemblyZipFile = string.Empty;
                 }
                 else
                 {
                     Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
-                    CoreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+                    _CoreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
                 }
             }
             public string Release { get; set; }
@@ -199,7 +200,13 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
-            public string CoreToolsAssemblyZipFile { get; set; }
+            public string CoreToolsAssemblyZipFile
+            {
+                get
+                {
+                    return _CoreToolsAssemblyZipFile;
+                }
+            }
 
         }
 
