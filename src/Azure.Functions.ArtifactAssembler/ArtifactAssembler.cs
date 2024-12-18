@@ -18,6 +18,12 @@ namespace Azure.Functions.ArtifactAssembler
             { "Azure.Functions.Cli.linux-x64", "linux-x64" }
         };
 
+        private readonly string[] _net6OsxArtifacts =
+        {
+            "Azure.Functions.Cli.osx-x64",
+            "Azure.Functions.Cli.osx-arm64",
+        };
+
         /// <summary>
         /// The artifacts for which we want to pack out-of-proc core tools with it (along with inproc6 and inproc8 directories).
         /// </summary>
@@ -201,19 +207,28 @@ namespace Azure.Functions.ArtifactAssembler
                 EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
                 await Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
                 Directory.Delete(coreToolsHostArtifactDirPath, true);
-
-                // consolidatedArtifactDirPath now contains custom core-tools host, in-proc6 and in-proc8 sub directories. Create a zip file.
-                var zipPath = Path.Combine(customHostTargetArtifactDir, $"{consolidatedArtifactDirName}.zip");
-                await Task.Run(() => FileUtilities.CreateZipFile(consolidatedArtifactDirPath, zipPath));
-                Console.WriteLine($"Successfully created target runtime zip at: {zipPath}");
-
-                Directory.Delete(consolidatedArtifactDirPath, true);
             }
 
-            // Delete directories
-            Directory.Delete(_inProc6ExtractedRootDir, true);
-            Directory.Delete(_inProc8ExtractedRootDir, true);
-            Directory.Delete(_coreToolsHostExtractedRootDir, true);
+            // Create artifacts for .NET 6 OSX to use instead of the custom host
+            foreach (string artifactName in _net6OsxArtifacts)
+            {
+                var inProc6ArtifactDirPath = Directory.EnumerateDirectories(_inProc6ExtractedRootDir)
+                                          .FirstOrDefault(dir => dir.Contains(artifactName));
+                if (inProc6ArtifactDirPath == null)
+                {
+                    throw new InvalidOperationException($"Artifact directory '{inProc6ArtifactDirPath}' not found!");
+                }
+
+                // Create a new directory to store the in-proc6 files.
+                var artifactDirName = Path.GetFileName(inProc6ArtifactDirPath);
+                var consolidatedArtifactDirName = $"{artifactName}{Constants.InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
+                var consolidatedArtifactDirPath = Path.Combine(customHostTargetArtifactDir, consolidatedArtifactDirName);
+                Directory.CreateDirectory(consolidatedArtifactDirPath);
+
+                // Copy in-proc6 files and delete directory after
+                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, consolidatedArtifactDirPath));
+                Directory.Delete(inProc6ArtifactDirPath, true);
+            }
 
             Console.WriteLine("Finished assembling Visual Studio Core Tools artifacts");
         }

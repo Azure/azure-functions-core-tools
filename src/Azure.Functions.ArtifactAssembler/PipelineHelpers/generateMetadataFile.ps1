@@ -1,3 +1,4 @@
+# Note that this file should be used with YAML steps directly when the consolidated pipeline is migrated over to YAML
 param (
     [string]$StagingDirectory
 )
