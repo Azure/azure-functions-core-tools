@@ -251,7 +251,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-x64 --self-contained
+      arguments: -c Release -r osx-x64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-x64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: DotnetCoreCLI@2
@@ -260,7 +260,7 @@ jobs:
       command: publish
       publishWebProjects: false
       zipAfterPublish: false
-      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64 --self-contained
+      arguments: -c Release -r osx-arm64 -o $(Build.SourcesDirectory)/pkg_output/osx/osx-arm64
       workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
 
   - task: CopyFiles@2
