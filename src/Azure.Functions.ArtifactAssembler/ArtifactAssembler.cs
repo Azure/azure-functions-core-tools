@@ -178,22 +178,7 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (string artifactName in _visualStudioArtifacts.Keys)
             {
-                var inProc8ArtifactDirPath = Directory.EnumerateDirectories(_inProc8ExtractedRootDir)
-                                          .FirstOrDefault(dir => dir.Contains(artifactName));
-                if (inProc8ArtifactDirPath == null)
-                {
-                    throw new InvalidOperationException($"Artifact directory '{inProc8ArtifactDirPath}' not found!");
-                }
-
-                // Create a new directory to store the custom host with in-proc8 and in-proc6 files.
-                var artifactDirName = Path.GetFileName(inProc8ArtifactDirPath);
-                var consolidatedArtifactDirName = $"{artifactName}{Constants.InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
-                var consolidatedArtifactDirPath = Path.Combine(customHostTargetArtifactDir, consolidatedArtifactDirName);
-                Directory.CreateDirectory(consolidatedArtifactDirPath);
-
-                // Copy in-proc8 files and delete directory after
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
-                Directory.Delete(inProc8ArtifactDirPath, true);
+                (string artifactDirName, string consolidatedArtifactDirPath) = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, _inProc8ExtractedRootDir, createDirectory: true);
 
                 // Copy in-proc6 files and delete directory after
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
@@ -212,25 +197,32 @@ namespace Azure.Functions.ArtifactAssembler
             // Create artifacts for .NET 6 OSX to use instead of the custom host
             foreach (string artifactName in _net6OsxArtifacts)
             {
-                var inProc6ArtifactDirPath = Directory.EnumerateDirectories(_inProc6ExtractedRootDir)
-                                          .FirstOrDefault(dir => dir.Contains(artifactName));
-                if (inProc6ArtifactDirPath == null)
-                {
-                    throw new InvalidOperationException($"Artifact directory '{inProc6ArtifactDirPath}' not found!");
-                }
-
-                // Create a new directory to store the in-proc6 files.
-                var artifactDirName = Path.GetFileName(inProc6ArtifactDirPath);
-                var consolidatedArtifactDirName = $"{artifactName}{Constants.InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
-                var consolidatedArtifactDirPath = Path.Combine(customHostTargetArtifactDir, consolidatedArtifactDirName);
-                Directory.CreateDirectory(consolidatedArtifactDirPath);
-
-                // Copy in-proc6 files and delete directory after
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, consolidatedArtifactDirPath));
-                Directory.Delete(inProc6ArtifactDirPath, true);
+                _ = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, _inProc6ExtractedRootDir, createDirectory: false);
             }
 
             Console.WriteLine("Finished assembling Visual Studio Core Tools artifacts");
+        }
+
+        private async Task<(string artifactDirName, string consolidatedArtifactDirPath)> VisualStudioArtifactsHelper(string artifactName, string customHostTargetArtifactDir, string inProcExtractDir, bool createDirectory)
+        {
+            var inProcArtifactDirPath = Directory.EnumerateDirectories(inProcExtractDir)
+                          .FirstOrDefault(dir => dir.Contains(artifactName));
+            if (inProcArtifactDirPath == null)
+            {
+                throw new InvalidOperationException($"Artifact directory '{inProcArtifactDirPath}' not found!");
+            }
+
+            // Create a new directory to store the custom host.
+            var artifactDirName = Path.GetFileName(inProcArtifactDirPath);
+            var consolidatedArtifactDirName = $"{artifactName}{Constants.InProcOutputArtifactNameSuffix}.{GetCoreToolsProductVersion(artifactDirName)}";
+            var consolidatedArtifactDirPath = Path.Combine(customHostTargetArtifactDir, consolidatedArtifactDirName);
+            Directory.CreateDirectory(consolidatedArtifactDirPath);
+
+            // Copy in-proc8 files and delete directory after
+            await Task.Run(() => FileUtilities.CopyDirectory(inProcArtifactDirPath, createDirectory ? Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName): consolidatedArtifactDirPath));
+            Directory.Delete(inProcArtifactDirPath, true);
+
+            return (artifactDirName, consolidatedArtifactDirPath);
         }
 
         private async Task CreateCliCoreToolsAsync()
