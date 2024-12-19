@@ -53,13 +53,13 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     var jProperty = (Newtonsoft.Json.Linq.JProperty)item;
                     var releaseDetail = JsonConvert.DeserializeObject<ReleaseDetail>(jProperty.Value.ToString());
-                    releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
+                    releaseList.Add(new ReleaseSummary(jProperty.Name, releaseDetail.ReleaseList.FirstOrDefault()));
                 }
 
-                var latestCoreToolsReleaseVersion = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsReleaseNumber;
+                var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
 
-                if (!string.IsNullOrEmpty(latestCoreToolsReleaseVersion) &&
-                    Constants.CliVersion != latestCoreToolsReleaseVersion)
+                if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
+                    !latestCoreToolsAssemblyZipFile.Contains($"{Constants.CliVersion}.zip"))
                 {
                     return true;
                 }
@@ -159,8 +159,24 @@ namespace Azure.Functions.Cli.Helpers
             public bool Hidden { get; set; }
         }
 
-        private class ReleaseSummary
+        internal class ReleaseSummary
         {
+            private readonly string _coreToolsAssemblyZipFile;
+            public ReleaseSummary(string release, CoreToolsRelease releaseDetail)
+            {
+                Release = release;
+                ReleaseDetail = releaseDetail;
+
+                if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
+                {
+                    _coreToolsAssemblyZipFile = string.Empty;
+                }
+                else
+                {
+                    Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
+                    _coreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+                }
+            }
             public string Release { get; set; }
 
             public string CoreToolsReleaseNumber
@@ -184,15 +200,23 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
+            public string CoreToolsAssemblyZipFile
+            {
+                get
+                {
+                    return _coreToolsAssemblyZipFile;
+                }
+            }
+
         }
 
-        private class ReleaseDetail
+        internal class ReleaseDetail
         {
             [JsonProperty("coreTools")]
             public IList<CoreToolsRelease> ReleaseList { get; set; }
         }
 
-        private class CoreToolsRelease
+        internal class CoreToolsRelease
         {
             [JsonProperty("OS")]
             public string Os { get; set; }
