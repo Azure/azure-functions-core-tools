@@ -71,7 +71,5 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             return false;
         }
-
-
     }
 }
