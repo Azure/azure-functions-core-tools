@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 var client = new System.Net.Http.HttpClient
                 {
-                    Timeout = TimeSpan.FromSeconds(5)
+                    Timeout = TimeSpan.FromSeconds(1)
                 };
                 var response = await client.GetAsync(Constants.CoreToolsVersionsFeedUrl);
                 var content = await response.Content.ReadAsStringAsync();
