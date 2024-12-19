@@ -161,7 +161,7 @@ namespace Azure.Functions.Cli.Helpers
 
         internal class ReleaseSummary
         {
-            private readonly string _CoreToolsAssemblyZipFile;
+            private readonly string _coreToolsAssemblyZipFile;
             public ReleaseSummary(string release, CoreToolsRelease releaseDetail)
             {
                 Release = release;
@@ -169,12 +169,12 @@ namespace Azure.Functions.Cli.Helpers
 
                 if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
                 {
-                    _CoreToolsAssemblyZipFile = string.Empty;
+                    _coreToolsAssemblyZipFile = string.Empty;
                 }
                 else
                 {
                     Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
-                    _CoreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+                    _coreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
                 }
             }
             public string Release { get; set; }
@@ -204,7 +204,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 get
                 {
-                    return _CoreToolsAssemblyZipFile;
+                    return _coreToolsAssemblyZipFile;
                 }
             }
 

@@ -49,5 +49,29 @@ namespace Azure.Functions.Cli.Tests.E2E
 
             result.Should().Be(string.Empty); // The result should be empty when there is no link
         }
+
+        [Theory]
+        [InlineData("4.0.6610", "Azure.Functions.Cli.linux-x64.4.0.6610.zip", false)]
+        [InlineData("4.0.1", "Azure.Functions.Cli.linux-x64.4.0.6610.zip", true)]
+
+        public void Test_IsRunningAnOlderVersion(string cliVersion, string latestCoreToolsAssemblyZipFile, bool expected)
+        {
+            bool result = IsRunningAnOlderVersion(cliVersion, latestCoreToolsAssemblyZipFile);
+
+            result.Should().Be(expected);
+        }
+
+        private bool IsRunningAnOlderVersion(string cliVersion, string latestCoreToolsAssemblyZipFile)
+        {
+            if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
+                !latestCoreToolsAssemblyZipFile.Contains($"{cliVersion}.zip"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+
     }
 }
