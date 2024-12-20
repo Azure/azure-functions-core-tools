@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -17,6 +18,14 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class VersionHelper
     {
+        private static string _cliVersion = Constants.CliVersion;
+
+        // This method is created only for testing
+        public static void SetCliVersion(string version)
+        {
+            _cliVersion = version;
+        }
+
         public static async Task<string> RunAsync(Task<bool> isRunningOlderVersion = null)
         {
             isRunningOlderVersion ??= IsRunningAnOlderVersion();
@@ -59,7 +68,7 @@ namespace Azure.Functions.Cli.Helpers
                 var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
 
                 if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
-                    !latestCoreToolsAssemblyZipFile.Contains($"{Constants.CliVersion}.zip"))
+                    !latestCoreToolsAssemblyZipFile.Contains($"{_cliVersion}.zip"))
                 {
                     return true;
                 }
