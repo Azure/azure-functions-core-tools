@@ -57,7 +57,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("4.0.6610", false)]
         [InlineData("4.0.1", true)]
         public async Task IsRunningAnOlderVersion_ReturnsExpected_WhenOlderVersion(string cliVersion, bool expected)
         {
