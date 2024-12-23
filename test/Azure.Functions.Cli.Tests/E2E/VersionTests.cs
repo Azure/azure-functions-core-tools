@@ -1,13 +1,8 @@
 using System;
-using System.Net.Http;
-using System.Net;
-using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using FluentAssertions;
-using Moq.Protected;
-using Moq;
 using Xunit;
 using Xunit.Abstractions;
 using static Azure.Functions.Cli.Helpers.VersionHelper;
