@@ -53,9 +53,10 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Theory]
         [InlineData("4.0.1", true)]
+        [InlineData("4.0.6610", false)]
         public async Task IsRunningAnOlderVersion_ReturnsExpected_WhenOlderVersion(string cliVersion, bool expected)
         {
-            VersionHelper.SetCliVersion(cliVersion);
+            VersionHelper.SetCliVersion(cliVersion, "Azure.Functions.Cli.linux-x64.4.0.6610.zip");
 
             var result = await VersionHelper.IsRunningAnOlderVersion();
 

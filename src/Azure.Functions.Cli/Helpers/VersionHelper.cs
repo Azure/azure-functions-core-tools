@@ -18,11 +18,13 @@ namespace Azure.Functions.Cli.Helpers
     internal class VersionHelper
     {
         private static string _cliVersion = Constants.CliVersion;
+        private static string _latestCoreToolsAssemblyZipFile;
 
         // This method is created only for testing
-        public static void SetCliVersion(string version)
+        public static void SetCliVersion(string version, string assemblyZipfile)
         {
             _cliVersion = version;
+            _latestCoreToolsAssemblyZipFile = assemblyZipfile;
         }
 
         public static async Task<string> RunAsync(Task<bool> isRunningOlderVersion = null)
@@ -64,7 +66,7 @@ namespace Azure.Functions.Cli.Helpers
                     releaseList.Add(new ReleaseSummary(jProperty.Name, releaseDetail.ReleaseList.FirstOrDefault()));
                 }
 
-                var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
+                var latestCoreToolsAssemblyZipFile = _latestCoreToolsAssemblyZipFile ?? releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
 
                 if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
                     !latestCoreToolsAssemblyZipFile.Contains($"{_cliVersion}.zip"))
