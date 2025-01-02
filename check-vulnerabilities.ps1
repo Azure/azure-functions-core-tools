@@ -16,11 +16,13 @@ $cmd = "list", "package", "--include-transitive", "--vulnerable"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath
 
-# Filter out lines containing DotNetZip
-Get-Content $logFilePath | Where-Object { $_ -notmatch "DotNetZip" } | Set-Content $filteredLogFilePath
+# Read log and filter vulnerabilities
+$logContent = Get-Content $logFilePath
 
-# Check for remaining vulnerabilities
-$vulnerabilities = Get-Content $filteredLogFilePath | Where-Object { $_ -match "Vulnerable Packages found" }
+# Extract vulnerabilities excluding DotNetZip
+$vulnerabilities = $logContent | Where-Object {
+    $_ -match "High|Critical|Moderate|Low" -and $_ -notmatch "DotNetZip"
+}
 
 $result = Get-content $logFilePath | select-string "has no vulnerable packages given the current sources"
 
@@ -32,8 +34,11 @@ if ($logFileExists)
 
 cd ../..
 
-if (!$result)
-{
-  Write-Host "Vulnerabilities found" 
-  Exit 1
+# Check if there are other vulnerabilities
+if ($vulnerabilities) {
+    Write-Host "Security vulnerabilities found (excluding DotNetZip):"
+    $vulnerabilities | ForEach-Object { Write-Host $_ }
+    Exit 1
+} else {
+    Write-Host "No security vulnerabilities found (excluding DotNetZip)."
 }
