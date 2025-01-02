@@ -21,7 +21,7 @@ $logContent = Get-Content $logFilePath
 
 # Extract vulnerabilities excluding DotNetZip
 $vulnerabilities = $logContent | Where-Object {
-    $_ -match "High|Critical|Moderate|Low" -and $_ -notmatch "DotNetZip"
+    ($_ -match "^\s*>") -and ($_ -notmatch "DotNetZip")
 }
 
 $result = Get-content $logFilePath | select-string "has no vulnerable packages given the current sources"
