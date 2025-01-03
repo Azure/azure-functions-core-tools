@@ -60,27 +60,28 @@ namespace Azure.Functions.Cli.Tests.E2E
         public async Task IsRunningAnOlderVersion_ShouldReturnTrue_WhenVersionIsOlder()
         {
             // Create the mocked HttpClient with the mock response
-            var mockHttpClient = GetMockHttpClient();
+            var mockHttpClient = GetMockHttpClientWithResponse();
 
             SetCliVersion("4.0.1");
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
-            Assert.True(result);
+            result.Should().Be(true);
         }
 
         [Fact]
         public async Task IsRunningAnOlderVersion_ShouldReturnFalse_WhenVersionIsUpToDate()
         {
             // Create the mocked HttpClient with the mock response
-            var mockHttpClient = GetMockHttpClient();
+            var mockHttpClient = GetMockHttpClientWithResponse();
 
             SetCliVersion("4.0.6610");
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
-            Assert.False(result);
+            result.Should().Be(false);
         }
+
         // Method to return a mocked HttpClient
-        private HttpClient GetMockHttpClient()
+        private HttpClient GetMockHttpClientWithResponse()
         {
             var mockJsonResponse = @"{
                 'tags': {
