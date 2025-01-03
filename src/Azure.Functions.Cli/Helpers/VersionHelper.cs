@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -18,13 +19,11 @@ namespace Azure.Functions.Cli.Helpers
     internal class VersionHelper
     {
         private static string _cliVersion = Constants.CliVersion;
-        private static string _latestCoreToolsAssemblyZipFile;
 
         // This method is created only for testing
-        public static void SetCliVersion(string version, string assemblyZipfile)
+        public static void SetCliVersion(string version)
         {
             _cliVersion = version;
-            _latestCoreToolsAssemblyZipFile = assemblyZipfile;
         }
 
         public static async Task<string> RunAsync(Task<bool> isRunningOlderVersion = null)
@@ -46,11 +45,11 @@ namespace Azure.Functions.Cli.Helpers
         // Check that current core tools is the latest version. 
         // To ensure that it doesn't block other tasks. The HTTP Request timeout is only 1 second. 
         // We simply ingnore the exception if for any reason the check fails. 
-        public static async Task<bool> IsRunningAnOlderVersion()
+        public static async Task<bool> IsRunningAnOlderVersion(HttpClient client = null)
         {
             try
             {
-                var client = new System.Net.Http.HttpClient
+                client ??= new System.Net.Http.HttpClient
                 {
                     Timeout = TimeSpan.FromSeconds(1)
                 };
@@ -66,7 +65,7 @@ namespace Azure.Functions.Cli.Helpers
                     releaseList.Add(new ReleaseSummary(jProperty.Name, releaseDetail.ReleaseList.FirstOrDefault()));
                 }
 
-                var latestCoreToolsAssemblyZipFile = _latestCoreToolsAssemblyZipFile ?? releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
+                var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
 
                 if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
                     !latestCoreToolsAssemblyZipFile.Contains($"{_cliVersion}.zip"))
