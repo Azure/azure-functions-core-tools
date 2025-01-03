@@ -25,6 +25,15 @@ $topLevelPackages = $logContent.projects.frameworks.topLevelPackages
 $skipCveContent = Get-Content $skipCveFilePath -Raw | ConvertFrom-Json
 $skipPackages = $skipCveContent.packages
 
+# Validate files in skipPackagesCve.json are still valid security vulnerabilities
+$topLevelPackageIds = $topLevelPackages.id
+$invalidSkips = $skipPackages | Where-Object { $_ -notin $topLevelPackageIds }
+
+if ($invalidSkips.Count -gt 0) {
+    Write-Host "The following packages in 'skipPackagesCve.json' do not exist in the vulnerable packages list: $($invalidSkips -join ', '). Please remove these packages from the JSON file."
+    Exit 1
+}
+
 # Filter vulnerabilities
 $vulnerablePackages = @()
 foreach ($package in $topLevelPackages) {
