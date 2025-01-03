@@ -1,4 +1,5 @@
 {
+  // Note that once the CVEs listed here have been addressed and resolved, the specified package will have to be removed from this JSON file.
   "packages": [
     "DotNetZip"
   ]
