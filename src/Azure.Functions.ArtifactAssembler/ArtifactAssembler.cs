@@ -18,7 +18,7 @@ namespace Azure.Functions.ArtifactAssembler
             { "Azure.Functions.Cli.linux-x64", "linux-x64" }
         };
 
-        private readonly string[] _net6OsxArtifacts =
+        private readonly string[] _net8OsxArtifacts =
         {
             "Azure.Functions.Cli.osx-x64",
             "Azure.Functions.Cli.osx-arm64",
@@ -178,7 +178,7 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (string artifactName in _visualStudioArtifacts.Keys)
             {
-                (string artifactDirName, string consolidatedArtifactDirPath) = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, _inProc8ExtractedRootDir, createDirectory: true);
+                (string artifactDirName, string consolidatedArtifactDirPath) = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, createDirectory: true);
 
                 // Copy in-proc6 files and delete directory after
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
@@ -194,18 +194,23 @@ namespace Azure.Functions.ArtifactAssembler
                 Directory.Delete(coreToolsHostArtifactDirPath, true);
             }
 
-            // Create artifacts for .NET 6 OSX to use instead of the custom host
-            foreach (string artifactName in _net6OsxArtifacts)
+            // Create artifacts for .NET 8 OSX to use instead of the custom host
+            foreach (string artifactName in _net8OsxArtifacts)
             {
-                _ = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, _inProc6ExtractedRootDir, createDirectory: false);
+                _ = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, createDirectory: false);
             }
+
+            // Delete directories
+            Directory.Delete(_inProc6ExtractedRootDir, true);
+            Directory.Delete(_inProc8ExtractedRootDir, true);
+            Directory.Delete(_coreToolsHostExtractedRootDir, true);
 
             Console.WriteLine("Finished assembling Visual Studio Core Tools artifacts");
         }
 
-        private async Task<(string artifactDirName, string consolidatedArtifactDirPath)> VisualStudioArtifactsHelper(string artifactName, string customHostTargetArtifactDir, string inProcExtractDir, bool createDirectory)
+        private async Task<(string artifactDirName, string consolidatedArtifactDirPath)> VisualStudioArtifactsHelper(string artifactName, string customHostTargetArtifactDir, bool createDirectory)
         {
-            var inProcArtifactDirPath = Directory.EnumerateDirectories(inProcExtractDir)
+            var inProcArtifactDirPath = Directory.EnumerateDirectories(_inProc8ExtractedRootDir)
                           .FirstOrDefault(dir => dir.Contains(artifactName));
             if (inProcArtifactDirPath == null)
             {
