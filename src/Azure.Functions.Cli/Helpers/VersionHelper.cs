@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -17,6 +18,13 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class VersionHelper
     {
+        private static string _cliVersion = Constants.CliVersion;
+
+        // This method is created only for testing
+        public static void SetCliVersion(string version)
+        {
+            _cliVersion = version;
+        }
         public static async Task<string> RunAsync(Task<bool> isRunningOlderVersion = null)
         {
             isRunningOlderVersion ??= IsRunningAnOlderVersion();
@@ -36,11 +44,11 @@ namespace Azure.Functions.Cli.Helpers
         // Check that current core tools is the latest version. 
         // To ensure that it doesn't block other tasks. The HTTP Request timeout is only 1 second. 
         // We simply ingnore the exception if for any reason the check fails. 
-        public static async Task<bool> IsRunningAnOlderVersion()
+        public static async Task<bool> IsRunningAnOlderVersion(HttpClient client = null)
         {
             try
             {
-                var client = new System.Net.Http.HttpClient
+                client ??= new System.Net.Http.HttpClient
                 {
                     Timeout = TimeSpan.FromSeconds(1)
                 };
@@ -53,13 +61,13 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     var jProperty = (Newtonsoft.Json.Linq.JProperty)item;
                     var releaseDetail = JsonConvert.DeserializeObject<ReleaseDetail>(jProperty.Value.ToString());
-                    releaseList.Add(new ReleaseSummary() { Release = jProperty.Name, ReleaseDetail = releaseDetail.ReleaseList.FirstOrDefault() });
+                    releaseList.Add(new ReleaseSummary(jProperty.Name, releaseDetail.ReleaseList.FirstOrDefault()));
                 }
 
-                var latestCoreToolsReleaseVersion = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsReleaseNumber;
+                var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
 
-                if (!string.IsNullOrEmpty(latestCoreToolsReleaseVersion) &&
-                    Constants.CliVersion != latestCoreToolsReleaseVersion)
+                if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
+                    !latestCoreToolsAssemblyZipFile.Contains($"{_cliVersion}.zip"))
                 {
                     return true;
                 }
@@ -159,8 +167,24 @@ namespace Azure.Functions.Cli.Helpers
             public bool Hidden { get; set; }
         }
 
-        private class ReleaseSummary
+        internal class ReleaseSummary
         {
+            private readonly string _coreToolsAssemblyZipFile;
+            public ReleaseSummary(string release, CoreToolsRelease releaseDetail)
+            {
+                Release = release;
+                ReleaseDetail = releaseDetail;
+
+                if (string.IsNullOrEmpty(ReleaseDetail?.DownloadLink))
+                {
+                    _coreToolsAssemblyZipFile = string.Empty;
+                }
+                else
+                {
+                    Uri uri = new UriBuilder(ReleaseDetail?.DownloadLink).Uri;
+                    _coreToolsAssemblyZipFile = uri.Segments.FirstOrDefault(segment => segment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+                }
+            }
             public string Release { get; set; }
 
             public string CoreToolsReleaseNumber
@@ -184,15 +208,22 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
             public CoreToolsRelease ReleaseDetail { get; set; }
+            public string CoreToolsAssemblyZipFile
+            {
+                get
+                {
+                    return _coreToolsAssemblyZipFile;
+                }
+            }
         }
 
-        private class ReleaseDetail
+        internal class ReleaseDetail
         {
             [JsonProperty("coreTools")]
             public IList<CoreToolsRelease> ReleaseList { get; set; }
         }
 
-        private class CoreToolsRelease
+        internal class CoreToolsRelease
         {
             [JsonProperty("OS")]
             public string Os { get; set; }
