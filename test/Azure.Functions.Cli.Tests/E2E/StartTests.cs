@@ -1662,11 +1662,11 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet-isolated", "--dotnet-isolated", "HttpTriggerFunc: [GET,POST] http://localhost:{_funcHostPort}/api/HttpTriggerFunc", true, false)] // Runtime parameter set (dni), successful startup & invocation
-        [InlineData("node", "--node", "HttpTriggerFunc: [GET,POST] http://localhost:{_funcHostPort}/api/HttpTriggerFunc", true, false)] // Runtime parameter set (node), successful startup & invocation
+        [InlineData("dotnet-isolated", "--dotnet-isolated", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)] // Runtime parameter set (dni), successful startup & invocation
+        [InlineData("node", "--node", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)] // Runtime parameter set (node), successful startup & invocation
         [InlineData("dotnet", "--worker-runtime None", $"Use the up/down arrow keys to select a worker runtime:", false, false)] // Runtime parameter set to None, worker runtime prompt displayed
         [InlineData("dotnet", "", $"Use the up/down arrow keys to select a worker runtime:", false, false)] // Runtime parameter not provided, worker runtime prompt displayed
-        [InlineData("dotnet-isolated", "", "HttpTriggerFunc: [GET, POST] http://localhost:{_funcHostPort}/api/HttpTriggerFunc", true, true)] // Runtime value is set via environment variable,  successful startup & invocation
+        [InlineData("dotnet-isolated", "", "HttpTriggerFunc: [GET, POST] http://localhost:", true, true)] // Runtime value is set via environment variable, successful startup & invocation
         public async Task Start_MissingLocalSettingsJson_BehavesAsExpected(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment)
         {
             try

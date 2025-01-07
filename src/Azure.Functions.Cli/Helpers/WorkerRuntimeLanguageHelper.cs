@@ -181,14 +181,16 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static WorkerRuntime SetWorkerRuntime(ISecretsManager secretsManager, string language)
         {
-            var worker = NormalizeWorkerRuntime(language);
+            var workerRuntime = NormalizeWorkerRuntime(language);
+            var runtimeMoniker = GetRuntimeMoniker(workerRuntime);
 
-            secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, worker.ToString());
+            secretsManager.SetSecret(Constants.FunctionsWorkerRuntime, runtimeMoniker);
+
             ColoredConsole
-                .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings"))
-                .WriteLine(WarningColor($"'{worker}' has been set in your local.settings.json"));
+                .WriteLine(WarningColor("Starting from 2.0.1-beta.26 it's required to set a language for your project in your settings."))
+                .WriteLine(WarningColor($"Worker runtime '{runtimeMoniker}' has been set in '{SecretsManager.AppSettingsFilePath}'."));
 
-            return worker;
+            return workerRuntime;
         }
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
