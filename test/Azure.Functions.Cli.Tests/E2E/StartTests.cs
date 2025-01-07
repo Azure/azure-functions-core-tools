@@ -392,6 +392,52 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
+        [Theory]
+        [InlineData("function", false, "Welcome to Azure Functions!", "response from default function should be 'Welcome to Azure Functions!'", "Selected out-of-process host.")]
+        [InlineData("anonymous", true, "Welcome to Azure Functions!", "response from default function should be 'Welcome to Azure Functions!'", "Selected out-of-process host.")]
+        [InlineData("anonymous", true, "", "the call to the function is unauthorized", "\"status\": \"401\"")]
+        public async Task Start_DotnetIsolated_Test_EnableAuthFeature(string authLevel, bool enableAuth, string resultOfFunctionCall, string becauseResult, string testOutputHelperValue)
+        {
+            string templateCommand = $"new --template Httptrigger --name HttpTrigger --authlevel ${authLevel}";
+            string startCommand = enableAuth ? $"start --build --port {_funcHostPort} --verbose --enableAuth" : $"start --build --port {_funcHostPort} --verbose";
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet-isolated",
+                        templateCommand,
+                    },
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        startCommand,
+                    },
+                    ExpectExit = false,
+                    Test = async (workingDir, p, _) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            var result = await response.Content.ReadAsStringAsync();
+                            p.Kill();
+                            result.Should().Be(resultOfFunctionCall, because: becauseResult);
+
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain(testOutputHelperValue);
+                            }
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                }
+            }, _output);
+        }
+
         [Fact]
         public async Task Start_WithInspect_DebuggerIsStarted()
         {
