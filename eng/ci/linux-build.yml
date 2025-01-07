@@ -5,8 +5,7 @@ pr: none
 trigger:
   branches:
     include:
-    - v4.x
-    - feature/oop-host
+    - main
 
 resources:
   repositories:
