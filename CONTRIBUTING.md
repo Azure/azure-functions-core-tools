@@ -36,7 +36,16 @@ Run the emulator before your run the tests.
 
 #### Templates missing
 
-If you see an error saying the templates folder is missing, you can follow these steps to fix it:
+If you see an error saying the templates folder is missing, you can follow either of the following steps:
+
+##### (a)
+
+- Find your offical func instation directory
+  - i.e. `/opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.6610`
+  - or `%LOCALAPPDATA%\AzureFunctionsTools\Releases\4.69.0\cli_x64\`
+- Copy the templates folder to the test project's output directory (`test/Azure.Functions.Cli.Tests/bin/Debug/net8.0`)
+
+##### or (b)
 
 - Update `build/Program.cs` to just add the template nugets and json:
 
