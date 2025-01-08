@@ -814,8 +814,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private void EnsureWorkerRuntimeIsSet()
         {
-            if (_secretsManager.GetSecrets().Any(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase))
-               || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)))
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime))
+                || _secretsManager.GetSecrets().Any(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)))
             {
                 return;
             }
