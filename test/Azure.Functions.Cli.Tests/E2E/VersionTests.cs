@@ -32,6 +32,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 CommandTimeout = TimeSpan.FromSeconds(30)
             }, _output);
         }
+
         [Fact]
         public void CoreToolsAssemblyZipFile_ShouldParseCorrectSegment_WhenValidDownloadLinkIsProvided()
         {
@@ -119,7 +120,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
 
             // Return HttpClient with mocked handler
-            return new HttpClient(mockHandler.Object);
+            return new HttpClient(mockHandler.Object) { Timeout = TimeSpan.FromSeconds(1) };
         }
     }
 }

@@ -18,13 +18,14 @@ namespace Azure.Functions.Cli.Helpers
 {
     internal class VersionHelper
     {
-        private static string _cliVersion = Constants.CliVersion;
+        internal static string _cliVersion = Constants.CliVersion;
 
         // This method is created only for testing
-        public static void SetCliVersion(string version)
+        internal static void SetCliVersion(string version)
         {
             _cliVersion = version;
         }
+
         public static async Task<string> RunAsync(Task<bool> isRunningOlderVersion = null)
         {
             isRunningOlderVersion ??= IsRunningAnOlderVersion();
@@ -52,27 +53,30 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     Timeout = TimeSpan.FromSeconds(1)
                 };
-                var response = await client.GetAsync(Constants.CoreToolsVersionsFeedUrl);
-                var content = await response.Content.ReadAsStringAsync();
-                var data = JsonConvert.DeserializeObject<CliFeed>(content);
-                IEnumerable releases = ((IEnumerable) data.Releases);
-                var releaseList = new List<ReleaseSummary>();
-                foreach (var item in releases)
+                using (client)
                 {
-                    var jProperty = (Newtonsoft.Json.Linq.JProperty)item;
-                    var releaseDetail = JsonConvert.DeserializeObject<ReleaseDetail>(jProperty.Value.ToString());
-                    releaseList.Add(new ReleaseSummary(jProperty.Name, releaseDetail.ReleaseList.FirstOrDefault()));
+                    var response = await client.GetAsync(Constants.CoreToolsVersionsFeedUrl);
+                    var content = await response.Content.ReadAsStringAsync();
+                    var data = JsonConvert.DeserializeObject<CliFeed>(content);
+                    IEnumerable releases = ((IEnumerable)data.Releases);
+                    var releaseList = new List<ReleaseSummary>();
+                    foreach (var item in releases)
+                    {
+                        var jProperty = (Newtonsoft.Json.Linq.JProperty)item;
+                        var releaseDetail = JsonConvert.DeserializeObject<ReleaseDetail>(jProperty.Value.ToString());
+                        releaseList.Add(new ReleaseSummary(jProperty.Name, releaseDetail.ReleaseList.FirstOrDefault()));
+                    }
+
+                    var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
+
+                    if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
+                        !latestCoreToolsAssemblyZipFile.Contains($"{_cliVersion}.zip"))
+                    {
+                        return true;
+                    }
+
+                    return false;
                 }
-
-                var latestCoreToolsAssemblyZipFile = releaseList.FirstOrDefault(x => x.Release == data.Tags.V4Release.ReleaseVersion)?.CoreToolsAssemblyZipFile;
-
-                if (!string.IsNullOrEmpty(latestCoreToolsAssemblyZipFile) &&
-                    !latestCoreToolsAssemblyZipFile.Contains($"{_cliVersion}.zip"))
-                {
-                    return true;
-                }
-
-                return false;
             }
             catch (Exception)
             {
@@ -170,6 +174,7 @@ namespace Azure.Functions.Cli.Helpers
         internal class ReleaseSummary
         {
             private readonly string _coreToolsAssemblyZipFile;
+
             public ReleaseSummary(string release, CoreToolsRelease releaseDetail)
             {
                 Release = release;
