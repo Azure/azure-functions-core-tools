@@ -166,7 +166,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager)
         {
-            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime);
+            var setting = Environment.GetEnvironmentVariable(Constants.FunctionsWorkerRuntime)
                           ?? secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsWorkerRuntime, StringComparison.OrdinalIgnoreCase)).Value;
 
             try
