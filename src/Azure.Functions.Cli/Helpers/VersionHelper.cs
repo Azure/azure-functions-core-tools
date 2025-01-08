@@ -208,7 +208,9 @@ namespace Azure.Functions.Cli.Helpers
                     return uri.Segments[2].Replace("/", string.Empty);
                 }
             }
+
             public CoreToolsRelease ReleaseDetail { get; set; }
+
             public string CoreToolsAssemblyZipFile
             {
                 get
