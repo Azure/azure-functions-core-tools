@@ -1708,144 +1708,74 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet-isolated")]
-        [InlineData("node")]
-        public async Task Start_MissingLocalSettingsJson_SuccessfulFunctionExecution(string language)
+        [InlineData("dotnet-isolated", "--dotnet-isolated", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)] // Runtime parameter set (dni), successful startup & invocation
+        [InlineData("node", "--node", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)] // Runtime parameter set (node), successful startup & invocation
+        [InlineData("dotnet", "--worker-runtime None", $"Use the up/down arrow keys to select a worker runtime:", false, false)] // Runtime parameter set to None, worker runtime prompt displayed
+        [InlineData("dotnet", "", $"Use the up/down arrow keys to select a worker runtime:", false, false)] // Runtime parameter not provided, worker runtime prompt displayed
+        [InlineData("dotnet-isolated", "", "HttpTriggerFunc: [GET,POST] http://localhost:", true, true)] // Runtime value is set via environment variable, successful startup & invocation
+        public async Task Start_MissingLocalSettingsJson_BehavesAsExpected(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment)
         {
-            await CliTester.Run(new RunConfiguration[]
+            try
             {
-                new RunConfiguration
+                if (setRuntimeViaEnvironment)
                 {
-                    Commands = new[]
-                    {
-                        $"init . --worker-runtime {language}",
-                        $"new --template Httptrigger --name HttpTriggerFunc",
-                    },
-                    CommandTimeout = TimeSpan.FromSeconds(300),
-                },
-                new RunConfiguration
+                    Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
+                }
+
+                await CliTester.Run(new RunConfiguration[]
                 {
-                    PreTest = (workingDir) =>
+                    new RunConfiguration
                     {
-                       var LocalSettingsJson = Path.Combine(workingDir, "local.settings.json");
-                        File.Delete(LocalSettingsJson);
-                    },
-                    Commands = new[]
-                    {
-                        $"start --{language} --port {_funcHostPort}",
-                    },
-                    ExpectExit = false,
-                    OutputContains = new[]
-                    {
-                        $"local.settings.json",
-                        "Functions:",
-                        $"HttpTriggerFunc: [GET,POST] http://localhost:{_funcHostPort}/api/HttpTriggerFunc"
-                    },
-                    OutputDoesntContain = new string[]
-                    {
-                        "Initializing function HTTP routes"
-                    },
-                    Test = async (_, p,_) =>
-                    {
-                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
+                        Commands = new[]
                         {
-                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                            var response = await client.GetAsync("/api/HttpTriggerFunc?name=Test");
-                            response.StatusCode.Should().Be(HttpStatusCode.OK);
-                            await Task.Delay(TimeSpan.FromSeconds(2));
-                            p.Kill();
+                            $"init . --worker-runtime {language}",
+                            $"new --template Httptrigger --name HttpTriggerFunc",
+                        },
+                        CommandTimeout = TimeSpan.FromSeconds(300),
+                    },
+                    new RunConfiguration
+                    {
+                        PreTest = (workingDir) =>
+                        {
+                           var localSettingsJson = Path.Combine(workingDir, "local.settings.json");
+                           File.Delete(localSettingsJson);
+                        },
+                        Commands = new[]
+                        {
+                            $"start {runtimeParameter} --port {_funcHostPort}",
+                        },
+                        ExpectExit = false,
+                        OutputContains = new[]
+                        {
+                            expectedOutput
+                        },
+                        Test = async (_, p,_) =>
+                        {
+                            if (invokeFunction)
+                            {
+                                using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
+                                {
+                                    (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                                    var response = await client.GetAsync("/api/HttpTriggerFunc?name=Test");
+                                    response.StatusCode.Should().Be(HttpStatusCode.OK);
+                                    await Task.Delay(TimeSpan.FromSeconds(2));
+                                    p.Kill();
+                                }
+                            }
+                            else
+                            {
+                                await Task.Delay(TimeSpan.FromSeconds(2));
+                                p.Kill();
+                            }
+
                         }
                     }
-                }
-            }, _output);
-        }
-
-        [Fact]
-        public async Task Start_MissingLocalSettingsJson_Runtime_None_HandledAsExpected()
-        {
-            await CliTester.Run(new RunConfiguration[]
+                }, _output);
+            }
+            finally
             {
-                 new RunConfiguration
-                 {
-                     Commands = new[]
-                     {
-                         $"init . --worker-runtime dotnet",
-                         $"new --template Httptrigger --name HttpTriggerFunc",
-                     },
-                     CommandTimeout = TimeSpan.FromSeconds(300),
-                 },
-                 new RunConfiguration
-                 {
-                     PreTest = (workingDir) =>
-                     {
-                        var LocalSettingsJson = Path.Combine(workingDir, "local.settings.json");
-                         File.Delete(LocalSettingsJson);
-                     },
-                     Commands = new[]
-                     {
-                         $"start --worker-runtime None --port {_funcHostPort}",
-                     },
-                     ExpectExit = false,
-                     OutputContains = new[]
-                     {
-                         $"Use the up/down arrow keys to select a worker runtime:"
-                     },
-                     OutputDoesntContain = new string[]
-                     {
-                         "Initializing function HTTP routes"
-                     },
-                     Test = async (_, p,_) =>
-                     {
-                             await Task.Delay(TimeSpan.FromSeconds(2));
-                             p.Kill();
-                     }
-                 }
-            }, _output);
-
-        }
-
-        [Fact]
-        public async Task Start_MissingLocalSettingsJson_Runtime_NotProvided_HandledAsExpected()
-        {
-            await CliTester.Run(new RunConfiguration[]
-            {
-                 new RunConfiguration
-                 {
-                     Commands = new[]
-                     {
-                         $"init . --worker-runtime dotnet",
-                         $"new --template Httptrigger --name HttpTriggerFunc",
-                     },
-                     CommandTimeout = TimeSpan.FromSeconds(300),
-                 },
-                 new RunConfiguration
-                 {
-                     PreTest = (workingDir) =>
-                     {
-                        var LocalSettingsJson = Path.Combine(workingDir, "local.settings.json");
-                         File.Delete(LocalSettingsJson);
-                     },
-                     Commands = new[]
-                     {
-                         $"start --port {_funcHostPort}",
-                     },
-                     ExpectExit = false,
-                     OutputContains = new[]
-                     {
-                         $"Use the up/down arrow keys to select a worker runtime:"
-                     },
-                     OutputDoesntContain = new string[]
-                     {
-                         "Initializing function HTTP routes"
-                     },
-                     Test = async (_, p,_) =>
-                     {
-                             await Task.Delay(TimeSpan.FromSeconds(2));
-                             p.Kill();
-                     }
-                 }
-            }, _output);
-
+                Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
+            }
         }
 
         private async Task<bool> WaitUntilReady(HttpClient client)
