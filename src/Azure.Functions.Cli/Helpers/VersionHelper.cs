@@ -75,7 +75,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
                 
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // ignore exception and no warning when the check fails.
                 return false;
