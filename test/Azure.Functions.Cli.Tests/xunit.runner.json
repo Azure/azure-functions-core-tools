@@ -1,4 +1,5 @@
 {
     "parallelizeTestCollections": true,
-    "parallelizeAssembly": true
+    "parallelizeAssembly": false,
+    "stopOnFail":  true
 }
