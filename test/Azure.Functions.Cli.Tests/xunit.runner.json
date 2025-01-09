@@ -1,5 +1,5 @@
 {
-    "parallelizeTestCollections": true,
+    "parallelizeTestCollections": false,
     "parallelizeAssembly": false,
     "stopOnFail":  true
 }
