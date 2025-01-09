@@ -34,35 +34,12 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
-        public void CoreToolsAssemblyZipFile_ShouldParseCorrectSegment_WhenValidDownloadLinkIsProvided()
-        {
-            var fakeDownloadLink = "https://example.com/public/coretoolnumber/V4/assemblyfile.zip";
-            var releaseDetail = new CoreToolsRelease { DownloadLink = fakeDownloadLink };
-            var releaseSummary = new ReleaseSummary("V4", releaseDetail);
-
-            var result = releaseSummary.CoreToolsAssemblyZipFile;
-
-            result.Should().Be("assemblyfile.zip"); // We expect the segment "assemblyfile.zip" based on the provided URL
-        }
-
-        [Fact]
-        public void CoreToolsAssemblyZipFile_ShouldReturnEmpty_WhenDownloadLinkIsNull()
-        {
-            var releaseDetail = new CoreToolsRelease { DownloadLink = null };
-            var releaseSummary = new ReleaseSummary("V4", releaseDetail);
-
-            var result = releaseSummary.CoreToolsAssemblyZipFile;
-
-            result.Should().Be(string.Empty); // The result should be empty when there is no link
-        }
-
-        [Fact]
         public async Task IsRunningAnOlderVersion_ShouldReturnTrue_WhenVersionIsOlder()
         {
             // Create the mocked HttpClient with the mock response
             var mockHttpClient = GetMockHttpClientWithResponse();
 
-            SetCliVersion("4.0.1");
+            VersionHelper.CliVersion = "OlderVersion";
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
             result.Should().Be(true);
@@ -74,7 +51,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             // Create the mocked HttpClient with the mock response
             var mockHttpClient = GetMockHttpClientWithResponse();
 
-            SetCliVersion("4.0.6610");
+            VersionHelper.CliVersion = "LatestVersion-4.0";
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
             result.Should().Be(false);
@@ -84,27 +61,13 @@ namespace Azure.Functions.Cli.Tests.E2E
         private HttpClient GetMockHttpClientWithResponse()
         {
             var mockJsonResponse = @"{
-                'tags': {
-                    'v4': {
-                        'release': '4.0',
-                        'releaseQuality': 'GA',
-                        'hidden': false
-                    },
-                },
-                'releases': {
-                    '4.0': {
-                        'coreTools': [
-                            {
-                                'OS': 'Windows',
-                                'Architecture': 'x86',
-                                'downloadLink': 'https://example.com/public/0.0.1/Azure.Functions.Latest.4.0.6610.zip',
-                                'sha2': 'BB4978D83CFBABAE67D4D720FEC1F1171BE0406B2147EF3FECA476C19ADD9920',
-                                'size': 'full',
-                                'default': 'true'
-                            }
-                        ]
-                    }
-                }
+                'tag_name':'LatestVersion-4.0',
+                'target_commitish': '48490a7ee744ed435fdce62f5e1f2f39c61c5309',
+                'name': '4.0.6610',
+                'draft': false,
+                'prerelease': false,
+                'created_at': '',
+                'published_at': '2024-11-13T22:08:49Z',
             }";
             var mockHandler = new Mock<HttpMessageHandler>();
 

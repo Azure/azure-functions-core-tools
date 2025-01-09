@@ -95,6 +95,8 @@ namespace Azure.Functions.Cli.Common
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
+        public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
+
         // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
 
 
