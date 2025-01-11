@@ -19,7 +19,8 @@ echo ','
 echo '"functionsJson": {'
 
 if [ -f "functions.metadata" ]; then
-    sed -nzE 's/^\[(.+\n {4}"name": "([^"]+)".+)\]$/"\2": \1/p' functions.metadata
+    cat functions.metadata | \
+        perl -0 -pe 's/^\[//; s/\]$//; s/(\n {2}\{\n {4}"name": "([^"]+)".+?\n {2}\}\,?)/  "\2": \1\n/gsm'
 else
     for d in */; do
         d=$(echo $d | tr -d '/')
