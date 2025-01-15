@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             // Create the mocked HttpClient with the mock response
             var mockHttpClient = GetMockHttpClientWithResponse();
 
-            VersionHelper.CliVersion = "OlderVersion";
+            VersionHelper.CliVersion = "4.0.5";
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
             result.Should().Be(true);
@@ -51,7 +51,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             // Create the mocked HttpClient with the mock response
             var mockHttpClient = GetMockHttpClientWithResponse();
 
-            VersionHelper.CliVersion = "LatestVersion-4.0";
+            VersionHelper.CliVersion = "4.0.6610";
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
             result.Should().Be(false);
@@ -61,7 +61,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         private HttpClient GetMockHttpClientWithResponse()
         {
             var mockJsonResponse = @"{
-                'tag_name':'LatestVersion-4.0',
+                'tag_name':'4.0.6610',
                 'target_commitish': '48490a7ee744ed435fdce62f5e1f2f39c61c5309',
                 'name': '4.0.6610',
                 'draft': false,
@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 });
 
             // Return HttpClient with mocked handler
-            return new HttpClient(mockHandler.Object) { Timeout = TimeSpan.FromSeconds(1) };
+            return new HttpClient(mockHandler.Object);
         }
     }
 }

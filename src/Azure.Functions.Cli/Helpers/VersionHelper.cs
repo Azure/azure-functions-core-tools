@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             try
             {
-                using (client ??= new HttpClient { Timeout = TimeSpan.FromSeconds(1) })
+                using (client ??= new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "AzureFunctionsCoreToolsClient");
 
