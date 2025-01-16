@@ -5,6 +5,8 @@ jobs:
     name: 1es-pool-azfunc-public
     image: 1es-windows-2022
     os: windows
+  strategy:
+    parallel: 2
 
   variables:
     devops_buildNumber: $[counter(format(''), 1500)]
