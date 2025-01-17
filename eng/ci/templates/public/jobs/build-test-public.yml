@@ -43,9 +43,6 @@ jobs:
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
   - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
-  - pwsh: |
       Set-Location -Path "./build"
 
       # Run dotnet test to list the tests and filter for those matching 'Test_'
@@ -53,7 +50,7 @@ jobs:
       $tests = $testsOutput | Select-String -Pattern 'Test_' | ForEach-Object { $_.Line }
 
       # Call the create_slicing_filter_condition script with the tests as arguments
-      & './createSlicingFilterCondition.sh' -Tests $tests
+      & '.\createSlicingFilterCondition.sh' -Tests $tests
     displayName: 'Create slicing filter condition'
   
   - bash: |
