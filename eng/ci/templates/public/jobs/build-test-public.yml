@@ -6,7 +6,7 @@ jobs:
     image: 1es-windows-2022
     os: windows
   strategy:
-    parallel: 2
+    parallel: 5
 
   variables:
     devops_buildNumber: $[counter(format(''), 1500)]
@@ -45,6 +45,26 @@ jobs:
   - pwsh: |
       .\check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
+  - bash: |
+      # Define the build folder path relative to the script's location
+      script_dir=$(dirname "$(realpath "$0")")
+      build_folder_path="$script_dir/build"
+
+      # Check if the build folder exists
+      if [ ! -d "$build_folder_path" ]; then
+          echo "Build folder '$build_folder_path' does not exist."
+          exit 1
+      fi
+
+      # Change to the build folder
+      cd "$build_folder_path"
+      tests=($(dotnet test . --no-build --list-tests | grep Test_))
+      . 'create_slicing_filter_condition.sh' $tests
+    displayName: 'Create slicing filter condition'
+  
+  - bash: |
+      echo "Slicing filter condition: $(targetTestsFilter)"
+    displayName: 'Echo slicing filter condition'
   - pwsh: |
       .\build.ps1
     env:
