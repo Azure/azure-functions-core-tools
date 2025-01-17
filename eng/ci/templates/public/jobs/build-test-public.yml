@@ -46,13 +46,7 @@ jobs:
       .\check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
   - pwsh: |
-      $buildFolderPath = Join-Path $PSScriptRoot "build"
-      if (-not (Test-Path $buildFolderPath))
-      {
-          throw "Build folder '$buildFolderPath' does not exist."
-      }
-
-      Set-Location $buildFolderPath
+      Set-Location -Path "./build"
 
       # Run dotnet test to list the tests and filter for those matching 'Test_'
       $testsOutput = dotnet test . --no-build --list-tests
