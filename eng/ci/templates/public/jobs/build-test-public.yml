@@ -50,7 +50,7 @@ jobs:
       $tests = $testsOutput | Select-String -Pattern 'Test_' | ForEach-Object { $_.Line }
 
       # Call the create_slicing_filter_condition script with the tests as arguments
-      & '.\createSlicingFilterCondition.sh' -Tests $tests
+      & bash ./createSlicingFilterCondition.sh -Tests $tests
     displayName: 'Create slicing filter condition'
   
   - bash: |
