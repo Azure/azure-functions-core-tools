@@ -45,21 +45,21 @@ jobs:
   - pwsh: |
       .\check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
-  - bash: |
-      # Define the build folder path relative to the script's location
-      script_dir=$(dirname "$(realpath "$0")")
-      build_folder_path="$script_dir/build"
+  - pwsh: |
+      $buildFolderPath = Join-Path $PSScriptRoot "build"
+      if (-not (Test-Path $buildFolderPath))
+      {
+          throw "Build folder '$buildFolderPath' does not exist."
+      }
 
-      # Check if the build folder exists
-      if [ ! -d "$build_folder_path" ]; then
-          echo "Build folder '$build_folder_path' does not exist."
-          exit 1
-      fi
+      Set-Location $buildFolderPath
 
-      # Change to the build folder
-      cd "$build_folder_path"
-      tests=($(dotnet test . --no-build --list-tests | grep Test_))
-      . 'create_slicing_filter_condition.sh' $tests
+      # Run dotnet test to list the tests and filter for those matching 'Test_'
+      $testsOutput = dotnet test . --no-build --list-tests
+      $tests = $testsOutput | Select-String -Pattern 'Test_' | ForEach-Object { $_.Line }
+
+      # Call the create_slicing_filter_condition script with the tests as arguments
+      & './create_slicing_filter_condition.ps1' -Tests $tests
     displayName: 'Create slicing filter condition'
   
   - bash: |
