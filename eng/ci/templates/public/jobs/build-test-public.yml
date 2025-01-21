@@ -47,7 +47,11 @@ jobs:
 
       # Run dotnet test to list the tests and filter for those matching 'Test_'
       $testsOutput = dotnet test . --no-build --list-tests
+
+      Write-Host "Test output: $testsOutput"
       $tests = $testsOutput | Select-String -Pattern 'Test_' | ForEach-Object { $_.Line }
+
+      Write-Host "Value of tests: $tests"
 
       # Call the create_slicing_filter_condition script with the tests as arguments
       & bash ./createSlicingFilterCondition.sh -Tests $tests
