@@ -46,7 +46,7 @@ jobs:
       Set-Location -Path "./build"
 
       # Run dotnet test to list the tests and filter for those matching 'Test_'
-      $testsOutput = dotnet test . --no-build --list-tests
+      $testsOutput = dotnet test . --list-tests
 
       Write-Host "Test output: $testsOutput"
       $tests = $testsOutput | Select-String -Pattern 'Test_' | ForEach-Object { $_.Line }
