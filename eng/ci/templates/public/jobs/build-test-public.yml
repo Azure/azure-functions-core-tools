@@ -49,7 +49,7 @@ jobs:
       $testsOutput = dotnet test . --list-tests
 
       Write-Host "Test output: $testsOutput"
-      $tests = $testOutput | ForEach-Object { $_.Trim() } | Select-String -Pattern '^Azure\.Functions\.Cli\.Tests' |  ForEach-Object { $_.Line }
+      $tests = $testsOutput | ForEach-Object { $_.Trim() } | Select-String -Pattern '^Azure\.Functions\.Cli\.Tests' |  ForEach-Object { $_.Line }
 
       Write-Host "Value of tests: $tests"
 
