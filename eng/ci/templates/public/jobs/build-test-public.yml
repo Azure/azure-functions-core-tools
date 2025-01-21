@@ -43,7 +43,7 @@ jobs:
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
   - pwsh: |
-      Set-Location -Path "./build"
+      Set-Location -Path "./test/Azure.Functions.Cli.Tests"
 
       # Run dotnet test to list the tests and filter for those matching 'Test_'
       $testsOutput = dotnet test . --list-tests
@@ -54,7 +54,7 @@ jobs:
       Write-Host "Value of tests: $tests"
 
       # Call the create_slicing_filter_condition script with the tests as arguments
-      & bash ./createSlicingFilterCondition.sh -Tests $tests
+      & bash ../../build/createSlicingFilterCondition.sh -Tests $tests
     displayName: 'Create slicing filter condition'
   
   - bash: |
