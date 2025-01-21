@@ -69,7 +69,6 @@ namespace Azure.Functions.Cli.Common
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
         public const string HelpCommand = "help";
-        public const string CoreToolsVersionsFeedUrl = "https://functionscdn.azureedge.net/public/cli-feed-v4.json";
         public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
         public const string GetFunctionNameParamId = "trigger-functionName";
         public const string HttpTriggerAuthLevelParamId = "httpTrigger-authLevel";
