@@ -22,4 +22,5 @@ filter+="|${filterProperty}=${targetTestName}"
 done
 filter=${filter#"|"}
 
+echo "Value of filter: $filter"
 echo "##vso[task.setvariable variable=targetTestsFilter]$filter"
