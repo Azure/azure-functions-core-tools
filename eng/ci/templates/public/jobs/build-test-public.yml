@@ -60,6 +60,8 @@ jobs:
 
       # Call the create_slicing_filter_condition script with the tests as arguments
       & ../../slice.ps1 -tempTestsFile $tempFile
+
+      Write-Host "Value of targetTestsFilter: $($env:targetTestsFilter)"
     displayName: 'Create slicing filter condition'
   
   - bash: |
