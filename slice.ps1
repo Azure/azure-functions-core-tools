@@ -40,4 +40,4 @@ $filter = $filter.TrimStart('|')
 Write-Host "Value of filter: $filter"
 
 # Set the filter variable for Azure DevOps pipeline
-Write-Output "##vso[task.setvariable variable=targetTestsFilter]$filter"
+Write-Output "##vso[task.setvariable variable=targetTestsFilter;isOutput=true]$filter"
