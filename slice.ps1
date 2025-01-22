@@ -15,8 +15,8 @@ if (-not (Test-Path -Path $tempTestsFile)) {
 # Read the test names from the file into an array
 $tests = Get-Content -Path $tempTestsFile
 $testCount = $tests.Count
-$totalAgents = $env:SYSTEM_TOTALJOBSINPHASE
-$agentNumber = $env:SYSTEM_JOBPOSITIONINPHASE
+[int]$totalAgents = $env:SYSTEM_TOTALJOBSINPHASE
+[int]$agentNumber = $env:SYSTEM_JOBPOSITIONINPHASE
 
 if (-not $totalAgents) { $totalAgents = 1 }
 if (-not $agentNumber) { $agentNumber = 1 }
