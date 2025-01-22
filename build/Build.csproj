@@ -1,11 +1,165 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+	<TargetFrameworks>net8.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Colors.Net" Version="1.1.0" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
+
+	<!-- Define the build order -->
+	<Target Name="Build" DependsOnTargets="
+	TestSignedArtifacts;
+	Clean;
+	LogIntoAzure;
+	UpdatePackageVersionForIntegrationTests;
+	RestorePackages;
+	ReplaceTelemetryInstrumentationKey;
+	DotnetPublishForZips;
+	FilterPowershellRuntimes;
+	FilterPythonRuntimes;
+	AddDistLib;
+	AddTemplatesNupkgs;
+	AddTemplatesJson;
+	AddGoZip;
+	TestPreSignedArtifacts;
+	CopyBinariesToSign;
+	Test;
+	Zip;
+	DotnetPublishForNupkg;
+	DotnetPack;
+	CreateIntegrationTestsBuildManifest" />
+
+	<!-- Individual targets -->
+	<Target Name="TestSignedArtifacts" Condition="$(SignTest) == 'true'">
+		<Exec Command="powershell.exe -File TestSignedArtifacts.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
+
+	<Target Name="Clean">
+		<RemoveDir Directories="$(OutputPath)" />
+	</Target>
+
+	<Target Name="LogIntoAzure" Condition="$(CI) == 'true'">
+		<PropertyGroup>
+			<AzureDirectoryId>$(AZURE_DIRECTORY_ID)</AzureDirectoryId>
+			<AzureAppId>$(AZURE_SERVICE_PRINCIPAL_ID)</AzureAppId>
+			<AzureKey>$(AZURE_SERVICE_PRINCIPAL_KEY)</AzureKey>
+		</PropertyGroup>
+
+		<Exec Command="az login --service-principal -u $(AzureAppId) -p &quot;$(AzureKey)&quot; --tenant $(AzureDirectoryId)"
+				Condition="'$(AzureDirectoryId)' != '' AND '$(AzureAppId)' != '' AND '$(AzureKey)' != ''" />
+	</Target>
+
+	<Target Name="RestorePackages">
+		<Exec Command="dotnet restore" />
+	</Target>
+
+	<Target Name="ReplaceTelemetryInstrumentationKey" Condition="$(CI) == 'true'">
+		<PropertyGroup>
+			<ConstantsFile>$(MSBuildThisFileDirectory)src\Azure.Functions.Cli\Constants.cs</ConstantsFile>
+			<TelemetryKeyToReplace>TELEMETRY_INSTRUMENTATION_KEY</TelemetryKeyToReplace>
+		</PropertyGroup>
+
+		<WriteLinesToFile
+			File="$(ConstantsFile)"
+			Lines="$([System.IO.File]::ReadAllText($(ConstantsFile)).Replace($(TelemetryKeyToReplace), $(TelemetryInstrumentationKey)))"
+			Overwrite="true"
+			Condition="'$(TelemetryInstrumentationKey)' != ''" />
+	</Target>
+
+	<Target Name="DotnetPublishForZips">
+		<ItemGroup>
+			<TargetRuntime Include="win-x86" />
+			<TargetRuntime Include="win-x64" />
+			<TargetRuntime Include="win-arm64" />
+			<TargetRuntime Include="linux-x64" />
+			<TargetRuntime Include="osx-x64" />
+			<TargetRuntime Include="osx-arm64" />
+		</ItemGroup>
+
+		<PropertyGroup>
+			<PublishArgs>publish $(ProjectFile) /p:BuildNumber="$(BuildNumber)" /p:CommitHash="$(CommitId)"</PublishArgs>
+			<PublishArgs Condition="'$(IntegrationBuildNumber)' != ''">$(PublishArgs) /p:IntegrationBuildNumber="$(IntegrationBuildNumber)"</PublishArgs>
+		</PropertyGroup>
+
+		<Exec Command="dotnet $(PublishArgs) -o $(OutputPath)\%(TargetRuntime.Identity) -c Release -f net8.0 --self-contained -r %(TargetRuntime.Identity)"
+				WorkingDirectory="$(MSBuildThisFileDirectory)" />
+	</Target>
+
+	<!-- Add remaining targets following the same pattern... -->
+
+	<Target Name="FilterPowershellRuntimes">
+		<MSBuild Projects="$(MSBuildThisFileDirectory)scripts\FilterPowershellRuntimes.proj" />
+	</Target>
+
+	<Target Name="FilterPythonRuntimes">
+		<MSBuild Projects="$(MSBuildThisFileDirectory)scripts\FilterPythonRuntimes.proj" />
+	</Target>
+
+	<Target Name="AddDistLib">
+		<Exec Command="powershell.exe -File AddDistLib.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
+
+	<Target Name="AddTemplatesNupkgs">
+		<Exec Command="powershell.exe -File AddTemplatesNupkgs.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
+
+	<Target Name="AddTemplatesJson">
+		<Exec Command="powershell.exe -File AddTemplatesJson.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
+
+	<Target Name="AddGoZip">
+		<Exec Command="powershell.exe -File AddGoZip.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
+
+	<Target Name="TestPreSignedArtifacts" Condition="$(CI) == 'true'">
+		<Exec Command="powershell.exe -File TestPreSignedArtifacts.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
+
+	<Target Name="CopyBinariesToSign" Condition="$(CI) == 'true'">
+		<Exec Command="powershell.exe -File CopyBinariesToSign.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
+
+	<Target Name="Test">
+		<PropertyGroup>
+			<TestArgs>test $(TestProjectFile) -f net8.0 --logger trx --filter "Category=Integration"</TestArgs>
+		</PropertyGroup>
+		<Exec Command="dotnet $(TestArgs)" />
+	</Target>
+
+	<Target Name="Zip">
+		<MSBuild Projects="$(MSBuildThisFileDirectory)scripts\Zip.proj" />
+	</Target>
+
+	<Target Name="DotnetPublishForNupkg">
+		<PropertyGroup>
+			<PublishArgs>publish $(ProjectFile) /p:BuildNumber="$(BuildNumber)" /p:NoWorkers="true" /p:TargetFramework=net8.0 /p:CommitHash="$(CommitId)"</PublishArgs>
+			<PublishArgs Condition="'$(IntegrationBuildNumber)' != ''">$(PublishArgs) /p:IntegrationBuildNumber="$(IntegrationBuildNumber)"</PublishArgs>
+		</PropertyGroup>
+
+		<Exec Command="dotnet $(PublishArgs) -c Release -f net8.0" />
+	</Target>
+
+	<Target Name="DotnetPack">
+		<PropertyGroup>
+			<PackArgs>pack $(SrcProjectPath) /p:BuildNumber="$(BuildNumber)" /p:NoWorkers="true" /p:TargetFramework=net8.0 /p:CommitHash="$(CommitId)"</PackArgs>
+			<PackArgs Condition="'$(IntegrationBuildNumber)' != ''">$(PackArgs) /p:IntegrationBuildNumber="$(IntegrationBuildNumber)"</PackArgs>
+		</PropertyGroup>
+
+		<Exec Command="dotnet $(PackArgs) -o $(OutputPath) -c Release --no-build" />
+	</Target>
+
+	<Target Name="CreateIntegrationTestsBuildManifest" Condition="$(IntegrationTests) == 'true'">
+		<Exec Command="powershell.exe -File CreateIntegrationTestsBuildManifest.ps1"
+				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+	</Target>
 </Project>

@@ -36,6 +36,13 @@ jobs:
     inputs:
       versionSpec:
     displayName: Install Nuget tool
+
+  - task: MSBuild@1
+    inputs:
+      solution: 'Build.csproj'
+      msbuildArguments: '/t:TestSignedArtifacts /p:SignTest=$(IsReleaseBuild)'
+    displayName: 'Test Signed Artifacts'
+    condition: eq(variables['IsReleaseBuild'], 'true')
   - pwsh: |
       .\build.ps1
     env:
