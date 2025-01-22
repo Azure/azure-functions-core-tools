@@ -60,9 +60,6 @@ jobs:
 
       # Call the create_slicing_filter_condition script with the tests as arguments
       & ../../slice.ps1 -tempTestsFile $tempFile
-    name: setFilter
-    displayName: 'Create slicing filter condition'
-  - pwsh: |
       Write-Host "Value of targetTestsFilter: $(setFilter.targetTestsFilter)"
       .\build.ps1
     env:
@@ -70,7 +67,6 @@ jobs:
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
-      targetTestsFilter: $(setFilter.targetTestsFilter)
     displayName: 'Executing build script'
   - task: PublishTestResults@2
     inputs:
