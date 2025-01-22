@@ -15,7 +15,7 @@ if (-not (Test-Path -Path $tempTestsFile)) {
 # Read the test names from the file into an array
 $tests = Get-Content -Path $tempTestsFile
 $testCount = $tests.Count
-$totalAgents = 5
+$totalAgents = $env:SYSTEM_TOTALJOBSINPHASE
 $agentNumber = $env:SYSTEM_JOBPOSITIONINPHASE
 
 if (-not $totalAgents) { $totalAgents = 1 }
@@ -28,6 +28,7 @@ Write-Host "Total tests: $testCount"
 Write-Host "Target tests:"
 $filter = ""
 for ($i = $agentNumber; $i -le $testCount; $i += $totalAgents) {
+    Write-Host "Current index: $i"
     $targetTestName = $tests[$i - 1]  # Arrays are 0-indexed in PowerShell
     Write-Host "$targetTestName"
     $filter += "|Name=$targetTestName"
