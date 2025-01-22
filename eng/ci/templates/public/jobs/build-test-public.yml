@@ -60,7 +60,8 @@ jobs:
 
       # Call the create_slicing_filter_condition script with the tests as arguments
       & ../../slice.ps1 -tempTestsFile $tempFile
-      Write-Host "Value of targetTestsFilter: $(setFilter.targetTestsFilter)"
+      $myVariable = [System.Environment]::GetEnvironmentVariable("targetTestsFilter", "Process")
+      Write-Host "Value of targetTestsFilter: $myVariable"
       .\build.ps1
     env:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
