@@ -327,10 +327,8 @@ namespace Build
             }
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
-            var targetTestsFilter =  Environment.GetEnvironmentVariable("targetTestsFilter");
-            Console.WriteLine("Filter: " + targetTestsFilter);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx --filter \"${targetTestsFilter}\"");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx --filter \"Category=UnitTest\"");
         }
 
         public static void CopyBinariesToSign()

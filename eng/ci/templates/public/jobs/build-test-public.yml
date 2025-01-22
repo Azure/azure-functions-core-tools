@@ -5,8 +5,6 @@ jobs:
     name: 1es-pool-azfunc-public
     image: 1es-windows-2022
     os: windows
-  strategy:
-    parallel: 5
 
   variables:
     devops_buildNumber: $[counter(format(''), 1500)]
@@ -39,29 +37,6 @@ jobs:
       versionSpec:
     displayName: Install Nuget tool
   - pwsh: |
-      .\validateWorkerVersions.ps1
-    displayName: 'Validate worker versions'
-    condition: ne(variables['skipWorkerVersionValidation'], 'true')
-  - pwsh: |
-      Set-Location -Path "./test/Azure.Functions.Cli.Tests"
-
-      # Run dotnet test to list the tests and filter for those matching 'Test_'
-      $testsOutput = dotnet test . --list-tests
-
-      Write-Host "Test output: $testsOutput"
-      $tests = $testsOutput | ForEach-Object { $_.Trim() } | Select-String -Pattern '^Azure\.Functions\.Cli\.Tests' |  ForEach-Object { $_.Line }
-
-      Write-Host "Value of tests: $tests"
-
-      $tempFile = New-TemporaryFile
-
-      # Write the tests to the temporary file
-      $tests | Out-File -FilePath $tempFile -Encoding UTF8
-
-      # Call the create_slicing_filter_condition script with the tests as arguments
-      & ../../slice.ps1 -tempTestsFile $tempFile
-      $myVariable = [System.Environment]::GetEnvironmentVariable("targetTestsFilter", "Process")
-      Write-Host "Value of targetTestsFilter: $myVariable"
       .\build.ps1
     env:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
