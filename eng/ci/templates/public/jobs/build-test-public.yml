@@ -53,8 +53,13 @@ jobs:
 
       Write-Host "Value of tests: $tests"
 
+      $tempFile = New-TemporaryFile
+
+      # Write the tests to the temporary file
+      $tests | Out-File -FilePath $tempFile -Encoding UTF8
+
       # Call the create_slicing_filter_condition script with the tests as arguments
-      & bash ../../build/createSlicingFilterCondition.sh -Tests $tests
+      & ../../slice.ps1 -tempTestsFile $tempFile
     displayName: 'Create slicing filter condition'
   
   - bash: |
