@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace Build
 {
-    public class AzureLoginTask : Task
+    public class AzureLoginTask : Task, ITask
     {
         [Required]
         public string DirectoryId { get; set; }

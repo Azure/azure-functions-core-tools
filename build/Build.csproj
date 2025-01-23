@@ -23,7 +23,7 @@
 		<RemoveDir Directories="$(OutputPath)" />
 	</Target>
 
-	<Target Name="LogIntoAzure">
+	<Target Name="AzureLoginTask" Condition="'$(CI)' == 'true'">
 		<AzureLoginTask
 		  DirectoryId="$(AZURE_DIRECTORY_ID)"
 		  AppId="$(AZURE_SERVICE_PRINCIPAL_ID)"
