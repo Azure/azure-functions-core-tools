@@ -39,10 +39,24 @@ jobs:
 
   - task: MSBuild@1
     inputs:
-      solution: 'Build.csproj'
+      solution: './build/Build.csproj'
       msbuildArguments: '/t:TestSignedArtifacts /p:SignTest=$(IsReleaseBuild)'
     displayName: 'Test Signed Artifacts'
     condition: eq(variables['IsReleaseBuild'], 'true')
+
+  - task: MSBuild@1
+    inputs:
+      solution: './build/Build.csproj'
+      msbuildArguments: '/t:Clean'
+    displayName: 'Clean project'
+
+  - task: MSBuild@1
+    inputs:
+      solution: './build/Build.csproj'
+      msbuildArguments: '/t:LogIntoAzure /p:CI=true'
+    displayName: 'Log into Azure'
+    condition: eq(variables['Agent.OS'], 'Windows_NT')
+    
   - pwsh: |
       .\build.ps1
     env:
