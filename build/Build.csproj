@@ -12,7 +12,7 @@
   </ItemGroup>
 
 	<!-- Define the build order -->
-	<Target Name="Build" DependsOnTargets="&#xD;&#xA;	TestSignedArtifacts;&#xD;&#xA;	Clean;&#xD;&#xA;	LogIntoAzure;&#xD;&#xA;	UpdatePackageVersionForIntegrationTests;&#xD;&#xA;	RestorePackages;&#xD;&#xA;	ReplaceTelemetryInstrumentationKey;&#xD;&#xA;	DotnetPublishForZips;&#xD;&#xA;	FilterPowershellRuntimes;&#xD;&#xA;	FilterPythonRuntimes;&#xD;&#xA;	AddDistLib;&#xD;&#xA;	AddTemplatesNupkgs;&#xD;&#xA;	AddTemplatesJson;&#xD;&#xA;	AddGoZip;&#xD;&#xA;	TestPreSignedArtifacts;&#xD;&#xA;	CopyBinariesToSign;&#xD;&#xA;	Test;&#xD;&#xA;	Zip;&#xD;&#xA;	DotnetPublishForNupkg;&#xD;&#xA;	DotnetPack;&#xD;&#xA;	CreateIntegrationTestsBuildManifest" />
+	<Target Name="Build" DependsOnTargets="&#xD;&#xA;	TestSignedArtifacts;&#xD;&#xA;	Clean;&#xD;&#xA;	AzureLoginTask;&#xD;&#xA;	UpdatePackageVersionForIntegrationTests;&#xD;&#xA;	RestorePackages;&#xD;&#xA;	ReplaceTelemetryInstrumentationKey;&#xD;&#xA;	DotnetPublishForZips;&#xD;&#xA;	FilterPowershellRuntimes;&#xD;&#xA;	FilterPythonRuntimes;&#xD;&#xA;	AddDistLib;&#xD;&#xA;	AddTemplatesNupkgs;&#xD;&#xA;	AddTemplatesJson;&#xD;&#xA;	AddGoZip;&#xD;&#xA;	TestPreSignedArtifacts;&#xD;&#xA;	CopyBinariesToSign;&#xD;&#xA;	Test;&#xD;&#xA;	Zip;&#xD;&#xA;	DotnetPublishForNupkg;&#xD;&#xA;	DotnetPack;&#xD;&#xA;	CreateIntegrationTestsBuildManifest" />
 
 	<!-- Individual targets -->
 	<Target Name="TestSignedArtifacts" Condition="$(SignTest) == 'true'">

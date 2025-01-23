@@ -4,10 +4,21 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace Build
+namespace Build.Tasks
 {
     public class AzureLoginTask : Task, ITask
     {
+        //When implementing the ITask interface, it is necessary to
+        //implement a BuildEngine property of type
+        //Microsoft.Build.Framework.IBuildEngine. This is done for
+        //you if you derive from the Task class.
+        public IBuildEngine BuildEngine { get; set; }
+
+        // When implementing the ITask interface, it is necessary to
+        // implement a HostObject property of type object.
+        // This is done for you if you derive from the Task class.
+        public object HostObject { get; set; }
+
         [Required]
         public string DirectoryId { get; set; }
 
