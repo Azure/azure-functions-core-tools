@@ -69,7 +69,6 @@ namespace Azure.Functions.Cli.Common
         public const int DefaultGetFunctionReadinessTime = 30000;
         public const int DefaultRestartedWorkerProcessUptimeWithin = 45000;
         public const string HelpCommand = "help";
-        public const string CoreToolsVersionsFeedUrl = "https://functionscdn.azureedge.net/public/cli-feed-v4.json";
         public const string OldCoreToolsVersionMessage = "You are using an old Core Tools version. Please upgrade to the latest version.";
         public const string GetFunctionNameParamId = "trigger-functionName";
         public const string HttpTriggerAuthLevelParamId = "httpTrigger-authLevel";
@@ -95,6 +94,8 @@ namespace Azure.Functions.Cli.Common
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
+        public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
+
         // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
 
 
