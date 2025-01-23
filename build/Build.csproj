@@ -5,52 +5,29 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Colors.Net" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.12.6" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.12.6" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
 	<!-- Define the build order -->
-	<Target Name="Build" DependsOnTargets="
-	TestSignedArtifacts;
-	Clean;
-	LogIntoAzure;
-	UpdatePackageVersionForIntegrationTests;
-	RestorePackages;
-	ReplaceTelemetryInstrumentationKey;
-	DotnetPublishForZips;
-	FilterPowershellRuntimes;
-	FilterPythonRuntimes;
-	AddDistLib;
-	AddTemplatesNupkgs;
-	AddTemplatesJson;
-	AddGoZip;
-	TestPreSignedArtifacts;
-	CopyBinariesToSign;
-	Test;
-	Zip;
-	DotnetPublishForNupkg;
-	DotnetPack;
-	CreateIntegrationTestsBuildManifest" />
+	<Target Name="Build" DependsOnTargets="&#xD;&#xA;	TestSignedArtifacts;&#xD;&#xA;	Clean;&#xD;&#xA;	LogIntoAzure;&#xD;&#xA;	UpdatePackageVersionForIntegrationTests;&#xD;&#xA;	RestorePackages;&#xD;&#xA;	ReplaceTelemetryInstrumentationKey;&#xD;&#xA;	DotnetPublishForZips;&#xD;&#xA;	FilterPowershellRuntimes;&#xD;&#xA;	FilterPythonRuntimes;&#xD;&#xA;	AddDistLib;&#xD;&#xA;	AddTemplatesNupkgs;&#xD;&#xA;	AddTemplatesJson;&#xD;&#xA;	AddGoZip;&#xD;&#xA;	TestPreSignedArtifacts;&#xD;&#xA;	CopyBinariesToSign;&#xD;&#xA;	Test;&#xD;&#xA;	Zip;&#xD;&#xA;	DotnetPublishForNupkg;&#xD;&#xA;	DotnetPack;&#xD;&#xA;	CreateIntegrationTestsBuildManifest" />
 
 	<!-- Individual targets -->
 	<Target Name="TestSignedArtifacts" Condition="$(SignTest) == 'true'">
-		<Exec Command="powershell.exe -File TestSignedArtifacts.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File TestSignedArtifacts.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 
 	<Target Name="Clean">
 		<RemoveDir Directories="$(OutputPath)" />
 	</Target>
 
-	<Target Name="LogIntoAzure" Condition="$(CI) == 'true'">
-		<PropertyGroup>
-			<AzureDirectoryId>$(AZURE_DIRECTORY_ID)</AzureDirectoryId>
-			<AzureAppId>$(AZURE_SERVICE_PRINCIPAL_ID)</AzureAppId>
-			<AzureKey>$(AZURE_SERVICE_PRINCIPAL_KEY)</AzureKey>
-		</PropertyGroup>
-
-		<Exec Command="az login --service-principal -u $(AzureAppId) -p &quot;$(AzureKey)&quot; --tenant $(AzureDirectoryId)"
-				Condition="'$(AzureDirectoryId)' != '' AND '$(AzureAppId)' != '' AND '$(AzureKey)' != ''" />
+	<Target Name="LogIntoAzure">
+		<AzureLoginTask
+		  DirectoryId="$(AZURE_DIRECTORY_ID)"
+		  AppId="$(AZURE_SERVICE_PRINCIPAL_ID)"
+		  Key="$(AZURE_SERVICE_PRINCIPAL_KEY)" />
 	</Target>
 
 	<Target Name="RestorePackages">
@@ -63,11 +40,7 @@
 			<TelemetryKeyToReplace>TELEMETRY_INSTRUMENTATION_KEY</TelemetryKeyToReplace>
 		</PropertyGroup>
 
-		<WriteLinesToFile
-			File="$(ConstantsFile)"
-			Lines="$([System.IO.File]::ReadAllText($(ConstantsFile)).Replace($(TelemetryKeyToReplace), $(TelemetryInstrumentationKey)))"
-			Overwrite="true"
-			Condition="'$(TelemetryInstrumentationKey)' != ''" />
+		<WriteLinesToFile File="$(ConstantsFile)" Lines="$([System.IO.File]::ReadAllText($(ConstantsFile)).Replace($(TelemetryKeyToReplace), $(TelemetryInstrumentationKey)))" Overwrite="true" Condition="'$(TelemetryInstrumentationKey)' != ''" />
 	</Target>
 
 	<Target Name="DotnetPublishForZips">
@@ -85,8 +58,7 @@
 			<PublishArgs Condition="'$(IntegrationBuildNumber)' != ''">$(PublishArgs) /p:IntegrationBuildNumber="$(IntegrationBuildNumber)"</PublishArgs>
 		</PropertyGroup>
 
-		<Exec Command="dotnet $(PublishArgs) -o $(OutputPath)\%(TargetRuntime.Identity) -c Release -f net8.0 --self-contained -r %(TargetRuntime.Identity)"
-				WorkingDirectory="$(MSBuildThisFileDirectory)" />
+		<Exec Command="dotnet $(PublishArgs) -o $(OutputPath)\%(TargetRuntime.Identity) -c Release -f net8.0 --self-contained -r %(TargetRuntime.Identity)" WorkingDirectory="$(MSBuildThisFileDirectory)" />
 	</Target>
 
 	<!-- Add remaining targets following the same pattern... -->
@@ -100,33 +72,27 @@
 	</Target>
 
 	<Target Name="AddDistLib">
-		<Exec Command="powershell.exe -File AddDistLib.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File AddDistLib.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 
 	<Target Name="AddTemplatesNupkgs">
-		<Exec Command="powershell.exe -File AddTemplatesNupkgs.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File AddTemplatesNupkgs.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 
 	<Target Name="AddTemplatesJson">
-		<Exec Command="powershell.exe -File AddTemplatesJson.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File AddTemplatesJson.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 
 	<Target Name="AddGoZip">
-		<Exec Command="powershell.exe -File AddGoZip.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File AddGoZip.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 
 	<Target Name="TestPreSignedArtifacts" Condition="$(CI) == 'true'">
-		<Exec Command="powershell.exe -File TestPreSignedArtifacts.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File TestPreSignedArtifacts.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 
 	<Target Name="CopyBinariesToSign" Condition="$(CI) == 'true'">
-		<Exec Command="powershell.exe -File CopyBinariesToSign.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File CopyBinariesToSign.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 
 	<Target Name="Test">
@@ -159,7 +125,6 @@
 	</Target>
 
 	<Target Name="CreateIntegrationTestsBuildManifest" Condition="$(IntegrationTests) == 'true'">
-		<Exec Command="powershell.exe -File CreateIntegrationTestsBuildManifest.ps1"
-				WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
+		<Exec Command="powershell.exe -File CreateIntegrationTestsBuildManifest.ps1" WorkingDirectory="$(MSBuildThisFileDirectory)scripts" />
 	</Target>
 </Project>
