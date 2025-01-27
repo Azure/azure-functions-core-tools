@@ -63,12 +63,11 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task<Stream> CreateZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables, bool useGoZip = false)
         {
-            var zipFilePath = Path.GetTempFileName();
-
             if (useGoZip)
             {
                 if (GoZipExists(out string goZipLocation))
                 {
+                    var zipFilePath = Path.GetTempFileName();
                     return await CreateGoZip(files, rootPath, zipFilePath, goZipLocation, executables);
                 }
 
@@ -76,7 +75,7 @@ namespace Azure.Functions.Cli.Helpers
                     "This may cause problems preserving file permissions when using in a Linux based environment."));
             }
 
-            return CreateDotNetZip(files, rootPath, zipFilePath, executables);
+            return CreateDotNetZip(files, rootPath, executables);
         }
 
         public static bool GoZipExists(out string fileLocation)
@@ -94,7 +93,7 @@ namespace Azure.Functions.Cli.Helpers
             return false;
         }
 
-        public static Stream CreateDotNetZip(IEnumerable<string> files, string rootPath, string zipFilePath, IEnumerable<string> executables)
+        public static Stream CreateDotNetZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables)
         {
             // See section 4.4.2.2 in the zip spec: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
             const byte CreatedByUnix = 3;
@@ -127,7 +126,7 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             // In order to properly mount and/or unzip this in Azure, we need to create the zip as if it were
-            // Unix so that the correct file permissions set above are applies. To do this, we walk through the stream
+            // Unix so that the correct file permissions set above are applied. To do this, we walk through the stream
             // and update the "created by" field to 3, which indicates it was created by Unix.
             if (OperatingSystem.IsWindows())
             {

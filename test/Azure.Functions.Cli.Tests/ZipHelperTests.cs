@@ -101,6 +101,16 @@ namespace Azure.Functions.Cli.Tests
             // use our zip utilities to zip them
             var zipFile = Path.Combine(tempDir, "test.zip");
             var stream = await ZipHelper.CreateZip(files, tempDir, executables: new string[] { exe });
+
+            if (stream == null)
+            {
+                _output.WriteLine($"zipFile: {zipFile}");
+                _output.WriteLine($"file exists: {File.Exists(zipFile)}");
+                _output.WriteLine($"dir exists: {Directory.Exists(tempDir)}");
+            }
+
+            Assert.NotNull(stream);
+
             await FileSystemHelpers.WriteToFile(zipFile, stream);
 
             return zipFile;
