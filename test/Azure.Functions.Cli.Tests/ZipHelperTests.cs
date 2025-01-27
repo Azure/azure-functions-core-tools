@@ -19,6 +19,9 @@ namespace Azure.Functions.Cli.Tests
         public ZipHelperTests(ITestOutputHelper output)
         {
             _output = output;
+
+            // reset to default in case other tests have set this up with mocks
+            FileSystemHelpers.Instance = null;
         }
 
         [Fact]
@@ -31,7 +34,7 @@ namespace Azure.Functions.Cli.Tests
             {
                 if (_isCI)
                 {
-                    // copy the linux zip so we can include it in the docker image for validation
+                    // copy the windows-built linux zip so we can include it in ci artifacts for validation on linux
                     File.Copy(linuxZip, Path.Combine(Directory.GetCurrentDirectory(), "ZippedOnWindows.zip"), true);
                 }
 
@@ -92,7 +95,7 @@ namespace Azure.Functions.Cli.Tests
             foreach (string fileName in new[] { exe, dll, config })
             {
                 var f = new DirectoryInfo(outPath).GetFiles(fileName, SearchOption.AllDirectories).FirstOrDefault();
-                Assert.True(exe != null, $"{fileName} not found.");
+                Assert.True(f != null, $"{fileName} not found.");
                 string destFile = Path.Combine(tempDir, fileName);
                 File.Copy(f.FullName, destFile);
                 files.Add(destFile);
@@ -101,15 +104,6 @@ namespace Azure.Functions.Cli.Tests
             // use our zip utilities to zip them
             var zipFile = Path.Combine(tempDir, "test.zip");
             var stream = await ZipHelper.CreateZip(files, tempDir, executables: new string[] { exe });
-
-            if (stream == null)
-            {
-                _output.WriteLine($"zipFile: {zipFile}");
-                _output.WriteLine($"file exists: {File.Exists(zipFile)}");
-                _output.WriteLine($"dir exists: {Directory.Exists(tempDir)}");
-            }
-
-            Assert.NotNull(stream);
 
             await FileSystemHelpers.WriteToFile(zipFile, stream);
 
