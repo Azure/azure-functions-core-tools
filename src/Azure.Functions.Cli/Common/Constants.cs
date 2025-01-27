@@ -1,7 +1,7 @@
-using Azure.Functions.Cli.Helpers;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -63,6 +63,7 @@ namespace Azure.Functions.Cli.Common
         public const string UserSecretsIdElementName = "UserSecretsId";
         public const string TargetFrameworkElementName = "TargetFramework";
         public const string DisplayLogo = "FUNCTIONS_CORE_TOOLS_DISPLAY_LOGO";
+        public const string UseGoZip = "FUNCTIONS_CORE_TOOLS_USE_GOZIP";
         public const string AspNetCoreSupressStatusMessages = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
         public const string SequentialJobHostRestart = "AzureFunctionsJobHost__SequentialRestart";
         public const long DefaultMaxRequestBodySize = 104857600;
