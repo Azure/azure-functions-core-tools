@@ -178,7 +178,7 @@ namespace Azure.Functions.ArtifactAssembler
 
             foreach (string artifactName in _visualStudioArtifacts.Keys)
             {
-                (string artifactDirName, string consolidatedArtifactDirPath) = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, createDirectory: true);
+                (string artifactDirName, string consolidatedArtifactDirPath) = await CreateInProc8CoreToolsHostHelper(artifactName, customHostTargetArtifactDir, createDirectory: true);
 
                 // Copy in-proc6 files and delete directory after
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
@@ -197,7 +197,7 @@ namespace Azure.Functions.ArtifactAssembler
             // Create artifacts for .NET 8 OSX to use instead of the custom host
             foreach (string artifactName in _net8OsxArtifacts)
             {
-                _ = await VisualStudioArtifactsHelper(artifactName, customHostTargetArtifactDir, createDirectory: false);
+                _ = await CreateInProc8CoreToolsHostHelper(artifactName, customHostTargetArtifactDir, createDirectory: false);
             }
 
             // Delete directories
@@ -208,7 +208,8 @@ namespace Azure.Functions.ArtifactAssembler
             Console.WriteLine("Finished assembling Visual Studio Core Tools artifacts");
         }
 
-        private async Task<(string artifactDirName, string consolidatedArtifactDirPath)> VisualStudioArtifactsHelper(string artifactName, string customHostTargetArtifactDir, bool createDirectory)
+        // This method creates a new directory for the core tools host and copies the inproc8 files
+        private async Task<(string artifactDirName, string consolidatedArtifactDirPath)> CreateInProc8CoreToolsHostHelper(string artifactName, string customHostTargetArtifactDir, bool createDirectory)
         {
             var inProcArtifactDirPath = Directory.EnumerateDirectories(_inProc8ExtractedRootDir)
                           .FirstOrDefault(dir => dir.Contains(artifactName));
