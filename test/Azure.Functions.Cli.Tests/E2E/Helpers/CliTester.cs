@@ -41,6 +41,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
         public static async Task Run(RunConfiguration[] runConfigurations, ITestOutputHelper output = null, string workingDir = null, bool startHost = false)
         {
+            bool wasWorkingDirPassedIn = (workingDir != null);
             string workingDirectory = workingDir ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
             bool cleanupDirectory = string.IsNullOrEmpty(workingDir);
@@ -54,7 +55,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
 
             try
             {
-                await InternalRun(workingDirectory, runConfigurations, output, startHost);
+                await InternalRun(workingDirectory, runConfigurations, output, startHost, wasWorkingDirPassedIn);
             }
             finally
             {
@@ -73,7 +74,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
-        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost)
+        private static async Task InternalRun(string workingDir, RunConfiguration[] runConfigurations, ITestOutputHelper output, bool startHost, bool wasWorkingDirPassedIn)
         {
             await using var hostExe = new Executable(_func, StartHostCommand, workingDirectory: workingDir);
             var stdout = new StringBuilder();
@@ -132,6 +133,13 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                         catch (Exception e)
                         {
                             logErr($"Error while running test: {e.Message}");
+                            // Throw an error if working directory was passed in
+                            // For some reason, tests don't fail with the working directory not being the default one so we need this specification
+                            if(wasWorkingDirPassedIn)
+                            {
+                                exitError = true;
+                            }
+                            
                         }
                         finally
                         {
@@ -166,7 +174,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     }
                 }
 
-                // AssertExitError(runConfiguration, exitError);
+                AssertExitError(runConfiguration, exitError);
                 AssertFiles(runConfiguration, workingDir);
                 AssertDirectories(runConfiguration, workingDir);
                 AssertOutputContent(runConfiguration, stdout);
