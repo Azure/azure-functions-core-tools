@@ -16,9 +16,6 @@ namespace Azure.Functions.Cli.Helpers
     {
         public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
         {
-            // temporarily provide an escape hatch to use gozip in case there are bugs in the dotnet implementation
-            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
-
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
             {
@@ -49,7 +46,7 @@ namespace Azure.Functions.Cli.Helpers
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && buildOption == BuildOption.Remote)
             {
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
-                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Enumerable.Empty<string>(), useGoZip);
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Enumerable.Empty<string>());
             }
             else
             {
@@ -57,12 +54,15 @@ namespace Azure.Functions.Cli.Helpers
                 IEnumerable<string> executables = !string.IsNullOrEmpty(customHandler)
                     ? new[] { customHandler }
                     : Enumerable.Empty<string>();
-                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables, useGoZip);
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables);
             }
         }
 
-        public static async Task<Stream> CreateZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables, bool useGoZip = false)
+        public static async Task<Stream> CreateZip(IEnumerable<string> files, string rootPath, IEnumerable<string> executables)
         {
+            // temporarily provide an escape hatch to use gozip in case there are bugs in the dotnet implementation
+            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
+
             if (useGoZip)
             {
                 if (GoZipExists(out string goZipLocation))
