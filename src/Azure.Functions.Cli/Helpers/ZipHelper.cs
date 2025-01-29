@@ -16,6 +16,9 @@ namespace Azure.Functions.Cli.Helpers
     {
         public static async Task<Stream> GetAppZipFile(string functionAppRoot, bool buildNativeDeps, BuildOption buildOption, bool noBuild, GitIgnoreParser ignoreParser = null, string additionalPackages = null, bool ignoreDotNetCheck = false)
         {
+            // temporarily provide an escape hatch to use gozip in case there are bugs in the dotnet implementation
+            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
+
             var gitIgnorePath = Path.Combine(functionAppRoot, Constants.FuncIgnoreFile);
             if (ignoreParser == null && FileSystemHelpers.FileExists(gitIgnorePath))
             {
@@ -45,9 +48,6 @@ namespace Azure.Functions.Cli.Helpers
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && buildOption == BuildOption.Remote)
             {
-                // temporarily provide an escape hatch to use gozip in case there are bugs in the dotnet implementation
-                bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
-
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
                 return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Enumerable.Empty<string>(), useGoZip);
             }
@@ -57,7 +57,7 @@ namespace Azure.Functions.Cli.Helpers
                 IEnumerable<string> executables = !string.IsNullOrEmpty(customHandler)
                     ? new[] { customHandler }
                     : Enumerable.Empty<string>();
-                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables);
+                return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false), functionAppRoot, executables, useGoZip);
             }
         }
 
@@ -67,6 +67,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (GoZipExists(out string goZipLocation))
                 {
+                    ColoredConsole.WriteLine(DarkYellow("Using gozip for packaging."));
                     var zipFilePath = Path.GetTempFileName();
                     return await CreateGoZip(files, rootPath, zipFilePath, goZipLocation, executables);
                 }
@@ -126,8 +127,8 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             // In order to properly mount and/or unzip this in Azure, we need to create the zip as if it were
-            // Unix so that the correct file permissions set above are applied. To do this, we walk through the stream
-            // and update the "created by" field to 3, which indicates it was created by Unix.
+            // Unix so that the correct file permissions set above are applied. To do this, we walk backwards
+            // through the stream and update the "created by" field to 3, which indicates it was created by Unix.
             if (OperatingSystem.IsWindows())
             {
                 memStream.Seek(0, SeekOrigin.End);
@@ -135,6 +136,8 @@ namespace Azure.Functions.Cli.Helpers
                 // Update the file header in the zip file for every file to indicate that it was created by Unix
                 while (SeekBackwardsToSignature(memStream, centralDirectorySignature))
                 {
+                    // The field we need to set is 5 bytes from the beginning of the signature. Set it,
+                    // then move back to the previous location so we can continue.
                     memStream.Seek(5, SeekOrigin.Current);
                     memStream.WriteByte(CreatedByUnix);
                     memStream.Seek(-6, SeekOrigin.Current);
