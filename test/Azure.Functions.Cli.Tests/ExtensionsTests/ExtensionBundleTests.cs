@@ -28,6 +28,7 @@ namespace Azure.Functions.Cli.Tests.ExtensionsTests
                 {
                     "No action performed"
                 },
+                ExitInError = true,
                 CommandTimeout = TimeSpan.FromMinutes(300)
             }, _output);
         }
