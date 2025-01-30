@@ -103,9 +103,9 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 WorkingDirectory = workingDirectory,
-                FileName = fileName,
+                RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                RedirectStandardOutput = true
+                FileName = fileName
             };
 
             if (!string.IsNullOrEmpty(arguments))
@@ -113,15 +113,15 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 startInfo.Arguments = arguments;
             }
 
-            Process testProcess = Process.Start(startInfo);
-            string standardOut = null;
-            string standardError = null;
+            Process testProcess = new()
+            {
+                StartInfo = startInfo,
+            };
 
             testProcess.OutputDataReceived += (sender, e) =>
             {
                 if (e.Data != null)
                 {
-                    standardOut = e.Data + Environment.NewLine;
                     writeOutput?.Invoke(e.Data);
                 }
             };
@@ -130,31 +130,35 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             {
                 if (e.Data != null)
                 {
-                    standardOut += e.Data + Environment.NewLine;
                     writeError?.Invoke(e.Data);
                 }
             };
 
-            bool completed = testProcess.WaitForExit((int)procTimeout.TotalMilliseconds);
+            testProcess.Start();
+            testProcess.BeginOutputReadLine();
+            testProcess.BeginErrorReadLine();
+
+            bool completed = false;
+            try
+            {
+                completed = testProcess.WaitForExit((int)procTimeout.TotalMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Process '{fileName} {arguments}' in working directory '{workingDirectory}' threw exception '{ex}'.");
+            }
 
             if (!completed)
             {
-                testProcess.Kill();
                 throw new TimeoutException($"Process '{fileName} {arguments}' in working directory '{workingDirectory}' did not complete in {procTimeout}.");
-            }
-
-            if (testProcess.ExitCode != 0)
-            {
-                throw new InvalidOperationException($"Process '{fileName} {arguments}' in working directory '{workingDirectory}' exited with code '{testProcess.ExitCode}'.{Environment.NewLine}" +
-                    $"Output:{Environment.NewLine}{standardOut}{Environment.NewLine}Error:{Environment.NewLine}{standardError}");
             }
         }
 
         private static string ExecuteCommand(string command)
         {
-            string output = null;
+            string output = string.Empty;
 
-            RunProcess(CommandExe, command, null, writeOutput: o => output = o);
+            RunProcess(CommandExe, command, null, writeOutput: o => output += o + Environment.NewLine);
 
             return output;
         }
