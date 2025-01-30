@@ -733,6 +733,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start --port {_funcHostPort} --verbose --runtime inproc8"
                     },
                     ExpectExit = true,
+                    ExitInError = true,
                     ErrorContains = ["Failed to locate the inproc8 model host"],
                     Test = async (workingDir, p, _) =>
                     {
@@ -766,6 +767,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start --port {_funcHostPort} --verbose"
                     },
                     ExpectExit = true,
+                    ExitInError = true,
                     ErrorContains = ["Failed to locate the inproc8 model host"],
                     Test = async (workingDir, p, _) =>
                     {
@@ -885,6 +887,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start --port {_funcHostPort} --verbose"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["Failed to locate the inproc6 model host at"],
                     Test = async (workingDir, p, _) =>
                     {
@@ -918,6 +921,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start --port {_funcHostPort} --verbose --runtime inproc6"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["Failed to locate the inproc6 model host at"],
                     Test = async (workingDir, p, _) =>
                     {
@@ -999,7 +1003,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         $"start  --port {_funcHostPort} --verbose --runtime inproc6"
                     },
-                    ExpectExit = false,
+                    ExpectExit = true,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
@@ -1033,6 +1038,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start  --port {_funcHostPort} --verbose --runtime inproc8"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
@@ -1066,6 +1072,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start  --port {_funcHostPort} --verbose --runtime inproc8"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. For the 'inproc8' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
                     Test = async (workingDir, p, _) =>
                     {
@@ -1099,6 +1106,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start  --port {_funcHostPort} --verbose --runtime default"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
                     Test = async (workingDir, p, _) =>
                     {
@@ -1132,6 +1140,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start  --port {_funcHostPort} --verbose --runtime default"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
                     Test = async (workingDir, p, _) =>
                     {
@@ -1165,6 +1174,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start  --port {_funcHostPort} --verbose --runtime inproc6"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. For the 'inproc6' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
                     Test = async (workingDir, p, _) =>
                     {
@@ -1199,6 +1209,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start  --port {_funcHostPort} --verbose --runtime inproc6"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
@@ -1233,6 +1244,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         $"start  --port {_funcHostPort} --verbose --runtime inproc8"
                     },
                     ExpectExit = false,
+                    ExitInError = true,
                     ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
