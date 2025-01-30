@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -87,7 +88,7 @@ namespace Azure.Functions.Cli.Tests
             // build the project for the rid
             var csproj = dir.GetFiles($"{proj}.csproj", SearchOption.AllDirectories).FirstOrDefault();
             var csprojDir = csproj.Directory.FullName;
-            ProcessWrapper.RunProcess("dotnet", $"build -r {rid}", csprojDir, writeOutput: WriteOutput);
+            ProcessHelper.RunProcess("dotnet", $"build -r {rid}", csprojDir, writeOutput: WriteOutput);
 
             var outPath = Path.Combine(csprojDir, "bin", "Debug", "net8.0", rid);
 
@@ -118,7 +119,7 @@ namespace Azure.Functions.Cli.Tests
             string exeOutput = null;
             string exeError = null;
 
-            ProcessWrapper.RunProcess(Path.Combine(unzipPath, "ZippedExe.exe"), string.Empty, unzipPath, o => exeOutput = o, e => exeError = e);
+            ProcessHelper.RunProcess(Path.Combine(unzipPath, "ZippedExe.exe"), string.Empty, unzipPath, o => exeOutput += o + Environment.NewLine, e => exeError += e + Environment.NewLine);
 
             Assert.Equal(string.Empty, exeError);
             Assert.Equal("Hello, World!", exeOutput.Trim());
@@ -131,7 +132,7 @@ namespace Azure.Functions.Cli.Tests
 
             void CaptureOutput(string output)
             {
-                stdout = output;
+                stdout += output + Environment.NewLine;
                 WriteOutput(output);
             }
 
@@ -142,10 +143,10 @@ namespace Azure.Functions.Cli.Tests
             Directory.CreateDirectory(mntDir);
 
             // this is what our hosting environment does; we need to validate we can run the exe when mounted like this
-            ProcessWrapper.RunProcess("fuse-zip", $"./{zipFileName} ./mnt -r", zipDir, writeOutput: CaptureOutput);
-            ProcessWrapper.RunProcess("bash", $"-c \"ls -l\"", mntDir, writeOutput: CaptureOutput);
+            ProcessHelper.RunProcess("fuse-zip", $"./{zipFileName} ./mnt -r", zipDir, writeOutput: CaptureOutput);
+            ProcessHelper.RunProcess("bash", $"-c \"ls -l\"", mntDir, writeOutput: CaptureOutput);
 
-            var outputLines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var outputLines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
             Assert.Equal(14, outputLines.Length);
 
             // ignore first ('total ...') to validate file perms
@@ -184,8 +185,8 @@ namespace Azure.Functions.Cli.Tests
                 }
             }
 
-            ProcessWrapper.RunProcess($"{Path.Combine(mntDir, exeName)}", string.Empty, mntDir, writeOutput: CaptureOutput);
-            outputLines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            ProcessHelper.RunProcess($"{Path.Combine(mntDir, exeName)}", string.Empty, mntDir, writeOutput: CaptureOutput);
+            outputLines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
             Assert.Equal("Hello, World!", outputLines.Last());
         }
 
