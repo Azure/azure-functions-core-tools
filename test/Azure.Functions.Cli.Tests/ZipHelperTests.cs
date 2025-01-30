@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.Tests
 
             ProcessHelper.RunProcess(Path.Combine(unzipPath, "ZippedExe.exe"), string.Empty, unzipPath, o => exeOutput += o + Environment.NewLine, e => exeError += e + Environment.NewLine);
 
-            Assert.Equal(string.Empty, exeError);
+            Assert.Null(exeError);
             Assert.Equal("Hello, World!", exeOutput.Trim());
         }
 
