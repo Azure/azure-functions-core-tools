@@ -17,13 +17,14 @@ stages:
 
           - task: DotNetCoreCLI@2
             inputs:
-              command: publish
+              command: build
+              arguments: --output $(Build.ArtifactStagingDirectory)
 
           - task: UniversalPackages@0
             displayName: Publish a Universal Package
             inputs:
               command: publish
-              publishDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.Cli/bin/Release/net8.0/publish'
+              publishDirectory: '$(Build.ArtifactStagingDirectory)'
               vstsFeedPublish: 'funda'
               vstsFeedPackagePublish: 'azure-functions-core-tools'
               packagePublishDescription: 'Modified Funda version of the Azure Functions Core Tools. This is to be able to use the fix in Azure/azure-functions-core-tools#4228 before it is merged'
