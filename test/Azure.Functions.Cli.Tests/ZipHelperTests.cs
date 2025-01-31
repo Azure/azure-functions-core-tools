@@ -128,7 +128,7 @@ namespace Azure.Functions.Cli.Tests
         private void VerifyLinuxZip(string zipFile)
         {
             const string exeName = "ZippedExe";
-            string stdout = null;
+            string stdout = string.Empty;
 
             void CaptureOutput(string output)
             {
@@ -143,7 +143,7 @@ namespace Azure.Functions.Cli.Tests
             Directory.CreateDirectory(mntDir);
 
             // this is what our hosting environment does; we need to validate we can run the exe when mounted like this
-            ProcessHelper.RunProcess("fuse-zip", $"./{zipFileName} ./mnt -r", zipDir, writeOutput: CaptureOutput);
+            ProcessHelper.RunProcess("fuse-zip", $"./{zipFileName} ./mnt -r", zipDir, writeOutput: WriteOutput);
             ProcessHelper.RunProcess("bash", $"-c \"ls -l\"", mntDir, writeOutput: CaptureOutput);
 
             var outputLines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
