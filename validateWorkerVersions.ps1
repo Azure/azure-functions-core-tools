@@ -57,31 +57,40 @@ if (-Not $hostVersion) {
     setCliPackageVersion $hostPackageName $hostVersion
 }
 
-function getHostFileContent([string]$filePath) {
+function getWorkerPropsFile([string]$filePath) {
     $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/v$hostVersion/$filePath"
-    return removeBomIfExists((Invoke-WebRequest -Uri $uri -MaximumRetryCount 5 -RetryIntervalSec 2).Content)
+    return removeBomIfExists((Invoke-WebRequest -Uri $uri).Content)
 }
-$hostCsprojContent = getHostFileContent "src/WebJobs.Script/WebJobs.Script.csproj"
-$pythonPropsContent = getHostFileContent "build/python.props"
 
-$workers = "JavaWorker", "NodeJsWorker", "PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PowerShellWorker.PS7.4", "PythonWorker"
+$workerPropstoWorkerName = @{}
+$workerPropsToWorkerName["eng/build/Workers.Node.props"] = @("NodeJsWorker")
+$workerPropsToWorkerName["eng/build/Workers.Java.props"] = @("JavaWorker")
+$workerPropsToWorkerName["eng/build/Workers.Python.props"] = @("PythonWorker")
+$workerPropsToWorkerName["eng/build/Workers.Powershell.props"] = @("PowerShellWorker.PS7.0", "PowerShellWorker.PS7.2", "PowerShellWorker.PS7.4")
 
 $failedValidation = $false
-foreach($worker in $workers) {
-    $packageName = "Microsoft.Azure.Functions.$worker"
-    if ($worker -eq "PythonWorker") {
-        $hostWorkerVersion = getPackageVersion $packageName $pythonPropsContent
-    } else {
-        $hostWorkerVersion = getPackageVersion $packageName $hostCsprojContent
-    }
-    $cliWorkerVersion = getPackageVersion $packageName $cliCsprojContent
 
-    if ($Update) {
-        setCliPackageVersion $packageName $hostWorkerVersion
-    } elseif ($hostWorkerVersion -ne $cliWorkerVersion) {
-        Write-Output "Reference to $worker in the host ($hostWorkerVersion) does not match version in the cli ($cliWorkerVersion)"
-        $failedValidation = $true
+
+# Iterate through each key-value pair
+foreach ($key in $workerPropsToWorkerName.Keys) {
+    $workerPropsContent = getWorkerPropsFile $key
+    # Get the list associated with the key
+    $workerList = $workerPropsToWorkerName[$key]
+
+    # Iterate through the list
+    foreach ($worker in $workerList) {
+        $packageName = "Microsoft.Azure.Functions.$worker"
+        $hostWorkerVersion = getPackageVersion $packageName $workerPropsContent
+        $cliWorkerVersion = getPackageVersion $packageName $workerPropsContent
+
+        if ($Update) {
+            setCliPackageVersion $packageName $hostWorkerVersion
+        } elseif ($hostWorkerVersion -ne $cliWorkerVersion) {
+            Write-Output "Reference to $worker in the host ($hostWorkerVersion) does not match version in the cli ($cliWorkerVersion)"
+            $failedValidation = $true
+        }
     }
+    
 }
 
 if ($Update) {
