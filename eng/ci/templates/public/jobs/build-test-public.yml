@@ -43,6 +43,9 @@ jobs:
   - pwsh: |
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
+  - pwsh: |
+      .\check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
   - pwsh: |
       .\build.ps1
@@ -53,9 +56,6 @@ jobs:
       IsPublicBuild: true
       IsCodeqlBuild: false
     displayName: 'Executing build script'
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
