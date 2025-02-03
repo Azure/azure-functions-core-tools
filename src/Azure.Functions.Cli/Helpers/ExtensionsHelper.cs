@@ -51,6 +51,25 @@ namespace Azure.Functions.Cli.Helpers
             return bindings;
         }
 
+        public static string GetScriptFilePath()
+        {
+            // Ignore current implementation, I need help getting the script file path.
+
+            // Below should be the logic to get the script file path...
+
+            // If we don't have functions, this mean we don't have function.json
+            // If we don't have a function.json file, we can't determine the script file
+            var scriptFile =
+                FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: Constants.FunctionJsonFileName)
+                    .Select(p =>
+                    {
+                        var functionJsonFileContent = FileSystemHelpers.ReadAllTextFromFile(p);
+                        var functionMetadata = JsonConvert.DeserializeObject<FunctionMetadata>(functionJsonFileContent);
+                        return functionMetadata.ScriptFile[1..];
+                    }).FirstOrDefault();
+            return scriptFile;
+        }
+
         public static IEnumerable<ExtensionPackage> GetExtensionPackages()
         {
             Dictionary<string, ExtensionPackage> packages = new Dictionary<string, ExtensionPackage>();
