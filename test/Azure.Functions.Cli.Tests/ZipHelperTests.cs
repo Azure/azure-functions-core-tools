@@ -128,11 +128,11 @@ namespace Azure.Functions.Cli.Tests
         private void VerifyLinuxZip(string zipFile)
         {
             const string exeName = "ZippedExe";
-            string stdout = string.Empty;
+            List<string> outputLines = new List<string>();
 
             void CaptureOutput(string output)
             {
-                stdout += output + Environment.NewLine;
+                outputLines.Add(output);                
                 WriteOutput(output);
             }
 
@@ -146,8 +146,7 @@ namespace Azure.Functions.Cli.Tests
             ProcessHelper.RunProcess("fuse-zip", $"./{zipFileName} ./mnt -r", zipDir, writeOutput: WriteOutput);
             ProcessHelper.RunProcess("bash", $"-c \"ls -l\"", mntDir, writeOutput: CaptureOutput);
 
-            var outputLines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-            Assert.Equal(14, outputLines.Length);
+            Assert.Equal(14, outputLines.Count());
 
             // ignore first ('total ...') to validate file perms
             foreach (string line in outputLines.Skip(1))
@@ -184,9 +183,9 @@ namespace Azure.Functions.Cli.Tests
                     Assert.Equal(readWrite, fileInfo.UnixFileMode);
                 }
             }
-
+            
+            outputLines.Clear();
             ProcessHelper.RunProcess($"{Path.Combine(mntDir, exeName)}", string.Empty, mntDir, writeOutput: CaptureOutput);
-            outputLines = stdout.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
             Assert.Equal("Hello, World!", outputLines.Last());
         }
 
