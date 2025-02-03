@@ -14,8 +14,9 @@ namespace Azure.Functions.ArtifactAssembler
                 // Check if an argument for zipping is passed
                 if (args.Length > 0 && args[0].Equals("zip", StringComparison.OrdinalIgnoreCase))
                 {
-                    var zipCliArtifacts = new CliArtifactZipper(currentWorkingDirectory);
-                    zipCliArtifacts.ZipCliArtifacts();
+                    var zipArtifacts = new ArtifactZipper(currentWorkingDirectory);
+                    zipArtifacts.ZipCliArtifacts();
+                    zipArtifacts.ZipVisualStudioArtifacts();
                 }
                 else
                 {

@@ -40,6 +40,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     "new --template TimerTrigger --name testfunc --authlevel function"
                 },
                 HasStandardError = true,
+                ExitInError = true,
                 ErrorContains = new[]
                 {
                     Constants.AuthLevelErrorMessage

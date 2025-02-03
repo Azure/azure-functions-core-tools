@@ -171,6 +171,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[] { $"init . --worker-runtime {workerRuntime} --model {programmingModel}" },
                 HasStandardError = true,
+                ExitInError = true,
                 ErrorContains = new[]
                 {
                     $"programming model is not supported for worker runtime {workerRuntime}. Supported programming models for worker runtime {workerRuntime} are:"
@@ -278,6 +279,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[] { $"init . --worker-runtime {unknownWorkerRuntime}" },
                 HasStandardError = true,
+                ExitInError = true,
                 ErrorContains = new[]
                 {
                     $"Worker runtime '{unknownWorkerRuntime}' is not a valid option."
@@ -293,6 +295,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[] { $"init . --worker-runtime dotnet --target-framework {unsupportedTargetFramework}" },
                 HasStandardError = true,
+                ExitInError = true,
                 ErrorContains = new[]
                 {
                     $"Unable to parse target framework {unsupportedTargetFramework} for worker runtime dotnet. Valid options are net8.0, net6.0"
@@ -669,6 +672,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $"init . --docker-only"
                 },
                 HasStandardError = true,
+                ExitInError = true,
                 ErrorContains = new[]
                 {
                     $"Can't determine project language from files."
@@ -779,6 +783,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     $"init . --worker-runtime python --managed-dependencies "
                 },
                 HasStandardError = true,
+                ExitInError = true,
                 ErrorContains = new[]
                 {
                     $"Managed dependencies is only supported for PowerShell"
