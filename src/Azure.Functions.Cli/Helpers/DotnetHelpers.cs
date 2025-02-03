@@ -5,7 +5,9 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -265,6 +267,22 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        /// <summary>
+        /// Check csproj to determine if the project is a .NET 8 project
+        /// </summary>
+        /// <param name="projectPath">Path of the project to be checked</param>
+        /// <returns></returns>
+        public static async Task<bool> IsDotNet8(string projectPath)
+        {
+            var csprojPath = FileSystemHelpers.GetFiles(projectPath, searchPattern: "*.csproj", searchOption: SearchOption.TopDirectoryOnly).Single();
+
+            var dotNetVersion = await GetTargetFramework(csprojPath);
+
+            var result = dotNetVersion.Equals(TargetFramework.net8, StringComparison.OrdinalIgnoreCase);
+
+            return result;
+        }
+
         private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
@@ -348,6 +366,21 @@ namespace Azure.Functions.Cli.Helpers
                 var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();
             }
+        }
+
+        private static async Task<string> GetTargetFramework(string csprojPath)
+        {
+            await using var stream = new FileStream(csprojPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+            var doc = await XDocument.LoadAsync(stream, LoadOptions.None, CancellationToken.None);
+            var targetFrameworkElement = doc.Root?.Element("PropertyGroup")?.Element("TargetFramework");
+
+            if (targetFrameworkElement == null)
+            {
+                throw new CliException("Could not find the TargetFramework element in the .csproj file.");
+            }
+
+            return targetFrameworkElement.Value;
         }
     }
 }

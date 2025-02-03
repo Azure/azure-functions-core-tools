@@ -43,6 +43,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private readonly IProcessManager _processManager;
         private IConfigurationRoot _hostJsonConfig;
         private readonly KeyVaultReferencesManager _keyVaultReferencesManager;
+        private static string _dotnetProjectDirectory;
 
         public int Port { get; set; }
 
@@ -353,25 +354,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        /// <summary>
-        /// Check local.settings.json to determine whether in-proc .NET8 is enabled.
-        /// </summary>
-        private async Task<bool> IsInProcDotNet8Enabled()
-        {
-            var localSettingsJObject = await GetLocalSettingsJsonAsJObjectAsync();
-            var inProcDotNet8EnabledValue = localSettingsJObject?["Values"]?[Constants.InProcDotNet8EnabledSetting]?.Value<string>();
-            var isInProcDotNet8Enabled = string.Equals("1", inProcDotNet8EnabledValue, StringComparison.Ordinal);
-
-            if (VerboseLogging == true)
-            {
-                var message = isInProcDotNet8Enabled
-                    ? $"{Constants.InProcDotNet8EnabledSetting} app setting enabled in local.settings.json"
-                    : $"{Constants.InProcDotNet8EnabledSetting} app setting is not enabled in local.settings.json";
-                ColoredConsole.WriteLine(VerboseColor(message));
-            }
-
-            return isInProcDotNet8Enabled;
-        }
+        
 
         private async Task<JObject> GetLocalSettingsJsonAsJObjectAsync()
         {
@@ -400,7 +383,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            
+
             // Return if running is delegated to another version of Core Tools
             if (await TryHandleInProcDotNetLaunchAsync())
             {
@@ -486,12 +469,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
             {
                 // Infer host runtime by checking if .NET 8 is enabled
-                var isDotNet8Project = await IsInProcDotNet8Enabled();
+                var isDotNet8Project = await DotnetHelpers.IsDotNet8(_dotnetProjectDirectory);
 
                 var selectedRuntime = isDotNet8Project
                     ? DotnetConstants.InProc8HostRuntime
                     : DotnetConstants.InProc6HostRuntime;
-                
+
                 PrintVerboseForHostSelection(selectedRuntime);
 
                 if (Utilities.IsMinifiedVersion())
@@ -510,10 +493,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         }
 
         internal async Task ValidateHostRuntimeAsync(WorkerRuntime currentWorkerRuntime,
-            Func<Task<bool>> validateDotNet8ProjectEnablement = null)
+            bool? validateDotNet8ProjectEnablement = null)
         {
-            validateDotNet8ProjectEnablement ??= IsInProcDotNet8Enabled;
-
             void ThrowCliException(string suffix)
             {
                 throw new CliException($"The runtime argument value provided, '{HostRuntime}', is invalid. {suffix}");
@@ -534,11 +515,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnetIsolated}'.");
                 }
 
-                if (isInproc8ArgumentValue && !await validateDotNet8ProjectEnablement())
+                validateDotNet8ProjectEnablement ??= await DotnetHelpers.IsDotNet8(_dotnetProjectDirectory);
+
+                if (isInproc8ArgumentValue && !validateDotNet8ProjectEnablement.Value)
                 {
                     ThrowCliException($"For the '{DotnetConstants.InProc8HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
                 }
-                else if (isInproc6ArgumentValue && await validateDotNet8ProjectEnablement())
+                else if (isInproc6ArgumentValue && validateDotNet8ProjectEnablement.Value)
                 {
                     ThrowCliException($"For the '{DotnetConstants.InProc6HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
                 }
@@ -678,6 +661,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (WorkerRuntimeLanguageHelper.IsDotnet(GlobalCoreToolsSettings.CurrentWorkerRuntime) && !NoBuild)
             {
+                _dotnetProjectDirectory = Environment.CurrentDirectory;
                 await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
             }
             else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))

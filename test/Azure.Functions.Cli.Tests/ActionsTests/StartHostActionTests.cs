@@ -232,7 +232,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                     HostRuntime = hostRuntimeArgument
                 };
 
-                await startHostAction.ValidateHostRuntimeAsync(currentRuntime, () => Task.FromResult(validNet8Configuration));
+                await startHostAction.ValidateHostRuntimeAsync(currentRuntime, validNet8Configuration);
             }
             catch (CliException)
             {
