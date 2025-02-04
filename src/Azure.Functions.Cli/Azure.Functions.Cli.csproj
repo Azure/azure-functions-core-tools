@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net8.0</TargetFrameworks>
@@ -58,9 +58,9 @@
     <EmbeddedResource Include="StaticResources\Dockerfile.dotnet8Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet8Isolated</LogicalName>
     </EmbeddedResource>
-	<EmbeddedResource Include="StaticResources\Dockerfile.dotnet9Isolated">
+    <EmbeddedResource Include="StaticResources\Dockerfile.dotnet9Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet9Isolated</LogicalName>
-	</EmbeddedResource>
+    </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
@@ -279,7 +279,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1036.1" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.1037.0" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -288,17 +288,16 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
-
     <!-- Transitive dependency -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoWorkers)' != 'true'">
-    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.16.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.10.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.JavaWorker" Version="2.17.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.NodeJsWorker" Version="3.10.1" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.4020" />
-    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4021" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.31.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.4025" />
+    <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4026" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Version="4.34.0" />
   </ItemGroup>
   <Target Name="ExcludeWorkersFromReadyToRun">
     <CreateItem Include="%(None.Filename)%(None.Extension)" Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers'))" PreserveExistingMetadata="false">
