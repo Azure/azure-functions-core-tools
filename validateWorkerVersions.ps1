@@ -59,7 +59,7 @@ if (-Not $hostVersion) {
 
 function getHostFileContent([string]$filePath) {
     $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/v$hostVersion/$filePath"
-    return removeBomIfExists((Invoke-WebRequest -Uri $uri -MaximumRetryCount 5 -RetryIntervalSec 2).Content)
+    return removeBomIfExists((Invoke-WebRequest -Uri $uri).Content)
 }
 $hostCsprojContent = getHostFileContent "src/WebJobs.Script/WebJobs.Script.csproj"
 $pythonPropsContent = getHostFileContent "build/python.props"
