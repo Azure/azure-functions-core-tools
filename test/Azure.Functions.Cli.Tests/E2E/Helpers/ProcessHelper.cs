@@ -113,7 +113,7 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 startInfo.Arguments = arguments;
             }
 
-            Process testProcess = new()
+            using Process testProcess = new()
             {
                 StartInfo = startInfo,
             };
@@ -152,6 +152,8 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             {
                 throw new TimeoutException($"Process '{fileName} {arguments}' in working directory '{workingDirectory}' did not complete in {procTimeout}.");
             }
+
+            testProcess.WaitForExit();
         }
 
         private static string ExecuteCommand(string command)
