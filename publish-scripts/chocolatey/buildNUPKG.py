@@ -55,7 +55,7 @@ def preparePackage():
             wget.download(url)
 
         # get the checksums
-        # CodeQL [SM02167] False Positive: CodeQL wrongly detected. Authorized hash algorithm (SHA-512) is used; this is defined on line 13 of this script.
+        # CodeQL [SM02167] False Positive: CodeQL wrongly detected. Authorized hash algorithm (SHA-512) is used; this is defined here: https://github.com/Azure/azure-functions-core-tools/blob/9a8ba2e5cd52cf6aa3100e2f7032380d2ec858f8/publish-scripts/chocolatey/buildNUPKG.py#L13
         fileHash = produceHashForfile(fileName, HASH)
         substitutionMapping[f"CHECKSUM_{arch}"] = fileHash
 
