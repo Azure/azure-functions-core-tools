@@ -55,6 +55,7 @@ def preparePackage():
             wget.download(url)
 
         # get the checksums
+        # CodeQL [SM02167] False Positive: CodeQL wrongly detected. Authorized hash algorithm (SHA-512) is used; this is defined on line 13 of this script.
         fileHash = produceHashForfile(fileName, HASH)
         substitutionMapping[f"CHECKSUM_{arch}"] = fileHash
 
