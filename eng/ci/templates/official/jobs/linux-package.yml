@@ -44,37 +44,22 @@ jobs:
       linuxBuildNumber: $(LinuxPackageBuildTag)
       consolidatedBuildId: $(ConsolidatedBuildId)
 
-  - pwsh: |
-      $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
-      echo $env:LinuxPackageBuildTag
-      echo $majorVersion
-
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-    env:
-      LinuxPackageAccountName: $(LinuxPackageAccountName)
-      LinuxPackageAccountKey: $(LinuxPackageAccountKey)
-      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
-    displayName: 'Upload Core Tools Unsigned Linux Package to the storage'
-    condition: eq(variables['BuildOnly'], 'false')
-
-  - ${{ if eq(variables.BuildOnly, false) }}:
-    - template: ci/sign-files.yml@eng
-      parameters:
-        displayName: 'Sign'
-        folderPath: '/mnt/vss/_work/1/s/publish-scripts/artifact'
-        pattern: '*.deb'
-        signType: inline
-        inlineOperation: |
-          [
-            {
-              "keyCode": "CP-450779-Pgp",
-              "operationSetCode": "LinuxSign",
-              "parameters": [],
-              "toolName": "signtool.exe",
-              "toolVersion": "1.0"
-            }
-          ]
+  - template: ci/sign-files.yml@eng
+    parameters:
+      displayName: 'Sign'
+      folderPath: '/mnt/vss/_work/1/s/publish-scripts/artifact'
+      pattern: '*.deb'
+      signType: inline
+      inlineOperation: |
+        [
+          {
+            "keyCode": "CP-450779-Pgp",
+            "operationSetCode": "LinuxSign",
+            "parameters": [],
+            "toolName": "signtool.exe",
+            "toolVersion": "1.0"
+          }
+        ]
 
   - pwsh: |
       echo $env:LinuxPackageAccountName
@@ -86,7 +71,7 @@ jobs:
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
       LinuxPackageBuildTag: $(LinuxPackageBuildTag)
     displayName: 'Upload Core Tools Signed Linux Package to the storage'
-    condition: eq(variables['BuildOnly'], 'false')
+    condition: eq(variables['UploadSignedPackages'], 'true') # This is a UI variable that defaults to false
 
   - task: Bash@3
     displayName: 'Copy DEB package to drop'
