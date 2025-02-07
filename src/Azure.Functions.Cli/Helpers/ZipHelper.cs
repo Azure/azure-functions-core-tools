@@ -115,14 +115,7 @@ namespace Azure.Functions.Cli.Helpers
                     var entryName = file.FixFileNameForZip(rootPath);
                     var entry = zip.CreateEntryFromFile(file, entryName);
 
-                    if (executables.Contains(entryName))
-                    {
-                        entry.ExternalAttributes = UnixExecutablePermissions; // Mark as executable in Unix
-                    }
-                    else
-                    {
-                        entry.ExternalAttributes = UnixReadWritePermissions; // Mark as read/write in Unix
-                    }
+                    entry.ExternalAttributes = executables.Contains(entryName) ? UnixExecutablePermissions : UnixReadWritePermissions;
                 }
             }
 
@@ -155,17 +148,16 @@ namespace Azure.Functions.Cli.Helpers
         {
             int bufferPointer = 0;
             uint currentSignature = 0;
+            // 32-byte buffer is arbitrary and is following the runtime implementation here:
+            // https://github.com/dotnet/runtime/blob/ea97babd7ccfd2f6e9553093d315f26b51e4c7ac/src/libraries/System.IO.Compression/src/System/IO/Compression/ZipHelper.cs#L16
             byte[] buffer = new byte[32];
+
+            bool outOfBytes = false;
             bool signatureFound = false;
 
-            while (!signatureFound)
+            while (!signatureFound && !outOfBytes)
             {
-                bufferPointer = SeekBackwardsAndRead(stream, buffer);
-
-                if (bufferPointer == -1)
-                {
-                    break;
-                }
+                outOfBytes = SeekBackwardsAndRead(stream, buffer, out bufferPointer);
 
                 while (bufferPointer >= 0 && !signatureFound)
                 {
@@ -173,6 +165,7 @@ namespace Azure.Functions.Cli.Helpers
                     if (currentSignature == signatureToFind)
                     {
                         signatureFound = true;
+                        break;
                     }
                     else
                     {
@@ -187,24 +180,36 @@ namespace Azure.Functions.Cli.Helpers
             }
             else
             {
+                // set the stream up to continue from here next call
                 stream.Seek(bufferPointer, SeekOrigin.Current);
                 return true;
             }
         }
 
         // Returns true if we are out of bytes
-        private static int SeekBackwardsAndRead(Stream stream, byte[] buffer)
+        // This method (and SeekBackwardsToSignature) are mostly copied from the runtime implementation here:
+        // https://github.com/dotnet/runtime/blob/ea97babd7ccfd2f6e9553093d315f26b51e4c7ac/src/libraries/System.IO.Compression/src/System/IO/Compression/ZipHelper.cs#L172-L191
+        private static bool SeekBackwardsAndRead(Stream stream, byte[] buffer, out int bufferPointer)
         {
             if (stream.Position >= buffer.Length)
             {
                 stream.Seek(-buffer.Length, SeekOrigin.Current);
-                stream.Read(buffer.AsSpan());
+                stream.ReadExactly(buffer.AsSpan());
                 stream.Seek(-buffer.Length, SeekOrigin.Current);
-                return buffer.Length - 1;
+                bufferPointer = buffer.Length - 1;
+                return false;
             }
-
-            // the thing we're looking for can't possibly fit; we're done
-            return -1;
+            else
+            {
+                // if we cannot fill the buffer, read everything that's left and
+                // return back that position in the buffer to the caller
+                int bytesToRead = (int)stream.Position;
+                stream.Seek(0, SeekOrigin.Begin);
+                stream.ReadExactly(buffer, 0, bytesToRead);
+                stream.Seek(0, SeekOrigin.Begin);
+                bufferPointer = bytesToRead - 1;
+                return true;
+            }
         }
 
         public static async Task<Stream> CreateGoZip(IEnumerable<string> files, string rootPath, string zipFilePath, string goZipLocation, IEnumerable<string> executables)
