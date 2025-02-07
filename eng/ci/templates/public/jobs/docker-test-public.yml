@@ -9,10 +9,10 @@ jobs:
     os: linux
 
   steps:
-  - task: UseDotNet@2
-    displayName: Install .NET 8.x
-    inputs:
-      version: 8.x
+  - pwsh: |
+      Import-Module ".\pipelineUtilities.psm1" -Force
+      Install-Dotnet
+    displayName: 'Install .NET'
 
   - bash: |
       dotnet publish src/Azure.Functions.Cli/Azure.Functions.Cli.csproj --runtime linux-x64 --output /tmp/cli --framework net8.0
