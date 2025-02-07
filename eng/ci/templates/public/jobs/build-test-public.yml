@@ -7,7 +7,7 @@ jobs:
   timeoutInMinutes: "180"
   pool:
     name: 1es-pool-azfunc-public
-    image: 1es-windows-202
+    image: 1es-windows-2022
     os: windows
 
   variables:
