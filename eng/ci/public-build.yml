@@ -50,5 +50,6 @@ extends:
         jobs:
         - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
       - stage: DockerTest
+        dependsOn:
         jobs:
         - template: /eng/ci/templates/public/jobs/docker-test-public.yml@self
