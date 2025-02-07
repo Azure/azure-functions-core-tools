@@ -74,8 +74,8 @@ $DotnetSDKVersionRequirements = @{
     }
     # Update .NET 9 patch once .NET 9 has been released out of preview
     '9.0' = @{
-        MinimalPatch = '100-preview.6.24328.19'
-        DefaultPatch = '100-preview.6.24328.19'
+        MinimalPatch = '100-rc.1.24452.12'
+        DefaultPatch = '100-rc.1.24452.12'
 
     }
 }
@@ -124,7 +124,7 @@ function Install-DotnetVersion($Version,$Channel) {
     if ($IsWindows) {
         & .\$installScript -InstallDir "$env:ProgramFiles/dotnet" -Channel $Channel -Version $Version
         # Installing .NET into x86 directory since the E2E App runs the tests on x86 and looks for the specified framework there
-        & .\$installScript -InstallDir "$env:ProgramFiles (x86)/dotnet" -Channel $Channel -Version $Version
+        & .\$installScript -InstallDir "$env:ProgramFiles (x86)/dotnet" -Channel $Channel -Version $Version  -Architecture x86
     } else {
         bash ./$installScript --install-dir /usr/share/dotnet -c $Channel -v $Version
     }

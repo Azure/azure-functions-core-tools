@@ -82,9 +82,11 @@ jobs:
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
+  - task: PowerShell@2
+    displayName: "Run Check Vulnerabilities Script"
+    inputs:
+      filePath: '$(Build.SourcesDirectory)/check-vulnerabilities.ps1'
+      workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.Cli'
   - pwsh: |
       .\build.ps1
     env:
@@ -96,9 +98,6 @@ jobs:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Executing build script'
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
 
   - template: ci/sign-files.yml@eng
     parameters:
