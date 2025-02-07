@@ -49,5 +49,6 @@ extends:
       - stage: BuildAndTest
         jobs:
         - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
+      - stage: DockerTest
+        jobs:
         - template: /eng/ci/templates/public/jobs/docker-test-public.yml@self
-
