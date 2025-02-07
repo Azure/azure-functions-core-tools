@@ -1,0 +1,35 @@
+jobs:
+- job: DockerTest
+  displayName: 'Docker Test'
+  timeoutInMinutes: 180
+
+  pool:
+    name: 1es-pool-azfunc
+    image: 1es-ubuntu-22.04
+    os: linux
+
+  steps:
+  - task: UseDotNet@2
+    displayName: Install .NET 8.x
+    inputs:
+      version: 8.x
+
+  - bash: |
+      dotnet publish src/Azure.Functions.Cli/Azure.Functions.Cli.csproj --runtime linux-x64 --output /tmp/cli --framework net8.0
+      dotnet run --project build/Build.csproj
+      cp -r ../artifacts/linux-x64/templates /tmp/cli
+    displayName: 'Build CLI'
+
+  - bash: |
+      /tmp/cli/func init TestTarget --worker-runtime dotnet-isolated --target-framework net8.0 --docker
+      cd TestTarget
+      /tmp/cli/func new --name HttpFunc1 --template "HTTP trigger" --authlevel "anonymous"
+      /tmp/cli/func new --name HttpFunc2 --template "HTTP trigger" --authlevel "anonymous"
+    displayName: 'Setup Test Target Project'
+
+  - bash: |
+      cd TestTarget
+      docker build -t test-target .
+      sleep 10
+      /tmp/cli/func kubernetes deploy --image-name test-target:latest --name test --dry-run
+    displayName: 'Test Deploy Command'
