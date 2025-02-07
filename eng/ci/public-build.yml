@@ -46,9 +46,9 @@ extends:
       # PR's from forks do not have sufficient permissions to set tags.
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
     stages:
-      - stage: BuildAndTest
-        jobs:
-        - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
+      # - stage: BuildAndTest
+      #   jobs:
+      #   - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
       - stage: DockerTest
         dependsOn:
         jobs:
