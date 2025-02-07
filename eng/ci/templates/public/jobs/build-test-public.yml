@@ -43,10 +43,11 @@ jobs:
   - pwsh: |
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
-    condition: ne(variables['skipWorkerVersionValidation'], 'true')
+  - task: PowerShell@2
+    displayName: "Run Check Vulnerabilities Script"
+    inputs:
+      filePath: './checkVulnerabilities.ps1'
+      workingDirectory: './src/Azure.Functions.Cli'
   - pwsh: |
       .\build.ps1
     env:

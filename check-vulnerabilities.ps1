@@ -1,13 +1,7 @@
-$projectPath = ".\src\Azure.Functions.Cli"
 $projectFileName = ".\Azure.Functions.Cli.csproj"
 $logFilePath = "..\..\build.log"
 $skipCveFilePath = "..\..\skipPackagesCve.json"
-if (-not (Test-Path $projectPath))
-{
-    throw "Project path '$projectPath' does not exist."
-}
 
-cd $projectPath
 
 $cmd = "restore"
 Write-Host "dotnet $cmd"
@@ -63,5 +57,3 @@ if ($logFileExists)
 {
   Remove-Item $logFilePath
 }
-
-cd ../..
