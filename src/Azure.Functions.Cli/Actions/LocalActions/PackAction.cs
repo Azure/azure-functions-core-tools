@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,7 +8,6 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Script;
-using static Colors.Net.StringStaticMethods;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
@@ -104,6 +102,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             // Restore all valid extensions
             var installExtensionAction = new InstallExtensionAction(_secretsManager, false);
             await installExtensionAction.RunAsync();
+
+            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
+            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
+
             var stream = await ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, noBuild: false, buildOption: BuildOption.Default, additionalPackages: AdditionalPackages);
 
             if (Squashfs)
