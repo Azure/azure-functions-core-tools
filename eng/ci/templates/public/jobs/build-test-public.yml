@@ -63,3 +63,30 @@ jobs:
       testResultsFiles: '**/*.trx'
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
+  templateContext:
+    outputs:
+    - output: pipelineArtifact
+      path: 'test/Azure.Functions.Cli.Tests/bin/Debug/net8.0/ZippedOnWindows.zip'
+      artifact: ZippedOnWindows
+
+- job: Test_Linux
+  timeoutInMinutes: "180"
+  pool:
+    name: 1es-pool-azfunc-public
+    image: '1es-ubuntu-22.04'
+    os: 'linux'
+  steps:
+  - download: current
+    displayName: 'Download test zip'
+    artifact: ZippedOnWindows
+  - script: |
+      sudo apt-get update
+      sudo apt-get -y install fuse-zip
+    displayName: 'Install fuse-zip'
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: '**/Azure.Functions.Cli.Tests.csproj'
+      arguments: '--filter CreateZip_Succeeds'
+    displayName: 'Run zip test'
+  dependsOn: Default
