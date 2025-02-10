@@ -28,8 +28,7 @@ extends:
       name: 1es-pool-azfunc
       image: 1es-windows-2022
       os: windows
-    stages:     
+    stages:
       - stage: BuildAndTest
         jobs:
         - template: /eng/ci/templates/official/jobs/linux-package.yml@self
-

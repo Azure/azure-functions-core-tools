@@ -2,16 +2,29 @@ jobs:
 - job: LinuxPackage
   condition: and(ne(variables['LinuxPackageBuildTag'], ''), ne(variables['ConsolidatedBuildId'], ''))
   timeoutInMinutes: "120"
+
   pool:
     name: 1es-pool-azfunc
     image: 1es-ubuntu-22.04
     os: linux
+
+  variables:
+    drop_path: $(Build.ArtifactStagingDirectory)
+    pkg_drop_path: $(drop_path)/drop_debian
+
+  templateContext:
+    outputParentDirectory: $(drop_path)
+    outputs:
+    - output: pipelineArtifact
+      displayName: Publish debian package
+      path: $(pkg_drop_path)
+      artifact: drop_debian
+
   steps:
-  # Bash v3
-  # Run a Bash script on macOS, Linux, or Windows.
   - task: Bash@3
+    displayName: 'Build DEB package'
     inputs:
-      targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
+      targetType: 'inline'
       script: |
         cd publish-scripts
         python3 -m venv publish-env
@@ -29,17 +42,8 @@ jobs:
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
     env:
       linuxBuildNumber: $(LinuxPackageBuildTag)
-      consolidatedBuildId: $(ConsolidatedBuildId)      
-  - pwsh: |
-      echo $env:LinuxPackageAccountName
-      $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c unsigned -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-    env:
-      LinuxPackageAccountName: $(LinuxPackageAccountName)
-      LinuxPackageAccountKey: $(LinuxPackageAccountKey)
-      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
-    displayName: 'Upload Core Tools Unsigned Linux Package to the storage'
+      consolidatedBuildId: $(ConsolidatedBuildId)
+
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
@@ -56,6 +60,7 @@ jobs:
             "toolVersion": "1.0"
           }
         ]
+
   - pwsh: |
       echo $env:LinuxPackageAccountName
       $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
@@ -66,3 +71,14 @@ jobs:
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
       LinuxPackageBuildTag: $(LinuxPackageBuildTag)
     displayName: 'Upload Core Tools Signed Linux Package to the storage'
+    condition: eq(variables['UploadSignedPackages'], 'true') # This is a UI variable that defaults to false
+
+  - task: Bash@3
+    displayName: 'Copy DEB package to drop'
+    inputs:
+      targetType: 'inline'
+      script: |
+        mkdir -p $drop
+        cp -r /mnt/vss/_work/1/s/publish-scripts/artifact/* $drop
+    env:
+      drop: $(pkg_drop_path)
