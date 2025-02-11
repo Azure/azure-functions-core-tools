@@ -69,7 +69,7 @@ jobs:
       path: 'test/Azure.Functions.Cli.Tests/bin/Debug/net8.0/ZippedOnWindows.zip'
       artifact: ZippedOnWindows
 
-- job: Test_Linux
+- job: ${{ parameters.jobTitle }} Test_Linux
   timeoutInMinutes: "180"
   pool:
     name: 1es-pool-azfunc-public
