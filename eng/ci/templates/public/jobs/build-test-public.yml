@@ -1,6 +1,7 @@
 parameters:
   artifactTargetFramework: ''
   jobTitle: ''
+  tfm: ''
 
 jobs:
 - job: ${{ parameters.jobTitle }}
@@ -66,8 +67,8 @@ jobs:
   templateContext:
     outputs:
     - output: pipelineArtifact
-      path: 'test/Azure.Functions.Cli.Tests/bin/Debug/net8.0/ZippedOnWindows.zip'
-      artifact: ZippedOnWindows
+      path: 'test/Azure.Functions.Cli.Tests/bin/Debug/${{ parameters.tfm }}/ZippedOnWindows.zip'
+      artifact: ${{ parameters.jobTitle }}_ZippedOnWindows
 
 - job: ${{ parameters.jobTitle }}_Test_Linux
   timeoutInMinutes: "180"
@@ -78,7 +79,7 @@ jobs:
   steps:
   - download: current
     displayName: 'Download test zip'
-    artifact: ZippedOnWindows
+    artifact: ${{ parameters.jobTitle }}_ZippedOnWindows
   - script: |
       sudo apt-get update
       sudo apt-get -y install fuse-zip

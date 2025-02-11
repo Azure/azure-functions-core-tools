@@ -50,7 +50,9 @@ extends:
             parameters:
               artifactTargetFramework: inproc6
               jobTitle: BuildInproc6
+              tfm: net6.0
           - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
             parameters:
               artifactTargetFramework: inproc8
               jobTitle: BuildInproc8
+              tfm: net8.0
