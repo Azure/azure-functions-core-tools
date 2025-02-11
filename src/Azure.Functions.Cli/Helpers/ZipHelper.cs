@@ -194,7 +194,11 @@ namespace Azure.Functions.Cli.Helpers
             if (stream.Position >= buffer.Length)
             {
                 stream.Seek(-buffer.Length, SeekOrigin.Current);
+#if NET8_0_OR_GREATER
                 stream.ReadExactly(buffer.AsSpan());
+#else
+                stream.Read(buffer, 0, buffer.Length);
+#endif
                 stream.Seek(-buffer.Length, SeekOrigin.Current);
                 bufferPointer = buffer.Length - 1;
                 return false;
@@ -205,7 +209,11 @@ namespace Azure.Functions.Cli.Helpers
                 // return back that position in the buffer to the caller
                 int bytesToRead = (int)stream.Position;
                 stream.Seek(0, SeekOrigin.Begin);
+#if NET8_0_OR_GREATER
                 stream.ReadExactly(buffer, 0, bytesToRead);
+#else
+                stream.Read(buffer, 0, bytesToRead);
+#endif
                 stream.Seek(0, SeekOrigin.Begin);
                 bufferPointer = bytesToRead - 1;
                 return true;

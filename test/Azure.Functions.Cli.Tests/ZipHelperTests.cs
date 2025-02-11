@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.Tests
 
             void CaptureOutput(string output)
             {
-                outputLines.Add(output);                
+                outputLines.Add(output);
                 WriteOutput(output);
             }
 
@@ -162,6 +162,8 @@ namespace Azure.Functions.Cli.Tests
                 }
             }
 
+#if NET8_0_OR_GREATER
+            // Unix APIs are new in net8. The other checks are good enough for net6.
             var files = Directory.GetFiles(mntDir, "*.*", SearchOption.AllDirectories);
             Assert.Equal(13, files.Length);
             foreach (string file in files)
@@ -183,7 +185,7 @@ namespace Azure.Functions.Cli.Tests
                     Assert.Equal(readWrite, fileInfo.UnixFileMode);
                 }
             }
-            
+#endif
             outputLines.Clear();
             ProcessHelper.RunProcess($"{Path.Combine(mntDir, exeName)}", string.Empty, mntDir, writeOutput: CaptureOutput);
             Assert.Equal("Hello, World!", outputLines.Last());
