@@ -169,7 +169,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var targetFramework = await DotnetHelpers.DetermineTargetFramework(Path.GetDirectoryName(projectFilePath));
 
                     var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(targetFramework);
-                    
+
                     if (majorDotnetVersion != null)
                     {
                         // Get Stacks
@@ -179,8 +179,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         ShowEolMessage(stacks, runtimeSettings, majorDotnetVersion.Value);
 
                         // This is for future proofing with stacks API for future dotnet versions.
-                        if (runtimeSettings != null && 
-                            (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false) && 
+                        if (runtimeSettings != null &&
+                            (runtimeSettings.IsDeprecated == null || runtimeSettings.IsDeprecated == false) &&
                             (runtimeSettings.IsDeprecatedForRuntime == null || runtimeSettings.IsDeprecatedForRuntime == false))
                         {
                             _requiredNetFrameworkVersion = $"{majorDotnetVersion}.0";
@@ -275,12 +275,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 workerRuntimeStr = functionApp.FunctionAppConfig.runtime.name;
             }
 
-            if (workerRuntime == WorkerRuntime.None) 
-            { 
+            if (workerRuntime == WorkerRuntime.None)
+            {
                 throw new CliException($"Worker runtime is not set. Please set a valid runtime using {Constants.FunctionsWorkerRuntime}");
             }
 
-            if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr) || 
+            if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr) ||
                 (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr))))
             {
                 var resolution = $"You can pass --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
@@ -350,7 +350,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     (functionApp.IsFlex && !PythonHelpers.IsFlexPythonRuntimeVersionMatched(functionApp.FunctionAppConfig?.runtime?.name, functionApp.FunctionAppConfig?.runtime?.version, localVersion.Major, localVersion.Minor)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
-                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{(functionApp.IsFlex? functionApp.FunctionAppConfig.runtime.version: functionApp.LinuxFxVersion)}'."));
+                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{(functionApp.IsFlex ? functionApp.FunctionAppConfig.runtime.version : functionApp.LinuxFxVersion)}'."));
                 }
             }
 
@@ -558,6 +558,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 ColoredConsole.WriteLine(WarningColor("Recommend using '--build remote' to resolve project dependencies remotely on Azure"));
             }
+
+            bool useGoZip = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.UseGoZip);
+            TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
             ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
             Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption,

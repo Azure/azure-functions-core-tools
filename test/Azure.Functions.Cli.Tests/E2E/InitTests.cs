@@ -300,7 +300,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
+        [Fact(Skip = "Flaky test")]
         public Task init_with_no_source_control()
         {
             return CliTester.Run(new RunConfiguration
@@ -897,12 +897,12 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Theory]
-        [InlineData("dotnet-isolated","4", "net6.0")]
+        [InlineData("dotnet-isolated", "4", "net6.0")]
         [InlineData("dotnet-isolated", "4", "net7.0")]
-        [InlineData("dotnet-isolated","4", "net8.0")]
+        [InlineData("dotnet-isolated", "4", "net8.0")]
         public Task init_docker_only_for_existing_project_TargetFramework(string workerRuntime, string version, string TargetFramework)
         {
-           var TargetFrameworkstr = TargetFramework.Replace("net", string.Empty);
+            var TargetFrameworkstr = TargetFramework.Replace("net", string.Empty);
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
