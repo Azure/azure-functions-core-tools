@@ -58,7 +58,7 @@ def linuxOutput(buildFolder):
 
     # ubuntu dropped 64, fedora supports both
     fileName = f"Azure.Functions.Cli.linux-x64.{constants.VERSION}.zip"
-    url = f'https://functionscdn.azureedge.net/public/4.0.{constants.CONSOLIDATED_BUILD_ID}/{fileName}'
+    url = f'https://cdn.functions.azure.com/public/4.0.{constants.CONSOLIDATED_BUILD_ID}/{fileName}'
 
     # download the zip
     # output to local folder
