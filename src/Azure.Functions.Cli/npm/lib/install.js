@@ -41,7 +41,7 @@ if (os.platform() === 'win32') {
 }
 
 const fileName = 'Azure.Functions.Cli.' + platform + '.' + version + '.zip';
-const endpoint = 'https://functionscdn.azureedge.net/public/' + version + '/' + fileName;
+const endpoint = 'https://cdn.functions.azure.com/public/' + version + '/' + fileName;
 console.log('attempting to GET %j', endpoint);
 const options = url.parse(endpoint);
 // npm config preceed system environment
