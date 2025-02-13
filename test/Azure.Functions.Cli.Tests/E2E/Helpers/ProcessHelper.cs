@@ -94,34 +94,75 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
             }
         }
 
+        public static void RunProcess(string fileName, string arguments, string workingDirectory, Action<string> writeOutput = null, Action<string> writeError = null)
+        {
+            TimeSpan procTimeout = TimeSpan.FromMinutes(3);
+
+            ProcessStartInfo startInfo = new()
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                FileName = fileName
+            };
+
+            if (!string.IsNullOrEmpty(arguments))
+            {
+                startInfo.Arguments = arguments;
+            }
+
+            using Process testProcess = new()
+            {
+                StartInfo = startInfo,
+            };
+
+            testProcess.OutputDataReceived += (sender, e) =>
+            {
+                if (e.Data != null)
+                {
+                    writeOutput?.Invoke(e.Data);
+                }
+            };
+
+            testProcess.ErrorDataReceived += (sender, e) =>
+            {
+                if (e.Data != null)
+                {
+                    writeError?.Invoke(e.Data);
+                }
+            };
+
+            testProcess.Start();
+            testProcess.BeginOutputReadLine();
+            testProcess.BeginErrorReadLine();
+
+            bool completed = false;
+            try
+            {
+                completed = testProcess.WaitForExit((int)procTimeout.TotalMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Process '{fileName} {arguments}' in working directory '{workingDirectory}' threw exception '{ex}'.");
+            }
+
+            if (!completed)
+            {
+                throw new TimeoutException($"Process '{fileName} {arguments}' in working directory '{workingDirectory}' did not complete in {procTimeout}.");
+            }
+
+            testProcess.WaitForExit();
+        }
+
         private static string ExecuteCommand(string command)
         {
-            using (Process p = new Process())
-            {
-                string commandOut = string.Empty;
+            string output = string.Empty;
 
-                p.StartInfo.FileName = CommandExe;
-                p.StartInfo.Arguments = command;
-                p.StartInfo.UseShellExecute = false;
-                p.StartInfo.CreateNoWindow = true;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.RedirectStandardError = true;
-                p.Start();
+            RunProcess(CommandExe, command, null, writeOutput: o => output += o + Environment.NewLine);
 
-                commandOut = p.StandardOutput.ReadToEnd();
-                string errors = p.StandardError.ReadToEnd();
-
-                try
-                {
-                    p.WaitForExit(TimeSpan.FromSeconds(2).Milliseconds);
-                }
-                catch (Exception exp)
-                {
-                    Console.WriteLine(exp.ToString());
-                }
-
-                return commandOut;
-            }
+            return output;
         }
     }
 }

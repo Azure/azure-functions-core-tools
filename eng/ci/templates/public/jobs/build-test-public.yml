@@ -1,6 +1,7 @@
 parameters:
   artifactTargetFramework: ''
   jobTitle: ''
+  tfm: ''
 
 jobs:
 - job: ${{ parameters.jobTitle }}
@@ -43,7 +44,11 @@ jobs:
   - pwsh: |
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
-    condition: ne(variables['skipWorkerVersionValidation'], 'true')
+  - task: PowerShell@2
+    displayName: "Run Check Vulnerabilities Script"
+    inputs:
+      filePath: '$(Build.SourcesDirectory)/check-vulnerabilities.ps1'
+      workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.Cli'
   - pwsh: |
       .\build.ps1
     env:
@@ -53,12 +58,36 @@ jobs:
       IsPublicBuild: true
       IsCodeqlBuild: false
     displayName: 'Executing build script'
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
       testResultsFiles: '**/*.trx'
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
+  templateContext:
+    outputs:
+    - output: pipelineArtifact
+      path: 'test/Azure.Functions.Cli.Tests/bin/Debug/${{ parameters.tfm }}/ZippedOnWindows.zip'
+      artifact: ${{ parameters.jobTitle }}_ZippedOnWindows
+
+- job: ${{ parameters.jobTitle }}_Test_Linux
+  timeoutInMinutes: "180"
+  pool:
+    name: 1es-pool-azfunc-public
+    image: '1es-ubuntu-22.04'
+    os: 'linux'
+  steps:
+  - download: current
+    displayName: 'Download test zip'
+    artifact: ${{ parameters.jobTitle }}_ZippedOnWindows
+  - script: |
+      sudo apt-get update
+      sudo apt-get -y install fuse-zip
+    displayName: 'Install fuse-zip'
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: '**/Azure.Functions.Cli.Tests.csproj'
+      arguments: '--filter CreateZip_Succeeds'
+    displayName: 'Run zip test'
+  dependsOn: ${{ parameters.jobTitle }}

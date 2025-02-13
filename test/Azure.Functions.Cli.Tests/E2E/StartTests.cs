@@ -1,17 +1,17 @@
 using System;
-using System.IO;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
-using System.Net.Sockets;
-using System.Net;
-using System.Diagnostics;
-using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Tests.E2E
 {
@@ -531,7 +531,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     Test = async (_, p, stdout) =>
                     {
-                        await LogWatcher.WaitForLogOutput(stdout, "Initializing function HTTP routes", TimeSpan.FromSeconds(5));
+                        await LogWatcher.WaitForLogOutput(stdout, "Worker process started and initialized", TimeSpan.FromSeconds(5));
                         p.Kill();
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
