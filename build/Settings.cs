@@ -193,7 +193,7 @@ namespace Build
 
         public static readonly string DotnetProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
 
-        public static readonly string TemplatesJsonZip = $"https://functionscdn.azureedge.net/public/TemplatesApi/{TemplateJsonVersion}.zip";
+        public static readonly string TemplatesJsonZip = $"https://cdn.functions.azure.com/public/TemplatesApi/{TemplateJsonVersion}.zip";
 
         public static readonly string TelemetryKeyToReplace = "00000000-0000-0000-0000-000000000000";
 

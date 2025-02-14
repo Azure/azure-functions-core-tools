@@ -45,7 +45,7 @@ def preparePackage():
 
     for arch in archList:
         fileName = f"Azure.Functions.Cli.win-{arch.lower()}.{constants.VERSION}.zip"
-        url = f'https://functionscdn.azureedge.net/public/{constants.VERSION}/{fileName}'
+        url = f'https://cdn.functions.azure.com/public/{constants.VERSION}/{fileName}'
         substitutionMapping[f"ZIPURL_{arch}"] = url
 
         # download the zip
