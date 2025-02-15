@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = null)
         {
             EnsureDotnet();
-            if (projectFilename == null) 
+            if (projectFilename == null)
             {
                 var projectFilePath = ProjectHelpers.FindProjectFile(projectDirectory);
                 if (projectFilePath != null)
@@ -118,7 +118,7 @@ namespace Azure.Functions.Cli.Helpers
                     {
                         ColoredConsole.Error.WriteLine(ErrorColor(dotnetNewErrorMessage));
                     }
-                        
+
                     throw new CliException("Error creating function.");
                 }
             }, workerRuntime);
@@ -265,6 +265,22 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+        /// <summary>
+        /// Check dll to determine if the project is a .NET 8 project
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<bool> IsDotNet8()
+        {
+            var dllPath = ExtensionsHelper.GetScriptFilePath();
+
+            var dotNetVersion = await GetTargetFramework(dllPath);
+
+            var result = dotNetVersion.Contains(".NETCoreApp,Version=v8.0") ||
+                         dotNetVersion.Contains(".NET,Version=v8.0");
+
+            return result;
+        }
+
         private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
@@ -348,6 +364,20 @@ namespace Azure.Functions.Cli.Helpers
                 var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();
             }
+        }
+
+        private static async Task<string> GetTargetFramework(string dllPath)
+        {
+            var assembly = Assembly.LoadFrom(dllPath);
+            var targetFrameworkAttribute = (System.Runtime.Versioning.TargetFrameworkAttribute)
+                Attribute.GetCustomAttribute(assembly, typeof(System.Runtime.Versioning.TargetFrameworkAttribute));
+
+            if (targetFrameworkAttribute == null)
+            {
+                throw new CliException("Could not find the TargetFramework element in the .csproj file.");
+            }
+
+            return targetFrameworkAttribute.FrameworkName;
         }
     }
 }
