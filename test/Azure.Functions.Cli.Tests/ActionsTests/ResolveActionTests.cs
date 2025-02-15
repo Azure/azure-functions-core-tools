@@ -13,9 +13,11 @@ using Azure.Functions.Cli.Interfaces;
 using NSubstitute;
 using Xunit;
 using System.IO.Abstractions;
+using Azure.Functions.Cli.Tests.TestingTraits;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
+    [TestingTrait("Category", "UnitTests")]
     public class ResolveActionTests
     {
         [Theory]
