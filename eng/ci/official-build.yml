@@ -16,6 +16,7 @@ trigger:
     - release_4.0
     - main
     - in-proc
+    - feature/*
 
 resources:
   repositories:
