@@ -142,7 +142,13 @@ Alternatively, you can install the CLI manually by downloading the latest releas
 2. Unzip the CLI package
    - Using your preferred tool, unzip the downloaded release. To unzip into an `azure-functions-cli` directory using the `unzip` tool, run this command from the directory containing the downloaded release zip:
 
-    `unzip -d azure-functions-cli Azure.Functions.Cli.linux-x64.*.zip`
+2. Unzip release zip
+
+    Using your preferred tool, unzip the downloaded release. To unzip into an `azure-functions-cli` directory using the `unzip` tool, run this command from the directory containing the downloaded release zip:
+
+    ```bash
+    unzip -d azure-functions-cli Azure.Functions.Cli.linux-*.*.zip
+    ```
 
 3. Make the `func` command executable
    - Zip files do not maintain the executable bit on binaries. So, you'll need to make the `func` binary, as well as `gozip` (used by func during packaging) executables. Assuming you used the instructions above to unzip:
