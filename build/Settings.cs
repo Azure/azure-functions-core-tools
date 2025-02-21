@@ -44,6 +44,7 @@ namespace Build
             "min.win-x86",
             "min.win-x64",
             "linux-x64",
+            "linux-arm64",
             "osx-x64",
             "osx-arm64",
             "win-x86",
@@ -56,6 +57,7 @@ namespace Build
             { "win-x64", "WINDOWS" },
             { "win-arm64", "WINDOWS"},
             { "linux-x64", "LINUX" },
+            { "linux-arm64", "LINUX" },
             { "osx-x64", "OSX" },
             { "osx-arm64", "OSX" },
             { "min.win-x86", "WINDOWS" },
@@ -91,6 +93,7 @@ namespace Build
         {
             "linux",
             "linux-x64",
+            "linux-arm64",
             "unix",
             "linux-musl-x64"
         };
@@ -117,6 +120,7 @@ namespace Build
                 { "win-x64", _winPowershellRuntimes },
                 { "win-arm64", _winPowershellRuntimes },
                 { "linux-x64", _linPowershellRuntimes },
+                { "linux-arm64", _linPowershellRuntimes },
                 { "osx-x64", _osxPowershellRuntimes },
                 { "osx-arm64", _osxARMPowershellRuntimes }
             };
@@ -131,6 +135,7 @@ namespace Build
                 { "win-x64", _winPowershellRuntimesNet8 },
                 { "win-arm64", _winPowershellRuntimesNet8 },
                 { "linux-x64", _linPowershellRuntimes },
+                { "linux-arm64", _linPowershellRuntimes },
                 { "osx-x64", _osxPowershellRuntimes },
                 { "osx-arm64", _osxARMPowershellRuntimes }
             };
@@ -148,6 +153,7 @@ namespace Build
                     { "win-x64", _winPowershellRuntimes },
                     { "win-arm64", _winPowershellRuntimes },
                     { "linux-x64", _linPowershellRuntimes },
+                    { "linux-arm64", _linPowershellRuntimes },
                     { "osx-x64", _osxPowershellRuntimes },
                     // NOTE: PowerShell 7.0 does not support arm. First version supporting it is 7.2
                     // https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2#supported-versions
@@ -176,15 +182,15 @@ namespace Build
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
         public static readonly string SBOMManifestTelemetryDir = Path.Combine(OutputDir, "SBOMManifestTelemetry");
-        
+
         public static string TargetFramework = "net6.0";
 
         public static readonly string NupkgPublishDir = Path.GetFullPath($"../src/Azure.Functions.Cli/bin/Release/{TargetFramework}/publish");
-        
+
         public static readonly string PreSignTestDir = "PreSignTest";
 
         public static readonly string SignTestDir = "SignTest";
-       
+
         public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
 
         public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
@@ -271,7 +277,7 @@ namespace Build
                 "Grpc.AspNetCore.Server.dll",
                 "Grpc.Core.dll",
                 "Grpc.Core.Api.dll",
-                "Grpc.Net.Client.dll", 
+                "Grpc.Net.Client.dll",
                 "Grpc.Net.ClientFactory.dll",
                 "Grpc.Net.Common.dll",
                 "grpc_csharp_ext.x64.dll",
