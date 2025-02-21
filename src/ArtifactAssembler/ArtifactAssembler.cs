@@ -33,6 +33,7 @@ namespace ArtifactAssembler
             "Azure.Functions.Cli.min.win-x86",
             "Azure.Functions.Cli.min.win-x64",
             "Azure.Functions.Cli.linux-x64",
+            "Azure.Functions.Cli.linux-arm64",
             "Azure.Functions.Cli.osx-x64",
             "Azure.Functions.Cli.osx-arm64",
             "Azure.Functions.Cli.win-x86",

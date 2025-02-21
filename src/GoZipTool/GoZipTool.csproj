@@ -41,6 +41,9 @@
       <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-x64'">linux</GoOS>
       <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-x64'">amd64</GoArch>
 
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-arm64'">linux</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-arm64'">arm64</GoArch>
+
       <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-x64'">darwin</GoOS>
       <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-x64'">amd64</GoArch>
 
