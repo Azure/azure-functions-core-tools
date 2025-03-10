@@ -44,5 +44,13 @@ You can set these environment variables in your terminal or through Visual Studi
 ##### Sample Artifacts in the output directory, matching the environment variables:
 ![Diagram](assets/sample-artifacts-for-local-debug.png)
 
+2. If you only want to test generating one artifact rid type (ex: win-x64), you may pass in an argument when running the assembler. The argument must be formatted as `Azure.Functions.Cli.[RID]`
+```
+dotnet run "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj -c release Azure.Functions.Cli.win-x64"
+```
+3. To zip up the artifacts generated that are currently in the staging directory, you may pass in a zip parameter. Ex:
+```
+dotnet run "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj -c release zip"
+```
 
     
