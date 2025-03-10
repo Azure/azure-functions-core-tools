@@ -398,7 +398,7 @@ namespace Azure.Functions.ArtifactAssembler
                 return;
             }
 
-            var zipFiles = Directory.GetFiles(zipSo, "*.zip");
+            var zipFiles = Directory.GetFiles(zipSourceDir, "*.zip");
             if (!string.IsNullOrEmpty(_artifactName))
             {
                 zipFiles = zipFiles.Where(file => Path.GetFileName(file).StartsWith(_artifactName)).ToArray();
