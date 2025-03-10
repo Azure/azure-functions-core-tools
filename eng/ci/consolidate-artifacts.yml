@@ -7,8 +7,6 @@ schedules:
     include:
       - main
 
-name: $(Build.SourceBranchName)_$(Build.Reason)
-
 trigger: none
 
 # This pipeline is triggered by the completion of scheduled builds
@@ -50,12 +48,12 @@ resources:
 variables:
 - template: /ci/variables/cfs.yml@eng
 
-
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
   parameters:
     featureFlags:
       incrementalSDLBinaryAnalysis: true
+      incrementalSDLSourceAnalysis: true
     pool:
       name: 1es-pool-azfunc
       image: 1es-windows-2022
@@ -70,46 +68,21 @@ extends:
     - stage: ConsolidateArticacts
       displayName: "Assemble Artifacts"
       jobs:
-      - job: AssembleArtifacts
-        timeoutInMinutes: 200 # Have this here in case there are new artifacts to be scanned with increment SDL binary analysis
-        displayName: "Assemble Artifacts"
+      - job: ProcessNuGetPackage
+        displayName: "Process NuGet Package"
         templateContext:
-          outputParentDirectory: $(Build.ArtifactStagingDirectory)
           outputs:
-              - output: pipelineArtifact
-                displayName: Publish assembled artifacts
-                path: $(Pipeline.Workspace)\staging
-                artifact: drop
-
+            - output: pipelineArtifact
+              displayName: Publish nuget package
+              targetPath: $(Pipeline.Workspace)/staging
+              artifact: drop-nuget-package
         steps:
-        - checkout: self
-
-        - download: core-tools-host
-          artifact: drop-coretools-host-linux-signed
-          displayName: "Download core-tools-host linux"
-
-        - download: core-tools-host
-          artifact: drop-coretools-host-windows
-          displayName: "Download core-tools-host windows"
-
-        - download: core-tools-inproc
-          artifact: drop-inproc6
-          displayName: "Download inproc6 artifact"
-
-        - download: core-tools-inproc
-          artifact: drop-inproc8
-          displayName: "Download inproc8 artifact"
+        - checkout: none
 
         - download: core-tools-default
           artifact: drop
           displayName: "Download out-of-proc artifact"
 
-        - powershell: |
-            Write-Host "Value of env variable: $(Pipeline.Workspace)"
-            Write-Host "Artifacts are stored in:  D:\a\_work\1"
-            Get-ChildItem -Path "D:\a\_work\1" -Recurse
-          displayName: "List Artifact Paths"
-          
         - powershell: |
             $currentRunName = $env:BUILD_REASON
             Write-Host "Current pipeline run name: $currentRunName"
@@ -135,10 +108,10 @@ extends:
                 exit 1
             }
 
-            # Define the destination path in $(Pipeline.Workspace)/nugetPackage
-            $nugetPackageDirectory = Join-Path -Path $(Pipeline.Workspace) -ChildPath "nugetPackage"
+            # Define the destination path in $(Pipeline.Workspace)/staging
+            $nugetPackageDirectory = Join-Path -Path $(Pipeline.Workspace) -ChildPath "staging"
 
-            # Create the nugetPackage directory if it doesn't exist
+            # Create the staging directory if it doesn't exist
             if (-not (Test-Path $nugetPackageDirectory)) {
                 New-Item -Path $nugetPackageDirectory -ItemType Directory
                 Write-Host "Directory created at: $nugetPackageDirectory"
@@ -148,23 +121,81 @@ extends:
             Move-Item -Path $fileToMove.FullName -Destination $nugetPackageDirectory -Force
 
             Write-Host "File $($fileToMove.Name) moved to $nugetPackageDirectory"
-          displayName: 'Move Microsoft.Azure.Functions.CoreTools.x.x.xxxx.nupkg to nugetPackage directory'
-        
+          displayName: 'Process Microsoft.Azure.Functions.CoreTools NuGet Package'
+
+      - job: AssembleArtifacts
+        strategy:
+          matrix:
+            win-x64:
+              artifactName: 'Azure.Functions.Cli.win-x64'
+              artifactId: 'win-x64'
+            win-x86:
+              artifactName: 'Azure.Functions.Cli.win-x86'
+              artifactId: 'win-x86'
+            osx-x64:
+              artifactName: 'Azure.Functions.Cli.osx-x64'
+              artifactId: 'osx-x64'
+            linux-x64:
+              artifactName: 'Azure.Functions.Cli.linux-x64'
+              artifactId: 'linux-x64'
+            osx-arm64:
+              artifactName: 'Azure.Functions.Cli.osx-arm64'
+              artifactId: 'osx-arm64'
+            win-arm64:
+              artifactName: 'Azure.Functions.Cli.win-arm64'
+              artifactId: 'win-arm64'
+            min.win-x64:
+              artifactName: 'Azure.Functions.Cli.min.win-x64'
+              artifactId: 'min.win-x64'
+            min.win-arm64:
+              artifactName: 'Azure.Functions.Cli.min.win-arm64'
+              artifactId: 'min.win-arm64'
+            min.win-x86:
+              artifactName: 'Azure.Functions.Cli.min.win-x86'
+              artifactId: 'min.win-x86'
+        displayName: "Assemble Artifacts"
+        templateContext:
+          outputs:
+            - output: pipelineArtifact
+              displayName: Publish assembled artifact $(System.JobPositionInPhase)
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: drop-$(artifactId)
+            - output: pipelineArtifact
+              displayName: Publish metadata.json
+              targetPath: $(Pipeline.Workspace)/staging/metadata.json
+              artifact: drop-metadata-json
+              condition: and(succeeded(), eq(variables['artifactName'], 'Azure.Functions.Cli.min.win-x64')) 
+
+        steps:
+        - checkout: self
+
+        - download: core-tools-host
+          artifact: drop-coretools-host-linux-signed
+          displayName: "Download core-tools-host linux"
+
+        - download: core-tools-host
+          artifact: drop-coretools-host-windows
+          displayName: "Download core-tools-host windows"
+
+        - download: core-tools-inproc
+          artifact: drop-inproc6
+          displayName: "Download inproc6 artifact"
+
+        - download: core-tools-inproc
+          artifact: drop-inproc8
+          displayName: "Download inproc8 artifact"
+
+        - download: core-tools-default
+          artifact: drop
+          displayName: "Download out-of-proc artifact"
+                  
         - task: DotNetCoreCLI@2
           displayName: "Run ArtifactAssembler"
           inputs:
             command: run
             projects: "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj"
-            arguments: ' -c release'
+            arguments: ' -c release "$(artifactName)"'
             workingDirectory: '$(Pipeline.Workspace)'
-
-        
-        - powershell: |
-            Write-Host "Value of env variable: $(Pipeline.Workspace)"
-            Write-Host "Artifacts are stored in:  D:\a\_work\1"
-            Get-ChildItem -Path "D:\a\_work\1" -Recurse
-          displayName: "List Artifact Paths"
-
 
         - task: PowerShell@2
           displayName: 'Generate metadata.json file'
@@ -173,6 +204,7 @@ extends:
             filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/generateMetadataFile.ps1'
             arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging"'
             workingDirectory: '$(Pipeline.Workspace)'
+            condition: and(succeeded(), eq(variables['artifactName'], 'Azure.Functions.Cli.min.win-x64')) 
 
         - task: PowerShell@2
           displayName: 'Generate MSI files'
@@ -182,8 +214,7 @@ extends:
             arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
             workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
 
-
-        - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+        - task: EsrpCodeSigning@5
           displayName: 'ESRP CodeSigning'
           inputs:
             ConnectedServiceName: 'azfunc-internal-esrp'
@@ -226,6 +257,8 @@ extends:
             filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/testVsArtifacts.ps1'
             arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-visualstudio"'
             workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+          condition: and(succeeded(), eq(variables['artifactName'], 'Azure.Functions.Cli.min.win-x64')) 
+
         - task: PowerShell@2
           displayName: 'Test Artifacts'
           inputs:
@@ -233,13 +266,14 @@ extends:
             filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/testArtifacts.ps1'
             arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-cli"'
             workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+          condition: and(succeeded(), or(eq(variables['artifactName'], 'Azure.Functions.Cli.win-x64'), eq(variables['artifactName'], 'Azure.Functions.Cli.win-x86')))
         - task: DotNetCoreCLI@2
           displayName: 'Zip Artifacts'
           inputs:
             command: run
             projects: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj'
             arguments: 'zip  -c release'
-            workingDirectory: '$(Pipeline.Workspace)''
+            workingDirectory: '$(Pipeline.Workspace)'
         - powershell: |
             $rootPath = "$(Pipeline.Workspace)\staging"
             $zipFiles = Get-ChildItem -Path $rootPath -Filter *.zip  -Recurse
@@ -250,7 +284,7 @@ extends:
                 Out-File -InputObject $sha -Encoding ascii -FilePath $shaFilePath -NoNewline
                 Write-Host "Generated sha for $filePath at $shaFilePath"
             }
-            displayName: 'Generate SHA files'
+          displayName: 'Generate SHA files'
 
         - pwsh: |
             # Guardian files in TEMP add up and can cause the AntiMalware task to timeout.
@@ -261,11 +295,10 @@ extends:
           displayName: 'Copy Files to Artifact Staging Directory'
           inputs:
             SourceFolder: '$(Pipeline.Workspace)/staging'
-            Contents: '**'
+            Contents: 'coretools-*/**'
             TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
         - powershell: |
-            Write-Host "Value of env variable: $(Pipeline.Workspace)"
             Write-Host "Artifacts are stored in:  D:\a\_work\1"
             Get-ChildItem -Path "D:\a\_work\1\a" -Recurse
           displayName: "List Artifact Paths"
