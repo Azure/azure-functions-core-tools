@@ -71,38 +71,38 @@ extends:
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'win-x64'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'win-x86'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'min.win-x64'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'osx-x64'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'linux-x64'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'osx-arm64'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'win-arm64'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'min.win-arm64'
       
-      - template: /eng/ci/templates/official/jobs/assemble-artifact.yml@self
+      - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
         parameters:
           arch: 'min.win-x86'
