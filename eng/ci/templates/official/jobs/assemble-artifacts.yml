@@ -12,18 +12,23 @@ jobs:
       - input: pipelineArtifact
         pipeline: core-tools-host
         artifactName: drop-coretools-host-linux-signed
+        targetPath: $(Pipeline.Workspace)/core-tools-host
       - input: pipelineArtifact
         pipeline: core-tools-host
         artifactName: drop-coretools-host-windows
+        targetPath: $(Pipeline.Workspace)/core-tools-host
       - input: pipelineArtifact
         pipeline: core-tools-inproc
         artifactName: drop-inproc6
+        targetPath: $(Pipeline.Workspace)/core-tools-inproc
       - input: pipelineArtifact
         pipeline: core-tools-inproc
         artifactName: drop-inproc8
+        targetPath: $(Pipeline.Workspace)/core-tools-inproc
       - input: pipelineArtifact
         pipeline: core-tools-default
         artifactName: drop
+        targetPath: $(Pipeline.Workspace)/core-tools-default
   
     outputs:
       - output: pipelineArtifact

@@ -4,7 +4,9 @@ jobs:
   templateContext:
     inputs:
       - input: pipelineArtifact
+        pipeline: core-tools-default
         artifactName: drop
+        targetPath: $(Pipeline.Workspace)/core-tools-default
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
