@@ -10,19 +10,20 @@ jobs:
   templateContext:
     inputs:
       - input: pipelineArtifact
-        artifactName: drop-coretools-host-linux-signed
-        pipeline: azure\azure-functions-core-tools\core-tools-host.official
+        source: core-tools-host
+        artifact: drop-coretools-host-linux-signed
       - input: pipelineArtifact
-        artifactName: drop-coretools-host-windows
-        pipeline: azure\azure-functions-core-tools\core-tools-host.official
+        source: core-tools-host
+        artifact: drop-coretools-host-windows
       - input: pipelineArtifact
-        artifactName: drop-inproc6
-        pipeline: azure\azure-functions-core-tools\core-tools.official
+        source: core-tools-inproc
+        artifact: drop-inproc6
       - input: pipelineArtifact
-        artifactName: drop-inproc8
+        source: core-tools-inproc
+        artifact: drop-inproc8
       - input: pipelineArtifact
-        artifactName: drop
-        pipeline: azure\azure-functions-core-tools\core-tools.official
+        source: core-tools-default
+        artifact: drop
   
     outputs:
       - output: pipelineArtifact
