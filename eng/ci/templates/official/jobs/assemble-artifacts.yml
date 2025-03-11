@@ -11,14 +11,18 @@ jobs:
     inputs:
       - input: pipelineArtifact
         artifactName: drop-coretools-host-linux-signed
+        pipeline: azure\azure-functions-core-tools\core-tools-host.official
       - input: pipelineArtifact
         artifactName: drop-coretools-host-windows
+        pipeline: azure\azure-functions-core-tools\core-tools-host.official
       - input: pipelineArtifact
         artifactName: drop-inproc6
+        pipeline: azure\azure-functions-core-tools\core-tools.official
       - input: pipelineArtifact
         artifactName: drop-inproc8
       - input: pipelineArtifact
         artifactName: drop
+        pipeline: azure\azure-functions-core-tools\core-tools.official
   
     outputs:
       - output: pipelineArtifact
