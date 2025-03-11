@@ -3,7 +3,7 @@ parameters:
     type: string
 
 jobs:
-- job: AssembleArtifact_${{ parameters.arch }}
+- job: AssembleArtifact
   displayName: "Assemble ${{ parameters.arch }}"
   templateContext:
     inputs:
