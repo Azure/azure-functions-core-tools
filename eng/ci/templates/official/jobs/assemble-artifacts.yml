@@ -1,9 +1,11 @@
 parameters:
   - name: arch
     type: string
+  - name: displayName
+    type: string
 
 jobs:
-- job: AssembleArtifact
+- job: AssembleArtifact${{ parameters.displayName }}
   displayName: "Assemble ${{ parameters.arch }}"
   templateContext:
     inputs:
