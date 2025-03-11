@@ -10,20 +10,20 @@ jobs:
   templateContext:
     inputs:
       - input: pipelineArtifact
-        source: core-tools-host
-        artifact: drop-coretools-host-linux-signed
+        pipeline: core-tools-host
+        artifactName: drop-coretools-host-linux-signed
       - input: pipelineArtifact
-        source: core-tools-host
-        artifact: drop-coretools-host-windows
+        pipeline: core-tools-host
+        artifactName: drop-coretools-host-windows
       - input: pipelineArtifact
-        source: core-tools-inproc
-        artifact: drop-inproc6
+        pipeline: core-tools-inproc
+        artifactName: drop-inproc6
       - input: pipelineArtifact
-        source: core-tools-inproc
-        artifact: drop-inproc8
+        pipeline: core-tools-inproc
+        artifactName: drop-inproc8
       - input: pipelineArtifact
-        source: core-tools-default
-        artifact: drop
+        pipeline: core-tools-default
+        artifactName: drop
   
     outputs:
       - output: pipelineArtifact
