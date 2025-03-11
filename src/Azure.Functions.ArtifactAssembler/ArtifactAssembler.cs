@@ -164,7 +164,7 @@ namespace Azure.Functions.ArtifactAssembler
                         var destinationDirectoryWithArtifactFolder = Path.Combine(destinationDirectory, fileNameToSearchFor);
                         if (Directory.Exists(directory))
                         {
-                            await Task.Run(() => FileUtilities.CopyDirectory(directory, destinationDirectoryWithArtifactFolder));
+                            FileUtilities.CopyDirectory(directory, destinationDirectoryWithArtifactFolder);
                         }
 
                     }
@@ -174,7 +174,7 @@ namespace Azure.Functions.ArtifactAssembler
             }
             else
             {
-                await Task.Run(() => FileUtilities.CopyDirectory(artifactZipPath, destinationDirectory));
+                FileUtilities.CopyDirectory(artifactZipPath, destinationDirectory);
                 await ExtractZipFilesInDirectoryAsync(artifactZipPath, destinationDirectory);
             }
             // Delete additional files that are not needed
@@ -226,14 +226,14 @@ namespace Azure.Functions.ArtifactAssembler
                 // Copy in-proc6 files and delete directory after
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
                 EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName));
                 Directory.Delete(inProc6ArtifactDirPath, true);
 
                 // Copy core-tools-host files
                 var rid = GetRuntimeIdentifierForArtifactName(artifactName);
                 var coreToolsHostArtifactDirPath = Path.Combine(_coreToolsHostExtractedRootDir, rid);
                 EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
-                await Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
+                FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath);
                 Directory.Delete(coreToolsHostArtifactDirPath, true);
             }
             if ((!String.IsNullOrEmpty(_artifactName) && _net8OsxArtifacts.Contains(_artifactName)))
@@ -274,7 +274,7 @@ namespace Azure.Functions.ArtifactAssembler
             Directory.CreateDirectory(consolidatedArtifactDirPath);
 
             // Copy in-proc8 files and delete directory after
-            await Task.Run(() => FileUtilities.CopyDirectory(inProcArtifactDirPath, createDirectory ? Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName) : consolidatedArtifactDirPath));
+            FileUtilities.CopyDirectory(inProcArtifactDirPath, createDirectory ? Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName) : consolidatedArtifactDirPath);
             Directory.Delete(inProcArtifactDirPath, true);
 
             return (artifactDirName, consolidatedArtifactDirPath);
@@ -316,7 +316,7 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Copy oop core tools and delete old directory
                 EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
-                await Task.Run(() => FileUtilities.CopyDirectory(outOfProcArtifactDirPath, consolidatedArtifactDirPath));
+                FileUtilities.CopyDirectory(outOfProcArtifactDirPath, consolidatedArtifactDirPath);
                 Directory.Delete(outOfProcArtifactDirPath, true);
 
                 // If we are currently on the minified version of the artifacts, we do not want the inproc6/inproc8 subfolders
@@ -343,7 +343,7 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Copy in-proc8 files
                 var inProc8FinalDestination = Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName);
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
+                FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName));
                 Console.WriteLine($"Copied files from {inProc8ArtifactDirPath} => {inProc8FinalDestination}");
 
                 // Rename inproc6 directory to have the same version as the out-of-proc artifact before copying
@@ -353,7 +353,7 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Copy in-proc6 files
                 var inProc6FinalDestination = Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName);
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName));
                 Console.WriteLine($"Copied files from {inProc8ArtifactDirPath} => {inProc8FinalDestination}");
 
                 Console.WriteLine($"Finished assembling {consolidatedArtifactDirPath}");
@@ -417,7 +417,7 @@ namespace Azure.Functions.ArtifactAssembler
                 }
                 var destinationDir = Path.Combine(extractDestinationDir, Path.GetFileNameWithoutExtension(zipFile));
                 Console.WriteLine($"Extracting {zipFile} to {destinationDir}");
-                await Task.Run(() => FileUtilities.ExtractToDirectory(zipFile, destinationDir));
+                FileUtilities.ExtractToDirectory(zipFile, destinationDir);
                 File.Delete(zipFile);
             }
         }

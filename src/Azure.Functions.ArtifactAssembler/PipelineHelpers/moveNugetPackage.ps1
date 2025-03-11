@@ -1,12 +1,13 @@
-﻿# Retrieve environment variables
+﻿param (
+    [string]$CurrentDirectory
+)
+
+# Retrieve environment variables
 $defaultArtifactAlias = $env:DEFAULT_ARTIFACT_ALIAS
 $defaultArtifactName = $env:DEFAULT_ARTIFACT_NAME
 
-# Get the current working directory
-$currentDirectory = "$(Pipeline.Workspace)"
-
 # Construct the path using current directory, and environment variables
-$artifactPath = Join-Path -Path $currentDirectory -ChildPath "$defaultArtifactAlias\$defaultArtifactName"
+$artifactPath = Join-Path -Path $CurrentDirectory -ChildPath "$defaultArtifactAlias\$defaultArtifactName"
 
 # Define the regex pattern to match the nupkg file (digit.digit.4digits)
 $regexPattern = "^Microsoft\.Azure\.Functions\.CoreTools\.\d+\.\d+\.\d{4}\.nupkg$"

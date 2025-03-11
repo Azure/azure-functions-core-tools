@@ -19,5 +19,5 @@ jobs:
     displayName: 'Process and move nuget package to staging directory'
     inputs:
       targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/moveNugetPacakge.ps1'
-      workingDirectory: '$(Pipeline.Workspace)'
+      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/moveNugetPackage.ps1'
+      arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'

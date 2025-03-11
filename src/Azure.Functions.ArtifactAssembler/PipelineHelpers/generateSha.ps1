@@ -1,4 +1,8 @@
-$rootPath = "$(Pipeline.Workspace)\staging"
+param (
+    [string]$CurrentDirectory
+)
+
+$rootPath = Join-Path $CurrentDirectory "staging"
 $zipFiles = Get-ChildItem -Path $rootPath -Filter *.zip  -Recurse
 foreach ($file in $zipfiles) 
 {

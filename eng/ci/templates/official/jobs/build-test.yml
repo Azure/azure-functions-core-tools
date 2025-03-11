@@ -81,17 +81,10 @@ jobs:
   - pwsh: |
       .\check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
-  - pwsh: |
-      # Check if this is a scheduled build
-      $buildReason = $env:BUILD_REASON
-      Write-Host "Current build reason: $buildReason"
-      
-      if ($buildReason -eq "Schedule") {
-          Write-Host "This is a scheduled nightly build - adding nightly-build tag"
-          Write-Host "##vso[build.addbuildtag]nightly-build"
-      } else {
-          Write-Host "This is not a scheduled build (reason: $buildReason) - no tag added"
-      }
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - pwsh: |
+        # Check if this is a scheduled build
+        Write-Host "##vso[build.addbuildtag]nightly-build"
   - pwsh: |
       .\build.ps1
     env:
