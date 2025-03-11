@@ -96,4 +96,93 @@ jobs:
     displayName: 'Generate metadata.json file'
     inputs:
       targetType: filePath
-      filePath: '$(Build.SourcesDir
+      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/generateMetadataFile.ps1'
+      arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging"'
+      workingDirectory: '$(Pipeline.Workspace)'
+    condition: and(succeeded(), eq('${{ parameters.arch }}', 'min.win-x64'))
+
+  - task: PowerShell@2
+    displayName: 'Generate MSI files'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/generateMsiFiles.ps1'
+      arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
+      workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+    condition: and(succeeded(), startsWith('${{ parameters.arch }}', 'win'))
+
+  - task: EsrpCodeSigning@5
+    displayName: 'ESRP CodeSigning'
+    inputs:
+      ConnectedServiceName: 'azfunc-internal-esrp'
+      AppRegistrationClientId: 'a31bf239-3e15-498e-a335-f6ec0c9d9ccf'
+      AppRegistrationTenantId: '72f988bf-86f1-41af-91ab-2d7cd011db47'
+      AuthAKVName: 'kv-azfunc-esrp'
+      AuthCertName: 'azfunc-internal-esrp-auth'
+      AuthSignCertName: 'azfunc-internal-esrp-sign'
+      FolderPath: '$(Pipeline.Workspace)\staging\coretools-cli'
+      Pattern: '*.msi'
+      signConfigType: inlineSignParams
+      inlineOperation: |
+        [
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolSign",
+            "Parameters": {
+              "OpusName": "Microsoft",
+              "OpusInfo": "http://www.microsoft.com",
+              "FileDigest": "/fd \"SHA256\"",
+              "PageHash": "/NPH",
+              "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+            },
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          },
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolVerify",
+            "Parameters": {},
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          }
+        ]
+      VerboseLogin: true
+    condition: and(succeeded(), startsWith('${{ parameters.arch }}', 'win'))
+
+  - task: PowerShell@2
+    displayName: 'Test Artifacts - Visual Studio'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/testVsArtifacts.ps1'
+      arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-visualstudio"'
+      workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+    condition: and(succeeded(), eq('${{ parameters.arch }}', 'min.win-x64'))
+
+  - task: PowerShell@2
+    displayName: 'Test Artifacts'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/testArtifacts.ps1'
+      arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-cli"'
+      workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+    condition: and(succeeded(), startsWith('${{ parameters.arch }}', 'win'))
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Zip Artifacts'
+    inputs:
+      command: run
+      projects: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj'
+      arguments: 'zip -c release'
+      workingDirectory: '$(Pipeline.Workspace)'
+
+  - task: PowerShell@2
+    displayName: 'Generate SHA files'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/generateSha.ps1'
+
+  - task: CopyFiles@2
+    displayName: 'Copy Files to Artifact Staging Directory'
+    inputs:
+      SourceFolder: '$(Pipeline.Workspace)/staging'
+      Contents: 'coretools-*/**'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
