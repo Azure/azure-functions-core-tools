@@ -84,13 +84,6 @@ jobs:
 
       Show-RecursiveContents -Path $workspacePath
     displayName: 'List Pipeline Workspace Contents'
-              
-  - task: DotNetCoreCLI@2
-    displayName: 'Build ArtifactAssembler'
-    inputs:
-      command: build
-      projects: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj'
-      workingDirectory: '$(Pipeline.Workspace)'
 
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
@@ -100,7 +93,7 @@ jobs:
       arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
 
-  - ${{ if eq('${{ parameters.arch }}', 'min.win-x64') }}:
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
     - task: PowerShell@2
       displayName: 'Generate metadata.json file'
       inputs:
@@ -109,7 +102,7 @@ jobs:
         arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging"'
         workingDirectory: '$(Pipeline.Workspace)'
 
-  - ${{ if startsWith('${{ parameters.arch }}', 'win') }}:
+  - ${{ if startsWith(parameters.arch, 'win') }}:
     - task: PowerShell@2
       displayName: 'Generate MSI files'
       inputs:
@@ -118,7 +111,7 @@ jobs:
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
 
-  - ${{ if startsWith('${{ parameters.arch }}', 'win') }}:
+  - ${{ if startsWith(parameters.arch, 'win') }}:
     - template: ci/sign-files.yml@eng
       parameters:
         displayName: Sign MSI files
@@ -126,7 +119,7 @@ jobs:
         pattern: '*.msi'
         signType: 'inline'
 
-  - ${{ if eq('${{ parameters.arch }}', 'min.win-x64') }}:
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
     - task: PowerShell@2
       displayName: 'Test Artifacts - Visual Studio'
       inputs:
@@ -135,7 +128,7 @@ jobs:
         arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-visualstudio"'
         workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
 
-  - ${{ if startsWith('${{ parameters.arch }}', 'win') }}:
+  - ${{ if startsWith(parameters.arch, 'win') }}:
     - task: PowerShell@2
       displayName: 'Test Artifacts'
       inputs:
@@ -166,7 +159,7 @@ jobs:
       Contents: 'coretools-*/**'
       TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
 
-  - ${{ if eq('${{ parameters.arch }}', 'min.win-x64') }}:
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
     - task: CopyFiles@2
       displayName: 'Copy metadata.json to Artifact Staging Directory'
       inputs:
