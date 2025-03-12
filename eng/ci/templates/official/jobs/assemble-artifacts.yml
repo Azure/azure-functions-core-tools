@@ -97,7 +97,7 @@ jobs:
     inputs:
       command: run
       projects: "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj"
-      arguments: '--no-build -c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
+      arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
 
   - ${{ if eq('${{ parameters.arch }}', 'min.win-x64') }}:
