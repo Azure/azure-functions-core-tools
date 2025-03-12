@@ -22,7 +22,7 @@ if ($fileToMove -eq $null) {
 }
 
 # Define the destination path in $(Pipeline.Workspace)/nugetPackage
-$nugetPackageDirectory = Join-Path -Path $(Pipeline.Workspace) -ChildPath "nugetPackage"
+$nugetPackageDirectory = Join-Path -Path $CurrentDirectory -ChildPath "nugetPackage"
 
 # Create the nugetPackage directory if it doesn't exist
 if (-not (Test-Path $nugetPackageDirectory)) {
