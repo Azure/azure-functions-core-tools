@@ -118,6 +118,29 @@ jobs:
         folderPath: $(Pipeline.Workspace)\staging\coretools-cli
         pattern: '*.msi'
         signType: 'inline'
+        inlineOperation: |
+          [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+          ]
 
   - ${{ if eq(parameters.arch, 'min.win-x64') }}:
     - task: PowerShell@2

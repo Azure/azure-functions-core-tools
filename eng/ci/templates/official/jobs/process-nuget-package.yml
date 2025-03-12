@@ -10,7 +10,7 @@ jobs:
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
-        targetPath: $(Pipeline.Workspace)/staging
+        targetPath: $(Pipeline.Workspace)/nugetPackage
         artifact: drop-nuget-package
   steps:
   - checkout: self
