@@ -48,16 +48,9 @@ resources:
 
 variables:
 - template: /ci/variables/cfs.yml@eng
-  archs:
-    - win-x64
-    - win-x86
-    - min.win-x64
-    - osx-x64
-    - linux-x64
-    - osx-arm64
-    - win-arm64
-    - min.win-arm64
-    - min.win-x86
+- name: archs
+  value: 'win-x64,win-x86,min.win-x64,osx-x64,linux-x64,osx-arm64,win-arm64,min.win-arm64,min.win-x86'
+
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -81,8 +74,8 @@ extends:
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
       
-      - ${{ each config in variables.archs }}:
+      - ${{ each arch in split(variables.archs,',') }}:
         - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
           parameters:
-            arch: ${{ config.arch }}
+            arch: ${{ arch }}
             displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
