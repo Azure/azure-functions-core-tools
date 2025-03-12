@@ -44,46 +44,6 @@ jobs:
 
   steps:
   - checkout: self
-  
-  - pwsh: |
-      Write-Host "Recursively listing all files in Pipeline.Workspace..."
-
-      $workspacePath = $env:PIPELINE_WORKSPACE
-      if (-not $workspacePath) {
-          $workspacePath = "$(Pipeline.Workspace)"
-      }
-
-      Write-Host "Pipeline Workspace path: $workspacePath"
-
-      function Show-RecursiveContents {
-          param (
-              [string]$Path,
-              [int]$Depth = 0
-          )
-
-          $indent = "  " * $Depth
-  
-          try {
-              $items = Get-ChildItem -Path $Path -ErrorAction Stop
-      
-              foreach ($item in $items) {
-                  if ($item.PSIsContainer) {
-                      # Directory
-                      Write-Host "$indent$($item.FullName) [DIR]"
-                      Show-RecursiveContents -Path $item.FullName -Depth ($Depth + 1)
-                  } else {
-                      # File
-                      $sizeKB = [math]::Round($item.Length / 1KB, 2)
-                      Write-Host "$indent$($item.FullName) ($sizeKB KB)"
-                  }
-              }
-          } catch {
-              Write-Host "$indentError accessing $Path : $($_.Exception.Message)"
-          }
-      }
-
-      Show-RecursiveContents -Path $workspacePath
-    displayName: 'List Pipeline Workspace Contents'
 
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
@@ -159,6 +119,46 @@ jobs:
         filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/testArtifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+
+  - pwsh: |
+      Write-Host "Recursively listing all files in Pipeline.Workspace..."
+
+      $workspacePath = $env:PIPELINE_WORKSPACE
+      if (-not $workspacePath) {
+          $workspacePath = "$(Pipeline.Workspace)"
+      }
+
+      Write-Host "Pipeline Workspace path: $workspacePath"
+
+      function Show-RecursiveContents {
+          param (
+              [string]$Path,
+              [int]$Depth = 0
+          )
+
+          $indent = "  " * $Depth
+  
+          try {
+              $items = Get-ChildItem -Path $Path -ErrorAction Stop
+      
+              foreach ($item in $items) {
+                  if ($item.PSIsContainer) {
+                      # Directory
+                      Write-Host "$indent$($item.FullName) [DIR]"
+                      Show-RecursiveContents -Path $item.FullName -Depth ($Depth + 1)
+                  } else {
+                      # File
+                      $sizeKB = [math]::Round($item.Length / 1KB, 2)
+                      Write-Host "$indent$($item.FullName) ($sizeKB KB)"
+                  }
+              }
+          } catch {
+              Write-Host "$indentError accessing $Path : $($_.Exception.Message)"
+          }
+      }
+
+      Show-RecursiveContents -Path $workspacePath
+    displayName: 'List Pipeline Workspace Contents'
 
   - task: DotNetCoreCLI@2
     displayName: 'Zip Artifacts'
