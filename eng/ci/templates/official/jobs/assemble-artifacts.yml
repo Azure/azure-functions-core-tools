@@ -111,7 +111,7 @@ jobs:
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
 
-  - ${{ if startsWith(parameters.arch, 'win') }}:
+  - ${{ if startsWith(parameters.arch, 'win-x') }}:
     - template: ci/sign-files.yml@eng
       parameters:
         displayName: Sign MSI files
