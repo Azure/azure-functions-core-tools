@@ -50,24 +50,15 @@ variables:
 - template: /ci/variables/cfs.yml@eng
 - name: archs
   value:
-    - arch: 'win-x64'
-      displayName: 'winx64'
-    - arch: 'win-x86'
-      displayName: 'winx86'
-    - arch: 'min.win-x64'
-      displayName: 'minwinx64'
-    - arch: 'osx-x64'
-      displayName: 'osx64'
-    - arch: 'linux-x64'
-      displayName: 'linuxx64'
-    - arch: 'osx-arm64'
-      displayName: 'osxarm64'
-    - arch: 'win-arm64'
-      displayName: 'winarm64'
-    - arch: 'min.win-arm64'
-      displayName: 'minwinarm64'
-    - arch: 'min.win-x86'
-      displayName: 'minwinx86'
+  - { arch: 'win-x64', displayName: 'winx64' }
+  - { arch: 'win-x86', displayName: 'winx86' }
+  - { arch: 'min.win-x64', displayName: 'minwinx64' }
+  - { arch: 'osx-x64', displayName: 'osx64' }
+  - { arch: 'linux-x64', displayName: 'linuxx64' }
+  - { arch: 'osx-arm64', displayName: 'osxarm64' }
+  - { arch: 'win-arm64', displayName: 'winarm64' }
+  - { arch: 'min.win-arm64', displayName: 'minwinarm64' }
+  - { arch: 'min.win-x86', displayName: 'minwinx86' }
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
