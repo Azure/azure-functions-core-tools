@@ -10,9 +10,11 @@ jobs:
     devops_buildNumber: $[counter(format(''), 1500)]
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+
   steps:
-  - pwsh: . "tools/start-emulators.ps1" -NoWait
+  - pwsh: . "eng/scripts/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
+
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -22,65 +24,78 @@ jobs:
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
     displayName: 'Set IsIntegrationBuild variable'
+
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
     displayName: Set up environment variables
+
   - task: NodeTool@0
     inputs:
       versionSpec: '18.x'
+
   - pwsh: |
-      Import-Module ".\pipelineUtilities.psm1" -Force
+      Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
+
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
     displayName: Install Nuget tool
+
   - pwsh: |
-      .\validateWorkerVersions.ps1
+      eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
+
   - pwsh: |
-      .\check-vulnerabilities.ps1
+      eng/scripts/check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
+
   - pwsh: |
-      .\build.ps1
+      eng/scripts/build.ps1
     env:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
     displayName: 'Executing build script'
+
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
       testResultsFiles: '**/*.trx'
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
+
   templateContext:
     outputs:
     - output: pipelineArtifact
-      path: 'test/Azure.Functions.Cli.Tests/bin/Debug/net8.0/ZippedOnWindows.zip'
+      path: 'out/bin/Azure.Functions.Cli.Tests/debug/ZippedOnWindows.zip'
       artifact: ZippedOnWindows
 
 - job: Test_Linux
   timeoutInMinutes: "180"
+  dependsOn: Default
+
   pool:
     name: 1es-pool-azfunc-public
     image: '1es-ubuntu-22.04'
     os: 'linux'
+
   steps:
   - download: current
     displayName: 'Download test zip'
     artifact: ZippedOnWindows
+
   - script: |
       sudo apt-get update
       sudo apt-get -y install fuse-zip
     displayName: 'Install fuse-zip'
+
   - task: DotNetCoreCLI@2
     inputs:
       command: 'test'
       projects: '**/Azure.Functions.Cli.Tests.csproj'
       arguments: '--filter CreateZip_Succeeds'
     displayName: 'Run zip test'
-  dependsOn: Default

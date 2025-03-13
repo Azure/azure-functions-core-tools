@@ -12,6 +12,7 @@ jobs:
       version: 9.x
       includePreviewVersions: true
     displayName: Install .NET 9
+
   - task: UseDotNet@2
     inputs:
       version: 6.x
@@ -24,7 +25,7 @@ jobs:
       publishWebProjects: false
       zipAfterPublish: false
       arguments: -c Release -r win-x64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-x64
-      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+      workingDirectory: $(Build.SourcesDirectory)/src/CoreToolsHost
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-arm64)
@@ -33,7 +34,7 @@ jobs:
       publishWebProjects: false
       zipAfterPublish: false
       arguments: -c Release -r win-arm64 -o $(Build.SourcesDirectory)/pkg_output/windows/win-arm64
-      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+      workingDirectory: $(Build.SourcesDirectory)/src/CoreToolsHost
 
   - template: ci/sign-files.yml@eng
     parameters:
@@ -143,7 +144,7 @@ jobs:
       publishWebProjects: false
       zipAfterPublish: false
       arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
-      workingDirectory: $(Build.SourcesDirectory)/host/src/CoreToolsHost
+      workingDirectory: $(Build.SourcesDirectory)/src/CoreToolsHost
 
   - task: CopyFiles@2
     displayName: Copy files (linux-x64)
@@ -161,7 +162,7 @@ jobs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
       artifact: drop-coretools-host-linux
-      
+
 - job: SignCoreToolsHostLinux
   displayName: '[Linux] Sign CoreToolsHost'
   dependsOn: BuildCoreToolsHostLinux
