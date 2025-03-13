@@ -481,10 +481,9 @@ namespace Azure.Functions.Cli.Kubernetes
 
             public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
             {
-                if (eventInfo.Source.Type == typeof(string) && double.TryParse(eventInfo.Source.Value.ToString(), out _))
-                {
-                    eventInfo.Style = ScalarStyle.DoubleQuoted;
-                } else if (eventInfo.Source.Type == typeof(string) && bool.TryParse(eventInfo.Source.Value.ToString(), out _))
+                if (eventInfo.Source.Type == typeof(string) &&
+                    (double.TryParse(eventInfo.Source.Value.ToString(), out _) ||
+                     bool.TryParse(eventInfo.Source.Value.ToString(), out _)))
                 {
                     eventInfo.Style = ScalarStyle.DoubleQuoted;
                 }
