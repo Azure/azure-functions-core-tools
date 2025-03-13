@@ -1,6 +1,10 @@
 # Azure Functions Artifact Assembler
 
-This project is designed to assemble artifacts for Azure Functions, including custom core tools hosts and various versions of in-proc artifacts (to support .NET 6.0 and .NET 8.0 in-proc apps). It currently packages these artifacts for Visual Studio builds, but we plan to expand to other use cases in the future. It extracts, processes, and packages these artifacts into a format suitable for use with Visual Studio.
+This project is designed to assemble artifacts for Azure Functions, including custom core tools hosts
+and various versions of in-proc artifacts (to support .NET 6.0 and .NET 8.0 in-proc apps).
+It currently packages these artifacts for Visual Studio builds, but we plan to expand to other use cases
+in the future. It extracts, processes, and packages these artifacts into a format suitable for use with Visual Studio.
+
 ## Prerequisites
 
 - .NET 8 SDK
@@ -8,7 +12,7 @@ This project is designed to assemble artifacts for Azure Functions, including cu
 
 ## Expected Artifact Folders
 
-The following artifact folders are expected to be present in the root directory of the executable (when debugging locally, it will be `bin/debug/net8.0`):
+The following artifact folders are expected to be present in the root directory of the executable (when debugging locally, it will be `out/bin/<project-name>/debug_net8.0`):
 
 - A directory which contains `in-proc6` and `in-proc8` artifact directories (not zips).
 - A directory which contains the core tools custom host artifact directory (not zip).
@@ -27,7 +31,7 @@ You can set these environment variables in your terminal or through Visual Studi
 
 ## Running the Project
 
-1. Once you set the environment variables and have the sample artifacts in the output directory, you can do F5 debugging. 
+1. Once you set the environment variables and have the sample artifacts in the output directory, you can do F5 debugging.
 
 ##### Example environment variable section in launchSettings.json:
 
@@ -42,6 +46,7 @@ You can set these environment variables in your terminal or through Visual Studi
 ```
 
 ##### Sample Artifacts in the output directory, matching the environment variables:
+
 ![Diagram](assets/sample-artifacts-for-local-debug.png)
 
 2. If you only want to test generating one artifact rid type (ex: win-x64), you may pass in an argument when running the assembler. The argument must be formatted as `Azure.Functions.Cli.[RID]`
@@ -52,5 +57,3 @@ dotnet run "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azur
 ```
 dotnet run "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj -c release zip"
 ```
-
-    

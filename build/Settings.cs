@@ -27,7 +27,7 @@ namespace Build
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
 
-        public static readonly string SrcProjectPath = Path.GetFullPath("../src/Azure.Functions.Cli/");
+        public static readonly string SrcProjectPath = Path.GetFullPath("../src/Cli/func/");
 
         public static readonly string ConstantsFile = Path.Combine(SrcProjectPath, "Common", "Constants.cs");
 

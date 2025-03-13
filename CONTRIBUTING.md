@@ -21,7 +21,7 @@ where PATH_TO_FUNCTIONS_CLI is the absolute or relative path to the root of this
 ### Running the Test Suite
 
 - Build the solution `dotnet build Azure.Functions.Cli.sln`
-  - As part of this build, the cli is copied into the test project's output directory (`test/Azure.Functions.Cli.Tests/bin/Debug/net8.0`) - this is what will be used by the tests
+  - As part of this build, the cli is copied into the test project's output directory (`out/bin/Azure.Functions.Cli.Tests/debug_net8.0`) - this is what will be used by the tests
   - If you wish to override this, you can set the `FUNC_PATH` environment variable to the path of the `func`/`func.exe` you wish to test against
 - Run the test suite in Visual Studio Test Explorer or by running `dotnet test` from the `test` project root.
   - i.e. `cd test/Azure.Functions.Cli.Tests; dotnet test`
@@ -43,7 +43,7 @@ If you see an error saying the templates folder is missing, you can follow eithe
 - Find your offical func instation directory
   - i.e. `/opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.6610`
   - or `%LOCALAPPDATA%\AzureFunctionsTools\Releases\4.69.0\cli_x64\`
-- Copy the templates folder to the test project's output directory (`test/Azure.Functions.Cli.Tests/bin/Debug/net8.0`)
+- Copy the templates folder to the test project's output directory (`out/bin/Azure.Functions.Cli.Tests/debug_net8.0`)
 
 ##### or (b)
 
@@ -62,7 +62,7 @@ If you see an error saying the templates folder is missing, you can follow eithe
     - If using M1/M2, you may need to set the dotnet root as well `export DOTNET_ROOT=/usr/local/share/dotnet/x64`
 - Run the build script `build.ps1`
 - In the `artifacts` folder, you should find a `templates` folder within any the subfolders here
-- Copy the `templates` folder to the test project's output directory (`test/Azure.Functions.Cli.Tests/bin/Debug/net8.0`)
+- Copy the `templates` folder to the test project's output directory (`out/bin/Azure.Functions.Cli.Tests/debug_net8.0`)
 
 ## Contributing to this Repository
 
