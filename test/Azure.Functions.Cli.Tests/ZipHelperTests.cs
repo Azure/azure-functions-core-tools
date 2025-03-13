@@ -90,7 +90,7 @@ namespace Azure.Functions.Cli.Tests
             var csprojDir = csproj.Directory.FullName;
             ProcessHelper.RunProcess("dotnet", $"build -r {rid}", csprojDir, writeOutput: WriteOutput);
 
-            var outPath = Path.Combine(csprojDir, "bin", "Debug", "net8.0", rid);
+            string outPath = Path.GetFullPath(Path.Combine(csprojDir, "..", "..", "out", "bin", "ZippedExe", $"debug_{rid}"));
 
             // copy the files to the zip dir
             foreach (string fileName in new[] { exe, dll, config })
@@ -132,7 +132,7 @@ namespace Azure.Functions.Cli.Tests
 
             void CaptureOutput(string output)
             {
-                outputLines.Add(output);                
+                outputLines.Add(output);
                 WriteOutput(output);
             }
 
@@ -183,7 +183,7 @@ namespace Azure.Functions.Cli.Tests
                     Assert.Equal(readWrite, fileInfo.UnixFileMode);
                 }
             }
-            
+
             outputLines.Clear();
             ProcessHelper.RunProcess($"{Path.Combine(mntDir, exeName)}", string.Empty, mntDir, writeOutput: CaptureOutput);
             Assert.Equal("Hello, World!", outputLines.Last());
