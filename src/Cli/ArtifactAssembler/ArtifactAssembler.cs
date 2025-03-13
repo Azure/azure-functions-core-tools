@@ -5,7 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
 
-namespace Azure.Functions.ArtifactAssembler
+namespace Azure.Functions.Cli.ArtifactAssembler
 {
     internal sealed class ArtifactAssembler
     {
