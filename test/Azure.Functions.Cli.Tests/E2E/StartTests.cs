@@ -601,7 +601,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                        var settingsFile = Path.Combine(workingDir, "local.settings.json");
                        var content = File.ReadAllText(settingsFile);
                        content = content.Replace("EMPTY_VALUE", "");
-                       File.WriteAllText(settingsFile,content);
+                       File.WriteAllText(settingsFile, content);
+                       await Task.CompletedTask;
                    },
                    CommandTimeout = TimeSpan.FromSeconds(300),
                },
@@ -895,6 +896,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
 
                         }
+                        await Task.CompletedTask;
                     },
                     CommandTimeout = TimeSpan.FromSeconds(100)
                 }
@@ -929,6 +931,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         {
 
                         }
+                        await Task.CompletedTask;
                     },
                     CommandTimeout = TimeSpan.FromSeconds(100)
                 }
@@ -1535,9 +1538,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    Test = async (workingDir, p, _) =>
                    {
-                       var hostJsonPath = Path.Combine(workingDir, "host.json");
-                       File.Delete(hostJsonPath);
-
+                        var hostJsonPath = Path.Combine(workingDir, "host.json");
+                        File.Delete(hostJsonPath);
+                        await Task.CompletedTask;
                    },
                },
                new RunConfiguration
