@@ -3,7 +3,7 @@
 
 using System.IO.Compression;
 
-namespace Azure.Functions.ArtifactAssembler
+namespace Azure.Functions.Cli.ArtifactAssembler
 {
     internal static class FileUtilities
     {
