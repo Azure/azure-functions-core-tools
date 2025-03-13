@@ -1,0 +1,20 @@
+<Project>
+
+  <!-- artifacts -->
+  <PropertyGroup>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)out</ArtifactsPath>
+    <ArtifactsPublishOutputName>pub</ArtifactsPublishOutputName>
+    <ArtifactsPackageOutputName>pkg</ArtifactsPackageOutputName>
+    <IsPackable>false</IsPackable> <!-- default false -->
+  </PropertyGroup>
+
+  <!-- paths -->
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <EngRoot>$(RepoRoot)eng/</EngRoot>
+    <EngBuildRoot>$(EngRoot)build/</EngBuildRoot>
+    <EngResourceRoot>$(EngRoot)res/</EngResourceRoot>
+    <SourceRoot>$(EngRoot)src/</SourceRoot>
+  </PropertyGroup>
+
+</Project>
