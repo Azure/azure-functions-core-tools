@@ -12,6 +12,7 @@ jobs:
       version: 9.x
       includePreviewVersions: true
     displayName: Install .NET 9
+
   - task: UseDotNet@2
     inputs:
       version: 6.x
@@ -161,7 +162,7 @@ jobs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
       artifact: drop-coretools-host-linux
-      
+
 - job: SignCoreToolsHostLinux
   displayName: '[Linux] Sign CoreToolsHost'
   dependsOn: BuildCoreToolsHostLinux

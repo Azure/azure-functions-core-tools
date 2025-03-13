@@ -43,7 +43,7 @@ extends:
          compiled:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
-    stages:     
+    stages:
       - stage: BuildAndTest
         jobs:
         - template: /eng/ci/templates/official/jobs/build-test.yml@self
