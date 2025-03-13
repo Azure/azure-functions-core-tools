@@ -27,7 +27,7 @@ function Install-SBOMUtil
         [string]
         $SBOMUtilSASUrl
     )
-    
+
     if ([string]::IsNullOrEmpty($SBOMUtilSASUrl))
     {
         throw "The `$SBOMUtilSASUrl parameter cannot be null or empty when specifying `$(addSBOM)"
@@ -38,7 +38,7 @@ function Install-SBOMUtil
 
     Invoke-RestMethod -Uri $SBOMUtilSASUrl -OutFile "$MANIFESTOOL_DIRECTORY.zip"
     Expand-Archive "$MANIFESTOOL_DIRECTORY.zip" -DestinationPath $MANIFESTOOL_DIRECTORY
-    
+
     if (-not (Test-Path $MANIFEST_TOOL_PATH))
     {
         throw "$MANIFESTOOL_DIRECTORY does not contain '$DLL_NAME'"
@@ -102,7 +102,7 @@ function Find-DotnetVersionsToInstall
                                 Select-Object -First 1
         if ($firstAcceptable) {
             Write-Host "Found dotnet SDK $firstAcceptable for .NET Core $majorMinorVersion."
-        }                               
+        }
         else {
             Write-Host "Cannot find the dotnet SDK for .NET Core $majorMinorVersion. Version $minimalVersion or higher is required."
             $missingVersions.Add("$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].DefaultPatch)")

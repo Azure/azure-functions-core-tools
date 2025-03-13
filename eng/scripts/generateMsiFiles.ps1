@@ -1,4 +1,5 @@
-$baseDir = Get-Location
+$rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
+$rootDir = Resolve-Path $rootDir
 
 Write-Host "Generating MSI files"
 
@@ -17,15 +18,15 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$artifactsPath = "$baseDir\artifacts"
-$buildDir = "$baseDir\build"
+$artifactsPath = "$rootDir\artifacts"
+$buildDir = "$rootDir\build"
 $cli = Get-ChildItem -Path $artifactsPath -Include func.dll -Recurse | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 
 # Generate MSI installers for Windows
 # TODO: add 'arm64' to the below array once a production-ready version of the WiX toolset supporting
 # it is released. See https://github.com/Azure/azure-functions-core-tools/issues/3122
-@('x64', 'x86') | ForEach-Object { 
+@('x64', 'x86') | ForEach-Object {
     $platform = $_
     $targetDir = "$artifactsPath\win-$platform"
 
@@ -46,7 +47,7 @@ $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVer
     & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
     & { candle -arch $platform -dPlatform="$platform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
     & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
-    
+
     # Check that the .msi files are actually present
     if (-not(Test-Path -Path $msiPath))
     {

@@ -1,4 +1,7 @@
-Set-Location ".\build"
+$rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
+$rootDir = Resolve-Path $rootDir
+
+Set-Location "$rootDir/build"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Unzip([string]$zipfilePath, [string]$outputpath) {
@@ -10,7 +13,6 @@ function Unzip([string]$zipfilePath, [string]$outputpath) {
         LogErrorAndExit "Unzip failed for:$zipfilePath" $_.Exception
     }
 }
-
 
 function Zip([string]$directoryPath, [string]$zipPath) {
     try {
@@ -24,12 +26,11 @@ function Zip([string]$directoryPath, [string]$zipPath) {
     }
 }
 
-
 function LogErrorAndExit($errorMessage, $exception) {
     Write-Output $errorMessage
-    if ($exception -ne $null) {
+    if ($null -ne $exception) {
         Write-Output $exception|format-list -force
-    }    
+    }
     Exit 1
 }
 
@@ -38,10 +39,10 @@ function LogSuccess($message) {
     Write-Output $message
 }
 
-try 
+try
 {
-    $artifactsPath = Resolve-Path "..\artifacts\"
-    $tempDirectoryPath = "..\artifacts\temp\"
+    $artifactsPath = "$rootDir/artifacts/"
+    $tempDirectoryPath = "$rootDir/artifacts/temp/"
 
     if (Test-Path $tempDirectoryPath)
     {
@@ -50,7 +51,6 @@ try
 
     # Runtimes with signed binaries
     $runtimesIdentifiers = @("min.win-arm64", "min.win-x86","min.win-x64", "osx-arm64", "osx-x64")
-    $tempDirectory = New-Item $tempDirectoryPath -ItemType Directory
     LogSuccess "$tempDirectoryPath created"
 
     # Unzip the coretools artifact to add signed binaries
@@ -64,11 +64,10 @@ try
                 $fileName = [io.path]::GetFileNameWithoutExtension($file.Name)
 
                 $targetDirectory = Join-Path $tempDirectoryPath $fileName
-                $dir = New-Item $targetDirectory -ItemType Directory
-                $targetDirectory = Resolve-Path $targetDirectory 
+                $targetDirectory = Resolve-Path $targetDirectory
                 $filePath = Resolve-Path $file.FullName
-                Unzip $filePath $targetDirectory       
-                   
+                Unzip $filePath $targetDirectory
+
                 # Removing file after extraction
                 Remove-Item $filePath
                 LogSuccess "Removed $filePath"
@@ -80,7 +79,7 @@ try
     $fileCountBefore = (Get-ChildItem $tempDirectoryPath -Recurse | Measure-Object).Count
 
     # copy authenticode signed binaries into extracted directories
-    $authenticodeDirectory = "..\artifacts\ToSign\Authenticode\"
+    $authenticodeDirectory = "$rootDir\artifacts\ToSign\Authenticode\"
     $authenticodeDirectories = Get-ChildItem $authenticodeDirectory -Directory
 
     foreach($directory in $authenticodeDirectories)
@@ -90,7 +89,7 @@ try
     }
 
     # copy thirdparty signed directory into extracted directories
-    $thirdPathDirectory  = "..\artifacts\ToSign\ThirdParty\"
+    $thirdPathDirectory  = "$rootDir\artifacts\ToSign\ThirdParty\"
     $thirdPathDirectories  = Get-ChildItem $thirdPathDirectory -Directory
 
     foreach($directory in $thirdPathDirectories)
@@ -100,7 +99,7 @@ try
     }
 
     # mac signing requires the files to be in a zip to sign, so we have to extract the zip before copying over the signed files
-    $macZipFiles  = Get-ChildItem "..\artifacts\ToSign\Mac\*.zip"
+    $macZipFiles  = Get-ChildItem "$rootDir\artifacts\ToSign\Mac\*.zip"
     foreach($macZipFile in $macZipFiles)
     {
         $macUnzippedDir = Join-Path $macZipFile.DirectoryName $macZipFile.BaseName
@@ -122,9 +121,8 @@ try
        $zipPath = Join-Path $artifactsPath $directoryName
        $zipPath = $zipPath + ".zip"
        $directoryPath = $directory.FullName
-       Zip $directoryPath $zipPath 
+       Zip $directoryPath $zipPath
     }
-    
 }
 catch {
     LogErrorAndExit "Execution Failed" $_.Exception

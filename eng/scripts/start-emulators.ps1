@@ -17,7 +17,7 @@ if (!$IsWindows -and !$IsLinux -and !$IsMacOs)
 {
     # For pre-PS6
     Write-Host "Could not resolve OS. Assuming Windows."
-    $IsWindows = $true
+    $assumeWindows = $true
 }
 
 function IsStorageEmulatorRunning()
@@ -49,7 +49,7 @@ if (!$SkipStorageEmulator)
 
     if ($storageEmulatorRunning -eq $false)
     {
-        if ($IsWindows)
+        if ($IsWindows -or $assumeWindows)
         {
             npm install -g azurite
             Start-Process azurite.cmd -ArgumentList "--silent --skipApiVersionCheck"
