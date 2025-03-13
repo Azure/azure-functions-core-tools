@@ -71,7 +71,7 @@ jobs:
   templateContext:
     outputs:
     - output: pipelineArtifact
-      path: 'test/Azure.Functions.Cli.Tests/bin/Debug/net8.0/ZippedOnWindows.zip'
+      path: 'out/bin/Azure.Functions.Cli.Tests/debug_net8.0/ZippedOnWindows.zip'
       artifact: ZippedOnWindows
 
 - job: Test_Linux
