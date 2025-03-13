@@ -1,19 +1,20 @@
-$projectPath = ".\src\Azure.Functions.Cli"
-$projectFileName = ".\Azure.Functions.Cli.csproj"
-$logFilePath = "..\..\build.log"
-$skipCveFilePath = "..\..\skipPackagesCve.json"
+$rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
+$rootDir = Resolve-Path $rootDir
+
+$logFilePath = "$rootDir/build.log"
+$skipCveFilePath = "$rootDir/skipPackagesCve.json"
+$projectPath = "$rootDir/src/Cli/func"
+
 if (-not (Test-Path $projectPath))
 {
     throw "Project path '$projectPath' does not exist."
 }
 
-cd $projectPath
-
-$cmd = "restore"
+$cmd = "restore", $projectPath
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath
 
-$cmd = "list", "package", "--include-transitive", "--vulnerable", "--format", "json"
+$cmd = "list", $projectPath, "package", "--include-transitive", "--vulnerable", "--format", "json"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath
 
@@ -63,5 +64,3 @@ if ($logFileExists)
 {
   Remove-Item $logFilePath
 }
-
-cd ../..
