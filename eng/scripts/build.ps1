@@ -1,4 +1,8 @@
-$buildFolderPath = Join-Path $PSScriptRoot "build"
+
+$rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
+$rootDir = Resolve-Path $rootDir
+
+$buildFolderPath = "$rootDir/build"
 if (-not (Test-Path $buildFolderPath))
 {
     throw "Build folder '$buildFolderPath' does not exist."
