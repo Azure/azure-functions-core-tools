@@ -1073,7 +1073,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. For the 'inproc8' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
+                    ErrorContains = [$"The runtime argument value provided, 'inproc8', is invalid. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1165,7 +1165,8 @@ namespace Azure.Functions.Cli.Tests.E2E
                     {
                         "init . --worker-runtime dotnet --target-framework net8.0",
                         "new --template Httptrigger --name HttpTrigger",
-                    }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
                 },
                 new RunConfiguration
                 {
@@ -1855,6 +1856,43 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
             }
+        }
+
+        [Fact]
+        public async Task Start_InProc6_SpecifiedRuntime_Show_Migration_Warning()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        "new --template Httptrigger --name HttpTrigger",
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start  --port {_funcHostPort} --verbose --runtime inproc6"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new[]
+                    {
+                        $"Warning: Starting application with .NET 6 runtime. .NET 6 is no longer supported, and you should migrate to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process."
+                    },
+                    Test = async (workingDir, p, _) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(2));
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(100),
+                },
+            }, _output);
         }
 
         private async Task<bool> WaitUntilReady(HttpClient client)

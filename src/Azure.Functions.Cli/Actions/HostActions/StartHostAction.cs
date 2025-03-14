@@ -529,6 +529,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             if (currentWorkerRuntime == WorkerRuntime.dotnet)
             {
+                if (isInproc6ArgumentValue)
+                {
+                    ColoredConsole.WriteLine(WarningColor($"Warning: Starting application with .NET 6 runtime. .NET 6 is no longer supported, and you should migrate to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
+                }
                 if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
                     ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnetIsolated}'.");
@@ -536,11 +540,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (isInproc8ArgumentValue && !await validateDotNet8ProjectEnablement())
                 {
-                    ThrowCliException($"For the '{DotnetConstants.InProc8HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
+                    ThrowCliException($"If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process.");
                 }
                 else if (isInproc6ArgumentValue && await validateDotNet8ProjectEnablement())
                 {
                     ThrowCliException($"For the '{DotnetConstants.InProc6HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
+                }
+                else if (isInproc6ArgumentValue) { 
                 }
 
             }
