@@ -546,9 +546,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ThrowCliException($"For the '{DotnetConstants.InProc6HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
                 }
-                else if (isInproc6ArgumentValue) { 
-                }
-
             }
             else if (isInproc8ArgumentValue || isInproc6ArgumentValue)
             {
