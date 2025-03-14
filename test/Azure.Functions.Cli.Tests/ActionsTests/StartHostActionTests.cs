@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Tests.TestingTraits;
 using Colors.Net;
 using FluentAssertions;
 using Moq;
@@ -19,6 +20,7 @@ using YamlDotNet.Core;
 
 namespace Azure.Functions.Cli.Tests.ActionsTests
 {
+    [TestingTrait("Category", "UnitTests")]
     public class StartHostActionTests : IDisposable
     {
         [SkippableFact]
