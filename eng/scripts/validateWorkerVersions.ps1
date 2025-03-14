@@ -12,7 +12,7 @@
 #>
 param (
     [Switch]$Update,
-    
+
     # An explicit host version, otherwise the host version from Azure.Functions.Cli.csproj will be used
     [string]$hostVersion
 )
@@ -26,7 +26,10 @@ function removeBomIfExists([string]$data)
     return $data
 }
 
-$cliCsprojPath = "$PSScriptRoot/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj"
+$rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
+$rootDir = Resolve-Path $rootDir
+
+$cliCsprojPath = "$rootDir/src/Cli/func/Azure.Functions.Cli.csproj"
 $cliCsprojContent = removeBomIfExists(Get-Content $cliCsprojPath)
 $cliCsprojXml = [xml]$cliCsprojContent
 
@@ -90,7 +93,6 @@ foreach ($key in $workerPropsToWorkerName.Keys) {
             $failedValidation = $true
         }
     }
-    
 }
 
 if ($Update) {
