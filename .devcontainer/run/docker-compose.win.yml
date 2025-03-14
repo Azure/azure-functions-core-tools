@@ -1,0 +1,13 @@
+services:
+  func-cli:
+    build:
+      context: ../..  # Go up two levels to repo root
+      dockerfile: .devcontainer/run/Dockerfile
+      args:
+        TARGET_RUNTIME: win-x64
+        EXECUTABLE_NAME: func.exe
+        BASE_IMAGE: mcr.microsoft.com/dotnet/sdk:8.0-windowsservercore-ltsc2022
+        RUNTIME_IMAGE: mcr.microsoft.com/dotnet/runtime:8.0-windowsservercore-ltsc2022
+    container_name: func-cli
+    stdin_open: true
+    tty: true

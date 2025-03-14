@@ -1,0 +1,15 @@
+{
+    "name": "C# (.NET)",
+    "image": "mcr.microsoft.com/devcontainers/dotnet:8.0",
+    "containerEnv": {
+        "IsReleaseBuild": "false"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-dotnettools.csdevkit"
+            ]
+        }
+    },
+    "postCreateCommand": ".devcontainer/run/build-run-cli.sh"
+}
