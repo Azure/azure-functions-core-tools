@@ -1,0 +1,151 @@
+parameters:
+  - name: arch
+    type: string
+  - name: displayName
+    type: string
+
+jobs:
+- job: AssembleArtifact${{ parameters.displayName }}
+  displayName: "Assemble ${{ parameters.arch }}"
+  templateContext:
+    inputs:
+      - input: pipelineArtifact
+        pipeline: core-tools-host
+        artifactName: drop-coretools-host-linux-signed
+        targetPath: $(Pipeline.Workspace)\core-tools-host\drop-coretools-host-linux-signed
+      - input: pipelineArtifact
+        pipeline: core-tools-host
+        artifactName: drop-coretools-host-windows
+        targetPath: $(Pipeline.Workspace)\core-tools-host\drop-coretools-host-windows
+      - input: pipelineArtifact
+        pipeline: core-tools-inproc
+        artifactName: drop-inproc6
+        targetPath: $(Pipeline.Workspace)\core-tools-inproc\drop-inproc6
+      - input: pipelineArtifact
+        pipeline: core-tools-inproc
+        artifactName: drop-inproc8
+        targetPath: $(Pipeline.Workspace)\core-tools-inproc\drop-inproc8
+      - input: pipelineArtifact
+        pipeline: core-tools-default
+        artifactName: drop
+        targetPath: $(Pipeline.Workspace)\core-tools-default\drop
+  
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+      - output: pipelineArtifact
+        displayName: Publish assembled artifact ${{ parameters.arch }}
+        targetPath: $(Build.ArtifactStagingDirectory)/core-tools
+        artifact: drop-${{ parameters.arch }}
+      - output: pipelineArtifact
+        displayName: Publish metadata.json
+        targetPath: $(Build.ArtifactStagingDirectory)/metadata.json
+        artifact: drop-metadata-json
+        condition: and(succeeded(), eq('${{ parameters.arch }}', 'min.win-x64'))
+
+  steps:
+  - checkout: self
+
+  - task: DotNetCoreCLI@2
+    displayName: "Run ArtifactAssembler"
+    inputs:
+      command: run
+      projects: "$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj"
+      arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
+      workingDirectory: '$(Pipeline.Workspace)'
+
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+    - task: PowerShell@2
+      displayName: 'Generate metadata.json file'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/generateMetadataFile.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging"'
+        workingDirectory: '$(Pipeline.Workspace)'
+
+  - ${{ if startsWith(parameters.arch, 'win') }}:
+    - task: PowerShell@2
+      displayName: 'Generate MSI files'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/generateMsiFiles.ps1'
+        arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
+        workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+
+  - ${{ if startsWith(parameters.arch, 'win-x') }}:
+    - template: ci/sign-files.yml@eng
+      parameters:
+        displayName: Sign MSI files
+        folderPath: $(Pipeline.Workspace)\staging\coretools-cli
+        pattern: '*.msi'
+        signType: 'inline'
+        inlineOperation: |
+          [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+          ]
+
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+    - task: PowerShell@2
+      displayName: 'Test Artifacts - Visual Studio'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/testVsArtifacts.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-visualstudio"'
+        workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+
+  - ${{ if startsWith(parameters.arch, 'win') }}:
+    - task: PowerShell@2
+      displayName: 'Test Artifacts'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/testArtifacts.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)\staging\coretools-cli"'
+        workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Zip Artifacts'
+    inputs:
+      command: run
+      projects: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj'
+      arguments: '--no-build -c release -- zip'
+      workingDirectory: '$(Pipeline.Workspace)'
+
+  - task: PowerShell@2
+    displayName: 'Generate SHA files'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/generateSha.ps1'
+      arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'
+
+  - task: CopyFiles@2
+    displayName: 'Copy Files to Artifact Staging Directory'
+    inputs:
+      SourceFolder: '$(Pipeline.Workspace)/staging'
+      Contents: 'coretools-*/**'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
+
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+    - task: CopyFiles@2
+      displayName: 'Copy metadata.json to Artifact Staging Directory'
+      inputs:
+        SourceFolder: '$(Pipeline.Workspace)/staging'
+        Contents: 'metadata.json'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'

@@ -1,6 +1,8 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using System.IO;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 namespace Azure.Functions.ArtifactAssembler
@@ -55,8 +57,9 @@ namespace Azure.Functions.ArtifactAssembler
         private string _inProc8ExtractedRootDir = string.Empty;
         private string _coreToolsHostExtractedRootDir = string.Empty;
         private string _outOfProcExtractedRootDir = string.Empty;
+        private string _artifactName = string.Empty;
 
-        internal ArtifactAssembler(string rootWorkingDirectory)
+        internal ArtifactAssembler(string rootWorkingDirectory, string artifactName)
         {
             _inProcArtifactDirectoryName = GetRequiredEnvironmentVariable(EnvironmentVariables.InProcArtifactAlias);
             _coreToolsHostArtifactDirectoryName = GetRequiredEnvironmentVariable(EnvironmentVariables.CoreToolsHostArtifactAlias);
@@ -70,6 +73,7 @@ namespace Azure.Functions.ArtifactAssembler
 
             _rootWorkingDirectory = rootWorkingDirectory;
             _stagingDirectory = CreateStagingDirectory(_rootWorkingDirectory);
+            _artifactName = artifactName;
         }
 
         internal async Task AssembleArtifactsAsync()
@@ -109,8 +113,8 @@ namespace Azure.Functions.ArtifactAssembler
 
             Directory.Delete(inProcArtifactDownloadDir, true);
 
-            _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostWindowsArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
-            await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostLinuxArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName));
+            _coreToolsHostExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostWindowsArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName), true);
+            await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(coreToolsHostLinuxArtifactDirPath, Path.Combine(_stagingDirectory, Constants.CoreToolsHostDirectoryName), true);
             Directory.Delete(coreToolsHostArtifactDownloadDir, true);
 
             _outOfProcExtractedRootDir = await MoveArtifactsToStagingDirectoryAndExtractIfNeeded(outOfProcArtifactDirPath, Path.Combine(_stagingDirectory, Constants.OutOfProcDirectoryName));
@@ -141,11 +145,38 @@ namespace Azure.Functions.ArtifactAssembler
             return stagingDirectory;
         }
 
-        private static async Task<string> MoveArtifactsToStagingDirectoryAndExtractIfNeeded(string artifactZipPath, string destinationDirectory)
+        private async Task<string> MoveArtifactsToStagingDirectoryAndExtractIfNeeded(string artifactZipPath, string destinationDirectory, bool isCoreToolsHost = false)
         {
-            await Task.Run(() => FileUtilities.CopyDirectory(artifactZipPath, destinationDirectory));
-            await ExtractZipFilesInDirectoryAsync(artifactZipPath, destinationDirectory);
+            // Perform different steps if _artifactName is specified
+            if (!String.IsNullOrEmpty(_artifactName))
+            {
+                if (!Directory.Exists(destinationDirectory))
+                {
+                    Directory.CreateDirectory(destinationDirectory);
+                }
 
+                if (isCoreToolsHost)
+                {
+                    _visualStudioArtifacts.TryGetValue(_artifactName, out var fileNameToSearchFor);
+                    if (!string.IsNullOrEmpty(fileNameToSearchFor))
+                    {
+                        var directory = Path.Combine(artifactZipPath, fileNameToSearchFor);
+                        var destinationDirectoryWithArtifactFolder = Path.Combine(destinationDirectory, fileNameToSearchFor);
+                        if (Directory.Exists(directory))
+                        {
+                            FileUtilities.CopyDirectory(directory, destinationDirectoryWithArtifactFolder);
+                        }
+
+                    }
+                    return destinationDirectory;
+                }
+                await ExtractZipFilesInDirectoryAsync(artifactZipPath, destinationDirectory);
+            }
+            else
+            {
+                FileUtilities.CopyDirectory(artifactZipPath, destinationDirectory);
+                await ExtractZipFilesInDirectoryAsync(artifactZipPath, destinationDirectory);
+            }
             // Delete additional files that are not needed
             var filesToBeDeleted = Directory.EnumerateFiles(destinationDirectory);
             foreach (var file in filesToBeDeleted)
@@ -172,32 +203,50 @@ namespace Azure.Functions.ArtifactAssembler
         private async Task CreateVisualStudioCoreToolsAsync()
         {
             Console.WriteLine("Starting to assemble Visual Studio Core Tools artifacts");
+
+            bool isValidVisualStudioArtifact = _visualStudioArtifacts.ContainsKey(_artifactName);
             // Create a directory to store the assembled artifacts.
             var customHostTargetArtifactDir = Path.Combine(_stagingDirectory, Constants.VisualStudioOutputArtifactDirectoryName);
             Directory.CreateDirectory(customHostTargetArtifactDir);
 
-            foreach (string artifactName in _visualStudioArtifacts.Keys)
+            string[] visualStudioArtifactList = String.IsNullOrEmpty(_artifactName) ? _visualStudioArtifacts.Keys.ToArray() : new string[] { _artifactName };
+
+            foreach (string artifactName in visualStudioArtifactList)
             {
+                if (!String.IsNullOrEmpty(_artifactName))
+                {
+                    // Break early if we don't need to assemble VS artifacts for specified artifactName
+                    if (!isValidVisualStudioArtifact)
+                    {
+                        break;
+                    }
+                }
                 (string artifactDirName, string consolidatedArtifactDirPath) = await CreateInProc8CoreToolsHostHelper(artifactName, customHostTargetArtifactDir, createDirectory: true);
 
                 // Copy in-proc6 files and delete directory after
                 var inProc6ArtifactDirPath = Path.Combine(_inProc6ExtractedRootDir, artifactDirName);
                 EnsureArtifactDirectoryExist(inProc6ArtifactDirPath);
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName));
                 Directory.Delete(inProc6ArtifactDirPath, true);
 
                 // Copy core-tools-host files
                 var rid = GetRuntimeIdentifierForArtifactName(artifactName);
                 var coreToolsHostArtifactDirPath = Path.Combine(_coreToolsHostExtractedRootDir, rid);
                 EnsureArtifactDirectoryExist(coreToolsHostArtifactDirPath);
-                await Task.Run(() => FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath));
+                FileUtilities.CopyDirectory(coreToolsHostArtifactDirPath, consolidatedArtifactDirPath);
                 Directory.Delete(coreToolsHostArtifactDirPath, true);
             }
-
-            // Create artifacts for .NET 8 OSX to use instead of the custom host
-            foreach (string artifactName in _net8OsxArtifacts)
+            if ((!String.IsNullOrEmpty(_artifactName) && _net8OsxArtifacts.Contains(_artifactName)))
             {
-                _ = await CreateInProc8CoreToolsHostHelper(artifactName, customHostTargetArtifactDir, createDirectory: false);
+                _ = await CreateInProc8CoreToolsHostHelper(_artifactName, customHostTargetArtifactDir, createDirectory: false);
+            }
+            else if (String.IsNullOrEmpty(_artifactName))
+            {
+                // Create artifacts for .NET 8 OSX to use instead of the custom host
+                foreach (string artifactName in _net8OsxArtifacts)
+                {
+                    _ = await CreateInProc8CoreToolsHostHelper(_artifactName, customHostTargetArtifactDir, createDirectory: false);
+                }
             }
 
             // Delete directories
@@ -225,7 +274,7 @@ namespace Azure.Functions.ArtifactAssembler
             Directory.CreateDirectory(consolidatedArtifactDirPath);
 
             // Copy in-proc8 files and delete directory after
-            await Task.Run(() => FileUtilities.CopyDirectory(inProcArtifactDirPath, createDirectory ? Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName): consolidatedArtifactDirPath));
+            FileUtilities.CopyDirectory(inProcArtifactDirPath, createDirectory ? Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName) : consolidatedArtifactDirPath);
             Directory.Delete(inProcArtifactDirPath, true);
 
             return (artifactDirName, consolidatedArtifactDirPath);
@@ -243,7 +292,9 @@ namespace Azure.Functions.ArtifactAssembler
                    outOfProcArtifactDirPath = string.Empty,
                    inProc8ArtifactDirPath = string.Empty;
 
-            foreach (var artifactName in _cliArtifacts)
+            string[] cliArtifactList = String.IsNullOrEmpty(_artifactName) ? _cliArtifacts : new string[] { _artifactName };
+
+            foreach (var artifactName in cliArtifactList)
             {
                 // If we are running this for the first time, extract the directory path and out of proc version
                 if (String.IsNullOrEmpty(outOfProcArtifactDirPath))
@@ -265,7 +316,7 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Copy oop core tools and delete old directory
                 EnsureArtifactDirectoryExist(outOfProcArtifactDirPath);
-                await Task.Run(() => FileUtilities.CopyDirectory(outOfProcArtifactDirPath, consolidatedArtifactDirPath));
+                FileUtilities.CopyDirectory(outOfProcArtifactDirPath, consolidatedArtifactDirPath);
                 Directory.Delete(outOfProcArtifactDirPath, true);
 
                 // If we are currently on the minified version of the artifacts, we do not want the inproc6/inproc8 subfolders
@@ -292,7 +343,7 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Copy in-proc8 files
                 var inProc8FinalDestination = Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName);
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName)));
+                FileUtilities.CopyDirectory(inProc8ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName));
                 Console.WriteLine($"Copied files from {inProc8ArtifactDirPath} => {inProc8FinalDestination}");
 
                 // Rename inproc6 directory to have the same version as the out-of-proc artifact before copying
@@ -302,7 +353,7 @@ namespace Azure.Functions.ArtifactAssembler
 
                 // Copy in-proc6 files
                 var inProc6FinalDestination = Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName);
-                await Task.Run(() => FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName)));
+                FileUtilities.CopyDirectory(inProc6ArtifactDirPath, Path.Combine(consolidatedArtifactDirPath, Constants.InProc6DirectoryName));
                 Console.WriteLine($"Copied files from {inProc8ArtifactDirPath} => {inProc8FinalDestination}");
 
                 Console.WriteLine($"Finished assembling {consolidatedArtifactDirPath}");
@@ -339,7 +390,7 @@ namespace Azure.Functions.ArtifactAssembler
             throw new InvalidOperationException($"Runtime identifier (RID) not found for artifact name '{artifactName}'.");
         }
 
-        private static async Task ExtractZipFilesInDirectoryAsync(string zipSourceDir, string extractDestinationDir)
+        private async Task ExtractZipFilesInDirectoryAsync(string zipSourceDir, string extractDestinationDir)
         {
             if (!Directory.Exists(zipSourceDir))
             {
@@ -348,14 +399,25 @@ namespace Azure.Functions.ArtifactAssembler
             }
 
             var zipFiles = Directory.GetFiles(zipSourceDir, "*.zip");
+            if (!string.IsNullOrEmpty(_artifactName))
+            {
+                zipFiles = zipFiles.Where(file => Path.GetFileName(file).StartsWith(_artifactName)).ToArray();
+            }
             Console.WriteLine($"{zipFiles.Length} zip files found in {zipSourceDir}");
 
             // Extract each zip file and delete
             foreach (var zipFile in zipFiles)
             {
+                // Copy file over first if we are extracting a particular artifact
+                if (!string.IsNullOrEmpty(_artifactName))
+                {
+                    var destZipFile = Path.Combine(extractDestinationDir, Path.GetFileName(zipFile));
+                    File.Copy(zipFile, destZipFile, overwrite: true);
+                    Console.WriteLine($"Copied {zipFile} to {destZipFile}");
+                }
                 var destinationDir = Path.Combine(extractDestinationDir, Path.GetFileNameWithoutExtension(zipFile));
                 Console.WriteLine($"Extracting {zipFile} to {destinationDir}");
-                await Task.Run(() => FileUtilities.ExtractToDirectory(zipFile, destinationDir));
+                FileUtilities.ExtractToDirectory(zipFile, destinationDir);
                 File.Delete(zipFile);
             }
         }
