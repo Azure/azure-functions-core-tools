@@ -1005,7 +1005,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = true,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
+                    ErrorContains = ["The runtime argument value provided is 'inproc6'. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1039,7 +1039,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
+                    ErrorContains = ["The runtime argument value provided is 'inproc8'. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1073,7 +1073,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = [$"The runtime argument value provided, 'inproc8', is invalid. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process."],
+                    ErrorContains = [$"The runtime argument value provided is 'inproc8'. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1107,7 +1107,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
+                    ErrorContains = ["The runtime argument value provided is 'default'. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1141,7 +1141,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
+                    ErrorContains = ["The runtime argument value provided is 'default'. The provided value is only valid for the worker runtime 'dotnetIsolated'."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1176,7 +1176,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. For the 'inproc6' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
+                    ErrorContains = ["The runtime argument value provided is 'inproc6'. For the 'inproc6' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1211,7 +1211,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'inproc6', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
+                    ErrorContains = ["The runtime argument value provided is 'inproc6'. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
@@ -1246,7 +1246,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = ["The runtime argument value provided, 'inproc8', is invalid. The provided value is only valid for the worker runtime 'dotnet'."],
+                    ErrorContains = ["The runtime argument value provided is 'inproc8'. The provided value is only valid for the worker runtime 'dotnet'."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })

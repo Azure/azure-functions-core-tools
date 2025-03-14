@@ -516,7 +516,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             void ThrowCliException(string suffix)
             {
-                throw new CliException($"The runtime argument value provided, '{HostRuntime}', is invalid. {suffix}");
+                throw new CliException($"The runtime argument value provided is '{HostRuntime}'. {suffix}");
             }
 
             if (DotnetConstants.ValidRuntimeValues.Contains(HostRuntime, StringComparer.OrdinalIgnoreCase) == false)
