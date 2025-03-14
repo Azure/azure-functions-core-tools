@@ -1073,7 +1073,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     ExpectExit = false,
                     ExitInError = true,
-                    ErrorContains = [$"The runtime argument value provided, 'inproc8', is invalid. For the .NET 8 runtime in the in-proc model, you must set the '{Constants.InProcDotNet8EnabledSetting}' environment variable to '1'. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process."],
+                    ErrorContains = [$"The runtime argument value provided, 'inproc8', is invalid. For the .NET 8 runtime on the in-process, you must set the '{Constants.InProcDotNet8EnabledSetting}' environment variable to '1'. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process."],
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })

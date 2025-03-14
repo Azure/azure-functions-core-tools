@@ -541,7 +541,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (isInproc8ArgumentValue && !await validateDotNet8ProjectEnablement())
                 {
-                    ThrowCliException($"For the .NET 8 runtime in the in-proc model, you must set the '{Constants.InProcDotNet8EnabledSetting}' environment variable to '1'. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process.");
+                    ThrowCliException($"For the .NET 8 runtime on the in-process, you must set the '{Constants.InProcDotNet8EnabledSetting}' environment variable to '1'. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process.");
                 }
                 else if (isInproc6ArgumentValue && await validateDotNet8ProjectEnablement())
                 {
