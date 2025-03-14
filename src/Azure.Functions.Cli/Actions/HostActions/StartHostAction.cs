@@ -531,7 +531,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 if (isInproc6ArgumentValue)
                 {
-                    ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported, please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
+                    ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
                 }
 
                 if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
