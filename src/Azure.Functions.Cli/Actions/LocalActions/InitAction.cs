@@ -61,7 +61,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         // Default to .NET 8 if the target framework is not specified
         private const string DefaultTargetFramework = Common.TargetFramework.net8;
 
-        private const string DefaultInProcTargetFramework = Common.TargetFramework.net6;
+        private const string DefaultInProcTargetFramework = Common.TargetFramework.net8;
 
         internal static readonly Dictionary<Lazy<string>, Task<string>> fileToContentMap = new Dictionary<Lazy<string>, Task<string>>
         {
