@@ -494,6 +494,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 
                 PrintVerboseForHostSelection(selectedRuntime);
 
+                if (selectedRuntime == DotnetConstants.InProc6HostRuntime)
+                {
+                    PrintMigrationWarningForDotnet6Inproc();
+                }
+
                 if (Utilities.IsMinifiedVersion())
                 {
                     ThrowForInProc();
@@ -531,7 +536,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 if (isInproc6ArgumentValue)
                 {
-                    ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
+                    PrintMigrationWarningForDotnet6Inproc();
                 }
 
                 if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
@@ -835,6 +840,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // Update local.settings.json
             WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString());
+        }
+        private void PrintMigrationWarningForDotnet6Inproc() 
+        {
+            ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
         }
     }
 }

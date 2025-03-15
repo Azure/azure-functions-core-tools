@@ -257,6 +257,11 @@ namespace Azure.Functions.Cli.Tests.E2E
                             p.Kill();
                             await Task.Delay(TimeSpan.FromSeconds(2));
                             result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
+                            
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.");
+                            }
                         }
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
@@ -1876,18 +1881,22 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        $"start  --port {_funcHostPort} --verbose --runtime inproc6"
+                        $"start  --port {_funcHostPort} --runtime inproc6"
                     },
                     ExpectExit = false,
-                    OutputContains = new[]
-                    {
-                        $".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}."
-                    },
                     Test = async (workingDir, p, _) =>
                     {
                         using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
                         {
-                            await Task.Delay(TimeSpan.FromSeconds(2));
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            var result = await response.Content.ReadAsStringAsync();
+                            p.Kill();
+                            
+                            if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
+                            {
+                                testOutputHelper.Output.Should().Contain($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.");
+                            }
                         }
                     },
                     CommandTimeout = TimeSpan.FromSeconds(100),
