@@ -1864,6 +1864,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
         public async Task Start_InProc6_SpecifiedRuntime_Show_Migration_Warning()
         {
             await CliTester.Run(new RunConfiguration[]
