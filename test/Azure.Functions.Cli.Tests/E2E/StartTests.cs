@@ -1872,7 +1872,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime dotnet",
+                        "init . --worker-runtime dotnet --target-framework net6.0",
                         "new --template Httptrigger --name HttpTrigger",
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
