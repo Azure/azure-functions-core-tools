@@ -222,6 +222,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                         }
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)
+
                 }
             }, _output);
         }
