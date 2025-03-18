@@ -77,6 +77,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public string JsonOutputFile { get; set; }
 
         public string? HostRuntime { get; set; }
+        public string UserLogLevel { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
         {
@@ -178,6 +179,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                .WithDescription($"If provided, determines which version of the host to start. Allowed values are '{DotnetConstants.InProc6HostRuntime}', '{DotnetConstants.InProc8HostRuntime}', and 'default' (which runs the out-of-process host).")
                .Callback(startHostFromRuntime => HostRuntime = startHostFromRuntime);
 
+            Parser
+               .Setup<string>("userLogLevel")
+               .WithDescription($"If provided, determines the loglevel of user logs. Allowed values are '{LogLevel.Trace}', '{LogLevel.Debug}', '{LogLevel.Information}', '{LogLevel.Warning}', '{LogLevel.Error}', '{LogLevel.Critical}' and '{LogLevel.None}'.")
+               .Callback(userLogLevel => UserLogLevel = userLogLevel);
+
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
             // Input args do not contain --verbose flag
@@ -190,7 +196,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, UserLogLevel);
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
                 GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
             {

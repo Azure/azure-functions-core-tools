@@ -18,8 +18,9 @@ namespace Azure.Functions.Cli
         public const string Ci_Continuous_Integration = "CONTINUOUS_INTEGRATION";  // Travis CI, Cirrus CI
         public const string Ci_Build_Number = "BUILD_NUMBER";  // Travis CI, Cirrus CI
         public const string Ci_Run_Id = "RUN_ID"; // TaskCluster, dsari
+        public static readonly string[] ValidUserLogLevels = ["Trace", "Debug", "Information", "Warning", "Error","Critical", "None"];
 
-        public LoggingFilterHelper(IConfigurationRoot hostJsonConfig, bool? verboseLogging)
+        public LoggingFilterHelper(IConfigurationRoot hostJsonConfig, bool? verboseLogging, string userLogLevel = null)
         {
             VerboseLogging = verboseLogging.HasValue && verboseLogging.Value;
 
@@ -34,7 +35,16 @@ namespace Azure.Functions.Cli
             if (Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelDefaultSection, out LogLevel logLevel))
             {
                 SystemLogDefaultLogLevel = logLevel;
-                UserLogDefaultLogLevel = logLevel;
+            }
+
+            // Check for user log level
+            if (!string.IsNullOrEmpty(userLogLevel))
+            { 
+                ValidateUserLogLevel(userLogLevel);
+                if (Enum.TryParse(userLogLevel, true, out LogLevel UserLogLevel))
+                {
+                    UserLogDefaultLogLevel = UserLogLevel;
+                }
             }
         }
 
@@ -67,6 +77,13 @@ namespace Azure.Functions.Cli
                 return true;
             }
             return false;
+        }
+        private void ValidateUserLogLevel(string UserLogLevel)
+        {
+            if (LoggingFilterHelper.ValidUserLogLevels.Contains(UserLogLevel, StringComparer.OrdinalIgnoreCase) == false)
+            {
+                throw new CliException($"The userLogLevel value provided, '{UserLogLevel}', is invalid. Valid values are '{string.Join("', '", LoggingFilterHelper.ValidUserLogLevels)}'.");
+            }
         }
     }
 }
