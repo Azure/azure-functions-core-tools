@@ -1,0 +1,32 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Common library and package properties -->
+  <PropertyGroup>
+    <Company>Microsoft Corporation</Company>
+    <Authors>Microsoft</Authors>
+    <Title>Azure Functions CLI</Title>
+    <Copyright>© .NET Foundation. All rights reserved.</Copyright>
+    <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
+    <RepositoryUrl>https://github.com/Azure/azure-functions-core-tools</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+    <ApplicationIcon>$(RepoRoot)AzureFunctions-CLI.ico</ApplicationIcon>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <NeutralLanguage>en-US</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);NU1507</NoWarn>
+  </PropertyGroup>
+
+  <!-- enable this in a new PR and fix all warnings-->
+  <!-- <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup> -->
+</Project>
