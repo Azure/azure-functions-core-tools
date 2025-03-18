@@ -77,6 +77,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public string JsonOutputFile { get; set; }
 
         public string? HostRuntime { get; set; }
+
         public string UserLogLevel { get; set; }
 
         public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
