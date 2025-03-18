@@ -1,9 +1,7 @@
 ﻿using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Interfaces;
@@ -11,8 +9,6 @@ using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using static Colors.Net.StringStaticMethods;
-using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -33,6 +29,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private const string _defaultManagementURL = Constants.DefaultManagementURL;
 
         public string AccessToken { get; set; }
+        public string SyncAccessToken { get; set; }
         public bool ReadStdin { get; set; }
         public string ManagementURL { get; set; }
         public string Subscription { get; private set; }
@@ -43,6 +40,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<string>("access-token")
                 .WithDescription("Access token to use for performing authenticated azure actions")
                 .Callback(t => AccessToken = t);
+            Parser
+                .Setup<string>("sync-access-token")
+                .WithDescription("Access token to use for performing trigger sync azure action (if different to normal)")
+                .Callback(t => SyncAccessToken = t);
             Parser
                 .Setup<bool>("access-token-stdin")
                 .WithDescription("Read access token from stdin e.g: az account get-access-token | func ... --access-token-stdin")
