@@ -3,8 +3,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <!--Starting with .NET 9, CET is enabled by default (https://github.com/dotnet/docs/issues/42600).
@@ -14,7 +12,7 @@
     <CETCompat>false</CETCompat>
     <OptimizationPreference>Speed</OptimizationPreference>
     <AssemblyName>func</AssemblyName>
-	<IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
+    <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -26,7 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NETCore.DotNetAppHost" Version="8.0.8" />
+    <PackageReference Include="Microsoft.NETCore.DotNetAppHost" />
   </ItemGroup>
 
 </Project>

@@ -1,12 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net8.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
-    <AssemblyName>Azure.Functions.Cli.Tests</AssemblyName>
-    <RootNamespace>Azure.Functions.Cli.Tests</RootNamespace>
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <Nullable>disable</Nullable>
   </PropertyGroup>
+
   <ItemGroup>
     <Compile Remove="Resources\**" />
     <EmbeddedResource Remove="Resources\**" />
@@ -14,20 +12,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Data.Tables" Version="12.9.0" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.21.2" />
-    <PackageReference Include="Azure.Storage.Queues" Version="12.19.1" />
-    <PackageReference Include="FluentAssertions" Version="5.2.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.6.2" />
-    <PackageReference Include="Moq" Version="4.8.2" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="NSubstitute" Version="3.1.0" />
-    <PackageReference Include="Octokit" Version="0.29.0" />
-    <PackageReference Include="RichardSzalay.MockHttp" Version="5.0.0" />
-    <PackageReference Include="SuaveServerWrapper" Version="0.0.3" />
-    <PackageReference Include="xunit" Version="2.4.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
-    <PackageReference Include="Xunit.SkippableFact" Version="1.3.6" />
+    <PackageReference Include="Azure.Data.Tables" />
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Azure.Storage.Queues" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Octokit" />
+    <PackageReference Include="RichardSzalay.MockHttp" />
+    <PackageReference Include="SuaveServerWrapper" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Xunit.SkippableFact" />
   </ItemGroup>
 
   <ItemGroup>
