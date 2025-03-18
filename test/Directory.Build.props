@@ -1,8 +1,3 @@
 <Project>
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
-
-  <PropertyGroup>
-    <IsPackable>true</IsPackable>
-    <PackageOutputPath>$(RepoRoot)nupkg</PackageOutputPath>
-  </PropertyGroup>
 </Project>
