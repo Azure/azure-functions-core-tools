@@ -1,0 +1,6 @@
+# Ignore build artifacts
+bin/
+obj/
+out/
+nupkg/
+artifacts/
