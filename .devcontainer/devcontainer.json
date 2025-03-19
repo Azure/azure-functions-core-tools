@@ -1,0 +1,23 @@
+{
+    "name": "C# (.NET)",
+    "image": "mcr.microsoft.com/devcontainers/dotnet:8.0",
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/azure-cli:1": {},
+        "ghcr.io/devcontainers/features/dotnet:2": {
+            "version": "8.0",
+            "additionalVersions": "3.1, 9.0"
+        }
+    },
+    "containerEnv": {
+        "IsReleaseBuild": "false"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-dotnettools.csdevkit"
+            ]
+        }
+    },
+    "postCreateCommand": "dotnet build"
+}
