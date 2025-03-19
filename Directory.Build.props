@@ -12,7 +12,6 @@
     <ArtifactsPublishOutputName>pub</ArtifactsPublishOutputName>
     <ArtifactsPackageOutputName>pkg</ArtifactsPackageOutputName>
     <IsPackable>false</IsPackable>
-    <PackageOutputPath>$(RepoRoot)nupkg/</PackageOutputPath>
   </PropertyGroup>
 
   <Import Project="$(RepoEngRoot)Directory.Build.Common.props" />

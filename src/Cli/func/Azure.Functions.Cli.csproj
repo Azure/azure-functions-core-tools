@@ -4,16 +4,18 @@
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <Nullable>disable</Nullable>
+    <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
   </PropertyGroup>
 
   <PropertyGroup>
-    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
-    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
-    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
-    <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
-    <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
-    <NuspecProperties>ßconfiguration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>func</ToolCommandName>
     <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -22,16 +24,9 @@
     <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
     <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
     <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>func</ToolCommandName>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
-    <PublishReadyToRun>false</PublishReadyToRun>
-    <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
+    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
+    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
+    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -297,6 +292,12 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="content" />
+    <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\tools\python\packapp\__main__.py" Pack="true" PackagePath="contentFiles/any/$(TargetFramework)" />
+    <None Include="$(RepoRoot)out\pub\Azure.Functions.Cli\$(Configuration)_$(TargetFramework)\**\*" Pack="true" PackagePath="tools/$(TargetFramework)/any" />
   </ItemGroup>
 
   <Target Name="ExcludeWorkersFromReadyToRun">

@@ -11,7 +11,6 @@
     <Authors>Microsoft</Authors>
     <Title>Azure Functions CLI</Title>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
-    <PackageLicenseUrl>http://www.microsoft.com/web/webpi/eula/aspnetcomponent_rtw_enu.htm</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Azure/azure-functions-core-tools</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
@@ -25,7 +24,8 @@
     <NoWarn>$(NoWarn);NU1507</NoWarn>
   </PropertyGroup>
 
-  <!-- enable this in a new PR and fix all warnings-->
+  <!-- uncomment this in a new PR and fix all errors -->
+  <!-- https://github.com/Azure/azure-functions-core-tools/issues/4320 -->
   <!-- <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup> -->

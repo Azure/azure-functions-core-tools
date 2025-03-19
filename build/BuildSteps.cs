@@ -134,6 +134,7 @@ namespace Build
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
+                                $"/p:ContinuousIntegrationBuild=\"true\" " +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
                                 $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +
                                 (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));

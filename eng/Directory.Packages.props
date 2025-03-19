@@ -47,8 +47,6 @@
   </ItemGroup>
 
   <!-- test projects -->
-  <!-- <ItemGroup Condition="'$(IsTestProject)' == 'true'">
-     -->
   <ItemGroup>
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.21.2" />

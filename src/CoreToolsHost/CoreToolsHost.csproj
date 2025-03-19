@@ -12,7 +12,7 @@
     <CETCompat>false</CETCompat>
     <OptimizationPreference>Speed</OptimizationPreference>
     <AssemblyName>func</AssemblyName>
-	  <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
+    <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
   </PropertyGroup>
 
   <PropertyGroup>
