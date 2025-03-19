@@ -1,0 +1,11 @@
+# Run: docker-compose up --build -d && docker exec -it func-cli bash
+services:
+  func-cli:
+    build:
+      context: ..  # Go up one level to repo root
+      dockerfile: docker/Dockerfile
+      args:
+        TARGET_RUNTIME: linux-x64
+    # platform: linux/amd64 # Uncomment if you are on an M1/M2 Mac
+    container_name: func-cli
+    image: func-cli
