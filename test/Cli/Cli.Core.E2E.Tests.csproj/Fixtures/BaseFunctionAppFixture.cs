@@ -24,6 +24,7 @@ namespace Cli.Core.E2E.Tests.Fixtures
         public string WorkerRuntime {  get; set; }
         public string? TargetFramework { get; set; }
         public string? Version { get ; set; }
+        private static readonly SemaphoreSlim InitializationLock = new SemaphoreSlim(1, 1);
 
         public BaseFunctionAppFixture(string workerRuntime, string? targetFramework = null, string? version = null)
         {
@@ -59,39 +60,47 @@ namespace Cli.Core.E2E.Tests.Fixtures
             return Task.CompletedTask;
         }
 
-        public Task InitializeAsync()
+        public async Task InitializeAsync()
         {
-            // Create the function
-            var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
-                .Concat(TargetFramework != null
-                    ? new[] { "--target-framework", TargetFramework }
-                    : Array.Empty<string>())
-                .Concat(Version != null
-                    ? new[] { "-m", Version }
-                    : Array.Empty<string>())
-                .ToList();
+            // Wait for the lock before initializing
+            await InitializationLock.WaitAsync();
 
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
+            try
+            {
+                // Create the function
+                var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
+                    .Concat(TargetFramework != null
+                        ? new[] { "--target-framework", TargetFramework }
+                        : Array.Empty<string>())
+                    .Concat(Version != null
+                        ? new[] { "-m", Version }
+                        : Array.Empty<string>())
+                    .ToList();
+
+                var funcInitResult = new FuncInitCommand(FuncPath, Log)
+                                        .WithWorkingDirectory(WorkingDirectory)
+                                        .Execute(initArgs);
+
+                if (funcInitResult.ExitCode != 0)
+                {
+                    throw new Exception($"Failed to initialize function app: {funcInitResult.StdErr}");
+                }
+
+                // Add Http Trigger
+                var funcNewResult = new FuncNewCommand(FuncPath, Log)
                                     .WithWorkingDirectory(WorkingDirectory)
-                                    .Execute(initArgs);
+                                    .Execute(new List<string> { "--template", "Httptrigger", "--name", "HttpTrigger" });
 
-            if (funcInitResult.ExitCode != 0)
-            {
-                throw new Exception($"Failed to initialize function app: {funcInitResult.StdErr}");
+                if (funcNewResult.ExitCode != 0)
+                {
+                    throw new Exception($"Failed to add HTTP trigger: {funcNewResult.StdErr}");
+                }
             }
-
-            // Add Http Trigger
-            var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                                .WithWorkingDirectory(WorkingDirectory)
-                                .Execute(new List<string> { "--template", "Httptrigger", "--name", "HttpTrigger" });
-
-
-            if (funcNewResult.ExitCode != 0)
+            finally
             {
-                throw new Exception($"Failed to add HTTP trigger: {funcNewResult.StdErr}");
+                // Always release the lock, even if an exception occurs
+                InitializationLock.Release();
             }
-
-            return Task.CompletedTask;
         }
     }
 }
