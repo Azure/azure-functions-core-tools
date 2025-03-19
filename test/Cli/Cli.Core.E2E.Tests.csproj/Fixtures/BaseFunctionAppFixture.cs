@@ -83,7 +83,7 @@ namespace Cli.Core.E2E.Tests.Fixtures
             // Add Http Trigger
             var funcNewResult = new FuncNewCommand(FuncPath, Log)
                                 .WithWorkingDirectory(WorkingDirectory)
-                                .Execute(new List<string> { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+                                .Execute(new List<string> { "--template", "Httptrigger", "--name", "HttpTrigger" });
 
 
             if (funcNewResult.ExitCode != 0)

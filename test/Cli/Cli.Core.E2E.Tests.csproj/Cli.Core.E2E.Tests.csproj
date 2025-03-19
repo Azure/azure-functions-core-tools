@@ -30,4 +30,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <PropertyGroup>
+	<RunSettingsFilePath>$(MSBuildProjectDirectory)\Runsettings\StartTests_default.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+
 </Project>

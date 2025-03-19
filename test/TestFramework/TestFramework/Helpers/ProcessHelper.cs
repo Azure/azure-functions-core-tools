@@ -15,7 +15,7 @@ namespace TestFramework.Helpers
     {
         private static string FunctionsHostUrl = "http://localhost";
 
-        public static async Task WaitForFunctionHostToStart(Process funcProcess, int port)
+        public static async Task WaitForFunctionHostToStart(Process funcProcess, int port, int timeout = 60 * 1000)
         {
             var url = $"{FunctionsHostUrl}:{port.ToString()}";
             using var httpClient = new HttpClient();
@@ -39,7 +39,7 @@ namespace TestFramework.Helpers
                 {
                     return false;
                 }
-            });
+            }, timeout);
         }
 
         public static int GetAvailablePort()

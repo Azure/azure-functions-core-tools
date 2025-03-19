@@ -8,19 +8,22 @@ using Xunit.Abstractions;
 
 namespace Cli.Core.E2E.Tests
 {
-    public abstract class BaseE2ETest: IDisposable
+    public abstract class BaseE2ETest: IAsyncLifetime
     {
         protected ITestOutputHelper Log { get; }
         protected string FuncPath { get; set; }
 
         protected string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        protected bool CleanupWorkingDirectory { get; set; } = true;
+        protected bool DeleteWorkingDirectory { get; set; } = true;
 
         protected BaseE2ETest(ITestOutputHelper log)
         {
             Log = log;
             FuncPath = Environment.GetEnvironmentVariable("FUNC_PATH");
+        }
 
+        public Task InitializeAsync()
+        {
             if (FuncPath == null)
             {
                 // Fallback for local testing in Visual Studio, etc.
@@ -37,15 +40,90 @@ namespace Cli.Core.E2E.Tests
                 }
             }
             Directory.CreateDirectory(WorkingDirectory);
+            return Task.CompletedTask;
         }
 
-        public void Dispose()
+        public static void ClearDirectoryContents(string directoryPath)
         {
-            if (CleanupWorkingDirectory)
+            if (!Directory.Exists(directoryPath))
+                return;
+
+            // Delete all files
+            foreach (string file in Directory.GetFiles(directoryPath))
             {
-                Directory.Delete(WorkingDirectory, true);
+                try
+                {
+                    // Reset file attributes in case they're read-only
+                    File.SetAttributes(file, FileAttributes.Normal);
+                    File.Delete(file);
+                }
+                catch (Exception ex)
+                {
+                    // Log but continue with other files
+                    Console.WriteLine($"Failed to delete file {file}: {ex.Message}");
+                }
+            }
+
+            // Delete all subdirectories and their contents
+            foreach (string subDir in Directory.GetDirectories(directoryPath))
+            {
+                try
+                {
+                    Directory.Delete(subDir, true);
+                }
+                catch (Exception ex)
+                {
+                    // Log but continue with other directories
+                    Console.WriteLine($"Failed to delete directory {subDir}: {ex.Message}");
+                }
             }
         }
 
+        public Task DisposeAsync()
+        {
+            try
+            {
+                if (DeleteWorkingDirectory)
+                {
+                    Directory.Delete(WorkingDirectory, true);
+                }
+                else
+                {
+                    ClearDirectoryContents(WorkingDirectory);
+                }
+                return Task.CompletedTask;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Try to reset read-only attributes
+                try
+                {
+                    foreach (var file in Directory.GetFiles(WorkingDirectory, "*", SearchOption.AllDirectories))
+                    {
+                        File.SetAttributes(file, FileAttributes.Normal);
+                    }
+
+                    // Try delete again
+                    if (DeleteWorkingDirectory)
+                    {
+                        Directory.Delete(WorkingDirectory, true);
+                    }
+                    else
+                    {
+                        ClearDirectoryContents(WorkingDirectory);
+                    }
+                    return Task.CompletedTask;
+                }
+                catch (Exception ex)
+                {
+                    return Task.FromException(ex);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException(ex);
+            }
+        }
     }
 }

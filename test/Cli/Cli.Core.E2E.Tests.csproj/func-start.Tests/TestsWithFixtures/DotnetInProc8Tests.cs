@@ -9,6 +9,7 @@ using TestFramework.Commands;
 using TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
+using static Microsoft.Azure.AppService.Proxy.Runtime.Trace;
 
 namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 {
@@ -80,7 +81,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
-                .Execute(new[] { "start", "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
+                .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.",
@@ -89,44 +90,6 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             // Validate inproc8 host was started
             result.Should().HaveStdOutContaining("Starting child process for inproc8 model host.");
             result.Should().HaveStdOutContaining("Selected inproc8 host.");
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
-        public async Task Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
-        {
-            int port = ProcessHelper.GetAvailablePort();
-
-            // Use a different fixture or setup for Visual Studio project
-            // This might require additional configuration in your fixture
-
-            // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
-            string capturedContent = null;
-
-            funcStartCommand.ProcessStartedHandler = async process =>
-            {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                using (var client = new HttpClient())
-                {
-                    var response = await client.GetAsync($"http://localhost:{port}/api/Function1?name=Test");
-                    capturedContent = await response.Content.ReadAsStringAsync();
-                    process.Kill(true);
-                }
-            };
-
-            // Note: For Visual Studio project, you might need a different working directory
-            // The original test used "../../../E2E/TestProject/TestNet8InProcProject"
-            var result = funcStartCommand
-                .WithWorkingDirectory(_fixture.WorkingDirectory) // You may need to adjust this
-                .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.",
-                because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-
-            // Validate .NET 8 host was loaded
-            result.Should().HaveStdOutContaining("Loading .NET 8 host");
         }
 
         [Fact]

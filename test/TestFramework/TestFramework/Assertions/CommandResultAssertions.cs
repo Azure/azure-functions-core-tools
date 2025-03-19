@@ -41,7 +41,7 @@ namespace TestFramework.Assertions
         public AndConstraint<CommandResultAssertions> NotHaveStdOutContaining(string pattern)
         {
             Execute.Assertion.ForCondition(_commandResult.StdOut is not null && !_commandResult.StdOut.Contains(pattern))
-                .FailWith($"The command output did not contain expected result: {pattern}{Environment.NewLine}");
+                .FailWith($"The command output did contain expected result: {pattern}{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
 

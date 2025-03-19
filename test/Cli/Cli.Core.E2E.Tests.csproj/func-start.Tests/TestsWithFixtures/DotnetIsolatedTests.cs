@@ -43,7 +43,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
+                        .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
             capturedContent.Should().Be("Welcome to Azure Functions!");
@@ -110,7 +110,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
+                        .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
             capturedContent.Should().Be("Welcome to Azure Functions!",
@@ -129,7 +129,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             // Call func start with invalid runtime (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .Execute(new[] { "start", "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
+                        .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
             // Validate error message
             result.Should().ExitWith(1);
@@ -144,7 +144,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             // Call func start with invalid runtime (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .Execute(new[] { "start", "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
+                        .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
             // Validate error message
             result.Should().ExitWith(1);
