@@ -19,8 +19,8 @@ Licensed under the MIT license. See LICENSE file in the project root for full li
     <tags>azure,functions,azure-function,core-tools,cli</tags>
   </metadata>
   <files>
-    <file src=".\bin\$configuration$\$targetFramework$\publish\tools\python\packapp\__main__.py" target="content" />
-    <file src=".\bin\$configuration$\$targetFramework$\publish\tools\python\packapp\__main__.py" target="contentFiles\any\$targetFramework$" />
-    <file src=".\bin\$configuration$\$targetFramework$\publish\**\*" target="tools\$targetFramework$\any" />
+    <file src="$(RepoRoot)out\pub\Azure.Functions.Cli\$configuration$_$targetFramework$\tools\python\packapp\__main__.py" target="content" />
+    <file src="$(RepoRoot)out\pub\Azure.Functions.Cli\$configuration$_$targetFramework$\tools\python\packapp\__main__.py" target="contentFiles\any\$targetFramework$" />
+    <file src="$(RepoRoot)out\pub\Azure.Functions.Cli\$configuration$_$targetFramework$\**\*" target="tools\$targetFramework$\any" />
   </files>
 </package>
