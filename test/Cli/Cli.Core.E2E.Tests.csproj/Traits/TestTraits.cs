@@ -31,5 +31,7 @@ namespace Cli.Core.E2E.Tests.Traits
         /// Otherwise tests with this label will fail in the PR/ official core tools pipelines since the nested inproc artifacts are not present.
         /// </summary>
         public const string UseInVisualStudioConsolidatedArtifactGeneration = "UseInVisualStudioConsolidatedArtifactGeneration";
+
+        public const string InProc = "InProc";
     }
 }

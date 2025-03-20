@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Threading.Tasks;
 using TestFramework.Assertions;
+using TestFramework.Attributes;
 using TestFramework.Commands;
 using TestFramework.Helpers;
 using Xunit;
@@ -13,6 +14,8 @@ using Xunit.Abstractions;
 
 namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 {
+    [Collection("Dotnet6InProc")]
+    [Trait(TestTraits.Group, TestTraits.InProc)]
     public class Dotnet6InProcTests : IClassFixture<Dotnet6InProcFunctionAppFixture>
     {
         private readonly Dotnet6InProcFunctionAppFixture _fixture;

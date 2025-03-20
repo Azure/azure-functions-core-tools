@@ -5,6 +5,7 @@ using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 using TestFramework.Assertions;
+using TestFramework.Attributes;
 using TestFramework.Commands;
 using TestFramework.Helpers;
 using Xunit;
@@ -14,6 +15,7 @@ using static Microsoft.Azure.AppService.Proxy.Runtime.Trace;
 namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 {
     [Collection("Dotnet8InProc")]
+    [Trait(TestTraits.Group, TestTraits.InProc)]
     public class Dotnet8InProcTests : IClassFixture<Dotnet8InProcFunctionAppFixture>
     {
         private readonly Dotnet8InProcFunctionAppFixture _fixture;
