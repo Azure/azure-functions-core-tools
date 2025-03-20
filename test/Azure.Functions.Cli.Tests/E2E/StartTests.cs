@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using FluentAssertions;
+using Microsoft.Azure.Storage;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -1855,80 +1856,6 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
             }
-        }
-
-        [Theory]
-        [InlineData("dotnet-isolated", "debug")]
-        [InlineData("dotnet", "debug")]
-        public async Task Start_Host_SpecifieduserLogLevel_SuccessfulFunctionExecution(string WorkerRuntime, string UserLogLevel)
-        {
-            await CliTester.Run(new RunConfiguration[]
-            {
-                new RunConfiguration
-                {
-                    Commands = new[]
-                    {
-                        $"init . --worker-runtime {WorkerRuntime}",
-                        $"new --template Httptrigger --name HttpTrigger",
-                    },
-                    CommandTimeout = TimeSpan.FromSeconds(300),
-                },
-                new RunConfiguration
-                {
-                    Commands = new[]
-                    {
-                        $"start  --port {_funcHostPort} --userLogLevel {UserLogLevel}"
-                    },
-                    ExpectExit = false,
-                    Test = async (workingDir, p, _) =>
-                    {
-                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
-                        {
-                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
-                             var response = await client.GetAsync("/api/HttpTriggerFunc?name=Test");
-                             response.StatusCode.Should().Be(HttpStatusCode.OK);
-                             await Task.Delay(TimeSpan.FromSeconds(2));
-                             p.Kill();
-                        }
-                    },
-                    CommandTimeout = TimeSpan.FromSeconds(100),
-                },
-            }, _output);
-        }
-
-        [Theory]
-        [InlineData("TestLogLevel")]
-        public async Task Start_Host_Validate_SpecifieduserLogLevel( string UserLogLevel)
-        {
-            await CliTester.Run(new RunConfiguration[]
-            {
-                new RunConfiguration
-                {
-                    Commands = new[]
-                    {
-                        "init . --worker-runtime dotnet-isolated",
-                        "new --template Httptrigger --name HttpTrigger",
-                    }
-                },
-                new RunConfiguration
-                {
-                    Commands = new[]
-                    {
-                        $"start  --port {_funcHostPort} --userLogLevel {UserLogLevel}"
-                    },
-                    ExpectExit = true,
-                    ExitInError = true,
-                    ErrorContains = [$"The userLogLevel value provided, '{UserLogLevel}', is invalid. Valid values are '{string.Join("', '", LoggingFilterHelper.ValidUserLogLevels)}'."],
-                    Test = async (workingDir, p, _) =>
-                    {
-                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
-                        {
-                            await Task.Delay(TimeSpan.FromSeconds(2));
-                        }
-                    },
-                    CommandTimeout = TimeSpan.FromSeconds(100),
-                },
-            }, _output);
         }
 
         private async Task<bool> WaitUntilReady(HttpClient client)

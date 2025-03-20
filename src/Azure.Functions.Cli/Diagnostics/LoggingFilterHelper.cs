@@ -40,7 +40,6 @@ namespace Azure.Functions.Cli
             // Check for user log level
             if (!string.IsNullOrEmpty(userLogLevel))
             { 
-                ValidateUserLogLevel(userLogLevel);
                 if (Enum.TryParse(userLogLevel, true, out LogLevel UserLogLevel))
                 {
                     UserLogDefaultLogLevel = UserLogLevel;
@@ -78,12 +77,6 @@ namespace Azure.Functions.Cli
             }
             return false;
         }
-        private void ValidateUserLogLevel(string UserLogLevel)
-        {
-            if (LoggingFilterHelper.ValidUserLogLevels.Contains(UserLogLevel, StringComparer.OrdinalIgnoreCase) == false)
-            {
-                throw new CliException($"The userLogLevel value provided, '{UserLogLevel}', is invalid. Valid values are '{string.Join("', '", LoggingFilterHelper.ValidUserLogLevels)}'.");
-            }
-        }
+
     }
 }
