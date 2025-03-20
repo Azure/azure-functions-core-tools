@@ -1,0 +1,3 @@
+# Ignore build artifacts
+bin/
+obj/
