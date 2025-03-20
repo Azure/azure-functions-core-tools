@@ -599,8 +599,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             try
             {
-                childProcessInfo.Environment["AzureFunctionsJobHost"] = "true";
-                childProcessInfo.Environment["FUNCTIONS_LOG_LEVEL"] = "debug";
                 var childProcess = Process.Start(childProcessInfo);
                 if (VerboseLogging == true)
                 {
