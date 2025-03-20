@@ -190,7 +190,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, GetUserLogLevel());
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
                 GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
             {
@@ -830,6 +830,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // Update local.settings.json
             WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString());
+        }
+
+        private string GetUserLogLevel()
+        {
+            var UserLogLevel = Environment.GetEnvironmentVariable(Constants.FunctionsLoggingLogLevel) 
+                        ?? _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsLoggingLogLevel, StringComparison.OrdinalIgnoreCase)).Value;
+           
+            return UserLogLevel;
         }
     }
 }
