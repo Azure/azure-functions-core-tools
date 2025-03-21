@@ -1,5 +1,7 @@
 bin
 obj
+out
+nupkg
 csx
 .vs
 edge
@@ -27,6 +29,7 @@ artifacts/
 /src/Azure.Functions.Cli/Properties/launchSettings.json
 launchSettings.json
 publish-env
+*.binlog
 
 # MacOS related
 .DS_Store

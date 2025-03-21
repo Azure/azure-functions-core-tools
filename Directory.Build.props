@@ -1,0 +1,18 @@
+<Project>
+  <!-- paths -->
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <RepoEngRoot>$(RepoRoot)eng/</RepoEngRoot>
+    <RepoSrcRoot>$(RepoRoot)src/</RepoSrcRoot>
+  </PropertyGroup>
+
+  <!-- artifacts -->
+  <PropertyGroup>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)out</ArtifactsPath>
+    <ArtifactsPublishOutputName>pub</ArtifactsPublishOutputName>
+    <ArtifactsPackageOutputName>pkg</ArtifactsPackageOutputName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <Import Project="$(RepoEngRoot)Directory.Build.Common.props" />
+</Project>
