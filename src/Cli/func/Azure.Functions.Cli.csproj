@@ -12,6 +12,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>func</ToolCommandName>
     <PackageId>Microsoft.Azure.Functions.CoreTools</PackageId>
+    <ContainerRepository>Microsoft.Azure.Functions.Cli</ContainerRepository>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86'">
