@@ -28,6 +28,7 @@ namespace Build
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
                 .Then(TestNewProject)
+                .Then(TestNewProjectDotnetInProc)
                 .Then(Test)
                 .Then(Zip)
                 .Then(DotnetPublishForNupkg)

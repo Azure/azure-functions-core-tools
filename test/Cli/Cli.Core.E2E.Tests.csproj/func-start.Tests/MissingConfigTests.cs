@@ -183,7 +183,7 @@ namespace Cli.Core.E2E.Tests
             funcStartCommand.ProcessStartedHandler = async process =>
             {
                 // Wait for error to appear
-                await Task.Delay(5000);
+                await ProcessHelper.WaitForFunctionHostToStart(process, port);
                 // Kill the process
                 process.Kill(true);
             };
