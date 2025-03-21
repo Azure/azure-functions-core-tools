@@ -106,7 +106,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             funcStartCommand.ProcessStartedHandler = async process =>
             {
                 // Wait for debugger message
-                await Task.Delay(5000);
+                await ProcessHelper.WaitForFunctionHostToStart(process, port);
                 process.Kill(true);
             };
 
@@ -223,7 +223,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             funcStartCommand.ProcessStartedHandler = async process =>
             {
                 // Wait for logs to appear
-                await Task.Delay(5000);
+                await ProcessHelper.WaitForFunctionHostToStart(process, port);
                 process.Kill(true);
             };
 
@@ -259,7 +259,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             funcStartCommand.ProcessStartedHandler = async process =>
             {
                 // Wait for process to start
-                await Task.Delay(5000);
+                await ProcessHelper.WaitForFunctionHostToStart(process, port);
                 process.Kill(true);
             };
 
