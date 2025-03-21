@@ -152,5 +152,48 @@ namespace Cli.Core.E2E.Tests
                 }
             }
         }
+
+        [Fact]
+        public async Task Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError()
+        {
+            int port = ProcessHelper.GetAvailablePort();
+            var functionName = "HttpTriggerJS";
+
+            // Initialize Node.js function app
+            var funcInitResult = new FuncInitCommand(FuncPath, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--worker-runtime", "node", "-m", "v3" });
+            funcInitResult.Should().ExitWith(0);
+
+            // Add HTTP trigger
+            var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--template", "HttpTrigger", "--name", functionName });
+            funcNewResult.Should().ExitWith(0);
+
+            // Modify function.json to include an invalid binding type
+            var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
+            var functionJson = await File.ReadAllTextAsync(filePath);
+            functionJson = functionJson.Replace("\"type\": \"http\"", "\"type\": \"http2\"");
+            await File.WriteAllTextAsync(filePath, functionJson);
+
+            // Call func start
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+
+            funcStartCommand.ProcessStartedHandler = async process =>
+            {
+                // Wait for error to appear
+                await Task.Delay(5000);
+                // Kill the process
+                process.Kill(true);
+            };
+
+            var result = funcStartCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { "--port", port.ToString() });
+
+            // Validate error message
+            result.Should().HaveStdOutContaining("The binding type(s) 'http2' were not found in the configured extension bundle. Please ensure the type is correct and the correct version of extension bundle is configured.");
+        }
     }
 }
