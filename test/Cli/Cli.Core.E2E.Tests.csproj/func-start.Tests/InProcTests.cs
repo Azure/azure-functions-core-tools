@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 
 namespace Cli.Core.E2E.Tests.func_start.Tests
 {
+    [Trait(TestTraits.Group, TestTraits.InProc)]
     public class InProcTests: BaseE2ETest
     {
         public InProcTests(ITestOutputHelper log) : base(log)
