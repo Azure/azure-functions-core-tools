@@ -1,3 +1,4 @@
+# Run: docker-compose up --build -d && docker exec -it func-cli bash
 services:
   func-cli:
     build:
