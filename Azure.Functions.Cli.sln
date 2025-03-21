@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.12.35506.116 d17.12
+VisualStudioVersion = 17.12.35506.116
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{5F51C958-39C0-4E0C-9165-71D0BCE647BC}"
 EndProject
@@ -12,6 +12,16 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Azure.Functions.Cli.Tests", "test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj", "{EAEA6EDB-A301-4A50-86D8-91859DABE30E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZippedExe", "test\ZippedExe\ZippedExe.csproj", "{2CD45039-0ABD-4082-87D0-52BB5D467B50}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cli.Core.E2E.Tests", "test\Cli\Cli.Core.E2E.Tests.csproj\Cli.Core.E2E.Tests.csproj", "{F1873332-4041-49BD-A3CC-00C79F217856}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Cli", "Cli", "{92539CE8-552A-496D-BAF4-600A4949C417}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Abstractions", "Abstractions", "{CB42018F-B40F-425F-854D-7029101E550D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.Abstractions", "src\Cli\Abstractions\Azure.Functions.Cli.Abstractions\Azure.Functions.Cli.Abstractions.csproj", "{1590DCA8-4511-479C-9404-B67491B6A175}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestFramework", "test\TestFramework\TestFramework\TestFramework.csproj", "{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +41,18 @@ Global
 		{2CD45039-0ABD-4082-87D0-52BB5D467B50}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2CD45039-0ABD-4082-87D0-52BB5D467B50}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2CD45039-0ABD-4082-87D0-52BB5D467B50}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F1873332-4041-49BD-A3CC-00C79F217856}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F1873332-4041-49BD-A3CC-00C79F217856}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F1873332-4041-49BD-A3CC-00C79F217856}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F1873332-4041-49BD-A3CC-00C79F217856}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1590DCA8-4511-479C-9404-B67491B6A175}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1590DCA8-4511-479C-9404-B67491B6A175}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1590DCA8-4511-479C-9404-B67491B6A175}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1590DCA8-4511-479C-9404-B67491B6A175}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -39,6 +61,11 @@ Global
 		{6608738C-3BDB-47F5-BC62-66A8BDF9D884} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
 		{EAEA6EDB-A301-4A50-86D8-91859DABE30E} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
 		{2CD45039-0ABD-4082-87D0-52BB5D467B50} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
+		{F1873332-4041-49BD-A3CC-00C79F217856} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
+		{92539CE8-552A-496D-BAF4-600A4949C417} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
+		{CB42018F-B40F-425F-854D-7029101E550D} = {92539CE8-552A-496D-BAF4-600A4949C417}
+		{1590DCA8-4511-479C-9404-B67491B6A175} = {CB42018F-B40F-425F-854D-7029101E550D}
+		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FA1E01D6-A57B-4061-A333-EDC511D283C0}
