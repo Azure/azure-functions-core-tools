@@ -101,7 +101,7 @@ namespace Cli.Core.E2E.Tests
                 // Add HTTP trigger
                 var funcNewResult = new FuncNewCommand(FuncPath, Log)
                     .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerFunc" });
+                    .Execute(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" });
                 funcNewResult.Should().ExitWith(0);
 
                 // Delete local.settings.json
