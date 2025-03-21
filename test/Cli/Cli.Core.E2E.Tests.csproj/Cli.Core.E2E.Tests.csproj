@@ -16,6 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
+	<None Update="xunit.runner.json">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	</None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\src\Azure.Functions.Cli\Azure.Functions.Cli.csproj" />
     <ProjectReference Include="..\..\TestFramework\TestFramework\TestFramework.csproj" />
   </ItemGroup>
