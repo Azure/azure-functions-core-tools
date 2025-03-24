@@ -30,7 +30,6 @@ namespace Azure.Functions.Cli.Tests
             }
             if ( !string.IsNullOrEmpty(categoryKey) && categoryKey.Equals("Default", StringComparison.OrdinalIgnoreCase))
             {
-                Assert.Equal(expectedDefaultLogLevel, loggingFilterHelper.UserLogDefaultLogLevel);
                 Assert.Equal(expectedDefaultLogLevel, loggingFilterHelper.SystemLogDefaultLogLevel);
             }
             else

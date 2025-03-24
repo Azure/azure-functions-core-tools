@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli
         public const string Ci_Build_Number = "BUILD_NUMBER";  // Travis CI, Cirrus CI
         public const string Ci_Run_Id = "RUN_ID"; // TaskCluster, dsari
 
-        public LoggingFilterHelper(IConfigurationRoot hostJsonConfig, bool? verboseLogging)
+        public LoggingFilterHelper(IConfigurationRoot hostJsonConfig, bool? verboseLogging, string userLogLevel = null)
         {
             VerboseLogging = verboseLogging.HasValue && verboseLogging.Value;
 
@@ -34,7 +34,15 @@ namespace Azure.Functions.Cli
             if (Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelDefaultSection, out LogLevel logLevel))
             {
                 SystemLogDefaultLogLevel = logLevel;
-                UserLogDefaultLogLevel = logLevel;
+            }
+
+            // Check for user log level
+            if (!string.IsNullOrEmpty(userLogLevel))
+            { 
+                if (Enum.TryParse(userLogLevel, true, out LogLevel UserLogLevel))
+                {
+                    UserLogDefaultLogLevel = UserLogLevel;
+                }
             }
         }
 
@@ -68,5 +76,6 @@ namespace Azure.Functions.Cli
             }
             return false;
         }
+
     }
 }
