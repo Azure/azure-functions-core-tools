@@ -21,6 +21,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             _fixture = fixture;
             _fixture.Log = log;
         }
+
         [Fact]
         public async Task Start_PowershellApp_SuccessfulFunctionExecution()
         {
