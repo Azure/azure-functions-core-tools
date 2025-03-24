@@ -23,8 +23,8 @@ namespace Cli.Core.E2E.Tests
             DeleteWorkingDirectory = false;
 
             // Visual Studio test project paths - these should be configured in the test environment
-            _vsNet8ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
-            _vsNet6ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
+            _vsNet8ProjectPath = Environment.GetEnvironmentVariable("NET8_VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
+            _vsNet6ProjectPath = Environment.GetEnvironmentVariable("NET6_VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
         }
 
         [Fact]

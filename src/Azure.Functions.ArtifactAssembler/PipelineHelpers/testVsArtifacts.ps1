@@ -26,6 +26,13 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
         
             # Set the environment variable FUNC_PATH to the func.exe or func path
             [System.Environment]::SetEnvironmentVariable("FUNC_PATH", $funcExePath.FullName, "Process")
+
+            $net8VsProjectPath = "..\..\test\Cli\Cli.Core.E2E.Tests\VisualStudioTestProjects\TestNet8InProcProject"
+            $net6VsProjectPath = "..\..\test\Cli\Cli.Core.E2E.Tests\VisualStudioTestProjects\TestNet6InProcProject"
+
+            # Set the environment variables NET8_VS_PROJECT_PATH and NET6_VS_PROJECT_PATH to the func.exe or func path
+            [System.Environment]::SetEnvironmentVariable("NET8_VS_PROJECT_PATH", $net8VsProjectPath.FullName, "Process")
+            [System.Environment]::SetEnvironmentVariable("NET6_VS_PROJECT_PATH", $net6VsProjectPath.FullName, "Process")
         
             # Run dotnet test with the environment variable set
             Write-Host "Running 'dotnet test' on test project: $testProjectPath"

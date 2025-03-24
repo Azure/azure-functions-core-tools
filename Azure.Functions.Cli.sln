@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.Abstrac
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestFramework", "test\TestFramework\TestFramework\TestFramework.csproj", "{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cli.Core.E2E.Tests", "test\Cli\Cli.Core.E2E.Tests\Cli.Core.E2E.Tests.csproj", "{BBCF781A-0F48-4B7D-A559-6D6E3C82FE7A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -53,6 +55,10 @@ Global
 		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BBCF781A-0F48-4B7D-A559-6D6E3C82FE7A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BBCF781A-0F48-4B7D-A559-6D6E3C82FE7A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BBCF781A-0F48-4B7D-A559-6D6E3C82FE7A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BBCF781A-0F48-4B7D-A559-6D6E3C82FE7A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -66,6 +72,7 @@ Global
 		{CB42018F-B40F-425F-854D-7029101E550D} = {92539CE8-552A-496D-BAF4-600A4949C417}
 		{1590DCA8-4511-479C-9404-B67491B6A175} = {CB42018F-B40F-425F-854D-7029101E550D}
 		{DD3AB4E3-CE9C-4AAB-BD1C-84870413715D} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
+		{BBCF781A-0F48-4B7D-A559-6D6E3C82FE7A} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FA1E01D6-A57B-4061-A333-EDC511D283C0}

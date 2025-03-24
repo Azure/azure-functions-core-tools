@@ -156,16 +156,22 @@ namespace Cli.Core.E2E.Tests.Fixtures
                 throw new Exception($"Failed to initialize function app: {funcInitResult.StdErr}");
             }
 
-            // Add Http Trigger
-            var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                                .WithWorkingDirectory(WorkingDirectory)
-                                .Execute(new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
-
-            if (funcNewResult.ExitCode != 0)
+            await RetryHelper.RetryAsync(() =>
             {
-                throw new Exception($"Failed to add HTTP trigger: {funcNewResult.StdErr}");
-            }
-            Log.WriteLine(funcNewResult.StdOut);
+                // Add Http Trigger
+                var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                                    .WithWorkingDirectory(WorkingDirectory)
+                                    .Execute(new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
+
+
+                if (funcNewResult.ExitCode != 0)
+                {
+                    throw new Exception($"Failed to add HTTP trigger: {funcNewResult.StdErr}");
+                }
+                return Task.FromResult(true);
+
+            });
+            
         }
     }
 }
