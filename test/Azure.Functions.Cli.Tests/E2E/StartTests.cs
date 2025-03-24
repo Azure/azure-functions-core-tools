@@ -1859,6 +1859,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         }
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_DotnetApp_WithDebugLogs_DisplaysDebugLogsInConsole()
         {
             var DebugLogMessage = "This is a debug log message";
