@@ -27,7 +27,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
         }
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime()
         {
             int port = ProcessHelper.GetAvailablePort();
@@ -61,7 +61,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
         }
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime()
         {
             int port = ProcessHelper.GetAvailablePort();
