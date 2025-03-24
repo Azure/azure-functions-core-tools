@@ -131,7 +131,13 @@ namespace Cli.Core.E2E.Tests.Fixtures
 
         public Task DisposeAsync()
         {
-            Directory.Delete(WorkingDirectory, true);
+            try
+            {
+                Directory.Delete(WorkingDirectory, true);
+            }
+            catch
+            {
+            }
             return Task.CompletedTask;
         }
 
@@ -163,12 +169,7 @@ namespace Cli.Core.E2E.Tests.Fixtures
                                     .WithWorkingDirectory(WorkingDirectory)
                                     .Execute(new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
-
-                if (funcNewResult.ExitCode != 0)
-                {
-                    throw new Exception($"Failed to add HTTP trigger: {funcNewResult.StdErr}");
-                }
-                return Task.FromResult(true);
+                return Task.FromResult(funcNewResult.ExitCode == 0);
 
             });
             

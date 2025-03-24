@@ -99,10 +99,19 @@ namespace Cli.Core.E2E.Tests
                 funcInitResult.Should().ExitWith(0);
 
                 // Add HTTP trigger
-                var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                    .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" });
-                funcNewResult.Should().ExitWith(0);
+                await RetryHelper.RetryAsync(
+                 () => {
+                     var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                         .WithWorkingDirectory(WorkingDirectory)
+                         .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerFunc" });
+
+                     // Return true if successful (exit code 0), false if we should retry
+                     return Task.FromResult(funcNewResult.ExitCode == 0);
+                 },
+                 timeout: 60 * 1000, // 60 seconds timeout
+                 pollingInterval: 3 * 1000, // Retry every 3 seconds
+                 userMessageCallback: () => $"Failed to create HTTP trigger"
+             );
 
                 // Delete local.settings.json
                 var localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
@@ -166,10 +175,19 @@ namespace Cli.Core.E2E.Tests
             funcInitResult.Should().ExitWith(0);
 
             // Add HTTP trigger
-            var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--template", "HttpTrigger", "--name", functionName });
-            funcNewResult.Should().ExitWith(0);
+            await RetryHelper.RetryAsync(
+                () => {
+                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                        .WithWorkingDirectory(WorkingDirectory)
+                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", functionName });
+
+                    // Return true if successful (exit code 0), false if we should retry
+                    return Task.FromResult(funcNewResult.ExitCode == 0);
+                },
+                timeout: 60 * 1000, // 60 seconds timeout
+                pollingInterval: 3 * 1000, // Retry every 3 seconds
+                userMessageCallback: () => $"Failed to create HTTP trigger"
+            );
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");

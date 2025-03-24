@@ -15,8 +15,6 @@ namespace Cli.Core.E2E.Tests
 {
     public class AuthTests : BaseE2ETest
     {
-        // Static semaphore to coordinate function initialization across test instances
-        private static readonly SemaphoreSlim FunctionInitLock = new SemaphoreSlim(1, 1);
         public AuthTests (ITestOutputHelper log) : base(log)
         {
         }
@@ -33,26 +31,25 @@ namespace Cli.Core.E2E.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Wait for lock before initializing function
-            await FunctionInitLock.WaitAsync();
-            try
-            {
-                // Initialize dotnet-isolated function app
-                var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                    .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(new[] { ".", "--worker-runtime", "dotnet-isolated" });
-                funcInitResult.Should().ExitWith(0);
+            // Initialize dotnet-isolated function app
+            var funcInitResult = new FuncInitCommand(FuncPath, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--worker-runtime", "dotnet-isolated" });
+            funcInitResult.Should().ExitWith(0);
 
-                // Add HTTP trigger with specified auth level
-                var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                    .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
-                funcNewResult.Should().ExitWith(0);
-            }
-            finally
-            {
-                FunctionInitLock.Release();
-            }
+            await RetryHelper.RetryAsync(
+                () => {
+                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                        .WithWorkingDirectory(WorkingDirectory)
+                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
+
+                    // Return true if successful (exit code 0), false if we should retry
+                    return Task.FromResult(funcNewResult.ExitCode == 0);
+                },
+                timeout: 60 * 1000, // 60 seconds timeout
+                pollingInterval: 3 * 1000, // Retry every 3 seconds
+                userMessageCallback: () => $"Failed to create HTTP trigger"
+            );
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
