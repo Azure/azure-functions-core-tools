@@ -30,8 +30,11 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
             $net8VsProjectPath = "..\..\test\Cli\Cli.Core.E2E.Tests\VisualStudioTestProjects\TestNet8InProcProject"
             $net6VsProjectPath = "..\..\test\Cli\Cli.Core.E2E.Tests\VisualStudioTestProjects\TestNet6InProcProject"
 
-            Write-Host "Setting NET8_VS_PROJECT_PATH to: $net8VsProjectPath.FullName"
-            Write-Host "Setting NET6_VS_PROJECT_PATH to: $net6VsProjectPath.FullName"
+            $net8VSProjectPathFullName = $net8VsProjectPath.FullName
+            $net6VSProjectPathFullName = $net6VsProjectPath.FullName
+            
+            Write-Host "Setting NET8_VS_PROJECT_PATH to: $net8VSProjectPathFullName"
+            Write-Host "Setting NET6_VS_PROJECT_PATH to: $net6VsProjectPathFullName"
 
             # Set the environment variables NET8_VS_PROJECT_PATH and NET6_VS_PROJECT_PATH to the func.exe or func path
             [System.Environment]::SetEnvironmentVariable("NET8_VS_PROJECT_PATH", $net8VsProjectPath.FullName, "Process")
