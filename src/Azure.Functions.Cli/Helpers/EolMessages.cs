@@ -25,6 +25,15 @@ namespace Azure.Functions.Cli.Helpers
             return $"Upgrade your app to .NET {nextStackVersion} as .NET {currentStackVersion} has reached EOL on {FormatDate(eol)} and is no longer supported. {link}";
         }
 
+        public static string GetEarlyEolUpdateMessage(string displayName, string currentStackVersion, string nextStackVersion, DateTime eol)
+        {
+            return $"Upgrade to {displayName} {nextStackVersion} as {displayName} {currentStackVersion} will reach end-of-life on {FormatDate(eol)}  and will no longer be supported";
+        }
+        public static string GetAfterEolUpdateMessage(string displayName, string currentStackVersion, string nextStackVersion, DateTime eol)
+        {
+            return $"Upgrade to {displayName} {nextStackVersion} as {displayName} {currentStackVersion} has reached end-of-life on {FormatDate(eol)} and is no longer supported.";
+        }
+
         private static string FormatDate(DateTime dateTime)
         {
             return dateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
