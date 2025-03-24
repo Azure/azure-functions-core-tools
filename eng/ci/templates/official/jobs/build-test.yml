@@ -81,6 +81,10 @@ jobs:
   - pwsh: |
       .\check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - pwsh: |
+        # Check if this is a scheduled build
+        Write-Host "##vso[build.addbuildtag]nightly-build"
   - pwsh: |
       .\build.ps1
     env:

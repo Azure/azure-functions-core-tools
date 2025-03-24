@@ -20,7 +20,8 @@ namespace Azure.Functions.ArtifactAssembler
                 }
                 else
                 {
-                    var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory);
+                    string? artifactName = args.Length > 0 ? args[0] : string.Empty;
+                    var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory, artifactName);
                     await artifactAssembler.AssembleArtifactsAsync();
                 }
 
