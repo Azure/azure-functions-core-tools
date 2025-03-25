@@ -15,7 +15,7 @@ namespace TestFramework.Helpers
     {
         private static string FunctionsHostUrl = "http://localhost";
 
-        public static async Task WaitForFunctionHostToStart(Process funcProcess, int port, int timeout = 90 * 1000)
+        public static async Task WaitForFunctionHostToStart(Process funcProcess, int port, int timeout = 60 * 1000, HttpStatusCode expectedStatus = HttpStatusCode.OK)
         {
             var url = $"{FunctionsHostUrl}:{port.ToString()}";
             using var httpClient = new HttpClient();
@@ -25,18 +25,41 @@ namespace TestFramework.Helpers
                 try
                 {
                     var response = await httpClient.GetAsync($"{url}/admin/host/status");
-                    var content = await response.Content.ReadAsStringAsync();
-                    var doc = JsonDocument.Parse(content);
 
-                    if (doc.RootElement.TryGetProperty("state", out JsonElement value) && value.GetString() == "Running")
+                    // If we're expecting a 401, check for that first
+                    if (expectedStatus == HttpStatusCode.Unauthorized && response.StatusCode == HttpStatusCode.Unauthorized)
                     {
+                        Console.WriteLine($"Received expected 401 Unauthorized response - host is ready");
                         return true;
                     }
 
+                    // For successful responses, check the running state
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var content = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Host status response: {content}");
+
+                        try
+                        {
+                            var doc = JsonDocument.Parse(content);
+                            if (doc.RootElement.TryGetProperty("state", out JsonElement value) &&
+                                value.GetString() == "Running")
+                            {
+                                return true;
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            Console.WriteLine($"Error parsing JSON: {ex.Message}");
+                        }
+                    }
+
+                    Console.WriteLine($"Host not ready yet. Status: {response.StatusCode}");
                     return false;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Console.WriteLine($"Error checking host status: {ex.Message}");
                     return false;
                 }
             }, timeout);

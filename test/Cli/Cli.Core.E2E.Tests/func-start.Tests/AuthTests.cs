@@ -1,7 +1,9 @@
 ﻿using FluentAssertions;
+using Grpc.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using TestFramework.Assertions;
@@ -56,20 +58,26 @@ namespace Cli.Core.E2E.Tests
             string capturedContent = null;
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                // Need this delay here to give the host time to start
-                // for the unauthorized function call, the host /admin/host/status is never marked as ready
-                await Task.Delay(30000);
-                using (var client = new HttpClient())
+                try
                 {
-                    var response = await client.GetAsync($"http://localhost:{port}/api/HttpTrigger?name=Test");
-                    if (response.IsSuccessStatusCode)
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, expectedStatus: enableAuth ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
+                    // Need this delay here to give the host time to start
+                    // for the unauthorized function call, the host /admin/host/status is never marked as ready
+                    using (var client = new HttpClient())
                     {
-                        capturedContent = await response.Content.ReadAsStringAsync();
+                        var response = await client.GetAsync($"http://localhost:{port}/api/HttpTrigger?name=Test");
+                        if (response.IsSuccessStatusCode)
+                        {
+                            capturedContent = await response.Content.ReadAsStringAsync();
+                        }
+                        else
+                        {
+                            capturedContent = "";
+                        }
                     }
-                    else
-                    {
-                        capturedContent = "";
-                    }
+                }
+                finally
+                {
                     process.Kill(true);
                 }
             };

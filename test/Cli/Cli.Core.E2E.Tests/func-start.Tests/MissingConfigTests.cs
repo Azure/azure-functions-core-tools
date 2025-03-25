@@ -123,17 +123,23 @@ namespace Cli.Core.E2E.Tests
 
                 funcStartCommand.ProcessStartedHandler = async process =>
                 {
-                    if (invokeFunction)
+                    try
                     {
-                        await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                        using (var client = new HttpClient())
+                        if (invokeFunction)
                         {
-                            var response = await client.GetAsync($"http://localhost:{port}/api/HttpTriggerFunc?name=Test");
-                            response.StatusCode.Should().Be(HttpStatusCode.OK);
-                            capturedContent = await response.Content.ReadAsStringAsync();
+                            await ProcessHelper.WaitForFunctionHostToStart(process, port);
+                            using (var client = new HttpClient())
+                            {
+                                var response = await client.GetAsync($"http://localhost:{port}/api/HttpTriggerFunc?name=Test");
+                                response.StatusCode.Should().Be(HttpStatusCode.OK);
+                                capturedContent = await response.Content.ReadAsStringAsync();
+                            }
                         }
                     }
-                    process.Kill(true);
+                    finally
+                    {
+                        process.Kill(true);
+                    }
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString() };
