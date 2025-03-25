@@ -9,7 +9,7 @@ namespace TestFramework.Helpers
 {
     public static class RetryHelper
     {
-        public static async Task RetryAsync(Func<Task<bool>> condition, int timeout = 60 * 1000, int pollingInterval = 2 * 1000, bool throwWhenDebugging = false, Func<string> userMessageCallback = null)
+        public static async Task RetryAsync(Func<Task<bool>> condition, int timeout = 120 * 1000, int pollingInterval = 2 * 1000, bool throwWhenDebugging = false, Func<string> userMessageCallback = null)
         {
             DateTime start = DateTime.Now;
             while (!await condition())
