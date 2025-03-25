@@ -56,7 +56,7 @@ try
     # Unzip the coretools artifact to add signed binaries
     foreach($rid in $runtimesIdentifiers)
     {
-        $files= Get-ChildItem -Path "..\artifacts\*.zip"
+        $files = Get-ChildItem -Path "$rootDir\artifacts\*.zip"
         foreach($file in $files)
         {
             if ($file.Name.Contains($rid))
