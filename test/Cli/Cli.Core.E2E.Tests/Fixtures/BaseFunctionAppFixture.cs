@@ -143,8 +143,10 @@ namespace Cli.Core.E2E.Tests.Fixtures
 
         public async Task InitializeAsync()
         {
-            // Create the function
-            var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
+            await RetryHelper.RetryAsync(() =>
+            {
+                // Create the function
+                var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
                 .Concat(TargetFramework != null
                     ? new[] { "--target-framework", TargetFramework }
                     : Array.Empty<string>())
@@ -153,14 +155,12 @@ namespace Cli.Core.E2E.Tests.Fixtures
                     : Array.Empty<string>())
                 .ToList();
 
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                                    .WithWorkingDirectory(WorkingDirectory)
-                                    .Execute(initArgs);
+                var funcInitResult = new FuncInitCommand(FuncPath, Log)
+                                        .WithWorkingDirectory(WorkingDirectory)
+                                        .Execute(initArgs);
 
-            if (funcInitResult.ExitCode != 0)
-            {
-                throw new Exception($"Failed to initialize function app: {funcInitResult.StdErr}");
-            }
+                return Task.FromResult(funcInitResult.ExitCode == 0);
+            });
 
             await RetryHelper.RetryAsync(() =>
             {

@@ -28,41 +28,14 @@ namespace Cli.Core.E2E.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize dotnet function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", language });
-            funcInitResult.Should().ExitWith(0);
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", language });
 
-            // Add HTTP trigger
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
 
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger"
-            );
-
-            // Add Queue trigger
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create Queue trigger"
-            );
+            // Add Queue trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
             string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -118,41 +91,14 @@ namespace Cli.Core.E2E.Tests
 
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize dotnet function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", "dotnet" });
-            funcInitResult.Should().ExitWith(0);
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-            // Add HTTP trigger
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
 
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger"
-            );
-
-            // Add Queue trigger
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create Queue trigger"
-            );
+            // Add Queue trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
             string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -196,41 +142,14 @@ namespace Cli.Core.E2E.Tests
 
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize dotnet function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", "dotnet" });
-            funcInitResult.Should().ExitWith(0);
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-            // Add HTTP trigger
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
 
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger"
-            );
-
-            // Add Queue trigger
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create Queue trigger"
-            );
+            // Add Queue trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
             string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");

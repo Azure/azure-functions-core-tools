@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace Cli.Core.E2E.Tests.func_start.Tests
 {
-    public class MultipleFunctionsTests: BaseE2ETest
+    public class MultipleFunctionsTests : BaseE2ETest
     {
         public MultipleFunctionsTests(ITestOutputHelper log) : base(log)
         {
@@ -22,56 +22,13 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize JavaScript function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", "javascript" });
-            funcInitResult.Should().ExitWith(0);
+            // Initialize JavaScript function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "javascript" });
 
-            // Add multiple HTTP triggers
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger http1"
-            );
-
-            // Add multiple HTTP triggers
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "http2" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger http2"
-            );
-
-            // Add multiple HTTP triggers
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "http3" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger http3"
-            );
+            // Add multiple HTTP triggers using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http2" });
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http3" });
 
             // Call func start with specific functions
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);

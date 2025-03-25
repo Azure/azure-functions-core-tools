@@ -4,6 +4,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using TestFramework.Commands;
+using TestFramework.Helpers;
 using Xunit.Abstractions;
 
 namespace Cli.Core.E2E.Tests
@@ -124,6 +126,30 @@ namespace Cli.Core.E2E.Tests
             {
                 return Task.FromException(ex);
             }
+        }
+
+        public async Task FuncInitWithRetryAsync(IEnumerable<string> args)
+        {
+            await RetryHelper.RetryAsync(
+               () =>
+               {
+                   var funcInitResult = new FuncInitCommand(FuncPath, Log)
+                    .WithWorkingDirectory(WorkingDirectory)
+                    .Execute(args);
+                   return Task.FromResult(funcInitResult.ExitCode == 0);
+               });
+        }
+
+        public async Task FuncNewWithRetryAsync(IEnumerable<string> args)
+        {
+            await RetryHelper.RetryAsync(
+               () =>
+               {
+                   var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                    .WithWorkingDirectory(WorkingDirectory)
+                    .Execute(args);
+                   return Task.FromResult(funcNewResult.ExitCode == 0);
+               });
         }
     }
 }

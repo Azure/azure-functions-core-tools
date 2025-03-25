@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 namespace Cli.Core.E2E.Tests.func_start.Tests
 {
     [Trait(TestTraits.Group, TestTraits.InProc)]
-    public class InProcTests: BaseE2ETest
+    public class InProcTests : BaseE2ETest
     {
         public InProcTests(ITestOutputHelper log) : base(log)
         {
@@ -27,17 +27,11 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize dotnet function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", "dotnet" });
-            funcInitResult.Should().ExitWith(0);
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-            // Add HTTP trigger
-            var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
-            funcNewResult.Should().ExitWith(0);
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
@@ -69,25 +63,11 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize dotnet function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", "dotnet" });
-            funcInitResult.Should().ExitWith(0);
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger"
-            );
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
             // Modify host.json to set log level to Debug
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -117,25 +97,11 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize dotnet function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", "dotnet" });
-            funcInitResult.Should().ExitWith(0);
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger"
-            );
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
             // Modify host.json to set log level with filter
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");

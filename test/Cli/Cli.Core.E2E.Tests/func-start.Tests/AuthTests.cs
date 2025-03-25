@@ -33,25 +33,9 @@ namespace Cli.Core.E2E.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Initialize dotnet-isolated function app
-            var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { ".", "--worker-runtime", "dotnet-isolated" });
-            funcInitResult.Should().ExitWith(0);
-
-            await RetryHelper.RetryAsync(
-                () => {
-                    var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                        .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
-
-                    // Return true if successful (exit code 0), false if we should retry
-                    return Task.FromResult(funcNewResult.ExitCode == 0);
-                },
-                timeout: 60 * 1000, // 60 seconds timeout
-                pollingInterval: 3 * 1000, // Retry every 3 seconds
-                userMessageCallback: () => $"Failed to create HTTP trigger"
-            );
+            // Call func init and func new
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet-isolated" });
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);

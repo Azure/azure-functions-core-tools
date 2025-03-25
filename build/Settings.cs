@@ -41,7 +41,7 @@ namespace Build
 
         public static readonly string NewTestProjectFile = Path.Combine(Path.GetFullPath("../test/Cli/Cli.Core.E2E.Tests"), "Cli.Core.E2E.Tests.csproj");
 
-        public static readonly string RuntimeSettings = Path.Combine(NewTestProjectFile, Path.Combine("Runsettings", "StartTests_dotnet_inproc.runsettings"));
+        public static readonly string RuntimeSettings = Path.Combine(Path.GetFullPath("../test/Cli/Cli.Core.E2E.Tests"), Path.Combine("Runsettings", "StartTests_dotnet_inproc.runsettings"));
 
         public static readonly string[] TargetRuntimes = new[] {
             "min.win-arm64",
