@@ -11,9 +11,11 @@ jobs:
     devops_buildNumber: $[counter(format('1'), 6100)]
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+
   steps:
-  - pwsh: . "tools/start-emulators.ps1" -NoWait
+  - pwsh: . "eng/scripts/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
+
   - pwsh: |
       $simulateReleaseBuild = $null
       if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
@@ -26,6 +28,7 @@ jobs:
       {
           $isReleaseBuild = $true
       }
+
       Write-Host "Setting IsReleaseBuild to $isReleaseBuild because the branch name is $env:BuildSourceBranchName and SimulateReleaseBuild is $env:SimulateReleaseBuild"
       Write-Host "##vso[task.setvariable variable=IsReleaseBuild]$isReleaseBuild"
       Write-Host "IsReleaseBuild: $isReleaseBuild"
@@ -33,6 +36,7 @@ jobs:
     env:
       BuildSourceBranchName: $(Build.SourceBranchName)
       SimulateReleaseBuild: $(SimulateReleaseBuild)
+
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -42,27 +46,33 @@ jobs:
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
     displayName: 'Set IsIntegrationBuild variable'
+
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
     displayName: Set up environment variables
+
   - task: NodeTool@0
     inputs:
       versionSpec: '18.x'
+
   - pwsh: |
-      Import-Module ".\pipelineUtilities.psm1" -Force
+      Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
+
   - pwsh: |
-      Import-Module ".\pipelineUtilities.psm1" -Force
+      Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
       Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
     env:
       SBOMUtilSASUrl: $(SBOMUtilSASUrl)
     condition: eq(variables['IsReleaseBuild'], 'true')
     displayName: 'Install SBOM ManifestTool'
+
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
     displayName: Install Nuget tool
+
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
     inputs:
@@ -74,19 +84,23 @@ jobs:
         # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+
   - pwsh: |
-      .\validateWorkerVersions.ps1
+      eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
+
   - pwsh: |
-      .\check-vulnerabilities.ps1
+      eng/scripts/check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
+
   - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
     - pwsh: |
         # Check if this is a scheduled build
         Write-Host "##vso[build.addbuildtag]nightly-build"
+
   - pwsh: |
-      .\build.ps1
+      eng/scripts/build.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -95,11 +109,11 @@ jobs:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Executing build script'
-  
+
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Authenticode signing (dll)'
-      folderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Authenticode\'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts/ToSign/Authenticode/'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
@@ -136,7 +150,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Third party signing (dll)'
-      folderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\ThirdParty\'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts/ToSign/ThirdParty/'
       pattern: '*.dll, *.exe'
       signType: inline
       inlineOperation: |
@@ -167,7 +181,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Mac signing'
-      folderPath: '$(Build.Repository.LocalPath)\artifacts\ToSign\Mac\'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts/ToSign/Mac/'
       pattern: '*.zip'
       signType: inline
       inlineOperation: |
@@ -182,7 +196,7 @@ jobs:
         ]
 
   - pwsh: |
-      .\repackageBinaries.ps1
+      eng/scripts/repackageBinaries.ps1
     displayName: Repackage signed binaries
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
@@ -190,15 +204,17 @@ jobs:
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+
   - task: DotNetCoreCLI@2
     inputs:
       command: 'run'
-      workingDirectory: '.\build'
+      workingDirectory: 'build'
       arguments: 'TestSignedArtifacts --signTest'
     displayName: 'Verify signed binaries'
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
+
   - pwsh: |
-      .\generateMsiFiles.ps1
+      eng/scripts/generateMsiFiles.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -210,7 +226,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'MSI Code Signing'
-      folderPath: '$(Build.Repository.LocalPath)\artifacts'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts'
       pattern: '*.msi'
       signType: inline
       inlineOperation: |
@@ -238,29 +254,31 @@ jobs:
         ]
 
   - pwsh: |
-      .\generateSha.ps1
+      eng/scripts/generateSha.ps1
     displayName: 'Generate sha files'
 
   - pwsh: |
-      Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
-      Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
-      Move-Item -Path '$(Build.Repository.LocalPath)\artifacts\Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
+      Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
+      Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
+      Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
       if ($env:IntegrationBuildNumber -like "PreRelease*-*")
       {
-          $sourcePath = Join-Path '$(Build.Repository.LocalPath)\artifacts' 'integrationTestsBuildManifest.json'
+          $sourcePath = Join-Path '$(Build.Repository.LocalPath)/artifacts' 'integrationTestsBuildManifest.json'
           Move-Item -Path $sourcePath -Destination '$(Build.ArtifactStagingDirectory)'
       }
     env:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
+
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeeded()
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: 'drop'
       artifactType: 'pipeline'
+
   - pwsh: |
-      .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
+      eng/scripts/uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
     env:
       IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)

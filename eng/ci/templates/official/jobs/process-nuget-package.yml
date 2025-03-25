@@ -6,7 +6,7 @@ jobs:
       - input: pipelineArtifact
         pipeline: core-tools-default
         artifactName: drop
-        targetPath: $(Pipeline.Workspace)\core-tools-default\drop
+        targetPath: $(Pipeline.Workspace)/core-tools-default/drop
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
@@ -19,5 +19,5 @@ jobs:
     displayName: 'Process and move nuget package to staging directory'
     inputs:
       targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/src/Azure.Functions.ArtifactAssembler/PipelineHelpers/moveNugetPackage.ps1'
+      filePath: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/PipelineHelpers/moveNugetPackage.ps1'
       arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'

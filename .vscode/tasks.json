@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj",
+                "${workspaceFolder}/src/Cli/func/Azure.Functions.Cli.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj",
+                "${workspaceFolder}/src/Cli/func/Azure.Functions.Cli.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary",
                 "--framework",
@@ -35,7 +35,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj"
+                "${workspaceFolder}/src/Cli/func/Azure.Functions.Cli.csproj"
             ],
             "problemMatcher": "$msCompile"
         }
