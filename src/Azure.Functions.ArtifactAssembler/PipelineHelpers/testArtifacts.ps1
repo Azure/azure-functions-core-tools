@@ -1,4 +1,3 @@
-# Note that this file should be used with YAML steps directly when the consolidated pipeline is migrated over to YAML
 param (
     [string]$StagingDirectory
 )
@@ -38,7 +37,6 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
                 Write-Host "All tests passed successfully within $subDir"
             }
 
-            dotnet new uninstall "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x"
             dotnet test $testProjectPath --no-build --settings $runtimeInProcSettings --logger "console;verbosity=detailed"
 
             if ($LASTEXITCODE -ne 0) {
