@@ -9,6 +9,7 @@ trigger:
     - release_4.0_hotfix
     - main
     - in-proc
+    - feature/*
 
 resources:
   repositories:
