@@ -136,7 +136,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 
             // Validate failure message
             result.Should().ExitWith(1);
-            result.Should().HaveStdErrContaining("The runtime argument value provided, 'inproc8', is invalid. For the 'inproc8' runtime, the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable must be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
+            result.Should().HaveStdErrContaining("The runtime argument value provided, 'inproc8', is invalid. For the .NET 8 runtime on the in-process model, you must set the 'FUNCTIONS_INPROC_NET8_ENABLED' environment variable to '1'. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process.");
         }
 
         [Fact]
