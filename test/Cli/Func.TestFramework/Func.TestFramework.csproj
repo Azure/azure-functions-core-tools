@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectCapability Remove="TestContainer" />
+  </ItemGroup>
+
+  <ItemGroup>
+	<PackageReference Include="Azure.Storage.Queues" />
+	<PackageReference Include="xunit" />
+	<PackageReference Include="FluentAssertions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+	<ProjectReference Include="..\..\..\src\Cli\Abstractions\Azure.Functions.Cli.Abstractions.csproj" />
+  </ItemGroup>
+
+
+</Project>
