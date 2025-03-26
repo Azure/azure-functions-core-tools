@@ -329,7 +329,43 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --filter \"FullyQualifiedName~Azure.Functions.Cli.Tests.E2E.StartTests\" --logger trx");
+        }
+
+        public static void TestNewProject()
+        {
+            var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
+                : Path.Combine(Settings.OutputDir, "linux-x64", "func");
+            Environment.SetEnvironmentVariable("FUNC_PATH", funcPath);
+
+            string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))
+            {
+                Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
+            }
+
+            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
+
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 -l \"console;verbosity=diagnostic\" --logger trx --blame-hang-timeout 15m");
+        }
+
+        public static void TestNewProjectDotnetInProc()
+        {
+            var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
+                : Path.Combine(Settings.OutputDir, "linux-x64", "func");
+            Environment.SetEnvironmentVariable("FUNC_PATH", funcPath);
+
+            string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))
+            {
+                Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
+            }
+
+            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
+
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 --logger trx --settings {Settings.RuntimeSettings} --blame-hang-timeout 10m");
         }
 
         public static void CopyBinariesToSign()
