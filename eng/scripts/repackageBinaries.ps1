@@ -1,5 +1,4 @@
-$rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
-$rootDir = Resolve-Path $rootDir
+$rootDir = Join-Path $PSScriptRoot "../.."  | Resolve-Path # Path to the root of the repository
 
 Set-Location "$rootDir/build"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -44,14 +43,21 @@ try
     $artifactsPath = "$rootDir/artifacts/"
     $tempDirectoryPath = "$rootDir/artifacts/temp/"
 
+    Write-Host "Artifacts path: $artifactsPath"
+    Write-Host "Temp directory path: $tempDirectoryPath"
+
     if (Test-Path $tempDirectoryPath)
     {
         Remove-Item $tempDirectoryPath -Force -Recurse
     }
+    else
+    {
+        New-Item -Path $tempDirectoryPath -ItemType Directory | Out-Null
+        Write-Host "Directory created: $tempDirectoryPath"
+    }
 
     # Runtimes with signed binaries
     $runtimesIdentifiers = @("min.win-arm64", "min.win-x86","min.win-x64", "osx-arm64", "osx-x64")
-    LogSuccess "$tempDirectoryPath created"
 
     # Unzip the coretools artifact to add signed binaries
     foreach($rid in $runtimesIdentifiers)
@@ -59,13 +65,16 @@ try
         $files = Get-ChildItem -Path "$rootDir\artifacts\*.zip"
         foreach($file in $files)
         {
+            Write-Host "Processing file: $file"
             if ($file.Name.Contains($rid))
             {
                 $fileName = [io.path]::GetFileNameWithoutExtension($file.Name)
+                Write-Host "File name: $fileName"
 
-                $targetDirectory = Join-Path $tempDirectoryPath $fileName
-                $targetDirectory = Resolve-Path $targetDirectory
+                $targetDirectory = Join-Path $tempDirectoryPath $fileName | Resolve-Path
+                Write-Host "Target directory: $targetDirectory"
                 $filePath = Resolve-Path $file.FullName
+                Write-Host "File path: $filePath"
                 Unzip $filePath $targetDirectory
 
                 # Removing file after extraction
