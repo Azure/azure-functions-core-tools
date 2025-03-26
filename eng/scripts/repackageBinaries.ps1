@@ -50,11 +50,6 @@ try
     {
         Remove-Item $tempDirectoryPath -Force -Recurse
     }
-    else
-    {
-        New-Item -Path $tempDirectoryPath -ItemType Directory | Out-Null
-        Write-Host "Directory created: $tempDirectoryPath"
-    }
 
     # Runtimes with signed binaries
     $runtimesIdentifiers = @("min.win-arm64", "min.win-x86","min.win-x64", "osx-arm64", "osx-x64")
@@ -65,16 +60,15 @@ try
         $files = Get-ChildItem -Path "$rootDir\artifacts\*.zip"
         foreach($file in $files)
         {
-            Write-Host "Processing file: $file"
             if ($file.Name.Contains($rid))
             {
                 $fileName = [io.path]::GetFileNameWithoutExtension($file.Name)
-                Write-Host "File name: $fileName"
 
-                $targetDirectory = Join-Path $tempDirectoryPath $fileName | Resolve-Path
-                Write-Host "Target directory: $targetDirectory"
+                $targetDirectory = Join-Path $tempDirectoryPath $fileName
+                New-Item $targetDirectory -ItemType Directory
+                $targetDirectory = Resolve-Path $targetDirectory
                 $filePath = Resolve-Path $file.FullName
-                Write-Host "File path: $filePath"
+                Write-Host "Target directory: $targetDirectory"
                 Unzip $filePath $targetDirectory
 
                 # Removing file after extraction
