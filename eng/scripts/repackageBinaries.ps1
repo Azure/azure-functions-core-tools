@@ -56,7 +56,7 @@ try
     # Unzip the coretools artifact to add signed binaries
     foreach($rid in $runtimesIdentifiers)
     {
-        $files= Get-ChildItem -Path "..\artifacts\*.zip"
+        $files = Get-ChildItem -Path "$rootDir\artifacts\*.zip"
         foreach($file in $files)
         {
             if ($file.Name.Contains($rid))
@@ -64,6 +64,7 @@ try
                 $fileName = [io.path]::GetFileNameWithoutExtension($file.Name)
 
                 $targetDirectory = Join-Path $tempDirectoryPath $fileName
+                New-Item $targetDirectory -ItemType Directory
                 $targetDirectory = Resolve-Path $targetDirectory
                 $filePath = Resolve-Path $file.FullName
                 Unzip $filePath $targetDirectory
