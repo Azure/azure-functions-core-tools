@@ -32,16 +32,9 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-
-                using (var client = new HttpClient())
-                {
-                    var response = await client.GetAsync($"http://localhost:{port}/api/HttpTrigger?name=Test");
-                    capturedContent = await response.Content.ReadAsStringAsync();
-
-                    process.Kill(true);
-                }
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTrigger?name=Test");
             };
+
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });

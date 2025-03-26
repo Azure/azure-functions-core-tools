@@ -40,6 +40,7 @@ namespace Cli.Core.E2E.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
             string capturedContent = null;
+
             funcStartCommand.ProcessStartedHandler = async process =>
             {
                 try

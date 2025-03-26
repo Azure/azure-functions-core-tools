@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -35,23 +36,29 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                using (var client = new HttpClient())
+                try
                 {
-                    // http1 should be available
-                    var response1 = await client.GetAsync($"http://localhost:{port}/api/http1?name=Test");
-                    response1.StatusCode.Should().Be(HttpStatusCode.OK);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port);
+                    using (var client = new HttpClient())
+                    {
+                        // http1 should be available
+                        var response1 = await client.GetAsync($"http://localhost:{port}/api/http1?name=Test");
+                        response1.StatusCode.Should().Be(HttpStatusCode.OK);
 
-                    // http2 should be available
-                    var response2 = await client.GetAsync($"http://localhost:{port}/api/http2?name=Test");
-                    response2.StatusCode.Should().Be(HttpStatusCode.OK);
+                        // http2 should be available
+                        var response2 = await client.GetAsync($"http://localhost:{port}/api/http2?name=Test");
+                        response2.StatusCode.Should().Be(HttpStatusCode.OK);
 
-                    // http3 should not be available
-                    var response3 = await client.GetAsync($"http://localhost:{port}/api/http3?name=Test");
-                    response3.StatusCode.Should().Be(HttpStatusCode.NotFound);
-
+                        // http3 should not be available
+                        var response3 = await client.GetAsync($"http://localhost:{port}/api/http3?name=Test");
+                        response3.StatusCode.Should().Be(HttpStatusCode.NotFound);
+                    }
+                }
+                finally
+                {
                     process.Kill(true);
                 }
+
             };
 
             var result = funcStartCommand

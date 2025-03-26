@@ -1,5 +1,6 @@
 ﻿using Cli.Core.E2E.Tests.Traits;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using System.Net;
 using TestFramework.Assertions;
 using TestFramework.Commands;
@@ -96,23 +97,7 @@ namespace Cli.Core.E2E.Tests
 
                 funcStartCommand.ProcessStartedHandler = async process =>
                 {
-                    try
-                    {
-                        if (invokeFunction)
-                        {
-                            await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                            using (var client = new HttpClient())
-                            {
-                                var response = await client.GetAsync($"http://localhost:{port}/api/HttpTriggerFunc?name=Test");
-                                response.StatusCode.Should().Be(HttpStatusCode.OK);
-                                capturedContent = await response.Content.ReadAsStringAsync();
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        process.Kill(true);
-                    }
+                    capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTriggerFunc");
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString() };
@@ -130,6 +115,7 @@ namespace Cli.Core.E2E.Tests
                 {
                     result.Should().HaveStdOutContaining("HttpTriggerFunc: [GET,POST] http://localhost:");
                 }
+                result.Should().HaveStdOutContaining("Executed 'Functions.HttpTriggerFunc' (Succeeded");
             }
             finally
             {
@@ -164,10 +150,7 @@ namespace Cli.Core.E2E.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                // Wait for error to appear
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                // Kill the process
-                process.Kill(true);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process);
             };
 
             var result = funcStartCommand

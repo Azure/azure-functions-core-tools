@@ -80,5 +80,28 @@ namespace TestFramework.Helpers
                 listener.Server.Dispose();
             }
         }
+
+        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, string functionCall = "")
+        {
+            string capturedContent = "";
+            try
+            {
+                await ProcessHelper.WaitForFunctionHostToStart(process, port);
+
+                if (!string.IsNullOrEmpty(functionCall))
+                {
+                    using (var client = new HttpClient())
+                    {
+                        var response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
+                        capturedContent = await response.Content.ReadAsStringAsync();
+                    }
+                }
+            }
+            finally
+            {
+                process.Kill(true);
+            }
+            return capturedContent;
+        }
     }
 }

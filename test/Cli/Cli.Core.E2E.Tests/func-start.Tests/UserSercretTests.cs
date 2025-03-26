@@ -62,12 +62,17 @@ namespace Cli.Core.E2E.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
+                try
+                {
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port);
 
-                // Insert message into queue
-                await QueueStorageHelper.InsertIntoQueue("myqueue-items", "hello world");
-
-                process.Kill(true);
+                    // Insert message into queue
+                    await QueueStorageHelper.InsertIntoQueue("myqueue-items", "hello world");
+                }
+                finally
+                {
+                    process.Kill(true);
+                }
             };
 
             var result = funcStartCommand
@@ -176,13 +181,7 @@ namespace Cli.Core.E2E.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                using (var client = new HttpClient())
-                {
-                    var response = await client.GetAsync($"http://localhost:{port}/api/http1?name=Test");
-                    capturedContent = await response.Content.ReadAsStringAsync();
-                    process.Kill(true);
-                }
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "http1?name=Test");
             };
 
             var result = funcStartCommand

@@ -1,14 +1,8 @@
 ﻿using Cli.Core.E2E.Tests.Traits;
 using FluentAssertions;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net.Http;
-using System.Threading.Tasks;
 using TestFramework.Assertions;
 using TestFramework.Commands;
 using TestFramework.Helpers;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Cli.Core.E2E.Tests.func_start.Tests
@@ -39,13 +33,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                using (var client = new HttpClient())
-                {
-                    var response = await client.GetAsync($"http://localhost:{port}/api/HttpTrigger?name=Test");
-                    capturedContent = await response.Content.ReadAsStringAsync();
-                    process.Kill(true);
-                }
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -79,8 +67,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                process.Kill(true);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process);
             };
 
             var result = funcStartCommand
@@ -113,8 +100,7 @@ namespace Cli.Core.E2E.Tests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.WaitForFunctionHostToStart(process, port);
-                process.Kill(true);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process);
             };
 
             var result = funcStartCommand
