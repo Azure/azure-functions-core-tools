@@ -14,6 +14,7 @@ pr:
     - release_4.0
     - main
     - in-proc
+    - feature/*
 
 trigger:
   batch: true
