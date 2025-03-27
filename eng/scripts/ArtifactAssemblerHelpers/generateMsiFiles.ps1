@@ -48,6 +48,8 @@ foreach ($dll in $funcDlls) {
     }
 }
 
+Write-Host "Value of cli: $cli"
+
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 $buildNumberForZipFile = ($cliVersion -split "\.")[2]
 Write-Host "Build number: $buildNumberForZipFile"
