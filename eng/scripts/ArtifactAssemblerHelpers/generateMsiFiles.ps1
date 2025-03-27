@@ -40,7 +40,8 @@ foreach ($dll in $funcDlls) {
 
 $cli = $funcDlls | Where-Object { 
     $fullPath = $_.FullName
-    -not ($fullPath -like "*\in-proc6\*" -or $fullPath -like "*\in-proc8\*")
+    Write-Host "$fullPath"
+    return (-not ($fullPath -like "*\in-proc6\*" -or $fullPath -like "*\in-proc8\*"))
 } | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 $buildNumberForZipFile = ($cliVersion -split "\.")[2]
