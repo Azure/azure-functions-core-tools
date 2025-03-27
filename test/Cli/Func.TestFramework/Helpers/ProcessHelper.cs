@@ -7,6 +7,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
+using Xunit.Abstractions;
 
 namespace Func.TestFramework.Helpers
 {
@@ -80,12 +81,14 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, string functionCall = "")
+        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "")
         {
             string capturedContent = "";
             try
             {
+                log.WriteLine("Waiting for host to start");
                 await WaitForFunctionHostToStart(process, port);
+                log.WriteLine("Host started");
 
                 if (!string.IsNullOrEmpty(functionCall))
                 {
@@ -97,8 +100,13 @@ namespace Func.TestFramework.Helpers
                 }
                 return capturedContent;
             }
+            catch (Exception e)
+            {
+                log.WriteLine("Error was thrown: " + e.ToString());
+            }
             finally
             {
+                log.WriteLine("Process is going to be killed");
                 process.Kill(true);
             }
         }

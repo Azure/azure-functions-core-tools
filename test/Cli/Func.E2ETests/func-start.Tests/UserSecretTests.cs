@@ -175,7 +175,7 @@ namespace Func.E2ETests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "http1?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "http1?name=Test");
             };
 
             var result = funcStartCommand
