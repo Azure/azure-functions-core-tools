@@ -53,6 +53,117 @@ jobs:
       arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
 
+  - task: PowerShell@2
+    displayName: 'List Staging Directory Content'
+    inputs:
+      targetType: 'inline'
+      script: |
+        Write-Host "=================================================================="
+        Write-Host "Starting recursive listing of staging directory" -ForegroundColor Green
+        Write-Host "=================================================================="
+        
+        $stagingPath = "$(Pipeline.Workspace)/staging"
+        
+        if (-not (Test-Path $stagingPath)) {
+            Write-Host "Error: Directory $stagingPath does not exist!" -ForegroundColor Red
+            exit 1
+        }
+        
+        function Format-FileSize {
+            param([long]$Size)
+            
+            if ($Size -ge 1GB) { return "{0:N2} GB" -f ($Size / 1GB) }
+            elseif ($Size -ge 1MB) { return "{0:N2} MB" -f ($Size / 1MB) }
+            elseif ($Size -ge 1KB) { return "{0:N2} KB" -f ($Size / 1KB) }
+            else { return "$Size Bytes" }
+        }
+        
+        function Show-DirectoryContent {
+            param(
+                [string]$Path,
+                [string]$Indent = "",
+                [int]$Level = 0
+            )
+            
+            $items = Get-ChildItem -Path $Path -Force
+            
+            # Process directories first
+            foreach ($item in $items | Where-Object { $_.PSIsContainer }) {
+                $dirSize = (Get-ChildItem $item.FullName -Recurse -Force -ErrorAction SilentlyContinue | 
+                           Measure-Object -Property Length -Sum).Sum
+                $formattedSize = Format-FileSize $dirSize
+                
+                Write-Host "$Indent📁" -NoNewline
+                Write-Host " $($item.Name)/" -NoNewline -ForegroundColor Blue
+                Write-Host " ($formattedSize)" -ForegroundColor Yellow
+                
+                # Recursively process subdirectories
+                Show-DirectoryContent -Path $item.FullName -Indent "  $Indent" -Level ($Level + 1)
+            }
+            
+            # Then process files
+            foreach ($item in $items | Where-Object { -not $_.PSIsContainer }) {
+                $formattedSize = Format-FileSize $item.Length
+                
+                $icon = "📄"
+                $color = "White"
+                
+                # Special formatting based on extension
+                switch -Regex ($item.Extension) {
+                    '\.dll$' { $icon = "📦"; $color = "Green" }
+                    '\.exe$' { $icon = "🚀"; $color = "Red" }
+                    '\.msi$' { $icon = "📥"; $color = "Red" }
+                    '\.json$' { $icon = "📄"; $color = "Yellow" }
+                    '\.zip$' { $icon = "🗜️"; $color = "Yellow" }
+                    '\.sha2$' { $icon = "🔐"; $color = "Cyan" }
+                }
+                
+                Write-Host "$Indent$icon" -NoNewline
+                Write-Host " $($item.Name)" -NoNewline -ForegroundColor $color
+                Write-Host " ($formattedSize)" -ForegroundColor Yellow
+            }
+        }
+        
+        $startTime = Get-Date
+        
+        # Start listing from the staging directory
+        Show-DirectoryContent -Path $stagingPath
+        
+        $endTime = Get-Date
+        $duration = ($endTime - $startTime).TotalSeconds
+        
+        # Calculate summary values
+        $totalDirs = (Get-ChildItem $stagingPath -Recurse -Directory | Measure-Object).Count
+        $totalFiles = (Get-ChildItem $stagingPath -Recurse -File | Measure-Object).Count
+        $totalSize = (Get-ChildItem $stagingPath -Recurse -File | Measure-Object -Property Length -Sum).Sum
+        $totalSizeFormatted = Format-FileSize $totalSize
+        
+        Write-Host "=================================================================="
+        Write-Host "Summary" -ForegroundColor Green
+        Write-Host "=================================================================="
+        Write-Host "Total directories: $totalDirs" -ForegroundColor Blue
+        Write-Host "Total files: $totalFiles" -ForegroundColor Blue
+        Write-Host "Total size: $totalSizeFormatted" -ForegroundColor Yellow
+        Write-Host "Listing completed in $([math]::Round($duration, 2)) seconds"
+        Write-Host "=================================================================="
+        
+        # Show key directories from the template
+        Write-Host "Key directories based on your artifact assembly template:" -ForegroundColor Green
+        
+        if (Test-Path "$stagingPath/coretools-cli") {
+            Write-Host "Core Tools CLI: $(Pipeline.Workspace)/staging/coretools-cli/" -ForegroundColor Blue
+        }
+        
+        if (Test-Path "$stagingPath/coretools-visualstudio") {
+            Write-Host "Visual Studio Integration: $(Pipeline.Workspace)/staging/coretools-visualstudio/" -ForegroundColor Blue
+        }
+        
+        if (Test-Path "$stagingPath/metadata.json") {
+            Write-Host "Metadata file: $(Pipeline.Workspace)/staging/metadata.json" -ForegroundColor Blue
+        }
+        
+        Write-Host "=================================================================="
+
   - ${{ if eq(parameters.arch, 'min.win-x64') }}:
     - task: PowerShell@2
       displayName: 'Generate metadata.json file'
