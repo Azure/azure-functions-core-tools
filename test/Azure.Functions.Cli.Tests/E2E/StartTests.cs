@@ -431,6 +431,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet6InProcProject");
 =======
             }, _output, "./test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
@@ -438,6 +439,9 @@ namespace Azure.Functions.Cli.Tests.E2E
 =======
             }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
 >>>>>>> 73f1a19e (path should hopefully be correct)
+=======
+            }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet6InProcProject");
+>>>>>>> 27a0ff4a (test should pass now)
 
         }
 
