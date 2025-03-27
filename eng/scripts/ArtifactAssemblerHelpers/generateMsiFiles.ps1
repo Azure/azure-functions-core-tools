@@ -38,15 +38,10 @@ foreach ($dll in $funcDlls) {
     Write-Host "  $($dll.FullName)"
 }
 
-$cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse |
-    Where-Object { 
-        # Get the parent directory of func.dll
-        $parentDir = Split-Path $_.FullName -Parent
-
-        # Ensure that the func.dll is not inside inproc6 or inproc8
-        (Split-Path $parentDir -Parent) -eq $ArtifactsPath
-    } |
-    Select-Object -First 1 # Only get the first matching func.dll
+$cli = $funcDlls | Where-Object { 
+    $fullPath = $_.FullName
+    -not ($fullPath -like "*\in-proc6\*" -or $fullPath -like "*\in-proc8\*")
+} | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 $buildNumberForZipFile = ($cliVersion -split "\.")[2]
 Write-Host "Build number: $buildNumberForZipFile"
