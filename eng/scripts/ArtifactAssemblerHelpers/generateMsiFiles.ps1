@@ -22,7 +22,7 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$buildDir = "$baseDir\..\..\build"
+$buildDir = ".\build"
 Write-Host "Build directory: $buildDir"
 
 Write-Host "Directly searching for func.dll in $ArtifactsPath..."
@@ -35,14 +35,12 @@ if ($funcDlls.Count -eq 0) {
 
 $cli = ""
 
-Write-Host "Found $($funcDlls.Count) func.dll files:"
+Write-Host "Found $($funcDlls.Count) func.dll files"
 foreach ($dll in $funcDlls) {
     $path = $dll.FullName
-    Write-Host "$path"
 
      # Check if this is the root func.dll and not in inproc folders
     if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
-        Write-Host "Found main func.dll: $path" -ForegroundColor Green
         $cli = $path
         break
     }
