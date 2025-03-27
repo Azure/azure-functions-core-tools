@@ -103,6 +103,7 @@ namespace Func.TestFramework.Helpers
             catch (Exception e)
             {
                 log.WriteLine("Error was thrown: " + e.ToString());
+                return "";
             }
             finally
             {
