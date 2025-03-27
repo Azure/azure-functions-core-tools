@@ -386,7 +386,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
                 }
-            }, _output, "../../../E2E/TestProject/TestNet8InProcProject");
+            }, _output, "./test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
 
         }
 
@@ -421,7 +421,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
                 }
-            }, _output, "../../../E2E/TestProject/TestNet6InProcProject");
+            }, _output, "./test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
 
         }
 
