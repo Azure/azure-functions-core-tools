@@ -3,9 +3,13 @@ param (
     [string]$StagingDirectory
 )
 
+$rootDir = Join-Path $PSScriptRoot "../../.." | Resolve-Path
+Write-Host "$rootDir"
+ls $rootDir
+
 # Set the path to test project (.csproj) and runtime settings
-$testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
-$runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact_consolidation.runsettings"
+$testProjectPath = ".\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
+$runtimeSettings = ".\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact_consolidation.runsettings"
 
 dotnet build $testProjectPath
 

@@ -4,7 +4,7 @@ param (
 )
 
 $rootDir = Join-Path $PSScriptRoot "../../.." | Resolve-Path
-Write-Host "$rootDir"
+Write-Host "Root directory: $rootDir"
 ls $rootDir
 
 # Set the path to test project (.csproj) and runtime settings

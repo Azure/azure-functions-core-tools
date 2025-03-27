@@ -220,7 +220,6 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testVsArtifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-visualstudio"'
-        workingDirectory: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler'
 
   - ${{ if startsWith(parameters.arch, 'win') }}:
     - task: PowerShell@2
@@ -229,7 +228,6 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testArtifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-cli"'
-        workingDirectory: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler'
 
   - task: DotNetCoreCLI@2
     displayName: 'Zip Artifacts'

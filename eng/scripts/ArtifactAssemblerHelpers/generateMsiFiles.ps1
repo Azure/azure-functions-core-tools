@@ -33,16 +33,20 @@ if ($funcDlls.Count -eq 0) {
     exit 1
 }
 
+$cli = ""
+
 Write-Host "Found $($funcDlls.Count) func.dll files:"
 foreach ($dll in $funcDlls) {
-    Write-Host "  $($dll.FullName)"
+    Write-Host "$($dll.FullName)"
+
+     # Check if this is the root func.dll and not in inproc folders
+    if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
+        Write-Host "Found main func.dll: $path" -ForegroundColor Green
+        $cli = $dll
+        break
+    }
 }
 
-$cli = $funcDlls | Where-Object { 
-    $fullPath = $_.FullName
-    Write-Host "$fullPath"
-    return (-not ($fullPath -like "*\in-proc6\*" -or $fullPath -like "*\in-proc8\*"))
-} | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 $buildNumberForZipFile = ($cliVersion -split "\.")[2]
 Write-Host "Build number: $buildNumberForZipFile"
