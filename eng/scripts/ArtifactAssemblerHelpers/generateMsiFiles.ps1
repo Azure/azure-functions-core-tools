@@ -36,6 +36,10 @@ $cli = ""
 Write-Host "Found $($funcDlls.Count) func.dll files"
 foreach ($dll in $funcDlls) {
     $path = $dll.FullName
+<<<<<<< HEAD
+=======
+    Write-Host "$path"
+>>>>>>> 9827ef23 (fixing msi file)
 
      # Check if this is the root func.dll and not in inproc folders
     if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
