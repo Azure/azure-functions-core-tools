@@ -43,7 +43,7 @@ foreach ($dll in $funcDlls) {
      # Check if this is the root func.dll and not in inproc folders
     if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
         Write-Host "Found main func.dll: $path" -ForegroundColor Green
-        $cli = $dll
+        $cli = $path
         break
     }
 }
