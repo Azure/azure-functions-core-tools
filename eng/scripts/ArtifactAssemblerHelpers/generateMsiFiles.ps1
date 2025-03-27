@@ -24,6 +24,20 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 # Get runtime version
 $buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
+
+Write-Host "Directly searching for func.dll in $ArtifactsPath..."
+$funcDlls = Get-ChildItem -Path $ArtifactsPath -Filter "func.dll" -Recurse -ErrorAction Continue
+
+if ($funcDlls.Count -eq 0) {
+    Write-Host "ERROR: No func.dll files found. Check the path or file name." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Found $($funcDlls.Count) func.dll files:"
+foreach ($dll in $funcDlls) {
+    Write-Host "  $($dll.FullName)"
+}
+
 $cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse |
     Where-Object { 
         # Get the parent directory of func.dll
