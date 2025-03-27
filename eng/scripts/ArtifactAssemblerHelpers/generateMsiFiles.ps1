@@ -22,7 +22,7 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$buildDir = "$baseDir\..\..\..\build"
+$buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
 $cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse |
     Where-Object { 
