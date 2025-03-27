@@ -387,10 +387,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                     CommandTimeout = TimeSpan.FromSeconds(300),
                 }
 <<<<<<< HEAD
+<<<<<<< HEAD
             }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
 =======
             }, _output, "./test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
 >>>>>>> 3ec8ee71 (changing path to see fi this works)
+=======
+            }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
+>>>>>>> 73f1a19e (path should hopefully be correct)
 
         }
 
@@ -426,10 +430,14 @@ namespace Azure.Functions.Cli.Tests.E2E
                     CommandTimeout = TimeSpan.FromSeconds(300),
                 }
 <<<<<<< HEAD
+<<<<<<< HEAD
             }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet6InProcProject");
 =======
             }, _output, "./test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
 >>>>>>> 3ec8ee71 (changing path to see fi this works)
+=======
+            }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
+>>>>>>> 73f1a19e (path should hopefully be correct)
 
         }
 
