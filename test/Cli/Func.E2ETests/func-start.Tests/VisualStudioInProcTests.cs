@@ -35,7 +35,7 @@ namespace Func.E2ETests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "Function1?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function1?name=Test");
             };
 
             var result = funcStartCommand
@@ -62,7 +62,7 @@ namespace Func.E2ETests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "Function2?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function2?name=Test");
             };
 
             var result = funcStartCommand

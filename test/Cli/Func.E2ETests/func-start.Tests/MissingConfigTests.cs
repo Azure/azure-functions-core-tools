@@ -96,7 +96,7 @@ namespace Func.E2ETests.func_start.Tests
 
                 funcStartCommand.ProcessStartedHandler = async process =>
                 {
-                    capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTriggerFunc");
+                    capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "HttpTriggerFunc");
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString() };
@@ -149,7 +149,7 @@ namespace Func.E2ETests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log);
             };
 
             var result = funcStartCommand

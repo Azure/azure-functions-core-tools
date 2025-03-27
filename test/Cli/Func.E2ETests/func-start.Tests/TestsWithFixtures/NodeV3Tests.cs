@@ -28,7 +28,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTrigger");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger");
             };
 
             var result = funcStartCommand
