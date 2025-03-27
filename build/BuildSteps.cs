@@ -347,7 +347,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 -l \"console;verbosity=diagnostic\" --logger trx --blame-hang-timeout 15m");
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 -l \"console;verbosity=diagnostic\" --logger trx");
         }
 
         public static void TestNewProjectDotnetInProc()
