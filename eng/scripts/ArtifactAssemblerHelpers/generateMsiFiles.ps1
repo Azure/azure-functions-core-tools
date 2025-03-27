@@ -104,6 +104,10 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         $fragmentPath = "$buildDir\$fragmentName.wxs"
         $msiPath = "$artifactsPath\$msiName.msi"
 
+        Write-Host "Msi path: $msiPath"
+        Write-Host "Cli version: $cliVersion"
+        Write-Host "Matched platform: $matchedPlatform"
+
         & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
         & { candle -arch $matchedPlatform -dPlatform="$matchedPlatform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
         & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
