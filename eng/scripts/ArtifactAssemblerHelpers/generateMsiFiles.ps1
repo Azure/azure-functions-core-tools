@@ -3,7 +3,7 @@ param (
     [string]$ArtifactsPath
 )
 
-$baseDir = Get-Location
+$buildDir = Get-Location
 
 Write-Host "Generating MSI files"
 
@@ -22,7 +22,6 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$buildDir = ".\build"
 Write-Host "Build directory: $buildDir"
 
 Write-Host "Directly searching for func.dll in $ArtifactsPath..."
