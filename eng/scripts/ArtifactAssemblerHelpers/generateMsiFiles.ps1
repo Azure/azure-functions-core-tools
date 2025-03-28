@@ -1,9 +1,8 @@
-# Note that this file should be used with YAML steps directly when the consolidated pipeline is migrated over to YAML
 param (
     [string]$ArtifactsPath
 )
 
-$baseDir = Get-Location
+$buildDir = Get-Location
 
 Write-Host "Generating MSI files"
 
@@ -22,17 +21,29 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-$buildDir = "$baseDir\..\..\build"
 Write-Host "Build directory: $buildDir"
-$cli = Get-ChildItem -Path $ArtifactsPath -Include func.dll -Recurse |
-    Where-Object { 
-        # Get the parent directory of func.dll
-        $parentDir = Split-Path $_.FullName -Parent
 
-        # Ensure that the func.dll is not inside inproc6 or inproc8
-        (Split-Path $parentDir -Parent) -eq $ArtifactsPath
-    } |
-    Select-Object -First 1 # Only get the first matching func.dll
+Write-Host "Directly searching for func.dll in $ArtifactsPath..."
+$funcDlls = Get-ChildItem -Path $ArtifactsPath -Filter "func.dll" -Recurse -ErrorAction Continue
+
+if ($funcDlls.Count -eq 0) {
+    Write-Host "ERROR: No func.dll files found. Check the path or file name." -ForegroundColor Red
+    exit 1
+}
+
+$cli = ""
+
+Write-Host "Found $($funcDlls.Count) func.dll files"
+foreach ($dll in $funcDlls) {
+    $path = $dll.FullName
+
+     # Check if this is the root func.dll and not in inproc folders
+    if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
+        $cli = $path
+        break
+    }
+}
+
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 $buildNumberForZipFile = ($cliVersion -split "\.")[2]
 Write-Host "Build number: $buildNumberForZipFile"

@@ -58,7 +58,7 @@ jobs:
       displayName: 'Generate metadata.json file'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/PipelineHelpers/generateMetadataFile.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/generateMetadataFile.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
         workingDirectory: '$(Pipeline.Workspace)'
 
@@ -67,9 +67,9 @@ jobs:
       displayName: 'Generate MSI files'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/PipelineHelpers/generateMsiFiles.ps1'
-        arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/coretools-cli"'
-        workingDirectory: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/generateMsiFiles.ps1'
+        arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
+        workingDirectory: '$(Build.SourcesDirectory)/build'
 
   - ${{ if startsWith(parameters.arch, 'win-x') }}:
     - template: ci/sign-files.yml@eng
@@ -107,24 +107,22 @@ jobs:
       displayName: 'Test Artifacts - Visual Studio'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/PipelineHelpers/testVsArtifacts.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testVsArtifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-visualstudio"'
-        workingDirectory: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler'
 
   - ${{ if startsWith(parameters.arch, 'win') }}:
     - task: PowerShell@2
       displayName: 'Test Artifacts'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/PipelineHelpers/testArtifacts.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testArtifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-cli"'
-        workingDirectory: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler'
 
   - task: DotNetCoreCLI@2
     displayName: 'Zip Artifacts'
     inputs:
       command: run
-      projects: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.ArtifactAssembler.csproj'
+      projects: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj'
       arguments: '--no-build -c release -- zip'
       workingDirectory: '$(Pipeline.Workspace)'
 
@@ -132,7 +130,7 @@ jobs:
     displayName: 'Generate SHA files'
     inputs:
       targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/PipelineHelpers/generateSha.ps1'
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/generateSha.ps1'
       arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'
 
   - task: CopyFiles@2
