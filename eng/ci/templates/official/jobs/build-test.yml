@@ -140,19 +140,19 @@ jobs:
             }
         ]
 
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFormat: 'VSTest'
-      testResultsFiles: '$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/TestResults/*.trx'
-      failTaskOnFailedTests: true
-    condition: succeededOrFailed()
-
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeededOrFailed()
     inputs:
       targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
       artifactName: '**/*.trx'
       artifactType: 'pipeline'
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/TestResults/*.trx'
+      failTaskOnFailedTests: false
+    condition: succeededOrFailed()
 
   - template: ci/sign-files.yml@eng
     parameters:
