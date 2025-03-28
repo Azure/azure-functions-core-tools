@@ -108,7 +108,7 @@ namespace Func.TestFramework.Helpers
             try
             {
                 log.WriteLine("Waiting for host to start");
-                //await WaitForFunctionHostToStart(process, port);
+                await WaitForFunctionHostToStart(process, port);
                 log.WriteLine("Host started");
 
                 if (!string.IsNullOrEmpty(functionCall))
