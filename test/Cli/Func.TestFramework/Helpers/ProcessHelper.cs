@@ -105,10 +105,48 @@ namespace Func.TestFramework.Helpers
 
         public static async Task ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "", string capturedContent = "")
         {
+            // Set up continuous reading of stdout
+            StringBuilder outputBuilder = new StringBuilder();
+            StringBuilder errorBuilder = new StringBuilder();
+
+            // Start asynchronous reading of stdout and stderr
+            var outputTask = Task.Run(() => {
+                string line;
+                while ((line = process.StandardOutput.ReadLine()) != null)
+                {
+                    log.WriteLine($"STDOUT: {line}");
+                    outputBuilder.AppendLine(line);
+                }
+            });
+
+            var errorTask = Task.Run(() => {
+                string line;
+                while ((line = process.StandardError.ReadLine()) != null)
+                {
+                    log.WriteLine($"STDERR: {line}");
+                    errorBuilder.AppendLine(line);
+                }
+            });
+
             try
             {
                 log.WriteLine("Waiting for host to start");
-                await WaitForFunctionHostToStart(process, port);
+
+                // Set a timeout for the host startup
+                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5)); // 5 minute timeout
+                var startTask = WaitForFunctionHostToStart(process, port);
+
+                // Wait for either success or timeout
+                var completedTask = await Task.WhenAny(startTask, timeoutTask);
+
+                if (completedTask == timeoutTask)
+                {
+                    log.WriteLine("TIMEOUT: Host did not start within 5 minutes");
+                    log.WriteLine("Current stdout content:");
+                    log.WriteLine(outputBuilder.ToString());
+                    throw new TimeoutException("Host did not start within the timeout period");
+                }
+
                 log.WriteLine("Host started");
 
                 if (!string.IsNullOrEmpty(functionCall))
@@ -117,7 +155,7 @@ namespace Func.TestFramework.Helpers
                     {
                         var response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
                         var responseContent = await response.Content.ReadAsStringAsync();
-
+                        log.WriteLine($"HTTP Response: {responseContent}");
                         responseContent.Should().Be(capturedContent);
                     }
                 }
@@ -125,11 +163,49 @@ namespace Func.TestFramework.Helpers
             catch (Exception e)
             {
                 log.WriteLine("Error was thrown: " + e.ToString());
+
+                // Log the captured output so far to help diagnose the issue
+                log.WriteLine("===== CAPTURED STDOUT =====");
+                log.WriteLine(outputBuilder.ToString());
+                log.WriteLine("===== CAPTURED STDERR =====");
+                log.WriteLine(errorBuilder.ToString());
+
+                throw; // Rethrow to fail the test
             }
             finally
             {
                 log.WriteLine("Process is going to be killed");
-                process.Kill(true);
+
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(true);
+                        log.WriteLine("Process was killed");
+                    }
+                    else
+                    {
+                        log.WriteLine($"Process already exited with code: {process.ExitCode}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.WriteLine($"Error killing process: {ex.Message}");
+                }
+
+                // Save full stdout to a file for later analysis
+                string logFileName = $"process_output_{port}_{DateTime.Now:yyyyMMdd_HHmmss}.log";
+                string logFilePath = Path.Combine(Path.GetTempPath(), logFileName);
+
+                try
+                {
+                    File.WriteAllText(logFilePath, outputBuilder.ToString());
+                    log.WriteLine($"Full stdout saved to: {logFilePath}");
+                }
+                catch (Exception ex)
+                {
+                    log.WriteLine($"Error saving stdout to file: {ex.Message}");
+                }
             }
         }
     }
