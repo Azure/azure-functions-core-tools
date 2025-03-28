@@ -61,10 +61,17 @@ jobs:
       IsCodeqlBuild: false
     displayName: 'Executing build script'
 
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
+      artifactName: '*.trx'
+      artifactType: 'pipeline'
+
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
-      testResultsFiles: '**/*.trx'
+      testResultsFiles: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults/*.trx'
       failTaskOnFailedTests: true
     condition: succeededOrFailed()
 
