@@ -96,6 +96,8 @@ namespace Azure.Functions.Cli.Common
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
         public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
+        public const string FunctionsStackUpgrade = "https://aka.ms/FunctionsStackUpgrade";
+
 
         // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
 

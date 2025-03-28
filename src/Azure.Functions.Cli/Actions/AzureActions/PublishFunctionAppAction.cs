@@ -1474,7 +1474,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
                     if (nextDotnetVersion != null)
                     {
-                        var warningMessage = EolMessages.GetAfterEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        var warningMessage = EolMessages.GetAfterEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
                         ColoredConsole.WriteLine(WarningColor(warningMessage));
                     }
                 }
@@ -1483,7 +1483,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var nextDotnetVersion = stacks.GetNextDotnetVersion(majorDotnetVersion.Value);
                     if (nextDotnetVersion != null)
                     {
-                        var warningMessage = EolMessages.GetEarlyEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value);
+                        var warningMessage = EolMessages.GetEarlyEolUpdateMessageDotNet(majorDotnetVersion.ToString(), nextDotnetVersion.ToString(), currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
                         ColoredConsole.WriteLine(WarningColor(warningMessage));
                     }
                 }
@@ -1519,7 +1519,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForPython(workerRuntime, runtimeVersion);
                     if (nextVersion != null)
                     {
-                        var warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value);
+                        var warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
                         ColoredConsole.WriteLine(WarningColor(warningMessage));
                     }
                 }
@@ -1528,7 +1528,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForPython(workerRuntime, runtimeVersion);
                     if (nextVersion != null)
                     {
-                        var warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value);
+                        var warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
                         ColoredConsole.WriteLine(WarningColor(warningMessage));
                     }
                 }
@@ -1548,7 +1548,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForNode(workerRuntime, runtimeVersion);
                     if (nextVersion != null)
                     {
-                        var warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value);
+                        var warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
                         ColoredConsole.WriteLine(WarningColor(warningMessage));
                     }
                 }
@@ -1557,7 +1557,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForNode(workerRuntime, runtimeVersion);
                     if (nextVersion != null)
                     {
-                        var warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value);
+                        var warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
                         ColoredConsole.WriteLine(WarningColor(warningMessage));
                     }
                 }
