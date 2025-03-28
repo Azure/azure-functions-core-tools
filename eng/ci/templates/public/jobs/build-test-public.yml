@@ -65,7 +65,7 @@ jobs:
     condition: succeededOrFailed()
     inputs:
       targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
-      artifactName: '*.trx'
+      artifactName: 'TestResults'
       artifactType: 'pipeline'
 
   - task: PublishTestResults@2
