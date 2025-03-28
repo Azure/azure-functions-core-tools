@@ -22,9 +22,12 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 
 # Get runtime version
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 $buildDir = ".\build"
 >>>>>>> 0a7845fc (specifying msi file)
+=======
+>>>>>>> 823cc71a (trying agagin)
 Write-Host "Build directory: $buildDir"
 
 Write-Host "Directly searching for func.dll in $ArtifactsPath..."

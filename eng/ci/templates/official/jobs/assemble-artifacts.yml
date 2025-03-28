@@ -180,12 +180,17 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/generateMsiFiles.ps1'
 <<<<<<< HEAD
+<<<<<<< HEAD
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/build'
 =======
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)'
 >>>>>>> 0a7845fc (specifying msi file)
+=======
+        arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
+        workingDirectory: '$(Build.SourcesDirectory)/build'
+>>>>>>> 823cc71a (trying agagin)
 
   - ${{ if startsWith(parameters.arch, 'win-x') }}:
     - template: ci/sign-files.yml@eng
