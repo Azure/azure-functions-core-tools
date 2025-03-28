@@ -26,19 +26,15 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test!");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
 
             result.Should().NotHaveStdOutContaining("Content root path:");
 
@@ -53,19 +49,15 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test!");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString(), "--default" });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test!", because: "response from default function should be 'Hello, {name}!'");
 
             result.Should().NotHaveStdOutContaining("Content root path:");
 
@@ -154,11 +146,10 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log);
             };
 
             var result = funcStartCommand

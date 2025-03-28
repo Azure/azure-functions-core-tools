@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
 using Xunit.Abstractions;
+using FluentAssertions;
 
 namespace Func.TestFramework.Helpers
 {
@@ -102,9 +103,8 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "")
+        public static async Task ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "", string capturedContent = "")
         {
-            string capturedContent = "";
             try
             {
                 log.WriteLine("Waiting for host to start");
@@ -116,7 +116,9 @@ namespace Func.TestFramework.Helpers
                     using (var client = new HttpClient())
                     {
                         var response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
-                        capturedContent = await response.Content.ReadAsStringAsync();
+                        var responseContent = await response.Content.ReadAsStringAsync();
+
+                        responseContent.Should().Be(capturedContent);
                     }
                 }
             }
@@ -129,7 +131,6 @@ namespace Func.TestFramework.Helpers
                 log.WriteLine("Process is going to be killed");
                 process.Kill(true);
             }
-            return capturedContent;
         }
     }
 }

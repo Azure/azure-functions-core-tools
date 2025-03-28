@@ -30,20 +30,15 @@ namespace Func.E2ETests.func_start.Tests
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.",
-                because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
         }
 
         [Fact]

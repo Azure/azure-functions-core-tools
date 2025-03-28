@@ -24,19 +24,15 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger", "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.");
         }
     }
 }

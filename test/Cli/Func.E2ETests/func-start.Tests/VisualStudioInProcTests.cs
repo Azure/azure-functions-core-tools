@@ -31,20 +31,15 @@ namespace Func.E2ETests.func_start.Tests
 
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function1?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function1?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_vsNet8ProjectPath)
                 .Execute(new[] { "--verbose", "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.",
-                because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
 
             // Validate .NET 8 host was loaded
             result.Should().HaveStdOutContaining("Loading .NET 8 host");
@@ -58,20 +53,15 @@ namespace Func.E2ETests.func_start.Tests
 
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function2?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function2?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_vsNet6ProjectPath)
                 .Execute(new[] { "--verbose", "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.",
-                because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
 
             // Validate .NET 6 host was loaded
             result.Should().HaveStdOutContaining("Loading .NET 6 host");
