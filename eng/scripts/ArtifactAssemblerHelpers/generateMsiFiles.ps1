@@ -90,9 +90,9 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         Write-Host "File exists: $(Test-Path $masterWxsPath)"
         $msiPath = "$artifactsPath\$msiName.msi"
 
-        Write-Host "Msi path: $msiPath"
-        Write-Host "Cli version: $cliVersion"
-        Write-Host "Matched platform: $matchedPlatform"
+        Write-Host "MasterWsxPath: $masterWxsPath"
+        Write-Host "FragementPath: $fragmentPath"
+        Write-Host "MsiPath: $msiPath"
 
         & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
         & { candle -arch $matchedPlatform -dPlatform="$matchedPlatform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
