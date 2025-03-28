@@ -653,5 +653,11 @@ namespace Azure.Functions.Cli.Helpers
         {
             return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, Constants.PySteinFunctionAppPy));
         }
+
+        public static async Task<string> GetPythonVersion(string functionAppRoot)
+        {
+            var versionInfo = await PythonHelpers.GetVersion();
+            return versionInfo?.Version;
+        }
     }
 }
