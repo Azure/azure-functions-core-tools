@@ -54,21 +54,25 @@ jobs:
       workingDirectory: '$(Pipeline.Workspace)'
 
   - task: PowerShell@2
-    displayName: 'List Staging Directory Content'
+    displayName: 'Enhanced Directory Listing'
     inputs:
       targetType: 'inline'
       script: |
         Write-Host "=================================================================="
-        Write-Host "Starting recursive listing of staging directory" -ForegroundColor Green
+        Write-Host "COMPREHENSIVE DIRECTORY LISTING" -ForegroundColor Green
         Write-Host "=================================================================="
         
-        $stagingPath = "$(Pipeline.Workspace)/staging"
+        # Set paths
+        $workspacePath = "$(Pipeline.Workspace)"
+        $stagingPath = "$workspacePath/staging"
+        $sourceDir = "$(Build.SourcesDirectory)"
         
-        if (-not (Test-Path $stagingPath)) {
-            Write-Host "Error: Directory $stagingPath does not exist!" -ForegroundColor Red
-            exit 1
-        }
+        Write-Host "Workspace Path: $workspacePath" -ForegroundColor Cyan
+        Write-Host "Staging Path: $stagingPath" -ForegroundColor Cyan
+        Write-Host "Source Directory: $sourceDir" -ForegroundColor Cyan
+        Write-Host ""
         
+        # Function to format file size
         function Format-FileSize {
             param([long]$Size)
             
@@ -78,91 +82,349 @@ jobs:
             else { return "$Size Bytes" }
         }
         
-        function Show-DirectoryContent {
+        # Function to check if a file exists with detailed output
+        function Check-FileExists {
             param(
-                [string]$Path,
-                [string]$Indent = "",
-                [int]$Level = 0
+                [string]$FilePath,
+                [string]$Description
             )
             
-            $items = Get-ChildItem -Path $Path -Force
-            
-            # Process directories first
-            foreach ($item in $items | Where-Object { $_.PSIsContainer }) {
-                $dirSize = (Get-ChildItem $item.FullName -Recurse -Force -ErrorAction SilentlyContinue | 
-                           Measure-Object -Property Length -Sum).Sum
-                $formattedSize = Format-FileSize $dirSize
+            if (Test-Path $FilePath) {
+                Write-Host "✓ $Description exists: $FilePath" -ForegroundColor Green
                 
-                Write-Host "$Indent📁" -NoNewline
-                Write-Host " $($item.Name)/" -NoNewline -ForegroundColor Blue
-                Write-Host " ($formattedSize)" -ForegroundColor Yellow
+                # Get file info
+                $fileInfo = Get-Item $FilePath
+                $size = Format-FileSize $fileInfo.Length
+                $lastModified = $fileInfo.LastWriteTime
                 
-                # Recursively process subdirectories
-                Show-DirectoryContent -Path $item.FullName -Indent "  $Indent" -Level ($Level + 1)
-            }
-            
-            # Then process files
-            foreach ($item in $items | Where-Object { -not $_.PSIsContainer }) {
-                $formattedSize = Format-FileSize $item.Length
+                Write-Host "  Size: $size" -ForegroundColor Gray
+                Write-Host "  Last Modified: $lastModified" -ForegroundColor Gray
                 
-                $icon = "📄"
-                $color = "White"
-                
-                # Special formatting based on extension
-                switch -Regex ($item.Extension) {
-                    '\.dll$' { $icon = "📦"; $color = "Green" }
-                    '\.exe$' { $icon = "🚀"; $color = "Red" }
-                    '\.msi$' { $icon = "📥"; $color = "Red" }
-                    '\.json$' { $icon = "📄"; $color = "Yellow" }
-                    '\.zip$' { $icon = "🗜️"; $color = "Yellow" }
-                    '\.sha2$' { $icon = "🔐"; $color = "Cyan" }
-                }
-                
-                Write-Host "$Indent$icon" -NoNewline
-                Write-Host " $($item.Name)" -NoNewline -ForegroundColor $color
-                Write-Host " ($formattedSize)" -ForegroundColor Yellow
+                return $true
+            } else {
+                Write-Host "✗ $Description NOT found: $FilePath" -ForegroundColor Red
+                return $false
             }
         }
         
+        # Function to recursively list directory contents with detailed info
+        function Show-DetailedDirectory {
+            param(
+                [string]$Path,
+                [string]$Indent = "",
+                [int]$Level = 0,
+                [int]$MaxLevel = 5,
+                [switch]$ShowHidden = $false,
+                [switch]$ShowAttributes = $false
+            )
+            
+            if (-not (Test-Path $Path)) {
+                Write-Host "${Indent}Directory does not exist: $Path" -ForegroundColor Red
+                return
+            }
+            
+            # Get items in the directory
+            $getChildParams = @{
+                Path = $Path
+                ErrorAction = "SilentlyContinue"
+            }
+            
+            if ($ShowHidden) {
+                $getChildParams.Force = $true
+            }
+            
+            $items = Get-ChildItem @getChildParams
+            
+            # Show directory stats
+            $dirInfo = Get-Item $Path
+            $dirName = Split-Path $Path -Leaf
+            if ([string]::IsNullOrEmpty($dirName)) { $dirName = $Path }
+            
+            $fileCount = ($items | Where-Object { -not $_.PSIsContainer }).Count
+            $dirCount = ($items | Where-Object { $_.PSIsContainer }).Count
+            
+            Write-Host "${Indent}📁 $dirName" -ForegroundColor Blue
+            Write-Host "${Indent}  |-- Contains: $fileCount files, $dirCount directories" -ForegroundColor Gray
+            
+            if ($ShowAttributes) {
+                Write-Host "${Indent}  |-- Created: $($dirInfo.CreationTime)" -ForegroundColor Gray
+                Write-Host "${Indent}  |-- Modified: $($dirInfo.LastWriteTime)" -ForegroundColor Gray
+                Write-Host "${Indent}  |-- Attributes: $($dirInfo.Attributes)" -ForegroundColor Gray
+            }
+            
+            # Skip further processing if we've reached max depth
+            if ($Level -ge $MaxLevel) {
+                Write-Host "${Indent}  |-- [Max depth reached]" -ForegroundColor Yellow
+                return
+            }
+            
+            # Process directories first
+            foreach ($dir in $items | Where-Object { $_.PSIsContainer } | Sort-Object Name) {
+                Show-DetailedDirectory -Path $dir.FullName -Indent "${Indent}  |" -Level ($Level + 1) -MaxLevel $MaxLevel -ShowHidden:$ShowHidden -ShowAttributes:$ShowAttributes
+            }
+            
+            # Then process files
+            $fileGroups = @{}
+            
+            foreach ($file in $items | Where-Object { -not $_.PSIsContainer } | Sort-Object Name) {
+                $ext = $file.Extension.ToLower()
+                if (-not $fileGroups.ContainsKey($ext)) {
+                    $fileGroups[$ext] = @()
+                }
+                $fileGroups[$ext] += $file
+            }
+            
+            # Process files by extension groups
+            foreach ($ext in $fileGroups.Keys | Sort-Object) {
+                $files = $fileGroups[$ext]
+                Write-Host "${Indent}  |-- $($files.Count) files with extension: $ext" -ForegroundColor Cyan
+                
+                foreach ($file in $files) {
+                    $size = Format-FileSize $file.Length
+                    
+                    # Determine icon and color based on extension
+                    $icon = "📄"
+                    $color = "White"
+                    $fileType = ""
+                    
+                    switch -Regex ($ext) {
+                        '\.exe$|\.com$|\.bat$|\.cmd$|\.ps1$' { 
+                            $icon = "🚀"; $color = "Red"; $fileType = "[Executable] " 
+                        }
+                        '\.dll$|\.so$|\.dylib$' { 
+                            $icon = "📦"; $color = "Green"; $fileType = "[Library] " 
+                        }
+                        '\.zip$|\.rar$|\.7z$|\.tar$|\.gz$' { 
+                            $icon = "🗜️"; $color = "Magenta"; $fileType = "[Archive] " 
+                        }
+                        '\.msi$|\.msix$|\.appx$' { 
+                            $icon = "📥"; $color = "Red"; $fileType = "[Installer] " 
+                        }
+                        '\.wxs$|\.wixobj$|\.wixpdb$' { 
+                            $icon = "📋"; $color = "Yellow"; $fileType = "[WiX] " 
+                        }
+                        '\.json$|\.xml$|\.config$' { 
+                            $icon = "⚙️"; $color = "Yellow"; $fileType = "[Config] " 
+                        }
+                        '\.cs$|\.fs$|\.vb$|\.cpp$|\.h$' { 
+                            $icon = "💻"; $color = "Blue"; $fileType = "[Source] " 
+                        }
+                        '\.txt$|\.log$|\.md$' { 
+                            $icon = "📃"; $color = "White"; $fileType = "[Text] " 
+                        }
+                        '\.sha1$|\.sha2$|\.sha256$' { 
+                            $icon = "🔐"; $color = "Cyan"; $fileType = "[Hash] " 
+                        }
+                    }
+                    
+                    Write-Host "${Indent}  |  $icon $fileType$($file.Name) ($size)" -ForegroundColor $color
+                    
+                    if ($ShowAttributes) {
+                        Write-Host "${Indent}  |     Modified: $($file.LastWriteTime)" -ForegroundColor Gray
+                        if ($ext -eq ".dll" -or $ext -eq ".exe") {
+                            # Show version info for binaries
+                            try {
+                                $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($file.FullName)
+                                if ($versionInfo.FileVersion) {
+                                    Write-Host "${Indent}  |     Version: $($versionInfo.FileVersion)" -ForegroundColor Gray
+                                }
+                            } catch {
+                                # Ignore version info errors
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Start measurement
         $startTime = Get-Date
         
-        # Start listing from the staging directory
-        Show-DirectoryContent -Path $stagingPath
+        # Check if staging directory exists
+        if (Test-Path $stagingPath) {
+            Write-Host "STAGING DIRECTORY STRUCTURE" -ForegroundColor Magenta
+            Write-Host "----------------------------------------------------------------" -ForegroundColor Blue
+            
+            # Get subdirectories of staging
+            $stagingSubdirs = Get-ChildItem -Path $stagingPath -Directory
+            
+            foreach ($subdir in $stagingSubdirs) {
+                $totalSize = (Get-ChildItem -Path $subdir.FullName -Recurse -File -ErrorAction SilentlyContinue | 
+                            Measure-Object -Property Length -Sum).Sum
+                $formattedSize = Format-FileSize $totalSize
+                
+                Write-Host "Analyzing $($subdir.Name) ($formattedSize)..." -ForegroundColor Yellow
+                Show-DetailedDirectory -Path $subdir.FullName -MaxLevel 3 -ShowAttributes
+                Write-Host ""
+            }
+            
+            # Special handling for metadata.json if it exists
+            $metadataPath = "$stagingPath/metadata.json"
+            if (Test-Path $metadataPath) {
+                Write-Host "METADATA.JSON FOUND" -ForegroundColor Green
+                Write-Host "----------------------------------------------------------------" -ForegroundColor Blue
+                $metadataFile = Get-Item $metadataPath
+                $size = Format-FileSize $metadataFile.Length
+                Write-Host "Size: $size" -ForegroundColor Gray
+                Write-Host "Last Modified: $($metadataFile.LastWriteTime)" -ForegroundColor Gray
+                
+                # Try to display JSON content
+                try {
+                    $jsonContent = Get-Content $metadataPath -Raw | ConvertFrom-Json
+                    Write-Host "Content preview:" -ForegroundColor Yellow
+                    $jsonContent | Format-List | Out-String | Write-Host -ForegroundColor Gray
+                } catch {
+                    Write-Host "Couldn't parse metadata.json as valid JSON: $_" -ForegroundColor Red
+                }
+                Write-Host ""
+            }
+            
+            # Check for MSI files
+            $msiFiles = Get-ChildItem -Path $stagingPath -Recurse -Filter "*.msi"
+            if ($msiFiles.Count -gt 0) {
+                Write-Host "MSI FILES FOUND: $($msiFiles.Count)" -ForegroundColor Green
+                Write-Host "----------------------------------------------------------------" -ForegroundColor Blue
+                foreach ($msi in $msiFiles) {
+                    $size = Format-FileSize $msi.Length
+                    Write-Host "📥 $($msi.Name) ($size)" -ForegroundColor Red
+                    Write-Host "  Path: $($msi.FullName)" -ForegroundColor Gray
+                    Write-Host "  Last Modified: $($msi.LastWriteTime)" -ForegroundColor Gray
+                    Write-Host ""
+                }
+            } else {
+                Write-Host "NO MSI FILES FOUND" -ForegroundColor Yellow
+                Write-Host "----------------------------------------------------------------" -ForegroundColor Blue
+                Write-Host ""
+            }
+        } else {
+            Write-Host "❌ STAGING DIRECTORY NOT FOUND: $stagingPath" -ForegroundColor Red
+            Write-Host "----------------------------------------------------------------" -ForegroundColor Blue
+            
+            # List workspace root to help diagnose
+            Write-Host "WORKSPACE DIRECTORY CONTENT:" -ForegroundColor Yellow
+            if (Test-Path $workspacePath) {
+                Get-ChildItem -Path $workspacePath | ForEach-Object {
+                    if ($_.PSIsContainer) {
+                        Write-Host "📁 $($_.Name)/" -ForegroundColor Blue
+                    } else {
+                        Write-Host "📄 $($_.Name)" -ForegroundColor White
+                    }
+                }
+            } else {
+                Write-Host "❌ Workspace path not found: $workspacePath" -ForegroundColor Red
+            }
+            Write-Host ""
+        }
         
+        # Check for important files and directories related to WiX builds
+        Write-Host "BUILD RESOURCES CHECK" -ForegroundColor Magenta
+        Write-Host "----------------------------------------------------------------" -ForegroundColor Blue
+        
+        # Check for WiX artifacts in source
+        $buildDir = "$sourceDir/build"
+        $altBuildDir = "$sourceDir/src/Azure.Functions.ArtifactAssembler/build"
+        
+        if (Test-Path $buildDir) {
+            Write-Host "Using build directory: $buildDir" -ForegroundColor Green
+            $wxsPath = "$buildDir/funcinstall.wxs"
+        } elseif (Test-Path $altBuildDir) {
+            Write-Host "Using alternative build directory: $altBuildDir" -ForegroundColor Yellow
+            $buildDir = $altBuildDir
+            $wxsPath = "$buildDir/funcinstall.wxs"
+        } else {
+            Write-Host "❌ Build directory not found!" -ForegroundColor Red
+            # Try to find it
+            Write-Host "Searching for build directory..." -ForegroundColor Yellow
+            $possibleBuildDirs = Get-ChildItem -Path $sourceDir -Recurse -Directory -Filter "build" -ErrorAction SilentlyContinue | 
+                Where-Object { Test-Path (Join-Path $_.FullName "funcinstall.wxs") }
+                
+            if ($possibleBuildDirs) {
+                $buildDir = $possibleBuildDirs[0].FullName
+                $wxsPath = "$buildDir/funcinstall.wxs"
+                Write-Host "Found potential build directory: $buildDir" -ForegroundColor Green
+            } else {
+                $wxsPath = "Not found"
+            }
+        }
+        
+        # Check for specific WiX resources
+        Check-FileExists -FilePath $wxsPath -Description "WiX installer definition (funcinstall.wxs)"
+        Check-FileExists -FilePath "$buildDir/icon.ico" -Description "Installer icon"
+        Check-FileExists -FilePath "$buildDir/license.rtf" -Description "License file"
+        Check-FileExists -FilePath "$buildDir/installbanner.bmp" -Description "Installer banner"
+        Check-FileExists -FilePath "$buildDir/installdialog.bmp" -Description "Installer dialog"
+        
+        # Check WiX environment
+        Write-Host ""
+        Write-Host "WIX TOOLSET CHECK" -ForegroundColor Magenta
+        Write-Host "----------------------------------------------------------------" -ForegroundColor Blue
+        
+        if ($env:WIX) {
+            Write-Host "WIX environment variable: $env:WIX" -ForegroundColor Green
+            if (Test-Path "$env:WIX\bin\candle.exe") {
+                Write-Host "✓ Candle.exe found: $env:WIX\bin\candle.exe" -ForegroundColor Green
+            } else {
+                Write-Host "❌ Candle.exe not found at: $env:WIX\bin\candle.exe" -ForegroundColor Red
+            }
+            
+            if (Test-Path "$env:WIX\bin\light.exe") {
+                Write-Host "✓ Light.exe found: $env:WIX\bin\light.exe" -ForegroundColor Green
+            } else {
+                Write-Host "❌ Light.exe not found at: $env:WIX\bin\light.exe" -ForegroundColor Red
+            }
+            
+            if (Test-Path "$env:WIX\bin\heat.exe") {
+                Write-Host "✓ Heat.exe found: $env:WIX\bin\heat.exe" -ForegroundColor Green
+            } else {
+                Write-Host "❌ Heat.exe not found at: $env:WIX\bin\heat.exe" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "❌ WIX environment variable not set" -ForegroundColor Red
+            
+            # Try to find WiX in standard locations
+            $possibleWixPaths = @(
+                "C:\Program Files (x86)\WiX Toolset v3.11",
+                "C:\Program Files\WiX Toolset v3.11",
+                "C:\Program Files (x86)\Windows Installer XML v3.11"
+            )
+            
+            foreach ($wixPath in $possibleWixPaths) {
+                if (Test-Path "$wixPath\bin\candle.exe") {
+                    Write-Host "Found WiX at: $wixPath" -ForegroundColor Yellow
+                    break
+                }
+            }
+        }
+        
+        # End measurement
         $endTime = Get-Date
         $duration = ($endTime - $startTime).TotalSeconds
         
         # Calculate summary values
-        $totalDirs = (Get-ChildItem $stagingPath -Recurse -Directory | Measure-Object).Count
-        $totalFiles = (Get-ChildItem $stagingPath -Recurse -File | Measure-Object).Count
-        $totalSize = (Get-ChildItem $stagingPath -Recurse -File | Measure-Object -Property Length -Sum).Sum
-        $totalSizeFormatted = Format-FileSize $totalSize
-        
-        Write-Host "=================================================================="
-        Write-Host "Summary" -ForegroundColor Green
-        Write-Host "=================================================================="
-        Write-Host "Total directories: $totalDirs" -ForegroundColor Blue
-        Write-Host "Total files: $totalFiles" -ForegroundColor Blue
-        Write-Host "Total size: $totalSizeFormatted" -ForegroundColor Yellow
-        Write-Host "Listing completed in $([math]::Round($duration, 2)) seconds"
-        Write-Host "=================================================================="
-        
-        # Show key directories from the template
-        Write-Host "Key directories based on your artifact assembly template:" -ForegroundColor Green
-        
-        if (Test-Path "$stagingPath/coretools-cli") {
-            Write-Host "Core Tools CLI: $(Pipeline.Workspace)/staging/coretools-cli/" -ForegroundColor Blue
+        if (Test-Path $stagingPath) {
+            $totalDirs = (Get-ChildItem $stagingPath -Recurse -Directory -ErrorAction SilentlyContinue | Measure-Object).Count
+            $totalFiles = (Get-ChildItem $stagingPath -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
+            $totalSize = (Get-ChildItem $stagingPath -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+            $totalSizeFormatted = Format-FileSize $totalSize
+            
+            Write-Host ""
+            Write-Host "=================================================================="
+            Write-Host "SUMMARY" -ForegroundColor Green
+            Write-Host "=================================================================="
+            Write-Host "Total directories: $totalDirs" -ForegroundColor Blue
+            Write-Host "Total files: $totalFiles" -ForegroundColor Blue
+            Write-Host "Total size: $totalSizeFormatted" -ForegroundColor Yellow
+            Write-Host "Analysis completed in $([math]::Round($duration, 2)) seconds"
+            Write-Host "=================================================================="
+        } else {
+            Write-Host ""
+            Write-Host "=================================================================="
+            Write-Host "SUMMARY" -ForegroundColor Red
+            Write-Host "=================================================================="
+            Write-Host "❌ Staging directory not found - check previous steps"
+            Write-Host "Analysis completed in $([math]::Round($duration, 2)) seconds"
+            Write-Host "=================================================================="
         }
-        
-        if (Test-Path "$stagingPath/coretools-visualstudio") {
-            Write-Host "Visual Studio Integration: $(Pipeline.Workspace)/staging/coretools-visualstudio/" -ForegroundColor Blue
-        }
-        
-        if (Test-Path "$stagingPath/metadata.json") {
-            Write-Host "Metadata file: $(Pipeline.Workspace)/staging/metadata.json" -ForegroundColor Blue
-        }
-        
-        Write-Host "=================================================================="
 
   - ${{ if eq(parameters.arch, 'min.win-x64') }}:
     - task: PowerShell@2
