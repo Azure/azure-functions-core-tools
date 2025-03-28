@@ -65,8 +65,6 @@ foreach ($dll in $funcDlls) {
     }
 }
 
-Write-Host "Value of cli: $cli"
-
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 $buildNumberForZipFile = ($cliVersion -split "\.")[2]
 Write-Host "Build number: $buildNumberForZipFile"
@@ -104,14 +102,8 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         $msiName = "func-cli-$cliVersion-$matchedPlatform"
 
         $masterWxsPath = "$buildDir\$masterWxsName.wxs"
-        Write-Host "File exists: $(Test-Path $masterWxsPath)"
         $fragmentPath = "$buildDir\$fragmentName.wxs"
-        Write-Host "File exists: $(Test-Path $masterWxsPath)"
         $msiPath = "$artifactsPath\$msiName.msi"
-
-        Write-Host "MasterWsxPath: $masterWxsPath"
-        Write-Host "FragementPath: $fragmentPath"
-        Write-Host "MsiPath: $msiPath"
 
         & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
         & { candle -arch $matchedPlatform -dPlatform="$matchedPlatform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
