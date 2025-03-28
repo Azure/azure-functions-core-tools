@@ -85,7 +85,9 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         $msiName = "func-cli-$cliVersion-$matchedPlatform"
 
         $masterWxsPath = "$buildDir\$masterWxsName.wxs"
+        Write-Host "File exists: $(Test-Path $masterWxsPath)"
         $fragmentPath = "$buildDir\$fragmentName.wxs"
+        Write-Host "File exists: $(Test-Path $masterWxsPath)"
         $msiPath = "$artifactsPath\$msiName.msi"
 
         Write-Host "Msi path: $msiPath"
