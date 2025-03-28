@@ -102,7 +102,7 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "")
+        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "")
         {
             string capturedContent = "";
             try
