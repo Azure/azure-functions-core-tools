@@ -29,20 +29,15 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "start", "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.",
-                because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
 
             // Validate inproc6 host was started
             result.Should().HaveStdOutContaining("Starting child process for inproc6 model host.");
@@ -57,20 +52,15 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.",
-                because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
 
             // Validate inproc6 host was started
             result.Should().HaveStdOutContaining("Starting child process for inproc6 model host.");
