@@ -271,6 +271,13 @@ jobs:
     displayName: 'Move artifacts'
 
   - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: 'D:\a\_work\1\s\test\Cli\Func.E2ETests\TestResults'
+      artifactName: '**/*.trx'
+      artifactType: 'pipeline'
+
+  - task: 1ES.PublishPipelineArtifact@1
     condition: succeeded()
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
