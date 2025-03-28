@@ -102,13 +102,13 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "")
+        public static async Task ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "")
         {
             string capturedContent = "";
             try
             {
                 log.WriteLine("Waiting for host to start");
-                // await WaitForFunctionHostToStart(process, port);
+                await WaitForFunctionHostToStart(process, port);
                 log.WriteLine("Host started");
 
                 if (!string.IsNullOrEmpty(functionCall))
@@ -119,18 +119,17 @@ namespace Func.TestFramework.Helpers
                         capturedContent = await response.Content.ReadAsStringAsync();
                     }
                 }
-                return capturedContent;
             }
             catch (Exception e)
             {
                 log.WriteLine("Error was thrown: " + e.ToString());
-                return "";
             }
             finally
             {
                 log.WriteLine("Process is going to be killed");
                 process.Kill(true);
             }
+            return capturedContent;
         }
     }
 }
