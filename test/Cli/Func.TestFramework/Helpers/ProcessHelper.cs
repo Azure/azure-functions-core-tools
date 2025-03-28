@@ -15,6 +15,27 @@ namespace Func.TestFramework.Helpers
     {
         private static string FunctionsHostUrl = "http://localhost";
 
+        private async Task<bool> WaitUntilReady(HttpClient client)
+        {
+            for (var limit = 0; limit < 10; limit++)
+            {
+                try
+                {
+                    var response = await client.GetAsync("/admin/host/ping");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        return true;
+                    }
+                    await Task.Delay(1000);
+                }
+                catch
+                {
+                    await Task.Delay(1000);
+                }
+            }
+            return false;
+        }
+
         public static async Task WaitForFunctionHostToStart(Process funcProcess, int port, int timeout = 120 * 1000, HttpStatusCode expectedStatus = HttpStatusCode.OK)
         {
             var url = $"{FunctionsHostUrl}:{port.ToString()}";
@@ -87,7 +108,7 @@ namespace Func.TestFramework.Helpers
             try
             {
                 log.WriteLine("Waiting for host to start");
-                await WaitForFunctionHostToStart(process, port);
+                //await WaitForFunctionHostToStart(process, port);
                 log.WriteLine("Host started");
 
                 if (!string.IsNullOrEmpty(functionCall))
