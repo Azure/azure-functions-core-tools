@@ -6,6 +6,8 @@ using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
+using Microsoft.VisualStudio.TestPlatform.Utilities;
+using System.Reflection;
 
 namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 {
@@ -26,8 +28,12 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
 
+            var type = _fixture.Log.GetType();
+            var testMember = type.GetField("test", BindingFlags.Instance | BindingFlags.NonPublic);
+            var test = (ITest)testMember.GetValue(type);
+
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, test.TestCase.ToString());
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {

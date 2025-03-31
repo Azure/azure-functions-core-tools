@@ -116,13 +116,13 @@ namespace Func.TestFramework.Commands
 
             command.OnOutputLine(line =>
             {
-                fileWriter.WriteLine(logFilePath, $"[STDOUT] {line}\r\n");
+                fileWriter.WriteLine($"[STDOUT] {line}\r\n");
                 Log.WriteLine($"》   {line}");
                 CommandOutputHandler?.Invoke(line);
             });
             command.OnErrorLine(line =>
             {
-                fileWriter.WriteLine(logFilePath, $"[STDERR] {line}\r\n");
+                fileWriter.WriteLine($"[STDERR] {line}\r\n");
                 if (!string.IsNullOrEmpty(line))
                 {
                     Log.WriteLine($"❌   {line}");
