@@ -23,17 +23,13 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.lol)]
         public async Task Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-
-            var type = _fixture.Log.GetType();
-            var testMember = type.GetField("test", BindingFlags.Instance | BindingFlags.NonPublic);
-            var test = (ITest)testMember.GetValue(type);
+            Environment.SetEnvironmentVariable("DIRECTORY_TO_LOG_TO", "C:\\Users\\aibhandari");
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, test.TestCase.ToString());
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
