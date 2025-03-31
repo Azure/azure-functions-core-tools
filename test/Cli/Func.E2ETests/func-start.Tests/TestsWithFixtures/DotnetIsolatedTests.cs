@@ -26,7 +26,6 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-            Environment.SetEnvironmentVariable("DIRECTORY_TO_LOG_TO", "C:\\Users\\aibhandari");
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
