@@ -14,6 +14,8 @@ namespace Func.TestFramework
         public List<string> EnvironmentToRemove { get; } = new List<string>();
         public string WorkingDirectory { get; set; }
 
+        public string TestName { get; set; }
+
         private string EscapeArgs()
         {
             //  Note: this doesn't handle invoking .cmd files via "cmd /c" on Windows, which probably won't be necessary here

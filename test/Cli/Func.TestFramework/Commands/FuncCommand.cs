@@ -95,8 +95,17 @@ namespace Func.TestFramework.Commands
                 .CaptureStdErr();
 
             var directoryToLogTo = Environment.GetEnvironmentVariable("DIRECTORY_TO_LOG_TO");
+
+            if (string.IsNullOrEmpty(directoryToLogTo))
+            {
+                directoryToLogTo = Directory.GetCurrentDirectory();
+            }
+
+            // Ensure directory exists
+            Directory.CreateDirectory(directoryToLogTo);
+
             string logFilePath = Path.Combine(directoryToLogTo,
-                $"func_test_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                $"func_start_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             File.WriteAllText(logFilePath, $"=== Test started at {DateTime.Now} ===\r\n");
 
             using var fileWriter = new StreamWriter(logFilePath, append: true)
