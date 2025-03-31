@@ -5,6 +5,7 @@ using Func.TestFramework.Helpers;
 using System.Net;
 using Xunit.Abstractions;
 using Xunit;
+using Grpc.Net.Client.Configuration;
 
 namespace Func.E2ETests.func_start.Tests
 {
@@ -28,7 +29,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http3" });
 
             // Call func start with specific functions
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {

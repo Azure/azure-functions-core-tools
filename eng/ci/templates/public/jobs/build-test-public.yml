@@ -72,7 +72,7 @@ jobs:
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeededOrFailed()
     inputs:
-      targetPath: '$(Build.SourcesDirectory)'
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
       artifactName: 'TestLogs'
       artifactType: 'pipeline'
 

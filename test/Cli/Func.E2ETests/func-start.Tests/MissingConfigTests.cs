@@ -5,6 +5,8 @@ using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
+using Grpc.Net.Client.Configuration;
+using System.Reflection;
 
 namespace Func.E2ETests.func_start.Tests
 {
@@ -73,6 +75,8 @@ namespace Func.E2ETests.func_start.Tests
         {
             try
             {
+                string methodName = System.Reflection.MethodBase.GetCurrentMethod().Name;
+                string logFileName = $"{methodName}_{language}_{runtimeParameter}";
                 if (setRuntimeViaEnvironment)
                 {
                     Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
@@ -91,7 +95,7 @@ namespace Func.E2ETests.func_start.Tests
                 File.Delete(localSettingsJson);
 
                 // Call func start
-                var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+                var funcStartCommand = new FuncStartCommand(FuncPath, Log, logFileName);
 
                 funcStartCommand.ProcessStartedHandler = async process =>
                 {
@@ -144,7 +148,7 @@ namespace Func.E2ETests.func_start.Tests
             await File.WriteAllTextAsync(filePath, functionJson);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
