@@ -94,14 +94,26 @@ namespace Func.TestFramework.Commands
                 .CaptureStdOut()
                 .CaptureStdErr();
 
+            var directoryToLogTo = Environment.GetEnvironmentVariable("DIRECTORY_TO_LOG_TO");
+            string logFilePath = Path.Combine(directoryToLogTo,
+                $"func_test_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+            File.WriteAllText(logFilePath, $"=== Test started at {DateTime.Now} ===\r\n");
+
+            using var fileWriter = new StreamWriter(logFilePath, append: true)
+            {
+                AutoFlush = true // Critical for ensuring content is written immediately
+            };
+
 
             command.OnOutputLine(line =>
             {
+                fileWriter.WriteLine(logFilePath, $"[STDOUT] {line}\r\n");
                 Log.WriteLine($"》   {line}");
                 CommandOutputHandler?.Invoke(line);
             });
             command.OnErrorLine(line =>
             {
+                fileWriter.WriteLine(logFilePath, $"[STDERR] {line}\r\n");
                 if (!string.IsNullOrEmpty(line))
                 {
                     Log.WriteLine($"❌   {line}");

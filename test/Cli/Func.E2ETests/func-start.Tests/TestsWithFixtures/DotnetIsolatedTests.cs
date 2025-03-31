@@ -21,6 +21,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
 
         [Fact]
+        [Trait(TestTraits.Group, TestTraits.lol)]
         public async Task Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
