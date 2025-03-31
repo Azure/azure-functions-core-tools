@@ -59,6 +59,7 @@ jobs:
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
+      DIRECTORY_TO_LOG_TO: $(Build.SourcesDirectory)
     displayName: 'Executing build script'
 
   - task: 1ES.PublishPipelineArtifact@1
@@ -66,6 +67,13 @@ jobs:
     inputs:
       targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
       artifactName: 'TestResults'
+      artifactType: 'pipeline'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)'
+      artifactName: '*.log'
       artifactType: 'pipeline'
 
   - task: PublishTestResults@2
