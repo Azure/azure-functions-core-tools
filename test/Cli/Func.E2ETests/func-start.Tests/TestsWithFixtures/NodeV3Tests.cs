@@ -23,7 +23,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {

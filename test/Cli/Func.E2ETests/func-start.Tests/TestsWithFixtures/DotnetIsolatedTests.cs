@@ -27,7 +27,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -50,7 +50,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -73,7 +73,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -95,7 +95,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start with invalid runtime (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log)
+            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
@@ -110,7 +110,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start with invalid runtime (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log)
+            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 

@@ -25,7 +25,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -48,7 +48,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -73,7 +73,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int debugPort = ProcessHelper.GetAvailablePort();
 
             // Call func start with inspect flag
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -99,7 +99,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             try
             {
                 tcpListener.Start();
-                var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+                var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
                 // Call func start
                 var result = funcStartCommand
                             .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -145,7 +145,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             File.WriteAllText(settingsPath, settingsContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -180,7 +180,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             funcSettingsResult.Should().ExitWith(0);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -214,7 +214,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -240,7 +240,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -257,7 +257,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
