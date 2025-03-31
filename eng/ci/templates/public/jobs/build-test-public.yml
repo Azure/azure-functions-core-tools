@@ -73,7 +73,7 @@ jobs:
     condition: succeededOrFailed()
     inputs:
       targetPath: '$(Build.SourcesDirectory)'
-      artifactName: '*.log'
+      artifactName: 'TestLogs'
       artifactType: 'pipeline'
 
   - task: PublishTestResults@2
