@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using Xunit.Abstractions;
 using FluentAssertions;
+using Azure.Functions.Cli.Abstractions;
+using Func.TestFramework.Commands;
 
 namespace Func.TestFramework.Helpers
 {
@@ -109,7 +111,6 @@ namespace Func.TestFramework.Helpers
                         }
                     }
                     */
-
                     try
                     {
                         // Try ping endpoint as a fallback
@@ -212,5 +213,70 @@ namespace Func.TestFramework.Helpers
                 process.Kill(true);
             }
         }
+
+        public static async Task<FuncStartCommand> WaitTillHostHasStarted(FuncStartCommand funcStartCommand, int port, string functionCall = "", string capturedContent = "", string because = "")
+        {
+            string outputFromFunction = "";
+
+            funcStartCommand.CommandOutputHandler = async output =>
+            {
+                outputFromFunction += output;
+            };
+
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            {
+                fileWriter?.WriteLine("[HANDLER] Handler started at " + DateTime.Now);
+                fileWriter?.Flush();
+
+                try
+                {
+                    int retryCount = 1;
+                    await RetryHelper.RetryAsync(async () =>
+                    {
+                        fileWriter?.WriteLine("Current retry count: " + retryCount);
+                        fileWriter?.Flush();
+
+                        retryCount += 1;
+                        if (outputFromFunction.Contains("Host started"))
+                        {
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (!string.IsNullOrEmpty(functionCall))
+                    {
+                        fileWriter?.WriteLine($"[HANDLER] Making request to http://localhost:{port}/api/{functionCall}");
+                        fileWriter?.Flush();
+
+                        using (var client = new HttpClient())
+                        {
+                            var response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
+                            var responseContent = await response.Content.ReadAsStringAsync();
+
+                            fileWriter?.WriteLine($"[HANDLER] Received response: {responseContent}");
+                            fileWriter?.Flush();
+                            responseContent.Should().Be(capturedContent);
+                        }
+                    }
+                }
+                catch (ApplicationException ex)
+                {
+                    fileWriter?.WriteLine("[HANDLER] Handler ran into an exception at " + DateTime.Now);
+                    fileWriter?.WriteLine("[HANDLER] Handler ran into an exception: " + ex.Message);
+                    fileWriter?.Flush();
+                    throw new TimeoutException("Host was not started in alloted time");
+                }
+                finally
+                {
+                    fileWriter?.WriteLine("[HANDLER] Process is going to be killed");
+                    fileWriter?.Flush();
+                    process.Kill();
+                }
+            };
+            return funcStartCommand;
+        }
     }
+
+    
 }

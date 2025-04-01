@@ -36,33 +36,7 @@ namespace Func.E2ETests.func_start.Tests
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, methodName);
-            string capturedContent = null;
-
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
-            {
-                try
-                {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter, expectedStatus: enableAuth ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
-                    // Need this delay here to give the host time to start
-                    // for the unauthorized function call, the host /admin/host/status is never marked as ready
-                    using (var client = new HttpClient())
-                    {
-                        var response = await client.GetAsync($"http://localhost:{port}/api/HttpTrigger?name=Test");
-                        if (response.IsSuccessStatusCode)
-                        {
-                            capturedContent = await response.Content.ReadAsStringAsync();
-                        }
-                        else
-                        {
-                            capturedContent = "";
-                        }
-                    }
-                }
-                finally
-                {
-                    process.Kill(true);
-                }
-            };
+            funcStartCommand = await ProcessHelper.WaitTillHostHasStarted(funcStartCommand, port, "HttpTrigger?name=Test", expectedResult, becauseReason);
 
             // Build command arguments based on enableAuth parameter
             var commandArgs = new List<string> { "start", "--verbose", "--port", port.ToString() };
@@ -74,9 +48,6 @@ namespace Func.E2ETests.func_start.Tests
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(commandArgs.ToArray());
-
-            // Validate response content
-            capturedContent.Should().Be(expectedResult, because: becauseReason);
 
             // Validate expected output content
             if (string.IsNullOrEmpty(expectedResult))

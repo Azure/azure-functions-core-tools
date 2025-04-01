@@ -26,44 +26,10 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
-            {
-                fileWriter?.WriteLine("[HANDLER] Handler started at " + DateTime.Now);
-                fileWriter?.Flush();
-
-                /*
-                // Try to read any available output immediately
-                try
-                {
-                    if (process.StandardOutput.Peek() > -1)
-                    {
-                        var initialOutput = process.StandardOutput.ReadToEnd();
-                        fileWriter?.WriteLine("[INITIAL OUTPUT] " + initialOutput);
-                        fileWriter?.Flush();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    fileWriter?.WriteLine("[ERROR] Failed 56ETY to read initial output: " + ex.Message);
-                    fileWriter?.Flush();
-                }
-                */
-
-                try
-                {
-                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "Welcome to Azure Functions!");
-                }
-                catch (Exception ex)
-                {
-                    fileWriter?.WriteLine("[ERROR] Failed to start process: " + ex.Message);
-                    fileWriter?.Flush();
-                }
-            };
-
+            funcStartCommand = await ProcessHelper.WaitTillHostHasStarted(funcStartCommand, port, "HttpTrigger", "Welcome to Azure Functions!");
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
