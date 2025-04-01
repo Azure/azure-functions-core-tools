@@ -107,9 +107,6 @@ namespace Func.TestFramework.Commands
             string logFilePath = Path.Combine(directoryToLogTo,
                 $"func_start_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
 
-            // Don't create the file here - let the StreamWriter create it
-            // Remove this line: File.WriteAllText(logFilePath, $"=== Test started at {DateTime.Now} ===\r\n");
-
             // Make sure we're only opening the file once
             StreamWriter fileWriter = null;
             try
