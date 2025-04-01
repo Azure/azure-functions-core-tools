@@ -66,6 +66,12 @@ namespace Func.TestFramework.Helpers
                     fileWriter?.Flush();
                     retry += 1;
 
+                    if (funcProcess.HasExited)
+                    {
+                        LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
+                        throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
+                    }
+
                     var response = await httpClient.GetAsync($"{url}/admin/host/status");
 
                     LogMessage($"Response status code: {response.StatusCode}");
