@@ -35,6 +35,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 fileWriter?.WriteLine("[HANDLER] Handler started at " + DateTime.Now);
                 fileWriter?.Flush();
 
+                /*
                 // Try to read any available output immediately
                 try
                 {
@@ -47,11 +48,20 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 }
                 catch (Exception ex)
                 {
-                    fileWriter?.WriteLine("[ERROR] Failed to read initial output: " + ex.Message);
+                    fileWriter?.WriteLine("[ERROR] Failed 56ETY to read initial output: " + ex.Message);
                     fileWriter?.Flush();
                 }
+                */
 
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "Welcome to Azure Functions!");
+                try
+                {
+                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "Welcome to Azure Functions!");
+                }
+                catch (Exception ex)
+                {
+                    fileWriter?.WriteLine("[ERROR] Failed to start process: " + ex.Message);
+                    fileWriter?.Flush();
+                }
             };
 
             var result = funcStartCommand

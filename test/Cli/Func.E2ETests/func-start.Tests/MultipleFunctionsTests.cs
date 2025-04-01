@@ -35,7 +35,7 @@ namespace Func.E2ETests.func_start.Tests
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter, "http1");
                     using (var client = new HttpClient())
                     {
                         // http1 should be available
