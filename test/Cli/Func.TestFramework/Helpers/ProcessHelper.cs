@@ -37,10 +37,23 @@ namespace Func.TestFramework.Helpers
             return false;
         }
 
-        public static async Task WaitForFunctionHostToStart(Process funcProcess, int port, int timeout = 120 * 1000, HttpStatusCode expectedStatus = HttpStatusCode.OK)
+        public static async Task WaitForFunctionHostToStart(
+         Process funcProcess,
+         int port,
+         StreamWriter? fileWriter = null,
+         int timeout = 120 * 1000,
+         HttpStatusCode expectedStatus = HttpStatusCode.OK)
         {
             var url = $"{FunctionsHostUrl}:{port.ToString()}";
             using var httpClient = new HttpClient();
+
+            void LogMessage(string message)
+            {
+                Console.WriteLine(message);
+                fileWriter?.WriteLine($"[HOST STATUS] {message}");
+            }
+
+            LogMessage($"Starting to wait for function host on {url}");
 
             await RetryHelper.RetryAsync(async () =>
             {
@@ -51,7 +64,7 @@ namespace Func.TestFramework.Helpers
                     // If we're expecting a 401, check for that first
                     if (expectedStatus == HttpStatusCode.Unauthorized && response.StatusCode == HttpStatusCode.Unauthorized)
                     {
-                        Console.WriteLine($"Received expected 401 Unauthorized response - host is ready");
+                        LogMessage($"Received expected 401 Unauthorized response - host is ready");
                         return true;
                     }
 
@@ -59,7 +72,7 @@ namespace Func.TestFramework.Helpers
                     if (response.IsSuccessStatusCode)
                     {
                         var content = await response.Content.ReadAsStringAsync();
-                        Console.WriteLine($"Host status response: {content}");
+                        LogMessage($"Host status response: {content}");
 
                         try
                         {
@@ -67,21 +80,22 @@ namespace Func.TestFramework.Helpers
                             if (doc.RootElement.TryGetProperty("state", out JsonElement value) &&
                                 value.GetString() == "Running")
                             {
+                                LogMessage("Host is in Running state - ready to process requests");
                                 return true;
                             }
                         }
                         catch (JsonException ex)
                         {
-                            Console.WriteLine($"Error parsing JSON: {ex.Message}");
+                            LogMessage($"Error parsing JSON: {ex.Message}");
                         }
                     }
 
-                    Console.WriteLine($"Host not ready yet. Status: {response.StatusCode}");
+                    LogMessage($"Host not ready yet. Status: {response.StatusCode}");
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error checking host status: {ex.Message}");
+                    LogMessage($"Error checking host status: {ex.Message}");
                     return false;
                 }
             }, timeout);
@@ -103,20 +117,29 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log, string functionCall = "", string capturedContent = "")
+        public static async Task ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log,
+    StreamWriter? fileWriter, string functionCall = "", string capturedContent = "")
         {
             try
             {
                 log.WriteLine("Waiting for host to start");
+                fileWriter?.WriteLine("[HANDLER] Waiting for host to start");
+
+                await WaitForFunctionHostToStart(process, port, fileWriter);
+
+                log.WriteLine("Host started");
+                fileWriter?.WriteLine("[HANDLER] Host started");
 
                 if (!string.IsNullOrEmpty(functionCall))
                 {
+                    fileWriter?.WriteLine($"[HANDLER] Making request to http://localhost:{port}/api/{functionCall}");
+
                     using (var client = new HttpClient())
                     {
-                        await WaitUntilReady(client);
                         var response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
                         var responseContent = await response.Content.ReadAsStringAsync();
 
+                        fileWriter?.WriteLine($"[HANDLER] Received response: {responseContent}");
                         responseContent.Should().Be(capturedContent);
                     }
                 }
@@ -124,10 +147,12 @@ namespace Func.TestFramework.Helpers
             catch (Exception e)
             {
                 log.WriteLine("Error was thrown: " + e.ToString());
+                fileWriter?.WriteLine("[HANDLER-ERROR] " + e.ToString());
             }
             finally
             {
                 log.WriteLine("Process is going to be killed");
+                fileWriter?.WriteLine("[HANDLER] Process is going to be killed");
                 process.Kill(true);
             }
         }

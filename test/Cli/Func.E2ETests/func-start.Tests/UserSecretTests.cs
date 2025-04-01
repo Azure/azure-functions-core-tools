@@ -54,11 +54,11 @@ namespace Func.E2ETests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter);
 
                     // Insert message into queue
                     await QueueStorageHelper.InsertIntoQueue("myqueue-items", "hello world");
@@ -173,9 +173,9 @@ namespace Func.E2ETests
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter);
             };
 
             var result = funcStartCommand

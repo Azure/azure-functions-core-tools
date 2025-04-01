@@ -25,9 +25,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_NodeJsApp_V3_SuccessfulFunctionExecution");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger", "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.");
             };
 
             var result = funcStartCommand

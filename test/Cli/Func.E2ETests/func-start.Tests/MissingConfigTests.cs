@@ -97,9 +97,9 @@ namespace Func.E2ETests.func_start.Tests
                 // Call func start
                 var funcStartCommand = new FuncStartCommand(FuncPath, Log, logFileName);
 
-                funcStartCommand.ProcessStartedHandler = async process =>
+                funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
                 {
-                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "HttpTriggerFunc", "lol");
+                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter, "HttpTriggerFunc", "lol");
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString() };
@@ -150,9 +150,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter);
             };
 
             var result = funcStartCommand

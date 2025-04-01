@@ -31,11 +31,11 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start with specific functions
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_FunctionsStartArgument_OnlySelectedFunctionsRun");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter);
                     using (var client = new HttpClient())
                     {
                         // http1 should be available

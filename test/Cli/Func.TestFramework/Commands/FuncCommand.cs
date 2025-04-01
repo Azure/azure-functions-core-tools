@@ -19,7 +19,7 @@ namespace Func.TestFramework.Commands
 
         //  These only work via Execute(), not when using GetProcessStartInfo()
         public Action<string>? CommandOutputHandler { get; set; }
-        public Action<Process>? ProcessStartedHandler { get; set; }
+        public Action<Process, StreamWriter?>? ProcessStartedHandler { get; set; }
 
         protected FuncCommand(ITestOutputHelper log)
         {
@@ -169,7 +169,7 @@ namespace Func.TestFramework.Commands
                 Log.WriteLine($"Executing '{display}':");
                 Log.WriteLine($"Output being captured to: {logFilePath}");
 
-                var result = ((Command)command).Execute(ProcessStartedHandler);
+                var result = ((Command)command).Execute(ProcessStartedHandler, fileWriter);
 
                 fileWriter.WriteLine("====================================");
                 fileWriter.WriteLine($"Command exited with code: {result.ExitCode}");

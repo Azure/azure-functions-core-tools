@@ -30,9 +30,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger", "Welcome to Azure Functions!");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "Welcome to Azure Functions!");
             };
 
             var result = funcStartCommand
@@ -53,9 +53,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithRuntimeSpecified");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger", "Welcome to Azure Functions!");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "Welcome to Azure Functions!");
             };
 
             var result = funcStartCommand
@@ -76,9 +76,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithoutRuntimeSpecified");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Welcome to Azure Functions!");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test", "Welcome to Azure Functions!");
             };
 
             var result = funcStartCommand

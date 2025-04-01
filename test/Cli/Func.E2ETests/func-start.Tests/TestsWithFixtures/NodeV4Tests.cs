@@ -27,9 +27,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test!");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test", "Hello, Test!");
             };
 
             var result = funcStartCommand
@@ -50,9 +50,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test!");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test", "Hello, Test!");
             };
 
             var result = funcStartCommand
@@ -75,9 +75,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start with inspect flag
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_WithInspect_DebuggerIsStarted");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log,"HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -105,7 +105,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                             .WithWorkingDirectory(_fixture.WorkingDirectory)
                             .Execute(new[] { "--port", port.ToString() });
 
-                funcStartCommand.ProcessStartedHandler = async process =>
+                funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
                 {
                     // Wait for debugger message
                     await Task.Delay(5000);
@@ -147,9 +147,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_EmptyEnvVars_HandledAsExpected");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter);
             };
 
             var result = funcStartCommand
@@ -182,9 +182,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -216,9 +216,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue");
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand

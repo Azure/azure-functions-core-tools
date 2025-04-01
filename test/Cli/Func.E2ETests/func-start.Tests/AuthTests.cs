@@ -38,11 +38,11 @@ namespace Func.E2ETests.func_start.Tests
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, methodName);
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port, expectedStatus: enableAuth ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter, expectedStatus: enableAuth ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
                     // Need this delay here to give the host time to start
                     // for the unauthorized function call, the host /admin/host/status is never marked as ready
                     using (var client = new HttpClient())
