@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using System.Net.Http;
 using System.Xml;
+using System.Text.Json;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -92,6 +93,31 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             return latestMajorVersion;
+        }
+
+        public static string GetPowerShellVersion(string functionAppRoot)
+        {
+            // Check environment variable (for Azure)
+            string runtimeVersion = Environment.GetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME_VERSION");
+            if (!string.IsNullOrEmpty(runtimeVersion))
+            {
+                return runtimeVersion;
+            }
+            // Fallback: Check local.settings.json (for local development)
+            string settingsPath = Path.Combine(functionAppRoot, "local.settings.json");
+            if (File.Exists(settingsPath))
+            {
+                var jsonText = File.ReadAllText(settingsPath);
+                using (JsonDocument doc = JsonDocument.Parse(jsonText))
+                {
+                    if (doc.RootElement.TryGetProperty("Values", out JsonElement values) &&
+                        values.TryGetProperty("FUNCTIONS_WORKER_RUNTIME_VERSION", out JsonElement versionElement))
+                    {
+                        return versionElement.GetString();
+                    }
+                }
+            }
+            return null;
         }
     }
 }
