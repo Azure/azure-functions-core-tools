@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli
         public const string Ci_Continuous_Integration = "CONTINUOUS_INTEGRATION";  // Travis CI, Cirrus CI
         public const string Ci_Build_Number = "BUILD_NUMBER";  // Travis CI, Cirrus CI
         public const string Ci_Run_Id = "RUN_ID"; // TaskCluster, dsari
+        public static readonly string[] ValidUserLogLevels = ["Trace", "Debug", "Information", "Warning", "Error", "Critical", "None"];
 
         public LoggingFilterHelper(IConfigurationRoot hostJsonConfig, bool? verboseLogging, string userLogLevel = null)
         {
@@ -38,7 +39,7 @@ namespace Azure.Functions.Cli
 
             // Check for user log level
             if (!string.IsNullOrEmpty(userLogLevel))
-            { 
+            {
                 if (Enum.TryParse(userLogLevel, true, out LogLevel UserLogLevel))
                 {
                     UserLogDefaultLogLevel = UserLogLevel;

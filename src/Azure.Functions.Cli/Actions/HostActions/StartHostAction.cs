@@ -78,6 +78,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         public string? HostRuntime { get; set; }
 
+        public string UserLogLevel { get; set; }
+
         public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
         {
             _secretsManager = secretsManager;
@@ -178,6 +180,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                .WithDescription($"If provided, determines which version of the host to start. Allowed values are '{DotnetConstants.InProc6HostRuntime}', '{DotnetConstants.InProc8HostRuntime}', and 'default' (which runs the out-of-process host).")
                .Callback(startHostFromRuntime => HostRuntime = startHostFromRuntime);
 
+            Parser
+               .Setup<string>("userLogLevel")
+               .WithDescription($"If provided, determines the log level of user logs. Allowed values are '{LogLevel.Trace}', '{LogLevel.Debug}', '{LogLevel.Information}', '{LogLevel.Warning}', '{LogLevel.Error}', '{LogLevel.Critical}' and '{LogLevel.None}'. The default is Information.")
+               .Callback(userLogLevel => UserLogLevel = userLogLevel);
+
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
             // Input args do not contain --verbose flag
@@ -190,7 +197,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
-            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, GetUserLogLevel());
+            LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging, UserLogLevel);
             if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
                 GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
             {
@@ -400,7 +407,20 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            
+
+            //set  flag --userLogLevel as Enviroment variable
+            if (!string.IsNullOrEmpty(UserLogLevel))
+            {
+                if (IsValidUserLogLevel(UserLogLevel))
+                {
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__Logging__LogLevel__Function", UserLogLevel);
+                }
+            }
+            else
+            {
+                UserLogLevel = GetUserLogLevelFromLocalSettings();
+            }
+
             // Return if running is delegated to another version of Core Tools
             if (await TryHandleInProcDotNetLaunchAsync())
             {
@@ -832,7 +852,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
             WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString());
         }
 
-        private string GetUserLogLevel()
+        private bool IsValidUserLogLevel(string UserLogLevel)
+        {
+            if (LoggingFilterHelper.ValidUserLogLevels.Contains(UserLogLevel, StringComparer.OrdinalIgnoreCase) == false)
+            {
+                throw new CliException($"The userLogLevel value provided, '{UserLogLevel}', is invalid. Valid values are '{string.Join("', '", LoggingFilterHelper.ValidUserLogLevels)}'. The default is Information.");
+            }
+            return true;
+        }
+
+        private string GetUserLogLevelFromLocalSettings()
         {
             var UserLogLevel = Environment.GetEnvironmentVariable(Constants.FunctionsLoggingLogLevel) 
                         ?? _secretsManager.GetSecrets().FirstOrDefault(s => s.Key.Equals(Constants.FunctionsLoggingLogLevel, StringComparison.OrdinalIgnoreCase)).Value;

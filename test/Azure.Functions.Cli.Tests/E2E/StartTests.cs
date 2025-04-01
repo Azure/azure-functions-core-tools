@@ -1860,6 +1860,63 @@ namespace Azure.Functions.Cli.Tests.E2E
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        public async Task Start_DotnetApp_WithUserLogLevelFlag_ShowDebugLogsInConsole()
+        {
+            var DebugLogMessage = "This is a debug log message";
+
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet",
+                        "new --template Httptrigger --name HttpTrigger"
+                    },
+                    Test = async (workingDir, _, _) =>
+                    {
+                        // Add debug logs to FunctionApp.cs
+                        var functionAppPath = Path.Combine(workingDir, "HttpTrigger.cs");
+                        if (File.Exists(functionAppPath))
+                        {
+                            var content = await File.ReadAllTextAsync(functionAppPath);
+                            content = content.Replace(
+                                "log.LogInformation(\"C# HTTP trigger function processed a request.\");",
+                                $"log.LogInformation(\"C# HTTP trigger function processed a request.\");\nlog.LogDebug(\"{DebugLogMessage}\");"
+                            );
+                            await File.WriteAllTextAsync(functionAppPath, content);
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --port {_funcHostPort} --userLogLevel Debug"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new[]
+                    {
+                        DebugLogMessage
+                    },
+                    Test = async (_, p, stdout) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            response.StatusCode.Should().Be(HttpStatusCode.OK);
+                            p.Kill();
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                }
+            }, _output);
+        }
+
+        [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_DotnetApp_WithDebugLogs_DisplaysDebugLogsInConsole()
         {
             var DebugLogMessage = "This is a debug log message";
@@ -1911,6 +1968,60 @@ namespace Azure.Functions.Cli.Tests.E2E
                     OutputContains = new[]
                     {
                         DebugLogMessage
+                    },
+                    Test = async (_, p, stdout) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            response.StatusCode.Should().Be(HttpStatusCode.OK);
+                            p.Kill();
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                }
+            }, _output);
+        }
+        [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        public async Task Start_NodeApp_DisplaysDebugLogsInConsole()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime node",
+                        "new --template Httptrigger --name HttpTrigger"
+                    },
+                    Test = async (workingDir, _, _) =>
+                    {
+                        // Add debug logs to FunctionApp.cs
+                        var functionAppPath = Path.Combine(workingDir,"src", "functions", "HttpTrigger.js");
+                        if (File.Exists(functionAppPath))
+                        {
+                            var content = await File.ReadAllTextAsync(functionAppPath);
+                            content = content.Replace(
+                                $"context.log(`Http function processed request for url \"${{request.url}}\"`);",
+                                $"context.log(`Http function processed request for url \"${{request.url}}\"`);\ncontext.debug(\"This is a debug log message\");"
+                            );
+                            await File.WriteAllTextAsync(functionAppPath, content);
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --port {_funcHostPort} --userLogLevel Debug"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new[]
+                    {
+                        "This is a debug log message"
                     },
                     Test = async (_, p, stdout) =>
                     {
