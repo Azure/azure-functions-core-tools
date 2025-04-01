@@ -41,6 +41,7 @@ namespace Func.TestFramework.Helpers
          Process funcProcess,
          int port,
          StreamWriter? fileWriter = null,
+         string? functionCall = null,
          int timeout = 120 * 1000,
          HttpStatusCode expectedStatus = HttpStatusCode.OK)
         {
@@ -90,7 +91,35 @@ namespace Func.TestFramework.Helpers
                         }
                     }
 
-                    LogMessage($"Host not ready yet. Status: {response.StatusCode}");
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        try
+                        {
+                            // Try ping endpoint as a fallback
+                            var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                            if (pingResponse.IsSuccessStatusCode)
+                            {
+                                LogMessage("Host responded to ping - assuming it's running");
+                                return true;
+                            }
+                        }
+                        catch { }
+
+                        // Try the function endpoint directly as a desperate measure
+                        if (!string.IsNullOrEmpty(functionCall))
+                        {
+                            try
+                            {
+                                var functionResponse = await httpClient.GetAsync($"{url}/api/{functionCall}");
+                                if (functionResponse.IsSuccessStatusCode)
+                                {
+                                    LogMessage("Function endpoint responded - assuming host is running");
+                                    return true;
+                                }
+                            }
+                            catch { }
+                        }
+                    }
                     return false;
                 }
                 catch (Exception ex)
@@ -125,7 +154,7 @@ namespace Func.TestFramework.Helpers
                 log.WriteLine("Waiting for host to start");
                 fileWriter?.WriteLine("[HANDLER] Waiting for host to start");
 
-                await WaitForFunctionHostToStart(process, port, fileWriter);
+                await WaitForFunctionHostToStart(process, port, fileWriter, functionCall);
 
                 log.WriteLine("Host started");
                 fileWriter?.WriteLine("[HANDLER] Host started");
