@@ -110,6 +110,20 @@ namespace Func.TestFramework.Helpers
                     }
                     */
 
+                    try
+                    {
+                        // Try ping endpoint as a fallback
+                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                        LogMessage($"Ping response: {pingResponse.StatusCode}");
+                        fileWriter?.Flush();
+                        if (pingResponse.IsSuccessStatusCode)
+                        {
+                            LogMessage("Host responded to ping - assuming it's running");
+                            return true;
+                        }
+                    }
+                    catch { }
+
                     // Try the function endpoint directly as a desperate measure
                     if (!string.IsNullOrEmpty(functionCall))
                     {
@@ -127,20 +141,6 @@ namespace Func.TestFramework.Helpers
                         }
                         catch { }
                     }
-
-                    try
-                    {
-                        // Try ping endpoint as a fallback
-                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
-                        LogMessage($"Ping response: {pingResponse.StatusCode}");
-                        fileWriter?.Flush();
-                        if (pingResponse.IsSuccessStatusCode)
-                        {
-                            LogMessage("Host responded to ping - assuming it's running");
-                            return true;
-                        }
-                    }
-                    catch { }
                     return false;
                 }
                 catch (Exception ex)
