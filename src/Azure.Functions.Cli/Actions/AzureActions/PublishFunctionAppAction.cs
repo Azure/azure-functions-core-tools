@@ -200,7 +200,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Show warning message for other worker runtimes (Node, Python, Powershell, Java)
-            if (workerRuntime == WorkerRuntime.node || workerRuntime == WorkerRuntime.python || workerRuntime == WorkerRuntime.powershell || workerRuntime == WorkerRuntime.java)
+            if (workerRuntime != WorkerRuntime.dotnet && workerRuntime != WorkerRuntime.dotnetIsolated)
             {
                 string workerRuntimeStr = Convert.ToString(workerRuntime);
                 string runtimeVersion = GetWorkerRuntimeVersion(workerRuntime, functionAppRoot);
@@ -211,7 +211,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     DateTime currentDate = DateTime.Now;
                     if (workerRuntime == WorkerRuntime.python)
                     {
-                        var linuxRuntimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isPythonLTS, s => s.LinuxRuntimeSettings);
+                        var linuxRuntimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isLinuxLTS, s => s.LinuxRuntimeSettings);
                         DateTime eolDate = linuxRuntimeSettings.EndOfLifeDate.Value;
                         DateTime warningThresholdDate = eolDate.AddMonths(-6);
                         if (currentDate > eolDate || currentDate >= warningThresholdDate)
@@ -222,7 +222,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                     else
                     {
-                        var runtimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isNodeLTS, s => s.WindowsRuntimeSettings);
+                        var runtimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isWindowsLTS, s => s.WindowsRuntimeSettings);
                         DateTime eolDate = runtimeSettings.EndOfLifeDate.Value;
                         DateTime warningThresholdDate = eolDate.AddMonths(-6);
                         if (currentDate > eolDate || currentDate >= warningThresholdDate)
