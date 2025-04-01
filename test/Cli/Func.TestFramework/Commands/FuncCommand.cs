@@ -88,14 +88,12 @@ namespace Func.TestFramework.Commands
         public virtual CommandResult Execute(IEnumerable<string> args)
         {
             var spec = CreateCommandInfo(args);
-
             var command = spec
                 .ToCommand(_doNotEscapeArguments)
                 .CaptureStdOut()
                 .CaptureStdErr();
 
             var directoryToLogTo = Environment.GetEnvironmentVariable("DIRECTORY_TO_LOG_TO");
-
             if (string.IsNullOrEmpty(directoryToLogTo))
             {
                 directoryToLogTo = Directory.GetCurrentDirectory();
@@ -104,38 +102,102 @@ namespace Func.TestFramework.Commands
             // Ensure directory exists
             Directory.CreateDirectory(directoryToLogTo);
 
+            // Create a more unique filename to avoid conflicts
+            string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
             string logFilePath = Path.Combine(directoryToLogTo,
-                $"func_start_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}.log");
-            File.WriteAllText(logFilePath, $"=== Test started at {DateTime.Now} ===\r\n");
+                $"func_start_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
 
-            using var fileWriter = new StreamWriter(logFilePath, append: true)
-            {
-                AutoFlush = true // Critical for ensuring content is written immediately
-            };
+            // Don't create the file here - let the StreamWriter create it
+            // Remove this line: File.WriteAllText(logFilePath, $"=== Test started at {DateTime.Now} ===\r\n");
 
-
-            command.OnOutputLine(line =>
+            // Make sure we're only opening the file once
+            StreamWriter fileWriter = null;
+            try
             {
-                fileWriter.WriteLine($"[STDOUT] {line}\r\n");
-                Log.WriteLine($"》   {line}");
-                CommandOutputHandler?.Invoke(line);
-            });
-            command.OnErrorLine(line =>
-            {
-                fileWriter.WriteLine($"[STDERR] {line}\r\n");
-                if (!string.IsNullOrEmpty(line))
+                // Open with FileShare.Read to allow others to read but not write
+                var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                fileWriter = new StreamWriter(fileStream)
                 {
-                    Log.WriteLine($"❌   {line}");
+                    AutoFlush = true
+                };
+
+                // Write initial information
+                fileWriter.WriteLine($"=== Test started at {DateTime.Now} ===");
+                fileWriter.WriteLine($"Test Name: {spec.TestName}");
+                var display = $"func {string.Join(" ", spec.Arguments)}";
+                fileWriter.WriteLine($"Command: {display}");
+                fileWriter.WriteLine($"Working Directory: {spec.WorkingDirectory ?? "not specified"}");
+                fileWriter.WriteLine("====================================");
+
+                command.OnOutputLine(line =>
+                {
+                    try
+                    {
+                        // Write to the file if it's still open
+                        if (fileWriter != null && fileWriter.BaseStream != null)
+                        {
+                            fileWriter.WriteLine($"[STDOUT] {line}");
+                        }
+
+                        Log.WriteLine($"》   {line}");
+                        CommandOutputHandler?.Invoke(line);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"Error writing to log file: {ex.Message}");
+                    }
+                });
+
+                command.OnErrorLine(line =>
+                {
+                    try
+                    {
+                        // Write to the file if it's still open
+                        if (fileWriter != null && fileWriter.BaseStream != null)
+                        {
+                            fileWriter.WriteLine($"[STDERR] {line}");
+                        }
+
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            Log.WriteLine($"❌   {line}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"Error writing to log file: {ex.Message}");
+                    }
+                });
+
+                Log.WriteLine($"Executing '{display}':");
+                Log.WriteLine($"Output being captured to: {logFilePath}");
+
+                var result = ((Command)command).Execute(ProcessStartedHandler);
+
+                fileWriter.WriteLine("====================================");
+                fileWriter.WriteLine($"Command exited with code: {result.ExitCode}");
+                fileWriter.WriteLine($"=== Test ended at {DateTime.Now} ===");
+
+                Log.WriteLine($"Command '{display}' exited with exit code {result.ExitCode}.");
+
+                return result;
+            }
+            finally
+            {
+                // Make sure to close and dispose the writer
+                if (fileWriter != null)
+                {
+                    try
+                    {
+                        fileWriter.Close();
+                        fileWriter.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"Error closing log file: {ex.Message}");
+                    }
                 }
-            });
-
-            var display = $"func {string.Join(" ", spec.Arguments)}";
-
-            Log.WriteLine($"Executing '{display}':");
-            var result = ((Command)command).Execute(ProcessStartedHandler);
-            Log.WriteLine($"Command '{display}' exited with exit code {result.ExitCode}.");
-
-            return result;
+            }
         }
 
         public static void LogCommandResult(ITestOutputHelper log, CommandResult result)
