@@ -29,7 +29,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http3" });
 
             // Call func start with specific functions
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_FunctionsStartArgument_OnlySelectedFunctionsRun");
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {

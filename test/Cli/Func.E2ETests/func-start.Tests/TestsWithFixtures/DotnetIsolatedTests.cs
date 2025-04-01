@@ -51,7 +51,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithRuntimeSpecified");
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -74,7 +74,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithoutRuntimeSpecified");
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
@@ -96,7 +96,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start with invalid runtime (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name)
+            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated")
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
@@ -111,7 +111,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start with invalid runtime (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name)
+            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc8_SpecifiedRuntime_ForDotnetIsolated")
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 

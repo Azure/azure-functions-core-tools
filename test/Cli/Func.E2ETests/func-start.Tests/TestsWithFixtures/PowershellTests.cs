@@ -27,7 +27,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, System.Reflection.MethodBase.GetCurrentMethod().Name);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_PowershellApp_SuccessfulFunctionExecution");
             funcStartCommand.ProcessStartedHandler = async process =>
             {
                 await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test.This HTTP triggered function executed successfully.");

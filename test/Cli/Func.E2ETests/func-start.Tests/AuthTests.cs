@@ -31,7 +31,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet-isolated" });
             await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
 
-            string methodName = System.Reflection.MethodBase.GetCurrentMethod().Name;
+            string methodName = "Start_DotnetIsolated_Test_EnableAuthFeature";
             string uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
             // Call func start

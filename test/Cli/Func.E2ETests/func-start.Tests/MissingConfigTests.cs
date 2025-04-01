@@ -75,7 +75,7 @@ namespace Func.E2ETests.func_start.Tests
         {
             try
             {
-                string methodName = System.Reflection.MethodBase.GetCurrentMethod().Name;
+                string methodName = "Start_MissingLocalSettingsJson_BehavesAsExpected";
                 string logFileName = $"{methodName}_{language}_{runtimeParameter}";
                 if (setRuntimeViaEnvironment)
                 {
@@ -148,7 +148,7 @@ namespace Func.E2ETests.func_start.Tests
             await File.WriteAllTextAsync(filePath, functionJson);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, MethodBase.GetCurrentMethod().Name);
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError");
 
             funcStartCommand.ProcessStartedHandler = async process =>
             {
