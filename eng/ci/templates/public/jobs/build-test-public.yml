@@ -12,9 +12,6 @@ jobs:
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
 
   steps:
-  - pwsh: . "eng/scripts/start-emulators.ps1" -NoWait
-    displayName: "Start emulators (NoWait)"
-
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -42,15 +39,6 @@ jobs:
     inputs:
       versionSpec:
     displayName: Install Nuget tool
-
-  - pwsh: |
-      eng/scripts/validateWorkerVersions.ps1
-    displayName: 'Validate worker versions'
-    condition: ne(variables['skipWorkerVersionValidation'], 'true')
-
-  - pwsh: |
-      eng/scripts/check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
 
   - pwsh: |
       eng/scripts/build.ps1
