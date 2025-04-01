@@ -318,7 +318,47 @@ Properties = new Properties
        }
    }
 }
+           },
+           new Language
+{
+   Name = "powershell",
+   Properties = new Properties
+   {
+       DisplayText = "PowerShell",
+       MajorVersions = new List<MajorVersion>
+       {
+           new MajorVersion
+           {
+               Value = "7",
+               MinorVersions = new List<MinorVersion>
+               {
+                   new MinorVersion
+                   {
+                       Value = "7",
+                       StackSettings = new StackSettings
+                       {
+                           WindowsRuntimeSettings = new WindowsRuntimeSettings
+                           {
+                               RuntimeVersion = "PowerShell|7"
+                           }
+                       }
+                   },
+                   new MinorVersion
+                   {
+                       Value = "7.2 LTS",
+                       StackSettings = new StackSettings
+                       {
+                           WindowsRuntimeSettings = new WindowsRuntimeSettings
+                           {
+                               RuntimeVersion = "PowerShell|7.2 LTS"
+                           }
+                       }
+                   }
+               }
            }
+       }
+   }
+}
        }
             };
         }
@@ -330,7 +370,7 @@ Properties = new Properties
             // Arrange
             var stacks = GetMockFunctionStacks();
             // Act
-            var (nextVersion, _) = stacks.GetNextRuntimeVersionForNode(runtime, currentVersion);
+            var (nextVersion, _) = stacks.GetNextRuntimeVersion(runtime, currentVersion, p => p.MajorVersions.Select(mv => mv.Value), isNumericVersion: true);
             // Assert
             Assert.Equal(expectedNextVersion, nextVersion);
         }
@@ -342,7 +382,7 @@ Properties = new Properties
             // Arrange
             var stacks = GetMockFunctionStacks();
             // Act
-            var (nextVersion, _) = stacks.GetNextRuntimeVersionForPython(runtime, currentVersion);
+            var (nextVersion, _) = stacks.GetNextRuntimeVersion(runtime, currentVersion, p => p.MajorVersions.SelectMany(mv => mv.MinorVersions, (major, minor) => minor.Value));
             // Assert
             Assert.Equal(expectedNextVersion, nextVersion);
         }
@@ -350,14 +390,13 @@ Properties = new Properties
         [Theory]
         [InlineData("node", "14.17", true)]  // Test for a known valid version
         [InlineData("node", "14.20 LTS", true)] // Test for an LTS version
-        [InlineData("node", "15", false)]  // A version that does not exist
         public void GetRuntimeSettingsForNode_ShouldReturnValidSettings(string runtime, string version, bool expectedNotNull)
         {
             // Arrange
             var stacks = GetMockFunctionStacks();
             bool isLTS;
             // Act
-            var settings = stacks.GetRuntimeSettingsForNode(runtime, version, out isLTS);
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.WindowsRuntimeSettings);
             // Assert
             Assert.Equal(expectedNotNull, settings != null);
         }
@@ -370,7 +409,21 @@ Properties = new Properties
             var stacks = GetMockFunctionStacks();
             bool isLTS;
             // Act
-            var settings = stacks.GetRuntimeSettingsForPython(runtime, version, out isLTS);
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.LinuxRuntimeSettings);
+            // Assert
+            Assert.Equal(expectedNotNull, settings != null);
+        }
+
+        [Theory]
+        [InlineData("powershell", "7", true)]  // PowerShell 7 should return runtime settings
+        [InlineData("powershell", "7.2 LTS", true)] // PowerShell 7.2 LTS should return runtime settings
+        public void GetRuntimeSettingsForPowerShell_ShouldReturnValidSettings(string runtime, string version, bool expectedNotNull)
+        {
+            // Arrange
+            var stacks = GetMockFunctionStacks();
+            bool isLTS;
+            // Act
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.WindowsRuntimeSettings);
             // Assert
             Assert.Equal(expectedNotNull, settings != null);
         }

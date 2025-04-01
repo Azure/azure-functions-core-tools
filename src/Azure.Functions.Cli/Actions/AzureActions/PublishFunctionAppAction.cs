@@ -199,8 +199,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 // We do not change the default targetFramework if no .csproj file is found
             }
 
-            // Show warning message for other worker runtimes (Node, Pyrhon)
-            if (workerRuntime == WorkerRuntime.node || workerRuntime == WorkerRuntime.python)
+            // Show warning message for other worker runtimes (Node, Python, Powershell, Java)
+            if (workerRuntime == WorkerRuntime.node || workerRuntime == WorkerRuntime.python || workerRuntime == WorkerRuntime.powershell || workerRuntime == WorkerRuntime.java)
             {
                 string workerRuntimeStr = Convert.ToString(workerRuntime);
                 string runtimeVersion = GetWorkerRuntimeVersion(workerRuntime, functionAppRoot);
@@ -211,26 +211,24 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     DateTime currentDate = DateTime.Now;
                     if (workerRuntime == WorkerRuntime.python)
                     {
-                        var linuxRuntimeSettings = stacks.GetRuntimeSettingsForPython(workerRuntimeStr, runtimeVersion, out bool isLTS);
+                        var linuxRuntimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isPythonLTS, s => s.LinuxRuntimeSettings);
                         DateTime eolDate = linuxRuntimeSettings.EndOfLifeDate.Value;
                         DateTime warningThresholdDate = eolDate.AddMonths(-6);
                         if (currentDate > eolDate || currentDate >= warningThresholdDate)
                         {
-                            linuxRuntimeSettings.isDeprecated = true;
                             //Show EOL warning message
-                            ShowEolMessageForPython(stacks, linuxRuntimeSettings, workerRuntimeStr, runtimeVersion);
+                            ShowEolMessageForOtherStack(stacks, linuxRuntimeSettings.EndOfLifeDate.Value, workerRuntimeStr, runtimeVersion);
                         }
                     }
                     else
                     {
-                        var runtimeSettings = stacks.GetRuntimeSettingsForNode(workerRuntimeStr, runtimeVersion, out bool isLTS);
+                        var runtimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isNodeLTS, s => s.WindowsRuntimeSettings);
                         DateTime eolDate = runtimeSettings.EndOfLifeDate.Value;
                         DateTime warningThresholdDate = eolDate.AddMonths(-6);
                         if (currentDate > eolDate || currentDate >= warningThresholdDate)
                         {
-                            runtimeSettings.IsDeprecated = true;
                             //Show EOL warning message
-                            ShowEolMessageForNode(stacks, runtimeSettings, workerRuntimeStr, runtimeVersion);
+                            ShowEolMessageForOtherStack(stacks, runtimeSettings.EndOfLifeDate.Value, workerRuntimeStr, runtimeVersion);
                         }
                     }
                 }
@@ -1505,61 +1503,42 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     return NodeJSHelpers.GetNodeVersion(functionAppRoot);
                 case WorkerRuntime.python:
                     return PythonHelpers.GetPythonVersion(functionAppRoot).GetAwaiter().GetResult();
+                case WorkerRuntime.powershell:
+                    return PowerShellHelper.GetPowerShellVersion(functionAppRoot);
+                case WorkerRuntime.java:
+                    return JavaHelper.GetJavaVersion(functionAppRoot);
                 default:
                     return null;
             }
         }
 
-        private void ShowEolMessageForPython(FunctionsStacks stacks, LinuxRuntimeSettings currentRuntimeSettings, string workerRuntime, string runtimeVersion)
+        private void ShowEolMessageForOtherStack(FunctionsStacks stacks, DateTime eolDate, string workerRuntime, string runtimeVersion)
         {
             try
             {
-                if (currentRuntimeSettings.isDeprecated == true)
+                string nextVersion, displayName, warningMessage = string.Empty;
+                (nextVersion, displayName) = workerRuntime switch
                 {
-                    var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForPython(workerRuntime, runtimeVersion);
-                    if (nextVersion != null)
-                    {
-                        var warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
-                        ColoredConsole.WriteLine(WarningColor(warningMessage));
-                    }
+                    var wr when wr.Equals(WorkerRuntime.python.ToString(), StringComparison.OrdinalIgnoreCase) || wr.Equals(WorkerRuntime.powershell.ToString(), StringComparison.OrdinalIgnoreCase) || wr.Equals(WorkerRuntime.java.ToString(), StringComparison.OrdinalIgnoreCase)
+                        => stacks.GetNextRuntimeVersion(workerRuntime, runtimeVersion,
+                           properties => properties.MajorVersions
+                           .SelectMany(mv => mv.MinorVersions, (major, minor) => minor.Value), isNumericVersion: false),
+                    var wr when wr.Equals(WorkerRuntime.node.ToString(), StringComparison.OrdinalIgnoreCase)
+                        => stacks.GetNextRuntimeVersion(workerRuntime, runtimeVersion,
+                           properties => properties.MajorVersions
+                           .Select(mv => mv.Value),
+                           isNumericVersion: true),
+                    _ => (null, workerRuntime) // Default case: No next version available
+                };
+                if (StacksApiHelper.ExpiresInNextSixMonths(eolDate))
+                {
+                    warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, eolDate, Constants.FunctionsStackUpgrade);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
-                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
+                else
                 {
-                    var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForPython(workerRuntime, runtimeVersion);
-                    if (nextVersion != null)
-                    {
-                        var warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
-                        ColoredConsole.WriteLine(WarningColor(warningMessage));
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // ignore. Failure to show the EOL message should not fail the deployment.
-            }
-        }
-
-        private void ShowEolMessageForNode(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, string workerRuntime, string runtimeVersion)
-        {
-            try
-            {
-                if (currentRuntimeSettings.IsDeprecated == true)
-                {
-                    var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForNode(workerRuntime, runtimeVersion);
-                    if (nextVersion != null)
-                    {
-                        var warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
-                        ColoredConsole.WriteLine(WarningColor(warningMessage));
-                    }
-                }
-                else if (StacksApiHelper.IsInNextSixMonths(currentRuntimeSettings.EndOfLifeDate))
-                {
-                    var (nextVersion, displayName) = stacks.GetNextRuntimeVersionForNode(workerRuntime, runtimeVersion);
-                    if (nextVersion != null)
-                    {
-                        var warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, currentRuntimeSettings.EndOfLifeDate.Value, Constants.FunctionsStackUpgrade);
-                        ColoredConsole.WriteLine(WarningColor(warningMessage));
-                    }
+                    warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, eolDate, Constants.FunctionsStackUpgrade);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
             }
             catch (Exception)

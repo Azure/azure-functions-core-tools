@@ -51,8 +51,16 @@ namespace Azure.Functions.Cli.Helpers
             return null;
         }
 
-        public static LinuxRuntimeSettings GetRuntimeSettingsForPython(this FunctionsStacks stacks, string workerRuntime, string runtimeVersion, out bool isLTS)
+        public static T GetOtherRuntimeSettings<T>(this FunctionsStacks stacks, string workerRuntime, string runtimeVersion, out bool isLTS, Func<StackSettings, T> settingsSelector)
         {
+            if (WorkerRuntime.java.ToString() == workerRuntime)
+            {
+                if (runtimeVersion.StartsWith("1."))
+                {
+                    runtimeVersion = runtimeVersion.Substring(2); // Removes "1."
+                }
+            }
+
             var languageStack = stacks?.Languages
                 .FirstOrDefault(x => x.Name.Equals(workerRuntime, StringComparison.InvariantCultureIgnoreCase));
 
@@ -64,26 +72,16 @@ namespace Azure.Functions.Cli.Helpers
                ?? majorVersion?.MinorVersions?.LastOrDefault();
 
             isLTS = minorVersion?.Value?.Contains("LTS") == true;
-            return minorVersion?.StackSettings?.LinuxRuntimeSettings;
+
+            return settingsSelector(minorVersion?.StackSettings);
         }
 
-        public static WindowsRuntimeSettings GetRuntimeSettingsForNode(this FunctionsStacks stacks, string workerRuntime, string runtimeVersion, out bool isLTS)
-        {
-            var languageStack = stacks?.Languages
-                .FirstOrDefault(x => x.Name.Equals(workerRuntime, StringComparison.InvariantCultureIgnoreCase));
-
-            var majorVersion = languageStack?.Properties.MajorVersions?
-                .FirstOrDefault(mv => runtimeVersion.StartsWith(mv.Value, StringComparison.InvariantCultureIgnoreCase));
-
-            var minorVersion = majorVersion?.MinorVersions?
-                .FirstOrDefault(mv => runtimeVersion.StartsWith(mv.Value, StringComparison.InvariantCultureIgnoreCase))
-                ?? majorVersion?.MinorVersions?.LastOrDefault();
-
-            isLTS = minorVersion?.Value?.Contains("LTS") == true;
-            return minorVersion?.StackSettings?.WindowsRuntimeSettings;
-        }
-
-        public static (string nextVersion, string displayText) GetNextRuntimeVersionForPython(this FunctionsStacks stacks, string workerRuntime, string currentRuntimeVersion)
+        public static (string nextVersion, string displayText) GetNextRuntimeVersion(
+            this FunctionsStacks stacks,
+            string workerRuntime,
+            string currentRuntimeVersion,
+            Func<Properties, IEnumerable<string>> versionSelector,
+            bool isNumericVersion = false) // Handle Node.js separately as it has integer versions
         {
             var runtimeStack = stacks?.Languages
                 .FirstOrDefault(x => x.Name.Equals(workerRuntime, StringComparison.InvariantCultureIgnoreCase));
@@ -92,63 +90,54 @@ namespace Azure.Functions.Cli.Helpers
                 return (null, null); // No matching runtime found
             }
             string displayName = runtimeStack.Properties.DisplayText;
-            // Extract and sort all supported versions (major and minor combined)
-            var supportedVersions = runtimeStack?.Properties.MajorVersions?
-                .SelectMany(mv => mv.MinorVersions, (major, minor) => minor.Value) // Flatten list
-                .Where(v => Version.TryParse(v, out _)) // Ensure valid versions
-                .Select(v => Version.Parse(v)) // Convert to Version object for proper sorting
-                .OrderByDescending(v => v) // Sort numerically (highest first)
+            // Extract and sort supported versions using the provided selector function
+            var supportedVersions = versionSelector(runtimeStack.Properties)?
+                .Where(v => !string.IsNullOrEmpty(v))
                 .ToList();
             if (supportedVersions == null || supportedVersions.Count == 0)
             {
                 return (null, displayName); // No valid versions found
             }
-            // Convert the current version to a Version object
-            if (!Version.TryParse(currentRuntimeVersion, out Version currentVersion))
+            if (isNumericVersion)
             {
-                return (null, displayName); // Invalid current version
+                // Special case for Node.js: Versions are integers
+                var numericVersions = supportedVersions
+                    .Select(v => int.TryParse(v, out int version) ? version : (int?)null)
+                    .Where(v => v.HasValue)
+                    .OrderByDescending(v => v)
+                    .ToList();
+                if (!int.TryParse(currentRuntimeVersion, out int currentMajorVersion))
+                {
+                    return (null, displayName); // Invalid current version
+                }
+                var nextVersion = numericVersions.FirstOrDefault(v => v > currentMajorVersion);
+                return ((nextVersion ?? numericVersions.First()).ToString(), displayName);
             }
-            // Find the next highest supported version
-            var nextVersion = supportedVersions.FirstOrDefault(v => v > currentVersion);
-            // If no higher version is found, return the highest available version
-            return ((nextVersion ?? supportedVersions.First()).ToString(), displayName);
+            else
+            {
+                // Standard versioning (Python, Java, PowerShell)
+                var parsedVersions = supportedVersions
+                    .Where(v => Version.TryParse(v, out _))
+                    .Select(v => Version.Parse(v))
+                    .OrderByDescending(v => v)
+                    .ToList();
+                if (!Version.TryParse(currentRuntimeVersion, out Version currentVersion))
+                {
+                    return (null, displayName); // Invalid current version
+                }
+                var nextVersion = parsedVersions.FirstOrDefault(v => v > currentVersion);
+                return ((nextVersion ?? parsedVersions.First()).ToString(), displayName);
+            }
         }
 
-        public static (string nextVersion, string displayText) GetNextRuntimeVersionForNode(this FunctionsStacks stacks, string workerRuntime, string currentRuntimeVersion)
+        public static bool ExpiresInNextSixMonths(this DateTime? date)
         {
-            var runtimeStack = stacks?.Languages
-                .FirstOrDefault(x => x.Name.Equals(workerRuntime, StringComparison.InvariantCultureIgnoreCase));
+            if (!date.HasValue) return false; // Null check
 
-            if (runtimeStack?.Properties == null)
-            {
-                return (null, null); // No matching runtime found
-            }
+            DateTime currentDate = DateTime.UtcNow;
+            DateTime sixMonthsFromNow = currentDate.AddMonths(6);
 
-            string displayName = runtimeStack.Properties.DisplayText;
-
-            // Extract and sort all supported versions
-            var supportedVersions = runtimeStack?.Properties.MajorVersions?
-                .Select(x => int.TryParse(x.Value, out int version) ? version : (int?)null) // Convert to int
-                .Where(x => x.HasValue) // Remove null values
-                .OrderByDescending(x => x) // Sort numerically
-                .ToList();
-
-            if (supportedVersions == null || supportedVersions.Count == 0)
-            {
-                return (null, displayName);// No valid versions found
-            }
-
-            // Convert the current version to an integer
-            if (!int.TryParse(currentRuntimeVersion, out int currentMajorVersion))
-            {
-                return (null, displayName); // Invalid current version
-            }
-
-            // Find the next highest supported version
-            var nextVersion = supportedVersions.FirstOrDefault(x => x > currentMajorVersion);
-
-            // If no higher version is found, return the highest available version
-            return ((nextVersion ?? supportedVersions.First()).ToString(), displayName);
+            return currentDate <= date.Value && date.Value <= sixMonthsFromNow;
         }
 
         public static bool IsInNextSixMonths(this DateTime? date)
@@ -156,7 +145,7 @@ namespace Azure.Functions.Cli.Helpers
             if (date == null)
                 return false;
             else
-                return date < DateTime.Now.AddMonths(6); 
+                return date < DateTime.Now.AddMonths(6);
         }
     }
 }
