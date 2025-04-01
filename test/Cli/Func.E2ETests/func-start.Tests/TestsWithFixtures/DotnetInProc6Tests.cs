@@ -30,9 +30,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
@@ -53,9 +53,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand

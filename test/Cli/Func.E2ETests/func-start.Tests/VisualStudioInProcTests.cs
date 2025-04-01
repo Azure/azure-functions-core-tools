@@ -32,9 +32,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function1?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter, "Function1?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
@@ -54,9 +54,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "Function2?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter, "Function2?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand

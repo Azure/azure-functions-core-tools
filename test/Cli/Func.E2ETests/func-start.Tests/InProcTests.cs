@@ -31,9 +31,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
             };
 
             var result = funcStartCommand
@@ -61,9 +61,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter);
             };
 
             var result = funcStartCommand
@@ -94,9 +94,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log);
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter);
             };
 
             var result = funcStartCommand
