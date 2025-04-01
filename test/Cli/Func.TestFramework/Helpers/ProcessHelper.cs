@@ -72,10 +72,12 @@ namespace Func.TestFramework.Helpers
                         throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
                     }
 
+                    /*
                     var response = await httpClient.GetAsync($"{url}/admin/host/status");
 
                     LogMessage($"Response status code: {response.StatusCode}");
                     fileWriter?.Flush();
+
 
                     // If we're expecting a 401, check for that first
                     if (expectedStatus == HttpStatusCode.Unauthorized && response.StatusCode == HttpStatusCode.Unauthorized)
@@ -83,6 +85,7 @@ namespace Func.TestFramework.Helpers
                         LogMessage($"Received expected 401 Unauthorized response - host is ready");
                         return true;
                     }
+                    
 
                     // For successful responses, check the running state
                     if (response.IsSuccessStatusCode)
@@ -105,41 +108,39 @@ namespace Func.TestFramework.Helpers
                             LogMessage($"Error parsing JSON: {ex.Message}");
                         }
                     }
+                    */
 
-                    if (!response.IsSuccessStatusCode)
+                    // Try the function endpoint directly as a desperate measure
+                    if (!string.IsNullOrEmpty(functionCall))
                     {
                         try
                         {
-                            // Try ping endpoint as a fallback
-                            var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
-                            LogMessage($"Ping response: {pingResponse.StatusCode}");
+                            var functionResponse = await httpClient.GetAsync($"{url}/api/{functionCall}");
+                            LogMessage($"Functions status code: {functionResponse.StatusCode}");
                             fileWriter?.Flush();
-                            if (pingResponse.IsSuccessStatusCode)
+
+                            if (functionResponse.IsSuccessStatusCode)
                             {
-                                LogMessage("Host responded to ping - assuming it's running");
+                                LogMessage("Function endpoint responded - assuming host is running");
                                 return true;
                             }
                         }
                         catch { }
+                    }
 
-                        // Try the function endpoint directly as a desperate measure
-                        if (!string.IsNullOrEmpty(functionCall))
+                    try
+                    {
+                        // Try ping endpoint as a fallback
+                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                        LogMessage($"Ping response: {pingResponse.StatusCode}");
+                        fileWriter?.Flush();
+                        if (pingResponse.IsSuccessStatusCode)
                         {
-                            try
-                            {
-                                var functionResponse = await httpClient.GetAsync($"{url}/api/{functionCall}");
-                                LogMessage($"Functions status code: {functionResponse.StatusCode}");
-                                fileWriter?.Flush();
-
-                                if (functionResponse.IsSuccessStatusCode)
-                                {
-                                    LogMessage("Function endpoint responded - assuming host is running");
-                                    return true;
-                                }
-                            }
-                            catch { }
+                            LogMessage("Host responded to ping - assuming it's running");
+                            return true;
                         }
                     }
+                    catch { }
                     return false;
                 }
                 catch (Exception ex)
