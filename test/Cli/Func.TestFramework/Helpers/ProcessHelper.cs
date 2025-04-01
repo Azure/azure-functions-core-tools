@@ -180,10 +180,12 @@ namespace Func.TestFramework.Helpers
 
                 log.WriteLine("Host started");
                 fileWriter?.WriteLine("[HANDLER] Host started");
+                fileWriter?.Flush();
 
                 if (!string.IsNullOrEmpty(functionCall))
                 {
                     fileWriter?.WriteLine($"[HANDLER] Making request to http://localhost:{port}/api/{functionCall}");
+                    fileWriter?.Flush();
 
                     using (var client = new HttpClient())
                     {
@@ -191,6 +193,7 @@ namespace Func.TestFramework.Helpers
                         var responseContent = await response.Content.ReadAsStringAsync();
 
                         fileWriter?.WriteLine($"[HANDLER] Received response: {responseContent}");
+                        fileWriter?.Flush();
                         responseContent.Should().Be(capturedContent);
                     }
                 }
@@ -199,11 +202,13 @@ namespace Func.TestFramework.Helpers
             {
                 log.WriteLine("Error was thrown: " + e.ToString());
                 fileWriter?.WriteLine("[HANDLER-ERROR] " + e.ToString());
+                fileWriter?.Flush();
             }
             finally
             {
                 log.WriteLine("Process is going to be killed");
                 fileWriter?.WriteLine("[HANDLER] Process is going to be killed");
+                fileWriter?.Flush();
                 process.Kill(true);
             }
         }
