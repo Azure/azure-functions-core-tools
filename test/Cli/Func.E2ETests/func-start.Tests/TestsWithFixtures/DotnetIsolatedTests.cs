@@ -32,6 +32,25 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
+                fileWriter?.WriteLine("[HANDLER] Handler started at " + DateTime.Now);
+                fileWriter?.Flush();
+
+                // Try to read any available output immediately
+                try
+                {
+                    if (process.StandardOutput.Peek() > -1)
+                    {
+                        var initialOutput = process.StandardOutput.ReadToEnd();
+                        fileWriter?.WriteLine("[INITIAL OUTPUT] " + initialOutput);
+                        fileWriter?.Flush();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    fileWriter?.WriteLine("[ERROR] Failed to read initial output: " + ex.Message);
+                    fileWriter?.Flush();
+                }
+
                 await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "Welcome to Azure Functions!");
             };
 

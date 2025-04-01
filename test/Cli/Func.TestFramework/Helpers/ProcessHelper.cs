@@ -55,6 +55,7 @@ namespace Func.TestFramework.Helpers
             }
 
             LogMessage($"Starting to wait for function host on {url}");
+            fileWriter?.Flush();
 
             await RetryHelper.RetryAsync(async () =>
             {
@@ -153,6 +154,7 @@ namespace Func.TestFramework.Helpers
             {
                 log.WriteLine("Waiting for host to start");
                 fileWriter?.WriteLine("[HANDLER] Waiting for host to start");
+                fileWriter?.Flush();
 
                 await WaitForFunctionHostToStart(process, port, fileWriter, functionCall);
 
