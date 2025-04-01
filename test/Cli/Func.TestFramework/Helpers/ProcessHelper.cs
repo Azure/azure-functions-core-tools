@@ -54,14 +54,22 @@ namespace Func.TestFramework.Helpers
                 fileWriter?.WriteLine($"[HOST STATUS] {message}");
             }
 
-            LogMessage($"Starting to wait for function host on {url}");
+            LogMessage($"Starting to wait for function host on {url} at {DateTime.Now}");
             fileWriter?.Flush();
+            int retry = 1;
 
             await RetryHelper.RetryAsync(async () =>
             {
                 try
                 {
+                    LogMessage($"Retry number: {retry}");
+                    fileWriter?.Flush();
+                    retry += 1;
+
                     var response = await httpClient.GetAsync($"{url}/admin/host/status");
+
+                    LogMessage($"Response status code: {response.StatusCode}");
+                    fileWriter?.Flush();
 
                     // If we're expecting a 401, check for that first
                     if (expectedStatus == HttpStatusCode.Unauthorized && response.StatusCode == HttpStatusCode.Unauthorized)
@@ -98,6 +106,8 @@ namespace Func.TestFramework.Helpers
                         {
                             // Try ping endpoint as a fallback
                             var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                            LogMessage($"Ping response: {pingResponse.StatusCode}");
+                            fileWriter?.Flush();
                             if (pingResponse.IsSuccessStatusCode)
                             {
                                 LogMessage("Host responded to ping - assuming it's running");
@@ -112,6 +122,9 @@ namespace Func.TestFramework.Helpers
                             try
                             {
                                 var functionResponse = await httpClient.GetAsync($"{url}/api/{functionCall}");
+                                LogMessage($"Functions status code: {functionResponse.StatusCode}");
+                                fileWriter?.Flush();
+
                                 if (functionResponse.IsSuccessStatusCode)
                                 {
                                     LogMessage("Function endpoint responded - assuming host is running");
