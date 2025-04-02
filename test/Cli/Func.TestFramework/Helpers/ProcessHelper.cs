@@ -239,8 +239,12 @@ namespace Func.TestFramework.Helpers
                         retryCount += 1;
                         if (outputFromFunction.Contains("Host started"))
                         {
+                            fileWriter?.WriteLine("Host has started");
+                            fileWriter?.Flush();
                             return true;
                         }
+                        fileWriter?.WriteLine("Returning false");
+                        fileWriter?.Flush();
                         return false;
                     }, fileWriter);
 
