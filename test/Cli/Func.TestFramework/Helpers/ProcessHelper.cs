@@ -54,12 +54,51 @@ namespace Func.TestFramework.Helpers
             {
                 Console.WriteLine(message);
                 fileWriter?.WriteLine($"[HOST STATUS] {message}");
+                fileWriter?.Flush();
             }
 
             LogMessage($"Starting to wait for function host on {url} at {DateTime.Now}");
             fileWriter?.Flush();
             int retry = 1;
 
+            await RetryHelper.RetryAsync((async () =>
+            {
+                try
+                {
+                    LogMessage($"Retry number: {retry}");
+                    fileWriter?.Flush();
+                    retry += 1;
+
+                    if (funcProcess.HasExited)
+                    {
+                        LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
+                        throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
+                    }
+
+                    try
+                    {
+                        // Try ping endpoint as a fallback
+                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                        LogMessage($"Ping response: {pingResponse.StatusCode}");
+                        fileWriter?.Flush();
+                        if (pingResponse.IsSuccessStatusCode)
+                        {
+                            LogMessage("Host responded to ping - assuming it's running");
+                            return true;
+                        }
+                    }
+                    catch { }
+
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"Error checking host status: {ex.Message}");
+                    return false;
+                }
+            });
+
+            /*
             await RetryHelper.ExecuteAsyncWithRetry(async () =>
             {
                 try
@@ -96,6 +135,8 @@ namespace Func.TestFramework.Helpers
                     return false;
                 }
             }, shouldStopRetry: result => result == true, 10, () => { return RetryHelper.TestingIntervals.Select(Task.Delay);  }, fileWriter);
+            */
+
 
             /*
             await RetryHelper.RetryUntilTimeoutAsync(async () =>
