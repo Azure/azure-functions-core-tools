@@ -97,20 +97,30 @@ namespace Func.TestFramework.Helpers
             Func<bool, bool> shouldStopRetry,
             int maxRetryCount,
             Func<IEnumerable<Task>> timer,
+            StreamWriter fileWriter,
             string taskDescription = "")
         {
             var count = 0;
             foreach (var t in timer())
             {
+                fileWriter.WriteLine($"Starting timer");
+                fileWriter.Flush();
                 await t;
                 count++;
+
+                fileWriter.WriteLine($"Value of count: {count}");
+                fileWriter.Flush();
 
                 bool result = await action();
 
                 if (shouldStopRetry(result))
                 {
+                    fileWriter.WriteLine($"Success! Returning");
+                    fileWriter.Flush();
                     return;
                 }
+                fileWriter.WriteLine($"Failed; trying again");
+                fileWriter.Flush();
 
                 if (count == maxRetryCount)
                 {

@@ -60,6 +60,44 @@ namespace Func.TestFramework.Helpers
             fileWriter?.Flush();
             int retry = 1;
 
+            await RetryHelper.ExecuteAsyncWithRetry(async () =>
+            {
+                try
+                {
+                    LogMessage($"Retry number: {retry}");
+                    fileWriter?.Flush();
+                    retry += 1;
+
+                    if (funcProcess.HasExited)
+                    {
+                        LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
+                        throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
+                    }
+
+                    try
+                    {
+                        // Try ping endpoint as a fallback
+                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                        LogMessage($"Ping response: {pingResponse.StatusCode}");
+                        fileWriter?.Flush();
+                        if (pingResponse.IsSuccessStatusCode)
+                        {
+                            LogMessage("Host responded to ping - assuming it's running");
+                            return true;
+                        }
+                    }
+                    catch { }
+
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"Error checking host status: {ex.Message}");
+                    return false;
+                }
+            }, shouldStopRetry: result => result == true, 10, () => { return RetryHelper.TestingIntervals.Select(Task.Delay);  }, fileWriter);
+
+            /*
             await RetryHelper.RetryUntilTimeoutAsync(async () =>
             {
                 try
@@ -74,43 +112,6 @@ namespace Func.TestFramework.Helpers
                         throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
                     }
 
-                    /*
-                    var response = await httpClient.GetAsync($"{url}/admin/host/status");
-
-                    LogMessage($"Response status code: {response.StatusCode}");
-                    fileWriter?.Flush();
-
-
-                    // If we're expecting a 401, check for that first
-                    if (expectedStatus == HttpStatusCode.Unauthorized && response.StatusCode == HttpStatusCode.Unauthorized)
-                    {
-                        LogMessage($"Received expected 401 Unauthorized response - host is ready");
-                        return true;
-                    }
-                    
-
-                    // For successful responses, check the running state
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var content = await response.Content.ReadAsStringAsync();
-                        LogMessage($"Host status response: {content}");
-
-                        try
-                        {
-                            var doc = JsonDocument.Parse(content);
-                            if (doc.RootElement.TryGetProperty("state", out JsonElement value) &&
-                                value.GetString() == "Running")
-                            {
-                                LogMessage("Host is in Running state - ready to process requests");
-                                return true;
-                            }
-                        }
-                        catch (JsonException ex)
-                        {
-                            LogMessage($"Error parsing JSON: {ex.Message}");
-                        }
-                    }
-                    */
                     try
                     {
                         // Try ping endpoint as a fallback
@@ -133,6 +134,7 @@ namespace Func.TestFramework.Helpers
                     return false;
                 }
             }, fileWriter, timeout);
+            */
         }
 
         public static int GetAvailablePort()
