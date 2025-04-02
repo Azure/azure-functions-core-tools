@@ -220,11 +220,11 @@ namespace Func.TestFramework.Helpers
                         {
                             fileWriter?.WriteLine("Host has started");
                             fileWriter?.Flush();
-                            return true;
+                            return Task.FromResult(true);
                         }
                         fileWriter?.WriteLine("Returning false");
                         fileWriter?.Flush();
-                        return false;
+                        return Task.FromResult(false);
                     }, fileWriter);
 
                     if (!string.IsNullOrEmpty(functionCall))
