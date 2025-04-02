@@ -36,13 +36,13 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
             };
 
-
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Welcome to Azure Functions!");
-
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
+
+
+            // Validate that getting http endpoint works
+            capturedContent.Should().Be("Welcome to Azure Functions!");
 
             // Validate out-of-process host was started
             result.Should().HaveStdOutContaining("4.10");
