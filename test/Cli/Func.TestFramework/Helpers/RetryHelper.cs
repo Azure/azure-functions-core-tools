@@ -26,7 +26,7 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task RetryUntilTimeoutAsync(Func<bool> operation, StreamWriter fileWriter, int pollingInterval = 2000)
+        public static async Task RetryUntilTimeoutAsync(Func<Task<bool>> operation, StreamWriter fileWriter, int pollingInterval = 2000)
         {
             DateTime startTime = DateTime.Now;
             int attemptCount = 0;
