@@ -231,7 +231,7 @@ namespace Func.TestFramework.Helpers
                 try
                 {
                     int retryCount = 1;
-                    await RetryHelper.RetryUntilTimeoutAsync(async () =>
+                    await RetryHelper.RetryUntilTimeoutAsync(() =>
                     {
                         fileWriter?.WriteLine("Current retry count: " + retryCount);
                         fileWriter?.Flush();
