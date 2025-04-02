@@ -1983,6 +1983,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             }, _output);
         }
+
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_NodeApp_DisplaysDebugLogsInConsole()
@@ -2031,6 +2032,115 @@ namespace Azure.Functions.Cli.Tests.E2E
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                             response.StatusCode.Should().Be(HttpStatusCode.OK);
                             p.Kill();
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                }
+            }, _output);
+        }
+
+        [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        public async Task Start_DotnetApp_DisplaysDebugLogsInConsole()
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        "init . --worker-runtime dotnet-isolated",
+                        "new --template Httptrigger --name HttpTrigger"
+                    },
+                    Test = async (workingDir, _, _) =>
+                    {
+                        //set minimum level in Program.cs
+                        var functionProgramFile = Path.Combine(workingDir, "Program.cs");
+                        if (File.Exists(functionProgramFile))
+                        {
+                            var Programcontent = await File.ReadAllTextAsync(functionProgramFile);
+                            Programcontent = Programcontent.Replace(
+                                $"using Microsoft.Extensions.Hosting;",
+                                $"using Microsoft.Extensions.Hosting;\r\nusing Microsoft.Extensions.Logging;"
+                            ).
+                            Replace(
+                                $"builder.Build().Run();",
+                                $"builder.Logging.SetMinimumLevel(LogLevel.Debug);\r\nbuilder.Build().Run();"
+                            );
+                            await File.WriteAllTextAsync(functionProgramFile, Programcontent);
+                        }
+
+                        // Add debug logs to FunctionApp.cs
+                        var functionAppPath = Path.Combine(workingDir,"HttpTrigger.cs");
+                        if (File.Exists(functionAppPath))
+                        {
+                            var content = await File.ReadAllTextAsync(functionAppPath);
+                            content = content.Replace(
+                                $"_logger.LogInformation(\"C# HTTP trigger function processed a request.\");",
+                                $"_logger.LogInformation(\"C# HTTP trigger function processed a request.\");\r\n_logger.LogDebug(\"This is Debug log from Dotnet-Isolated function app.\");"
+                            );
+                            await File.WriteAllTextAsync(functionAppPath, content);
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --port {_funcHostPort} --userLogLevel Debug"
+                    },
+                    ExpectExit = false,
+                    OutputContains = new[]
+                    {
+                        "This is Debug log from Dotnet-Isolated function app."
+                    },
+                    Test = async (_, p, stdout) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}/") })
+                        {
+                            (await WaitUntilReady(client)).Should().BeTrue(because: _serverNotReady);
+                            var response = await client.GetAsync("/api/HttpTrigger?name=Test");
+                            response.StatusCode.Should().Be(HttpStatusCode.OK);
+                            p.Kill();
+                        }
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                }
+            }, _output);
+        }
+
+        [Theory]
+        [InlineData("dotnet", "TestDotnet")]
+        [InlineData("dotnet-isolated", "TestDotnetIsolated")]
+        [InlineData("node", "TestNode")]
+        public async Task Start_FunctionApp_ExpectedToFail_WithInvalidUserLogLevel(string WorkerRuntime, string UserLogLevel)
+        {
+            await CliTester.Run(new RunConfiguration[]
+            {
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"init . --worker-runtime {WorkerRuntime}",
+                        $"new --template Httptrigger --name HttpTrigger",
+                    },
+                    CommandTimeout = TimeSpan.FromSeconds(300)
+                },
+                new RunConfiguration
+                {
+                    Commands = new[]
+                    {
+                        $"start --port {_funcHostPort} --userLogLevel {UserLogLevel}"
+                    },
+                    ExpectExit = true,
+                    ExitInError = true,
+                    ErrorContains = [$"The userLogLevel value provided, '{UserLogLevel}', is invalid. Valid values are '{string.Join("', '", LoggingFilterHelper.ValidUserLogLevels)}'. The default is Information."], 
+                    Test = async (workingDir, p, _) =>
+                    {
+                        using (var client = new HttpClient() { BaseAddress = new Uri($"http://localhost:{_funcHostPort}") })
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(2));
                         }
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300)

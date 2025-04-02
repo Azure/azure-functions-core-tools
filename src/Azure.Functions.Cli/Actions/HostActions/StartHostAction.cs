@@ -408,18 +408,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
 
-            //set  flag --userLogLevel as Enviroment variable
-            if (!string.IsNullOrEmpty(UserLogLevel))
-            {
-                if (IsValidUserLogLevel(UserLogLevel))
-                {
-                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__Logging__LogLevel__Function", UserLogLevel);
-                }
-            }
-            else
-            {
-                UserLogLevel = GetUserLogLevelFromLocalSettings();
-            }
+            //set --userLogLevel flag
+            ConfigureUserLogLevelFromFlagOrSettings();
 
             // Return if running is delegated to another version of Core Tools
             if (await TryHandleInProcDotNetLaunchAsync())
@@ -850,6 +840,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             // Update local.settings.json
             WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString());
+        }
+        
+        private void ConfigureUserLogLevelFromFlagOrSettings()
+        {
+            if (!string.IsNullOrEmpty(UserLogLevel))
+            {
+                if (IsValidUserLogLevel(UserLogLevel))
+                {
+                    Environment.SetEnvironmentVariable("AzureFunctionsJobHost__Logging__LogLevel__Function", UserLogLevel);
+                }
+            }
+            else
+            {
+                UserLogLevel = GetUserLogLevelFromLocalSettings();
+            }
         }
 
         private bool IsValidUserLogLevel(string UserLogLevel)
