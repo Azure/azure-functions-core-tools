@@ -43,7 +43,7 @@ namespace Func.TestFramework.Helpers
                     fileWriter.WriteLine($"Attempt {attemptCount}");
                     fileWriter.Flush();
                     // Try the operation
-                    if (operation())
+                    if (await operation())
                     {
                         fileWriter.WriteLine("actually succeeded!");
                         fileWriter.Flush();

@@ -60,7 +60,7 @@ namespace Func.TestFramework.Helpers
             fileWriter?.Flush();
             int retry = 1;
 
-            await RetryHelper.RetryAsync(async () =>
+            await RetryHelper.RetryUntilTimeoutAsync(async () =>
             {
                 try
                 {
@@ -132,7 +132,7 @@ namespace Func.TestFramework.Helpers
                     LogMessage($"Error checking host status: {ex.Message}");
                     return false;
                 }
-            }, timeout);
+            }, fileWriter, timeout);
         }
 
         public static int GetAvailablePort()
