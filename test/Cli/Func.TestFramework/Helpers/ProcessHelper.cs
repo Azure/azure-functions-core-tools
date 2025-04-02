@@ -231,7 +231,7 @@ namespace Func.TestFramework.Helpers
                 try
                 {
                     int retryCount = 1;
-                    await RetryHelper.RetryAsync(async () =>
+                    await RetryHelper.RetryUntilTimeoutAsync(async () =>
                     {
                         fileWriter?.WriteLine("Current retry count: " + retryCount);
                         fileWriter?.Flush();
@@ -242,7 +242,7 @@ namespace Func.TestFramework.Helpers
                             return true;
                         }
                         return false;
-                    });
+                    }, fileWriter);
 
                     if (!string.IsNullOrEmpty(functionCall))
                     {
