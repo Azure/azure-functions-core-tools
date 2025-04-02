@@ -41,12 +41,18 @@ namespace Func.TestFramework.Helpers
                 try
                 {
                     fileWriter.WriteLine($"Attempt {attemptCount}");
+                    fileWriter.Flush();
                     // Try the operation
                     if (operation())
                     {
+                        fileWriter.WriteLine("actually succeeded!");
+                        fileWriter.Flush();
                         // Success! We're done
                         return;
                     }
+
+                    fileWriter.WriteLine($"Retry until timeout return false");
+                    fileWriter.Flush();
                 }
                 catch (Exception ex)
                 {
@@ -65,8 +71,14 @@ namespace Func.TestFramework.Helpers
                         $"Operation timed out after {elapsed.TotalSeconds:F1} seconds and {attemptCount} attempts");
                 }
 
+                fileWriter.WriteLine($"Gonna hit polling interval");
+                fileWriter.Flush();
+
                 // Wait before the next attempt
                 await Task.Delay(pollingInterval);
+
+                fileWriter.WriteLine($"Done with polling interval");
+                fileWriter.Flush();
             }
         }
     }
