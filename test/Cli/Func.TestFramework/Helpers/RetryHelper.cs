@@ -26,7 +26,7 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task RetryUntilTimeoutAsync(Func<Task<bool>> operation, StreamWriter fileWriter, int pollingInterval = 2000)
+        public static async Task RetryUntilTimeoutAsync(Func<bool> operation, StreamWriter fileWriter, int pollingInterval = 2000)
         {
             DateTime startTime = DateTime.Now;
             int attemptCount = 0;
@@ -43,7 +43,7 @@ namespace Func.TestFramework.Helpers
                     fileWriter.WriteLine($"Attempt {attemptCount}");
                     fileWriter.Flush();
                     // Try the operation
-                    if (await operation())
+                    if (operation())
                     {
                         fileWriter.WriteLine("actually succeeded!");
                         fileWriter.Flush();
@@ -81,5 +81,44 @@ namespace Func.TestFramework.Helpers
                 fileWriter.Flush();
             }
         }
+
+        public static IEnumerable<TimeSpan> TestingIntervals
+        {
+            get
+            {
+                while (true)
+                {
+                    yield return TimeSpan.FromSeconds(0);
+                }
+            }
+        }
+
+        public static async Task ExecuteAsyncWithRetry(Func<Task<bool>> action,
+            Func<bool, bool> shouldStopRetry,
+            int maxRetryCount,
+            Func<IEnumerable<Task>> timer,
+            string taskDescription = "")
+        {
+            var count = 0;
+            foreach (var t in timer())
+            {
+                await t;
+                count++;
+
+                bool result = await action();
+
+                if (shouldStopRetry(result))
+                {
+                    return;
+                }
+
+                if (count == maxRetryCount)
+                {
+                    throw new TimeoutException("Reached max retry count");
+                }
+            }
+            throw new Exception("Timer should not be exhausted");
+        }
+
     }
 }
