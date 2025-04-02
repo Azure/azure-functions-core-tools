@@ -96,7 +96,7 @@ namespace Func.TestFramework.Helpers
                     LogMessage($"Error checking host status: {ex.Message}");
                     return false;
                 }
-            });
+            }));
 
             /*
             await RetryHelper.ExecuteAsyncWithRetry(async () =>
