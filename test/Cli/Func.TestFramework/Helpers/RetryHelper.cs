@@ -75,7 +75,7 @@ namespace Func.TestFramework.Helpers
                 fileWriter.Flush();
 
                 // Wait before the next attempt
-                await Task.Delay(pollingInterval);
+                //await Task.Delay(pollingInterval);
 
                 fileWriter.WriteLine($"Done with polling interval");
                 fileWriter.Flush();
