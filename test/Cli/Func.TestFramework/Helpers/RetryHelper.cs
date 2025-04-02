@@ -11,7 +11,7 @@ namespace Func.TestFramework.Helpers
             DateTime start = DateTime.Now;
             while (!await condition())
             {
-                await Task.Delay(pollingInterval);
+                //await Task.Delay(pollingInterval);
 
                 bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
                 if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)

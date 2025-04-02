@@ -125,23 +125,6 @@ namespace Func.TestFramework.Helpers
                     }
                     catch { }
 
-                    // Try the function endpoint directly as a desperate measure
-                    if (!string.IsNullOrEmpty(functionCall))
-                    {
-                        try
-                        {
-                            var functionResponse = await httpClient.GetAsync($"{url}/api/{functionCall}");
-                            LogMessage($"Functions status code: {functionResponse.StatusCode}");
-                            fileWriter?.Flush();
-
-                            if (functionResponse.IsSuccessStatusCode)
-                            {
-                                LogMessage("Function endpoint responded - assuming host is running");
-                                return true;
-                            }
-                        }
-                        catch { }
-                    }
                     return false;
                 }
                 catch (Exception ex)
@@ -168,50 +151,45 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task ProcessStartedHandlerHelper(int port, Process process, ITestOutputHelper log,
-    StreamWriter? fileWriter, string functionCall = "", string capturedContent = "")
+        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process,
+    StreamWriter? fileWriter, string functionCall = "")
         {
+            string capturedContent = "";
             try
             {
-                log.WriteLine("Waiting for host to start");
-                fileWriter?.WriteLine("[HANDLER] Waiting for host to start");
-                fileWriter?.Flush();
+                fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
+                fileWriter.Flush();
 
-                await WaitForFunctionHostToStart(process, port, fileWriter, functionCall);
+                await WaitForFunctionHostToStart(process, port, fileWriter);
 
-                log.WriteLine("Host started");
-                fileWriter?.WriteLine("[HANDLER] Host started");
-                fileWriter?.Flush();
+                fileWriter.WriteLine("[HANDLER] Host has started");
+                fileWriter.Flush();
 
                 if (!string.IsNullOrEmpty(functionCall))
                 {
-                    fileWriter?.WriteLine($"[HANDLER] Making request to http://localhost:{port}/api/{functionCall}");
-                    fileWriter?.Flush();
-
                     using (var client = new HttpClient())
                     {
                         var response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
-                        var responseContent = await response.Content.ReadAsStringAsync();
-
-                        fileWriter?.WriteLine($"[HANDLER] Received response: {responseContent}");
-                        fileWriter?.Flush();
-                        responseContent.Should().Be(capturedContent);
+                        capturedContent = await response.Content.ReadAsStringAsync();
+                        fileWriter.WriteLine($"[HANDLER] Captured content: {capturedContent}");
+                        fileWriter.Flush();
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                log.WriteLine("Error was thrown: " + e.ToString());
-                fileWriter?.WriteLine("[HANDLER-ERROR] " + e.ToString());
-                fileWriter?.Flush();
+                fileWriter.WriteLine($"[HANDLER] Caught the following exception: {ex.Message}");
+                fileWriter.Flush();
             }
             finally
             {
-                log.WriteLine("Process is going to be killed");
-                fileWriter?.WriteLine("[HANDLER] Process is going to be killed");
-                fileWriter?.Flush();
+                fileWriter.WriteLine($"[HANDLER] Going to kill process");
+                fileWriter.Flush();
                 process.Kill(true);
             }
+            fileWriter.WriteLine($"[HANDLER] Returning captured content");
+            fileWriter.Flush();
+            return capturedContent;
         }
 
         public static async Task<FuncStartCommand> WaitTillHostHasStarted(FuncStartCommand funcStartCommand, int port, string functionCall = "", string capturedContent = "", string because = "")

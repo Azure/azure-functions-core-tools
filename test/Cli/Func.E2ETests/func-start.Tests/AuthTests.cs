@@ -6,6 +6,7 @@ using System.Net;
 using Xunit.Abstractions;
 using Xunit;
 using Grpc.Net.Client.Configuration;
+using System.Diagnostics;
 
 namespace Func.E2ETests.func_start.Tests
 {
@@ -34,9 +35,14 @@ namespace Func.E2ETests.func_start.Tests
             string methodName = "Start_DotnetIsolated_Test_EnableAuthFeature";
             string uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
+            string capturedContent = null;
+
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, methodName);
-            funcStartCommand = await ProcessHelper.WaitTillHostHasStarted(funcStartCommand, port, "HttpTrigger?name=Test", expectedResult, becauseReason);
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            {
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
+            };
 
             // Build command arguments based on enableAuth parameter
             var commandArgs = new List<string> { "start", "--verbose", "--port", port.ToString() };

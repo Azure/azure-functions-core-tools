@@ -29,7 +29,17 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
 
-            funcStartCommand = await ProcessHelper.WaitTillHostHasStarted(funcStartCommand, port, "HttpTrigger", "Welcome to Azure Functions!");
+            string capturedContent = null;
+
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter)=>
+            {
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
+            };
+
+
+            // Validate that getting http endpoint works
+            capturedContent.Should().Be("Welcome to Azure Functions!");
+
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
@@ -47,15 +57,20 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithRuntimeSpecified");
+            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger", "Welcome to Azure Functions!");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
+
+            // Validate that getting http endpoint works
+            capturedContent.Should().Be("Welcome to Azure Functions!",
+                because: "response from default function should be 'Welcome to Azure Functions!'");
 
             // Validate default host was started
             result.Should().HaveStdOutContaining("4.10");
@@ -70,11 +85,16 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithoutRuntimeSpecified");
+            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, _fixture.Log, fileWriter, "HttpTrigger?name=Test", "Welcome to Azure Functions!");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
             };
+
+            // Validate that getting http endpoint works
+            capturedContent.Should().Be("Welcome to Azure Functions!",
+                because: "response from default function should be 'Welcome to Azure Functions!'");
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
