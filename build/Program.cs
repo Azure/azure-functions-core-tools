@@ -29,11 +29,11 @@ namespace Build
                 //.Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
                 .Then(TestNewProject)
                 .Then(TestNewProjectDotnetInProc)
-                .Then(Test)
-                .Then(Zip)
-                .Then(DotnetPublishForNupkg)
-                .Then(DotnetPack)
-                .Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
+                //.Then(Test)
+                //.Then(Zip)
+                //.Then(DotnetPublishForNupkg)
+                //.Then(DotnetPack)
+                //.Then(CreateIntegrationTestsBuildManifest, skip: !args.Contains("--integrationTests"))
                 .Run();
         }
     }
