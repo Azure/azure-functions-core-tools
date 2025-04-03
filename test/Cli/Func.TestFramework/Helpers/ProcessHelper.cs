@@ -61,10 +61,10 @@ namespace Func.TestFramework.Helpers
             }
 
             LogMessage($"Starting to wait for function host on {url} at {DateTime.Now}");
+
+            LogMessage($"PID of process: {funcProcess.Id}");
             fileWriter?.Flush();
             int retry = 1;
-
-            var stdOut = ,,,,,funcProcess.StandardOutput;
 
             await RetryHelper.RetryAsync((async () =>
             {
