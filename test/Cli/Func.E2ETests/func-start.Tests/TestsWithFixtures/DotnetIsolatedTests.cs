@@ -55,6 +55,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int i = 0;
             var task = RetryHelper.RetryAsync(async () =>
                 {
+                    await Task.Delay(1000);
                     if (i != 3)
                     {
                         i += 1;
