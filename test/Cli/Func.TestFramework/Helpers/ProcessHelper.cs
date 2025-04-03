@@ -48,7 +48,7 @@ namespace Func.TestFramework.Helpers
          HttpStatusCode expectedStatus = HttpStatusCode.OK)
         {
             var url = $"{FunctionsHostUrl}:{port.ToString()}";
-            using var httpClient = new HttpClient
+            var httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(5) // 5-second timeout for each request
             };
