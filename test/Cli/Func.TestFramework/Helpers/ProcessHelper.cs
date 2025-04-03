@@ -62,10 +62,22 @@ namespace Func.TestFramework.Helpers
 
             LogMessage($"Starting to wait for function host on {url} at {DateTime.Now}");
             fileWriter?.Flush();
+
+            // Create a master timeout
+            using var masterCts = new CancellationTokenSource(timeout);
+            DateTime startTime = DateTime.Now;
             int retry = 1;
 
-            await RetryHelper.RetryAsync((async () =>
+            // Loop with explicit delay instead of using RetryAsync
+            while (!masterCts.IsCancellationRequested)
             {
+                LogMessage($"Retry number: {retry} at {DateTime.Now}");
+
+                if (funcProcess.HasExited)
+                {
+                    LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
+                    throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
+                }
                 try
                 {
                     LogMessage($"Retry number: {retry}");
@@ -80,29 +92,35 @@ namespace Func.TestFramework.Helpers
 
                     LogMessage($"Trying to get ping response");
 
-                    // Try ping endpoint as a fallback
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                    var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);
+                    using var requestCts = new CancellationTokenSource(3000); // 3 second timeout
+                    var pingTask = httpClient.GetAsync($"{url}/admin/host/ping", requestCts.Token);
 
-                    LogMessage($"Got ping response: {pingResponse.StatusCode}");
-
-                    fileWriter?.Flush();
-                    if (pingResponse.IsSuccessStatusCode)
+                    if (await Task.WhenAny(pingTask, Task.Delay(3500)) == pingTask) // Additional safety timeout
                     {
-                        LogMessage("Host responded to ping - assuming it's running");
-                        return true;
+                        var pingResponse = await pingTask;
+                        LogMessage($"Ping response: {pingResponse.StatusCode}");
+
+                        if (pingResponse.IsSuccessStatusCode)
+                        {
+                            LogMessage("Host responded to ping - host is ready");
+                            return; // Success!
+                        }
                     }
-
-                    LogMessage($"Returning false");
-
-                    return false;
+                    else
+                    {
+                        LogMessage("Ping request timed out");
+                        requestCts.Cancel(); // Ensure the request is canceled
+                    }
                 }
                 catch (Exception ex)
                 {
                     LogMessage($"Error checking host status: {ex.Message}");
-                    return false;
                 }
-            }), fileWriter);
+            }
+            // If we get here, we timed out
+            LogMessage($"Operation timed out after {timeout / 1000} seconds and {retry - 1} attempts");
+            throw new TimeoutException($"Function host startup timed out after {timeout / 1000} seconds.");
+        }
 
             /*
             await RetryHelper.ExecuteAsyncWithRetry(async () =>
@@ -182,7 +200,7 @@ namespace Func.TestFramework.Helpers
                 }
             }, fileWriter, timeout);
             */
-        }
+
 
         public static int GetAvailablePort()
         {
