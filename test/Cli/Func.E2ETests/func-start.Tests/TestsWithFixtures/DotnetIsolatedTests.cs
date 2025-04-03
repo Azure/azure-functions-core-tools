@@ -50,6 +50,26 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         }
 
         [Fact]
+        public async Task RetryHelperTest()
+        {
+            int i = 0;
+            var task = RetryHelper.RetryAsync(async () =>
+                {
+                    if (i != 3)
+                    {
+                        i += 1;
+                        return false;
+                    }
+                    return true;
+                });
+
+            await task;
+            Assert.True(task.IsCompleted);
+            Assert.True(i == 3);
+            
+        }
+
+        [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
         public async Task Start_DotnetIsolated_WithRuntimeSpecified()
         {
@@ -92,13 +112,13 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
             };
 
-            // Validate that getting http endpoint works
-            capturedContent.Should().Be("Welcome to Azure Functions!",
-                because: "response from default function should be 'Welcome to Azure Functions!'");
-
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
+
+            // Validate that getting http endpoint works
+            capturedContent.Should().Be("Welcome to Azure Functions!",
+                because: "response from default function should be 'Welcome to Azure Functions!'");
 
             // Validate default host was started
             result.Should().HaveStdOutContaining("4.10");
