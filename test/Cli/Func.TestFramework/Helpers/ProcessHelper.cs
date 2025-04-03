@@ -75,19 +75,15 @@ namespace Func.TestFramework.Helpers
                         throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
                     }
 
-                    try
+                    // Try ping endpoint as a fallback
+                    var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                    LogMessage($"Ping response: {pingResponse.StatusCode}");
+                    fileWriter?.Flush();
+                    if (pingResponse.IsSuccessStatusCode)
                     {
-                        // Try ping endpoint as a fallback
-                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
-                        LogMessage($"Ping response: {pingResponse.StatusCode}");
-                        fileWriter?.Flush();
-                        if (pingResponse.IsSuccessStatusCode)
-                        {
-                            LogMessage("Host responded to ping - assuming it's running");
-                            return true;
-                        }
+                        LogMessage("Host responded to ping - assuming it's running");
+                        return true;
                     }
-                    catch { }
 
                     return false;
                 }
