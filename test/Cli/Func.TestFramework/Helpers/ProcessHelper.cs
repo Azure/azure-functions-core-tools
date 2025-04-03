@@ -48,7 +48,10 @@ namespace Func.TestFramework.Helpers
          HttpStatusCode expectedStatus = HttpStatusCode.OK)
         {
             var url = $"{FunctionsHostUrl}:{port.ToString()}";
-            using var httpClient = new HttpClient();
+            using var httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(5) // 5-second timeout for each request
+            };
 
             void LogMessage(string message)
             {
@@ -78,9 +81,10 @@ namespace Func.TestFramework.Helpers
                     LogMessage($"Trying to get ping response");
 
                     // Try ping endpoint as a fallback
-                    var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);
 
-                    LogMessage($"Got ping response");
+                    LogMessage($"Got ping response: {pingResponse.StatusCode}");
 
                     fileWriter?.Flush();
                     if (pingResponse.IsSuccessStatusCode)
