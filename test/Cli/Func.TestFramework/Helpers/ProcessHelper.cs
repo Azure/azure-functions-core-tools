@@ -245,6 +245,8 @@ namespace Func.TestFramework.Helpers
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
                 fileWriter.Flush();
 
+                fileWriter.WriteLine($"[HANDLER] Process working directory: {process.StartInfo.WorkingDirectory}");
+
                 await _functionHostSemaphore.WaitAsync();
                 try
                 {
