@@ -26,8 +26,30 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
+
+            string originalFuncDir = Path.GetDirectoryName(_fixture.FuncPath);
+
+            // Create a unique temporary directory
+            string uniqueTempDir = Path.Combine(Path.GetTempPath(), $"func_copy_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(uniqueTempDir);
+
+            // Copy all files from the original directory to the temp directory
+            foreach (string file in Directory.GetFiles(originalFuncDir, "*", SearchOption.AllDirectories))
+            {
+                string relativePath = Path.GetRelativePath(originalFuncDir, file);
+                string destFile = Path.Combine(uniqueTempDir, relativePath);
+
+                // Ensure the destination directory exists
+                Directory.CreateDirectory(Path.GetDirectoryName(destFile));
+
+                // Copy the file
+                File.Copy(file, destFile);
+            }
+
+            // The path to the copied func.exe
+            string uniqueFuncPath = Path.Combine(uniqueTempDir, Path.GetFileName(_fixture.FuncPath));
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
+            var funcStartCommand = new FuncStartCommand(uniqueFuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
 
             string capturedContent = null;
 
