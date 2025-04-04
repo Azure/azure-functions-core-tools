@@ -32,18 +32,22 @@ namespace Azure.Functions.Cli
             {
                 SystemLogDefaultLogLevel = LogLevel.Information;
             }
-            if (Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelDefaultSection, out LogLevel logLevel))
+            if (Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelDefaultSection, out LogLevel defaultLogLevel))
             {
-                SystemLogDefaultLogLevel = logLevel;
+                SystemLogDefaultLogLevel = defaultLogLevel;
+                UserLogDefaultLogLevel = defaultLogLevel;
             }
 
-            // Check for user log level
-            if (!string.IsNullOrEmpty(userLogLevel))
+            // set user log value to Function
+            if ( Utilities.LogLevelExists(hostJsonConfig, Utilities.LogLevelFunctionSection, out LogLevel functionLogLevel))
             {
-                if (Enum.TryParse(userLogLevel, true, out LogLevel UserLogLevel))
-                {
-                    UserLogDefaultLogLevel = UserLogLevel;
-                }
+                UserLogDefaultLogLevel = functionLogLevel;
+            }
+
+            // set user log value to --userLoglevel Flag
+            if (!string.IsNullOrEmpty(userLogLevel) && Enum.TryParse(userLogLevel, true, out LogLevel UserLogLevel))
+            {
+                UserLogDefaultLogLevel = UserLogLevel;
             }
         }
 

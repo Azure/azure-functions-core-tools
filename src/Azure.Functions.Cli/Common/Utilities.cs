@@ -26,6 +26,7 @@ namespace Azure.Functions.Cli
     {
         public const string LogLevelSection = "loglevel";
         public const string LogLevelDefaultSection = "Default";
+        public const string LogLevelFunctionSection = "Function";
 
         internal static void PrintLogo()
         {
