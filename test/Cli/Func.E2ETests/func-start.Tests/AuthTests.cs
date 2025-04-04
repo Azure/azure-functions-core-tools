@@ -37,8 +37,30 @@ namespace Func.E2ETests.func_start.Tests
 
             string capturedContent = null;
 
+            string originalFuncDir = Path.GetDirectoryName(FuncPath);
+
+            // Create a unique temporary directory
+            string uniqueTempDir = Path.Combine(Path.GetTempPath(), $"func_copy_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(uniqueTempDir);
+
+            // Copy all files from the original directory to the temp directory
+            foreach (string file in Directory.GetFiles(originalFuncDir, "*", SearchOption.AllDirectories))
+            {
+                string relativePath = Path.GetRelativePath(originalFuncDir, file);
+                string destFile = Path.Combine(uniqueTempDir, relativePath);
+
+                // Ensure the destination directory exists
+                Directory.CreateDirectory(Path.GetDirectoryName(destFile));
+
+                // Copy the file
+                File.Copy(file, destFile);
+            }
+
+            // The path to the copied func.exe
+            string uniqueFuncPath = Path.Combine(uniqueTempDir, Path.GetFileName(FuncPath));
+
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, methodName);
+            var funcStartCommand = new FuncStartCommand(uniqueFuncPath, Log, methodName);
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
                 fileWriter.WriteLine($"In process started handler: func.exe is {(ProcessHelper.IsFileLocked(FuncPath) ? "locked" : "not locked")}");

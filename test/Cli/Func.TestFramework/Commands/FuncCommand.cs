@@ -93,6 +93,10 @@ namespace Func.TestFramework.Commands
                 .CaptureStdOut()
                 .CaptureStdErr();
 
+            var funcExeDirectory = Path.GetDirectoryName(spec.FileName);
+
+            Directory.SetCurrentDirectory(funcExeDirectory);
+
             var directoryToLogTo = Environment.GetEnvironmentVariable("DIRECTORY_TO_LOG_TO");
             if (string.IsNullOrEmpty(directoryToLogTo))
             {
