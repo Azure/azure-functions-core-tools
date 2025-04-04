@@ -243,8 +243,6 @@ namespace Func.TestFramework.Helpers
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
                 fileWriter.Flush();
 
-                await Task.Delay(TimeSpan.FromSeconds(5));
-
                 await WaitForFunctionHostToStart(process, port, fileWriter);
 
                 fileWriter.WriteLine("[HANDLER] Host has started");
