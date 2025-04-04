@@ -247,16 +247,7 @@ namespace Func.TestFramework.Helpers
 
                 fileWriter.WriteLine($"[HANDLER] Process working directory: {process.StartInfo.WorkingDirectory}");
 
-                await _functionHostSemaphore.WaitAsync();
-                try
-                {
-                    await WaitForFunctionHostToStart(process, port, fileWriter);
-                }
-                finally
-                {
-                    _functionHostSemaphore.Release();
-                }
-                
+                await WaitForFunctionHostToStart(process, port, fileWriter);
 
                 fileWriter.WriteLine("[HANDLER] Host has started");
                 fileWriter.Flush();
