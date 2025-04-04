@@ -18,6 +18,8 @@ namespace Func.TestFramework.Helpers
     {
         private static string FunctionsHostUrl = "http://localhost";
 
+        private static SemaphoreSlim _functionHostSemaphore = new SemaphoreSlim(1, 1);
+
         private static async Task<bool> WaitUntilReady(HttpClient client)
         {
             for (var limit = 0; limit < 30; limit++)
@@ -243,7 +245,16 @@ namespace Func.TestFramework.Helpers
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
                 fileWriter.Flush();
 
-                await WaitForFunctionHostToStart(process, port, fileWriter);
+                await _functionHostSemaphore.WaitAsync();
+                try
+                {
+                    await WaitForFunctionHostToStart(process, port, fileWriter);
+                }
+                finally
+                {
+                    _functionHostSemaphore.Release();
+                }
+                
 
                 fileWriter.WriteLine("[HANDLER] Host has started");
                 fileWriter.Flush();
