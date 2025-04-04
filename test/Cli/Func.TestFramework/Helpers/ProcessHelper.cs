@@ -92,6 +92,7 @@ namespace Func.TestFramework.Helpers
             }
 
             LogMessage($"Starting to wait for function host on {url} at {DateTime.Now}");
+            LogMessage($"Current directory: {Directory.GetCurrentDirectory()}");
 
             LogMessage($"PID of process: {funcProcess.Id}");
             fileWriter?.Flush();
@@ -242,10 +243,9 @@ namespace Func.TestFramework.Helpers
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
                 fileWriter.Flush();
 
-                using (await TestResourceManager.AcquireNetworkResourceAsync())
-                {
-                    await WaitForFunctionHostToStart(process, port, fileWriter);
-                }
+                await Task.Delay(TimeSpan.FromSeconds(5));
+
+                await WaitForFunctionHostToStart(process, port, fileWriter);
 
                 fileWriter.WriteLine("[HANDLER] Host has started");
                 fileWriter.Flush();
