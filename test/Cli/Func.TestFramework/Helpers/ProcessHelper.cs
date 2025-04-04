@@ -220,6 +220,28 @@ namespace Func.TestFramework.Helpers
             */
         }
 
+        public static bool IsFileLocked(string filePath)
+        {
+            try
+            {
+                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    // If we get here, the file is not locked
+                    return false;
+                }
+            }
+            catch (IOException)
+            {
+                // The file is locked by another process
+                return true;
+            }
+            catch (Exception)
+            {
+                // Another error occurred
+                return false;
+            }
+        }
+
         public static int GetAvailablePort()
         {
             TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
