@@ -116,6 +116,8 @@ namespace Func.TestFramework.Helpers
 
                     LogMessage($"Trying to get ping response");
 
+                    funcProcess.Kill();
+
                     // Try ping endpoint as a fallback
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);

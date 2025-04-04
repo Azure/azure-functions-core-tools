@@ -12,7 +12,7 @@ namespace Func.TestFramework.Helpers
             int attempt = 1;
             while (!await condition())
             {
-                //await Task.Delay(pollingInterval);
+                await Task.Delay(pollingInterval);
                 attempt += 1;
                 fileWriter?.WriteLine($"Attempt: {attempt}");
                 fileWriter?.Flush();
