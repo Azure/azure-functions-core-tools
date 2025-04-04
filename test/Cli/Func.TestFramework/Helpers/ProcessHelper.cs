@@ -120,8 +120,6 @@ namespace Func.TestFramework.Helpers
                     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);
 
-                    funcProcess.Kill();
-
                     LogMessage($"Got ping response");
 
                     fileWriter?.Flush();
