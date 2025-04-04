@@ -39,6 +39,37 @@ namespace Func.TestFramework.Helpers
             return false;
         }
 
+        public static class TestResourceManager
+        {
+            private static SemaphoreSlim _networkSemaphore = new SemaphoreSlim(3, 3); // Allow 3 concurrent tests
+
+            public static async Task<IDisposable> AcquireNetworkResourceAsync()
+            {
+                await _networkSemaphore.WaitAsync();
+                return new DisposableAction(() => _networkSemaphore.Release());
+            }
+        }
+        public class DisposableAction : IDisposable
+        {
+            private readonly Action _action;
+            private bool _disposed = false;
+
+            public DisposableAction(Action action)
+            {
+                _action = action ?? throw new ArgumentNullException(nameof(action));
+            }
+
+            public void Dispose()
+            {
+                if (!_disposed)
+                {
+                    _action();
+                    _disposed = true;
+                }
+            }
+        }
+
+
         public static async Task WaitForFunctionHostToStart(
          Process funcProcess,
          int port,
@@ -211,7 +242,10 @@ namespace Func.TestFramework.Helpers
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
                 fileWriter.Flush();
 
-                await WaitForFunctionHostToStart(process, port, fileWriter);
+                using (await TestResourceManager.AcquireNetworkResourceAsync())
+                {
+                    await WaitForFunctionHostToStart(process, port, fileWriter);
+                }
 
                 fileWriter.WriteLine("[HANDLER] Host has started");
                 fileWriter.Flush();
