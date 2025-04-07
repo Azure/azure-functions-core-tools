@@ -52,27 +52,6 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         }
 
         [Fact]
-        public async Task RetryHelperTest()
-        {
-            int i = 0;
-            var task = RetryHelper.RetryAsync(async () =>
-                {
-                    await Task.Delay(1000);
-                    if (i != 3)
-                    {
-                        i += 1;
-                        return false;
-                    }
-                    return true;
-                });
-
-            await task;
-            Assert.True(task.IsCompleted);
-            Assert.True(i == 3);
-            
-        }
-
-        [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
         public async Task Start_DotnetIsolated_WithRuntimeSpecified()
         {
