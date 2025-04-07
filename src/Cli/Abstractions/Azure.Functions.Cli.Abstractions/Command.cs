@@ -6,10 +6,11 @@
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace Azure.Functions.Cli.Abstractions
 {
-    public class Command: ICommand
+    public class Command : ICommand
     {
         private readonly Process _process;
 
@@ -29,9 +30,9 @@ namespace Azure.Functions.Cli.Abstractions
 
         public CommandResult Execute()
         {
-            return Execute(null);
+            return Execute(null, null);
         }
-        public CommandResult Execute(Action<Process>? processStarted)
+        public CommandResult Execute(Action<Process, StreamWriter?>? processStarted, StreamWriter? fileWriter)
         {
             Reporter.Verbose.WriteLine(string.Format(
                 "Running {0} {1}",
@@ -57,7 +58,7 @@ namespace Azure.Functions.Cli.Abstractions
                 _process.Start();
                 if (processStarted != null)
                 {
-                    processStarted(_process);
+                    processStarted(_process, fileWriter);
                 }
                 reaper.NotifyProcessStarted();
 

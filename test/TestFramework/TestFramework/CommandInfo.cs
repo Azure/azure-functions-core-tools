@@ -1,12 +1,8 @@
 ﻿using Azure.Functions.Cli.Abstractions;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace TestFramework
+
+namespace Func.TestFramework
 {
     public class CommandInfo
     {
@@ -17,6 +13,8 @@ namespace TestFramework
 
         public List<string> EnvironmentToRemove { get; } = new List<string>();
         public string WorkingDirectory { get; set; }
+
+        public string TestName { get; set; }
 
         private string EscapeArgs()
         {

@@ -30,9 +30,9 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand

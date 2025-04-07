@@ -50,6 +50,7 @@ jobs:
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
+      DIRECTORY_TO_LOG_TO: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
   - task: PublishTestResults@2
     inputs:

@@ -28,9 +28,9 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTrigger");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
             };
 
             var result = funcStartCommand
@@ -55,9 +55,9 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process);
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
             };
 
             var result = funcStartCommand
@@ -83,9 +83,9 @@ namespace Cli.Core.E2E.Tests.func_start.Tests.TestsWithFixtures
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log);
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async process =>
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand

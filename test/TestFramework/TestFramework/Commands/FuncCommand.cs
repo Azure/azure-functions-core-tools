@@ -1,8 +1,9 @@
 ﻿using Azure.Functions.Cli.Abstractions;
 using System.Diagnostics;
+using TestFramework;
 using Xunit.Abstractions;
 
-namespace TestFramework
+namespace Func.TestFramework.Commands
 {
     public abstract class FuncCommand
     {
@@ -19,7 +20,7 @@ namespace TestFramework
 
         //  These only work via Execute(), not when using GetProcessStartInfo()
         public Action<string>? CommandOutputHandler { get; set; }
-        public Action<Process>? ProcessStartedHandler { get; set; }
+        public Action<Process, StreamWriter?>? ProcessStartedHandler { get; set; }
 
         protected FuncCommand(ITestOutputHelper log)
         {
@@ -88,33 +89,117 @@ namespace TestFramework
         public virtual CommandResult Execute(IEnumerable<string> args)
         {
             var spec = CreateCommandInfo(args);
-
             var command = spec
                 .ToCommand(_doNotEscapeArguments)
                 .CaptureStdOut()
                 .CaptureStdErr();
 
+            var funcExeDirectory = Path.GetDirectoryName(spec.FileName);
 
-            command.OnOutputLine(line =>
+            Directory.SetCurrentDirectory(funcExeDirectory);
+
+            var directoryToLogTo = Environment.GetEnvironmentVariable("DIRECTORY_TO_LOG_TO");
+            if (string.IsNullOrEmpty(directoryToLogTo))
             {
-                Log.WriteLine($"》   {line}");
-                CommandOutputHandler?.Invoke(line);
-            });
-            command.OnErrorLine(line =>
+                directoryToLogTo = Directory.GetCurrentDirectory();
+            }
+
+            // Ensure directory exists
+            Directory.CreateDirectory(directoryToLogTo);
+
+            // Create a more unique filename to avoid conflicts
+            string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
+            string logFilePath = Path.Combine(directoryToLogTo,
+                $"func_start_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
+
+            // Make sure we're only opening the file once
+            StreamWriter fileWriter = null;
+            try
             {
-                if (!string.IsNullOrEmpty(line))
+                // Open with FileShare.Read to allow others to read but not write
+                var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                fileWriter = new StreamWriter(fileStream)
                 {
-                    Log.WriteLine($"❌   {line}");
+                    AutoFlush = true
+                };
+
+                // Write initial information
+                fileWriter.WriteLine($"=== Test started at {DateTime.Now} ===");
+                fileWriter.WriteLine($"Test Name: {spec.TestName}");
+                var display = $"func {string.Join(" ", spec.Arguments)}";
+                fileWriter.WriteLine($"Command: {display}");
+                fileWriter.WriteLine($"Working Directory: {spec.WorkingDirectory ?? "not specified"}");
+                fileWriter.WriteLine("====================================");
+
+                command.OnOutputLine(line =>
+                {
+                    try
+                    {
+                        // Write to the file if it's still open
+                        if (fileWriter != null && fileWriter.BaseStream != null)
+                        {
+                            fileWriter.WriteLine($"[STDOUT] {line}");
+                        }
+
+                        Log.WriteLine($"》   {line}");
+                        CommandOutputHandler?.Invoke(line);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"Error writing to log file: {ex.Message}");
+                    }
+                });
+
+                command.OnErrorLine(line =>
+                {
+                    try
+                    {
+                        // Write to the file if it's still open
+                        if (fileWriter != null && fileWriter.BaseStream != null)
+                        {
+                            fileWriter.WriteLine($"[STDERR] {line}");
+                        }
+
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            Log.WriteLine($"❌   {line}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"Error writing to log file: {ex.Message}");
+                    }
+                });
+
+                Log.WriteLine($"Executing '{display}':");
+                Log.WriteLine($"Output being captured to: {logFilePath}");
+
+                var result = ((Command)command).Execute(ProcessStartedHandler, fileWriter);
+
+                fileWriter.WriteLine("====================================");
+                fileWriter.WriteLine($"Command exited with code: {result.ExitCode}");
+                fileWriter.WriteLine($"=== Test ended at {DateTime.Now} ===");
+
+                Log.WriteLine($"Command '{display}' exited with exit code {result.ExitCode}.");
+
+                return result;
+            }
+            finally
+            {
+                // Make sure to close and dispose the writer
+                if (fileWriter != null)
+                {
+                    try
+                    {
+                        fileWriter.Close();
+                        fileWriter.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"Error closing log file: {ex.Message}");
+                    }
                 }
-            });
-
-            var display = $"func {string.Join(" ", spec.Arguments)}";
-
-            Log.WriteLine($"Executing '{display}':");
-            var result = ((Command)command).Execute(ProcessStartedHandler);
-            Log.WriteLine($"Command '{display}' exited with exit code {result.ExitCode}.");
-
-            return result;
+            }
         }
 
         public static void LogCommandResult(ITestOutputHelper log, CommandResult result)
