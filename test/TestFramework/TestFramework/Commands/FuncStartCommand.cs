@@ -12,10 +12,12 @@ namespace TestFramework.Commands
     public class FuncStartCommand: FuncCommand
     {
         private string _funcPath;
+        private string? _methodName;
 
-        public FuncStartCommand(string funcPath, ITestOutputHelper log) : base(log)
+        public FuncStartCommand(string funcPath, ITestOutputHelper log, string? methodName) : base(log)
         {
             _funcPath = funcPath;
+            _methodName = methodName;
 
         }
 
@@ -28,6 +30,7 @@ namespace TestFramework.Commands
                 FileName = _funcPath,
                 Arguments = arguments,
                 WorkingDirectory = WorkingDirectory,
+                TestName = _methodName,
             };
             return commandInfo;
         }

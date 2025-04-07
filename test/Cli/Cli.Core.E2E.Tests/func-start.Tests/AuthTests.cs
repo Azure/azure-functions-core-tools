@@ -33,12 +33,15 @@ namespace Cli.Core.E2E.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
+            string methodName = "Start_DotnetIsolated_Test_EnableAuthFeature";
+            string uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
+
             // Call func init and func new
             await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet-isolated" });
             await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, methodName);
             string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
