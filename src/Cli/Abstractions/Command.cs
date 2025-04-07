@@ -32,7 +32,7 @@ namespace Azure.Functions.Cli.Abstractions
         {
             return Execute(null, null);
         }
-        public CommandResult Execute(Action<Process, StreamWriter?>? processStarted, StreamWriter? fileWriter)
+        public CommandResult Execute(Func<Process, StreamWriter?, Task>? processStarted, StreamWriter? fileWriter)
         {
             Reporter.Verbose.WriteLine(string.Format(
                 "Running {0} {1}",
@@ -58,7 +58,19 @@ namespace Azure.Functions.Cli.Abstractions
                 _process.Start();
                 if (processStarted != null)
                 {
-                    processStarted(_process, fileWriter);
+                    //processStarted(_process, fileWriter);
+                    var processTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await processStarted(_process, fileWriter);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log the exception
+                            Console.WriteLine($"Error in process started handler: {ex}");
+                        }
+                    });
                 }
                 reaper.NotifyProcessStarted();
 

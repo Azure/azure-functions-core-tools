@@ -269,7 +269,7 @@ namespace Func.TestFramework.Helpers
 
                 fileWriter.WriteLine($"[HANDLER] Process working directory: {process.StartInfo.WorkingDirectory}");
 
-                //await WaitForFunctionHostToStart(process, port, fileWriter);
+                await WaitForFunctionHostToStart(process, port, fileWriter);
 
                 fileWriter.WriteLine("[HANDLER] Host has started");
                 fileWriter.Flush();

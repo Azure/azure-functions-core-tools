@@ -19,7 +19,7 @@ namespace Func.TestFramework.Commands
 
         //  These only work via Execute(), not when using GetProcessStartInfo()
         public Action<string>? CommandOutputHandler { get; set; }
-        public Action<Process, StreamWriter?>? ProcessStartedHandler { get; set; }
+        public Func<Process, StreamWriter?, Task>? ProcessStartedHandler { get; set; }
 
         protected FuncCommand(ITestOutputHelper log)
         {
