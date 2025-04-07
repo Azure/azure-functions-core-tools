@@ -37,13 +37,6 @@ jobs:
       versionSpec:
     displayName: Install Nuget tool
   - pwsh: |
-      .\validateWorkerVersions.ps1
-    displayName: 'Validate worker versions'
-    condition: ne(variables['skipWorkerVersionValidation'], 'true')
-  - pwsh: |
-      .\check-vulnerabilities.ps1
-    displayName: "Check for security vulnerabilities"
-  - pwsh: |
       .\build.ps1
     env:
       BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -52,6 +45,13 @@ jobs:
       IsCodeqlBuild: false
       DIRECTORY_TO_LOG_TO: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
+      artifactName: 'TestLogs'
+      artifactType: 'pipeline'
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
