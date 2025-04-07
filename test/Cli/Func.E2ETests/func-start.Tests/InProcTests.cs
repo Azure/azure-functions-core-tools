@@ -1,111 +1,114 @@
-﻿//using FluentAssertions;
-//using Func.E2ETests.Traits;
-//using Func.TestFramework.Assertions;
-//using Func.TestFramework.Commands;
-//using Func.TestFramework.Helpers;
-//using Xunit.Abstractions;
-//using Xunit;
+﻿using FluentAssertions;
+using Func.E2ETests.Traits;
+using Func.TestFramework.Assertions;
+using Func.TestFramework.Commands;
+using Func.TestFramework.Helpers;
+using Xunit.Abstractions;
+using Xunit;
 
-//namespace Func.E2ETests.func_start.Tests
-//{
-//    [Trait(TestTraits.Group, TestTraits.InProc)]
-//    public class InProcTests : BaseE2ETest
-//    {
-//        public InProcTests(ITestOutputHelper log) : base(log)
-//        {
+namespace Func.E2ETests.func_start.Tests
+{
+    [Trait(TestTraits.Group, TestTraits.InProc)]
+    public class InProcTests : BaseE2ETest
+    {
+        public InProcTests(ITestOutputHelper log) : base(log)
+        {
 
-//        }
+        }
 
-//        [Fact]
-//        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-//        public async Task Start_InProc_SuccessfulFunctionExecution()
-//        {
-//            int port = ProcessHelper.GetAvailablePort();
+        [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        public async Task Start_InProc_SuccessfulFunctionExecution()
+        {
+            int port = ProcessHelper.GetAvailablePort();
 
-//            // Initialize dotnet function app using retry helper
-//            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-//            // Add HTTP trigger using retry helper
-//            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
 
-//            // Call func start
-//            var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+            // Call func start
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_SuccessfulFunctionExecution");
+            string? capturedContent = null;
 
-//            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
-//            {
-//                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test", "Hello, Test. This HTTP triggered function executed successfully.");
-//            };
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            {
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
+            };
 
-//            var result = funcStartCommand
-//                .WithWorkingDirectory(WorkingDirectory)
-//                .Execute(new[] { "--port", port.ToString() });
-//        }
+            var result = funcStartCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { "--port", port.ToString() });
 
-//        [Fact]
-//        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-//        public async Task Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
-//        {
-//            int port = ProcessHelper.GetAvailablePort();
+            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
+        }
 
-//            // Initialize dotnet function app using retry helper
-//            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+        [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        public async Task Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
+        {
+            int port = ProcessHelper.GetAvailablePort();
 
-//            // Add HTTP trigger using retry helper
-//            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-//            // Modify host.json to set log level to Debug
-//            string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
-//            string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
-//            File.WriteAllText(hostJsonPath, hostJsonContent);
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
-//            // Call func start
-//            var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+            // Modify host.json to set log level to Debug
+            string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
+            string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
+            File.WriteAllText(hostJsonPath, hostJsonContent);
 
-//            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
-//            {
-//                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter);
-//            };
+            // Call func start
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue");
 
-//            var result = funcStartCommand
-//                .WithWorkingDirectory(WorkingDirectory)
-//                .Execute(new[] { "start", "--port", port.ToString() });
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            {
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+            };
 
-//            // Validate host configuration was applied
-//            result.Should().HaveStdOutContaining("Host configuration applied.");
-//        }
+            var result = funcStartCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { "start", "--port", port.ToString() });
 
-//        [Fact]
-//        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-//        public async Task Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
-//        {
-//            int port = ProcessHelper.GetAvailablePort();
+            // Validate host configuration was applied
+            result.Should().HaveStdOutContaining("Host configuration applied.");
+        }
 
-//            // Initialize dotnet function app using retry helper
-//            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+        [Fact]
+        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+        public async Task Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
+        {
+            int port = ProcessHelper.GetAvailablePort();
 
-//            // Add HTTP trigger using retry helper
-//            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            // Initialize dotnet function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
-//            // Modify host.json to set log level with filter
-//            string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
-//            string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\", \"Host.Startup\": \"Information\"}}}";
-//            File.WriteAllText(hostJsonPath, hostJsonContent);
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
-//            // Call func start
-//            var funcStartCommand = new FuncStartCommand(FuncPath, Log);
+            // Modify host.json to set log level with filter
+            string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
+            string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"None\", \"Host.Startup\": \"Information\"}}}";
+            File.WriteAllText(hostJsonPath, hostJsonContent);
 
-//            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
-//            {
-//                await ProcessHelper.ProcessStartedHandlerHelper(port, process, Log, fileWriter);
-//            };
+            // Call func start
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue");
 
-//            var result = funcStartCommand
-//                .WithWorkingDirectory(WorkingDirectory)
-//                .Execute(new[] { "--port", port.ToString() });
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            {
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+            };
 
-//            // Validate we see some logs but not others due to filters
-//            result.Should().HaveStdOutContaining("Found the following functions:");
-//            result.Should().NotHaveStdOutContaining("Reading host configuration file");
-//        }
-//    }
-//}
+            var result = funcStartCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { "--port", port.ToString() });
+
+            // Validate we see some logs but not others due to filters
+            result.Should().HaveStdOutContaining("Found the following functions:");
+            result.Should().NotHaveStdOutContaining("Reading host configuration file");
+        }
+    }
+}

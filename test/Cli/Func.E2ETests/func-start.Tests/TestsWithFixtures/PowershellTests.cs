@@ -34,7 +34,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
-            capturedContent.Should().Be("Hello, Test.This HTTP triggered function executed successfully.");
+            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate out-of-process host was started
             result.Should().HaveStdOutContaining("4.10");
