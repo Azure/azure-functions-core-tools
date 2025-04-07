@@ -17,74 +17,15 @@ namespace Func.TestFramework.Helpers
     public class ProcessHelper
     {
         private static string FunctionsHostUrl = "http://localhost";
-
-        private static SemaphoreSlim _functionHostSemaphore = new SemaphoreSlim(1, 1);
-
-        private static async Task<bool> WaitUntilReady(HttpClient client)
-        {
-            for (var limit = 0; limit < 30; limit++)
-            {
-                try
-                {
-                    var response = await client.GetAsync("/admin/host/ping");
-                    if (response.IsSuccessStatusCode)
-                    {
-                        return true;
-                    }
-                    await Task.Delay(1000);
-                }
-                catch
-                {
-                    await Task.Delay(1000);
-                }
-            }
-            return false;
-        }
-
-        public static class TestResourceManager
-        {
-            private static SemaphoreSlim _networkSemaphore = new SemaphoreSlim(3, 3); // Allow 3 concurrent tests
-
-            public static async Task<IDisposable> AcquireNetworkResourceAsync()
-            {
-                await _networkSemaphore.WaitAsync();
-                return new DisposableAction(() => _networkSemaphore.Release());
-            }
-        }
-        public class DisposableAction : IDisposable
-        {
-            private readonly Action _action;
-            private bool _disposed = false;
-
-            public DisposableAction(Action action)
-            {
-                _action = action ?? throw new ArgumentNullException(nameof(action));
-            }
-
-            public void Dispose()
-            {
-                if (!_disposed)
-                {
-                    _action();
-                    _disposed = true;
-                }
-            }
-        }
-
-
         public static async Task WaitForFunctionHostToStart(
-         Process funcProcess,
-         int port,
-         StreamWriter? fileWriter = null,
-         string? functionCall = null,
-         int timeout = 120 * 1000,
-         HttpStatusCode expectedStatus = HttpStatusCode.OK)
+            Process funcProcess,
+            int port,
+            StreamWriter? fileWriter = null,
+            string? functionCall = null,
+            int timeout = 120 * 1000)
         {
             var url = $"{FunctionsHostUrl}:{port.ToString()}";
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(5) // 5-second timeout for each request
-            };
+            using var httpClient = new HttpClient();
 
             void LogMessage(string message)
             {
@@ -97,7 +38,6 @@ namespace Func.TestFramework.Helpers
             LogMessage($"Current directory: {Directory.GetCurrentDirectory()}");
 
             LogMessage($"PID of process: {funcProcess.Id}");
-            fileWriter?.Flush();
             int retry = 1;
 
             await RetryHelper.RetryAsync((async () =>
@@ -116,13 +56,12 @@ namespace Func.TestFramework.Helpers
 
                     LogMessage($"Trying to get ping response");
 
-                    // Try ping endpoint as a fallback
+                    // Try ping endpoint
                     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);
 
                     LogMessage($"Got ping response");
 
-                    fileWriter?.Flush();
                     if (pingResponse.IsSuccessStatusCode)
                     {
                         LogMessage("Host responded to ping - assuming it's running");
@@ -139,107 +78,6 @@ namespace Func.TestFramework.Helpers
                     return false;
                 }
             }), fileWriter);
-
-            /*
-            await RetryHelper.ExecuteAsyncWithRetry(async () =>
-            {
-                try
-                {
-                    LogMessage($"Retry number: {retry}");
-                    fileWriter?.Flush();
-                    retry += 1;
-
-                    if (funcProcess.HasExited)
-                    {
-                        LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
-                        throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
-                    }
-
-                    try
-                    {
-                        // Try ping endpoint as a fallback
-                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
-                        LogMessage($"Ping response: {pingResponse.StatusCode}");
-                        fileWriter?.Flush();
-                        if (pingResponse.IsSuccessStatusCode)
-                        {
-                            LogMessage("Host responded to ping - assuming it's running");
-                            return true;
-                        }
-                    }
-                    catch { }
-
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    LogMessage($"Error checking host status: {ex.Message}");
-                    return false;
-                }
-            }, shouldStopRetry: result => result == true, 10, () => { return RetryHelper.TestingIntervals.Select(Task.Delay);  }, fileWriter);
-            */
-
-
-            /*
-            await RetryHelper.RetryUntilTimeoutAsync(async () =>
-            {
-                try
-                {
-                    LogMessage($"Retry number: {retry}");
-                    fileWriter?.Flush();
-                    retry += 1;
-
-                    if (funcProcess.HasExited)
-                    {
-                        LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
-                        throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
-                    }
-
-                    try
-                    {
-                        // Try ping endpoint as a fallback
-                        var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping");
-                        LogMessage($"Ping response: {pingResponse.StatusCode}");
-                        fileWriter?.Flush();
-                        if (pingResponse.IsSuccessStatusCode)
-                        {
-                            LogMessage("Host responded to ping - assuming it's running");
-                            return true;
-                        }
-                    }
-                    catch { }
-
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    LogMessage($"Error checking host status: {ex.Message}");
-                    return false;
-                }
-            }, fileWriter, timeout);
-            */
-        }
-
-        public static bool IsFileLocked(string filePath)
-        {
-            try
-            {
-                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                {
-                    // If we get here, the file is not locked
-                    return false;
-                }
-            }
-            catch (IOException)
-            {
-                // The file is locked by another process
-                return true;
-            }
-            catch (Exception)
-            {
-                // Another error occurred
-                return false;
-            }
         }
 
         public static int GetAvailablePort()
