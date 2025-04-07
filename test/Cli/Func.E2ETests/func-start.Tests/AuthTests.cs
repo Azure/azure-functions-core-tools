@@ -61,11 +61,11 @@ namespace Func.E2ETests.func_start.Tests
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(uniqueFuncPath, Log, methodName);
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = (process, fileWriter) =>
             {
                 //fileWriter.WriteLine($"In process started handler: func.exe is {(ProcessHelper.IsFileLocked(FuncPath) ? "locked" : "not locked")}");
                 //await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
-                await Task.Delay(5000);
+                //await Task.Delay(5000);
                 process.Kill(true);
             };
 
