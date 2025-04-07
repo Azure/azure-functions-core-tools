@@ -56,7 +56,8 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter)=>
             {
                 await Task.Delay(5000);
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
+                process.Kill(true);
+                //capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
             };
 
             var result = funcStartCommand

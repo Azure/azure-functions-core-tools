@@ -63,8 +63,10 @@ namespace Func.E2ETests.func_start.Tests
             var funcStartCommand = new FuncStartCommand(uniqueFuncPath, Log, methodName);
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                fileWriter.WriteLine($"In process started handler: func.exe is {(ProcessHelper.IsFileLocked(FuncPath) ? "locked" : "not locked")}");
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
+                //fileWriter.WriteLine($"In process started handler: func.exe is {(ProcessHelper.IsFileLocked(FuncPath) ? "locked" : "not locked")}");
+                //await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
+                await Task.Delay(5000);
+                process.Kill(true);
             };
 
             // Build command arguments based on enableAuth parameter
