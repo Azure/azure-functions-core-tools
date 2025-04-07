@@ -63,7 +63,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .Execute(new[] { "--verbose", "--port", port.ToString(), "--default" });
+                        .Execute(new[] { "--verbose", "--port", port.ToString(), "--runtime", "default" });
 
             capturedContent.Should().Be("Hello, Test!");
 
@@ -197,7 +197,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(tempDir)
-                        .Execute(new[] { "--port", port.ToString() });
+                        .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate we see detailed worker logs
             result.Should().HaveStdOutContaining("Workers Directory set to");
