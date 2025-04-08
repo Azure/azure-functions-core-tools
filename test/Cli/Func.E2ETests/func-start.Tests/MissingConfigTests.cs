@@ -5,8 +5,6 @@ using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
-using Grpc.Net.Client.Configuration;
-using System.Reflection;
 
 namespace Func.E2ETests.func_start.Tests
 {
@@ -161,6 +159,45 @@ namespace Func.E2ETests.func_start.Tests
 
             // Validate error message
             result.Should().HaveStdOutContaining("The binding type(s) 'http2' were not found in the configured extension bundle. Please ensure the type is correct and the correct version of extension bundle is configured.");
+        }
+
+        [Fact]
+        public async Task Start_EmptyEnvVars_HandledAsExpected()
+        {
+            int port = ProcessHelper.GetAvailablePort();
+
+            // Initialize Node.js function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+
+            // Add empty setting
+            var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
+                                    .WithWorkingDirectory(WorkingDirectory)
+                                    .Execute(new[] { "add", "emptySetting", "EMPTY_VALUE" });
+            funcSettingsResult.Should().ExitWith(0);
+
+            // Modify settings file to have empty value
+            string settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
+            string settingsContent = File.ReadAllText(settingsPath);
+            settingsContent = settingsContent.Replace("EMPTY_VALUE", "");
+            File.WriteAllText(settingsPath, settingsContent);
+
+            // Call func start
+            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_EmptyEnvVars_HandledAsExpected");
+
+            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            {
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+            };
+
+            var result = funcStartCommand
+                        .WithWorkingDirectory(WorkingDirectory)
+                        .Execute(new[] { "--port", port.ToString() });
+
+            // Validate function works and doesn't show skipping message
+            result.Should().NotHaveStdOutContaining("Skipping 'emptySetting' from local settings as it's already defined in current environment variables.");
         }
     }
 }
