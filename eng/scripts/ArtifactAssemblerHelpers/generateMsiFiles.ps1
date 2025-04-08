@@ -21,13 +21,6 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-$buildDir = ".\build"
->>>>>>> 0a7845fc (specifying msi file)
-=======
->>>>>>> 823cc71a (trying agagin)
 Write-Host "Build directory: $buildDir"
 
 Write-Host "Directly searching for func.dll in $ArtifactsPath..."
@@ -43,23 +36,9 @@ $cli = ""
 Write-Host "Found $($funcDlls.Count) func.dll files"
 foreach ($dll in $funcDlls) {
     $path = $dll.FullName
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    Write-Host "$path"
->>>>>>> 9827ef23 (fixing msi file)
 
      # Check if this is the root func.dll and not in inproc folders
     if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
-<<<<<<< HEAD
-=======
-        Write-Host "Found main func.dll: $path" -ForegroundColor Green
->>>>>>> 19e8a1ac (meant to have it be full path)
-=======
-
-     # Check if this is the root func.dll and not in inproc folders
-    if ((-not $path.Contains("in-proc6")) -and (-not $path.Contains("in-proc8"))) {
->>>>>>> 0a7845fc (specifying msi file)
         $cli = $path
         break
     }
