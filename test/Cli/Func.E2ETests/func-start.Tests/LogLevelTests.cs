@@ -19,6 +19,12 @@ namespace Func.E2ETests.func_start.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
+            // Initialize Node.js function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
                                     .WithWorkingDirectory(WorkingDirectory)
@@ -45,6 +51,12 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
+
+            // Initialize Node.js function app using retry helper
+            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+
+            // Add HTTP trigger using retry helper
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
 
             // Modify host.json to set log level
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
