@@ -26,7 +26,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_SuccessfulFunctionExecution");
@@ -54,7 +54,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
 
             // Modify host.json to set log level to Debug
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -87,7 +87,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
 
             // Modify host.json to set log level with filter
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");

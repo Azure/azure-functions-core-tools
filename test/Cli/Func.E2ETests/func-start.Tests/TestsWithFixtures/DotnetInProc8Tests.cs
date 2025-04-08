@@ -43,7 +43,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .Execute(new[] { "--verbose", "--port", port.ToString() });
 
-            capturedContent.Should().Be("Hello, Test.This HTTP triggered function executed successfully.");
+            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate inproc8 host was started
             result.Should().HaveStdOutContaining("Starting child process for inproc8 model host.");
@@ -70,7 +70,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
-            capturedContent.Should().Be("Hello, Test.This HTTP triggered function executed successfully.");
+            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate inproc8 host was started
             result.Should().HaveStdOutContaining("Starting child process for inproc8 model host.");
