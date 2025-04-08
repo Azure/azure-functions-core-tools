@@ -82,10 +82,11 @@ namespace Azure.Functions.Cli.Abstractions
                 var taskOut = _stdOut?.BeginRead(_process.StandardOutput);
                 var taskErr = _stdErr?.BeginRead(_process.StandardError);
                 _process.WaitForExit();
-                processTask?.Wait();
 
                 taskOut?.Wait();
                 taskErr?.Wait();
+
+                processTask?.Wait();
             }
 
             var exitCode = _process.ExitCode;
