@@ -6,7 +6,7 @@ namespace Func.TestFramework.Helpers
 {
     public static class RetryHelper
     {
-        public static async Task RetryAsync(Func<Task<bool>> condition, StreamWriter? fileWriter = null, int timeout = 120 * 1000, int pollingInterval = 2 * 1000, bool throwWhenDebugging = false, Func<string> userMessageCallback = null)
+        public static async Task RetryAsync(Func<Task<bool>> condition, StreamWriter? fileWriter = null, int timeout = 180 * 1000, int pollingInterval = 2 * 1000, bool throwWhenDebugging = false, Func<string> userMessageCallback = null)
         {
             DateTime start = DateTime.Now;
             int attempt = 1;

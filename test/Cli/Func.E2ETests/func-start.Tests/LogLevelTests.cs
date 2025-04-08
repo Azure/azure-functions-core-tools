@@ -23,7 +23,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)

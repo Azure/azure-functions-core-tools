@@ -138,6 +138,7 @@ namespace Func.TestFramework.Commands
                         if (fileWriter != null && fileWriter.BaseStream != null)
                         {
                             fileWriter.WriteLine($"[STDOUT] {line}");
+                            fileWriter.Flush();
                         }
 
                         Log.WriteLine($"》   {line}");
@@ -157,6 +158,7 @@ namespace Func.TestFramework.Commands
                         if (fileWriter != null && fileWriter.BaseStream != null)
                         {
                             fileWriter.WriteLine($"[STDERR] {line}");
+                            fileWriter.Flush();
                         }
 
                         if (!string.IsNullOrEmpty(line))
