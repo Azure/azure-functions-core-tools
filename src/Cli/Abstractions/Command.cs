@@ -109,6 +109,16 @@ namespace Azure.Functions.Cli.Abstractions
                 }
             }
 
+            if (fileWriter != null)
+            {
+                try
+                {
+                    fileWriter.Close();
+                    fileWriter.Dispose();
+                }
+                catch { }
+            }
+
             return new CommandResult(
                 _process.StartInfo,
                 exitCode,
