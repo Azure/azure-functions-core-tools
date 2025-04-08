@@ -53,13 +53,14 @@ namespace Azure.Functions.Cli.Abstractions
                 Reporter.Verbose.WriteLine($"> {FormatProcessInfo(_process.StartInfo)}".White());
             }
 
+            Task? processTask = null;
+
             using (var reaper = new ProcessReaper(_process))
             {
                 _process.Start();
                 if (processStarted != null)
                 {
-                    //processStarted(_process, fileWriter);
-                    var processTask = Task.Run(async () =>
+                    processTask = Task.Run(async () =>
                     {
                         try
                         {
@@ -81,6 +82,7 @@ namespace Azure.Functions.Cli.Abstractions
                 var taskOut = _stdOut?.BeginRead(_process.StandardOutput);
                 var taskErr = _stdErr?.BeginRead(_process.StandardError);
                 _process.WaitForExit();
+                processTask?.Wait();
 
                 taskOut?.Wait();
                 taskErr?.Wait();

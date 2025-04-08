@@ -257,7 +257,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             p.Kill();
                             await Task.Delay(TimeSpan.FromSeconds(2));
                             result.Should().Be("Hello, Test. This HTTP triggered function executed successfully.", because: "response from default function should be 'Hello, {name}. This HTTP triggered function executed successfully.'");
-                            
+
                             if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                             {
                                 testOutputHelper.Output.Should().Contain($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.");
@@ -421,19 +421,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                     },
                     CommandTimeout = TimeSpan.FromSeconds(300),
                 }
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
             }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet6InProcProject");
-=======
-            }, _output, "./test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
->>>>>>> 3ec8ee71 (changing path to see fi this works)
-=======
-            }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet8InProcProject");
->>>>>>> 73f1a19e (path should hopefully be correct)
-=======
-            }, _output, "../../../../test/Azure.Functions.Cli.Tests/E2E/TestProject/TestNet6InProcProject");
->>>>>>> 27a0ff4a (test should pass now)
 
         }
 
@@ -1908,7 +1896,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                             var response = await client.GetAsync("/api/HttpTrigger?name=Test");
                             var result = await response.Content.ReadAsStringAsync();
                             p.Kill();
-                            
+
                             if (_output is Xunit.Sdk.TestOutputHelper testOutputHelper)
                             {
                                 testOutputHelper.Output.Should().Contain($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.");
