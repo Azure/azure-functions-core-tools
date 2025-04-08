@@ -71,7 +71,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             // Validate out-of-process host was started
             result.Should().HaveStdOutContaining("4.10");
-            result.Should().HaveStdOutContaining("Selected out-of-process host.");
+            result.Should().HaveStdOutContaining("Selected default host.");
         }
 
         [Fact]
