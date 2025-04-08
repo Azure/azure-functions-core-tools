@@ -22,6 +22,7 @@ trigger:
     - release_4.0
     - main
     - in-proc
+    - feature/*
 
 resources:
   repositories:
@@ -45,7 +46,7 @@ extends:
     settings:
       # PR's from forks do not have sufficient permissions to set tags.
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
-    stages:     
+    stages:
       - stage: BuildAndTest
         jobs:
         - template: /eng/ci/templates/public/jobs/build-test-public.yml@self

@@ -24,20 +24,20 @@ resources:
     ref: refs/tags/release
   pipelines:
     - pipeline: core-tools-host
-      source: azure\azure-functions-core-tools\core-tools-host.official
+      source: azure/azure-functions-core-tools/core-tools-host.official
 
     - pipeline: core-tools-inproc
-      source: azure\azure-functions-core-tools\core-tools.official
+      source: azure/azure-functions-core-tools/core-tools.official
       branch: in-proc  # in-proc branch of core-tools.official
       tags:
       - nightly-build
-      trigger: 
+      trigger:
         branches:
           include:
             - in-proc
 
     - pipeline: core-tools-default
-      source: azure\azure-functions-core-tools\core-tools.official
+      source: azure/azure-functions-core-tools/core-tools.official
       branch: main  # main branch of core-tools.official
       tags:
       - nightly-build
@@ -66,13 +66,13 @@ extends:
          compiled:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
-     
+
     stages:
     - stage: ConsolidateArticacts
       displayName: "Assemble Artifacts"
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
-      
+
       - ${{ each arch in split(variables.archs,',') }}:
         - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
           parameters:

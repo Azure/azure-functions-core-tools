@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("Python|3.10", 3, 10, true)]
         [InlineData("Python|3.11", 3, 11, true)]
         [InlineData("Python|3.12", 3, 12, true)]
-        public void ShouldHaveMatchingLinuxFxVersion(string linuxFxVersion, int major, int minor, bool expectedResult)
+        public void ShouldHaveMatchingLinuxFxVersion(string linuxFxVersion, int? major, int? minor, bool expectedResult)
         {
             bool result = PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(linuxFxVersion, major, minor);
             if (result != expectedResult)
