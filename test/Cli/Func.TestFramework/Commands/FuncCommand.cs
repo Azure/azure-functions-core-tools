@@ -109,7 +109,7 @@ namespace Func.TestFramework.Commands
             // Create a more unique filename to avoid conflicts
             string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
             string logFilePath = Path.Combine(directoryToLogTo,
-                $"func_start_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
+                $"func_{spec.Arguments.First()}_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
 
             // Make sure we're only opening the file once
             StreamWriter fileWriter = null;
