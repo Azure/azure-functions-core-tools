@@ -23,7 +23,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_PowershellApp_SuccessfulFunctionExecution");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_PowershellApp_SuccessfulFunctionExecution", _fixture.Log);
             string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>

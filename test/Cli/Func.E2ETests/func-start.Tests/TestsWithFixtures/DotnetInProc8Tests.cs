@@ -30,7 +30,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime", _fixture.Log);
 
             string? capturedContent = null;
 
@@ -57,7 +57,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime", _fixture.Log);
 
             string? capturedContent = null;
 
@@ -83,7 +83,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_Net8InProc_ExpectedToFail_WithSpecifyingRuntime");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_Net8InProc_ExpectedToFail_WithSpecifyingRuntime", _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -100,7 +100,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_Net8InProc_ExpectedToFail_WithoutSpecifyingRuntime");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_Net8InProc_ExpectedToFail_WithoutSpecifyingRuntime", _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -117,7 +117,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc6_SpecifiedRuntime_ForDotnet8InProc");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc6_SpecifiedRuntime_ForDotnet8InProc", _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -134,7 +134,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet8InProc");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet8InProc", _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)

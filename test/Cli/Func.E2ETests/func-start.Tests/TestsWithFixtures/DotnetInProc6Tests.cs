@@ -28,7 +28,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_Net6_SuccessfulFunctionExecution_WithSpecifyingRuntime");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net6_SuccessfulFunctionExecution_WithSpecifyingRuntime", _fixture.Log);
             string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
@@ -54,7 +54,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_Net6_SuccessfulFunctionExecution_WithoutSpecifyingRuntime");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net6_SuccessfulFunctionExecution_WithoutSpecifyingRuntime", _fixture.Log);
 
             string capturedContent = null;
 
@@ -80,7 +80,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_Dotnet6_WithoutSpecifyingRuntime_ExpectedToFail")
+            var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Dotnet6_WithoutSpecifyingRuntime_ExpectedToFail", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
 
@@ -95,7 +95,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_Dotnet6_WithSpecifyingRuntime_ExpectedToFail")
+            var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Dotnet6_WithSpecifyingRuntime_ExpectedToFail", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "start", "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
@@ -110,7 +110,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc8_SpecifiedRuntime_ForDotnet6InProc")
+            var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc8_SpecifiedRuntime_ForDotnet6InProc", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "start", "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
@@ -125,7 +125,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet6InProc")
+            var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet6InProc", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
 
@@ -151,7 +151,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_InvalidHostJson_FailsWithExpectedError")
+            var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_InvalidHostJson_FailsWithExpectedError", _fixture.Log)
                         .WithWorkingDirectory(tempDir)
                         .Execute(new[] { "--port", port.ToString() });
 
@@ -177,7 +177,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             CopyDirectoryHelpers.CopyDirectoryWithout(_fixture.WorkingDirectory, tempDir, "host.json");
 
             // Call func start
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_MissingHostJson_FailsWithExpectedError")
+            var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_MissingHostJson_FailsWithExpectedError", _fixture.Log)
                         .WithWorkingDirectory(tempDir)
                         .Execute(new[] { "--port", port.ToString() });
 

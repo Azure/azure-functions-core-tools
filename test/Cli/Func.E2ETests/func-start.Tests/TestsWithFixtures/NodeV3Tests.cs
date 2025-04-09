@@ -23,7 +23,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_NodeJsApp_V3_SuccessfulFunctionExecution");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_NodeJsApp_V3_SuccessfulFunctionExecution", _fixture.Log);
 
             string capturedContent = null;
 

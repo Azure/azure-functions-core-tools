@@ -21,15 +21,16 @@ namespace Func.E2ETests
         public async Task Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution(string language)
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", language });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http1" });
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
             string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -52,7 +53,7 @@ namespace Func.E2ETests
             SetupUserSecrets(userSecrets);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -89,15 +90,16 @@ namespace Func.E2ETests
             }
 
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http1" });
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
             string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -119,7 +121,7 @@ namespace Func.E2ETests
             SetupUserSecrets(userSecrets);
 
             // Call func start for HTTP function only
-            var result = new FuncStartCommand(FuncPath, Log, "Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError")
+            var result = new FuncStartCommand(FuncPath, testName, Log)
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "start", "--functions", "http1", "--port", port.ToString() });
 
@@ -140,15 +142,16 @@ namespace Func.E2ETests
             }
 
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http1" });
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
             string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -170,7 +173,7 @@ namespace Func.E2ETests
             SetupUserSecrets(userSecrets);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>

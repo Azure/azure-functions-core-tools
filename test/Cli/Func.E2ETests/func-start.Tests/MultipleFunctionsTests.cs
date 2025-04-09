@@ -17,14 +17,18 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_FunctionsStartArgument_OnlySelectedFunctionsRun()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_FunctionsStartArgument_OnlySelectedFunctionsRun";
+
             // Initialize JavaScript function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "javascript" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "javascript" });
+
             // Add multiple HTTP triggers using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http1" });
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http2" });
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http3" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http2" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http3" });
+
             // Call func start with specific functions
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_FunctionsStartArgument_OnlySelectedFunctionsRun");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 try

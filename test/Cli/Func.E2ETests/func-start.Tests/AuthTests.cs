@@ -38,7 +38,7 @@ namespace Func.E2ETests.func_start.Tests
             string capturedContent = null;
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, methodName);
+            var funcStartCommand = new FuncStartCommand(FuncPath, methodName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger");

@@ -5,10 +5,9 @@ using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
-
 namespace Func.E2ETests.func_start.Tests
 {
-    public class LogLevelTests: BaseE2ETest
+    public class LogLevelTests : BaseE2ETest
     {
         public LogLevelTests(ITestOutputHelper log) : base(log)
         {
@@ -18,12 +17,13 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue";
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
@@ -32,13 +32,11 @@ namespace Func.E2ETests.func_start.Tests
             funcSettingsResult.Should().ExitWith(0);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue");
-
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
-
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
                         .Execute(new[] { "--port", port.ToString(), "--verbose" });
@@ -51,12 +49,13 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue";
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
 
             // Modify host.json to set log level
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -64,13 +63,11 @@ namespace Func.E2ETests.func_start.Tests
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue");
-
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
-
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
                         .Execute(new[] { "--port", port.ToString() });

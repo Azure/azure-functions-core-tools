@@ -19,12 +19,13 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_InProc_InvalidHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_InProc_InvalidHostJson_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
             // Create invalid host.json
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -32,7 +33,7 @@ namespace Func.E2ETests.func_start.Tests
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var result = new FuncStartCommand(FuncPath, Log)
+            var result = new FuncStartCommand(FuncPath, testName, Log)
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "--port", port.ToString() });
 
@@ -45,19 +46,20 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_InProc_MissingHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_InProc_MissingHostJson_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
             // Delete host.json
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
             File.Delete(hostJsonPath);
 
             // Call func start
-            var result = new FuncStartCommand(FuncPath, Log)
+            var result = new FuncStartCommand(FuncPath, testName, Log)
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "--port", port.ToString() });
 
@@ -83,17 +85,17 @@ namespace Func.E2ETests.func_start.Tests
                 int port = ProcessHelper.GetAvailablePort();
 
                 // Initialize function app using retry helper
-                await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", language });
+                await FuncInitWithRetryAsync(logFileName, new[] { ".", "--worker-runtime", language });
 
                 // Add HTTP trigger using retry helper
-                await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerFunc" });
+                await FuncNewWithRetryAsync(logFileName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerFunc" });
 
                 // Delete local.settings.json
                 var localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
                 File.Delete(localSettingsJson);
 
                 // Call func start
-                var funcStartCommand = new FuncStartCommand(FuncPath, Log, logFileName);
+                var funcStartCommand = new FuncStartCommand(FuncPath, logFileName, Log);
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
@@ -132,12 +134,13 @@ namespace Func.E2ETests.func_start.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
             var functionName = "HttpTriggerJS";
+            string testName = "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError";
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v3" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", functionName });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", functionName });
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
@@ -146,7 +149,7 @@ namespace Func.E2ETests.func_start.Tests
             await File.WriteAllTextAsync(filePath, functionJson);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -165,12 +168,13 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_EmptyEnvVars_HandledAsExpected()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_EmptyEnvVars_HandledAsExpected";
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
 
             // Add empty setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
@@ -185,7 +189,7 @@ namespace Func.E2ETests.func_start.Tests
             File.WriteAllText(settingsPath, settingsContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_EmptyEnvVars_HandledAsExpected");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {

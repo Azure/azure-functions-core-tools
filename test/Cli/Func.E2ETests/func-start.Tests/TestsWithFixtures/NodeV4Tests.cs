@@ -25,7 +25,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost", _fixture.Log);
 
             string? capturedContent = null;
 
@@ -52,7 +52,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost", _fixture.Log);
 
             string? capturedContent = null;
 
@@ -81,7 +81,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int debugPort = ProcessHelper.GetAvailablePort();
 
             // Call func start with inspect flag
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_WithInspect_DebuggerIsStarted");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_WithInspect_DebuggerIsStarted", _fixture.Log);
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -107,7 +107,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             try
             {
                 tcpListener.Start();
-                var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_PortInUse_FailsWithExpectedError");
+                var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_PortInUse_FailsWithExpectedError", _fixture.Log);
                 // Call func start
                 var result = funcStartCommand
                             .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -136,7 +136,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp", _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -153,7 +153,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp", _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)

@@ -28,7 +28,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution", _fixture.Log);
 
             string capturedContent = null;
 
@@ -58,7 +58,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithRuntimeSpecified");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_DotnetIsolated_WithRuntimeSpecified", _fixture.Log);
             string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
@@ -86,7 +86,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_DotnetIsolated_WithoutRuntimeSpecified");
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_DotnetIsolated_WithoutRuntimeSpecified", _fixture.Log);
             string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
@@ -113,7 +113,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start with invalid runtime (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated")
+            var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
@@ -128,7 +128,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start with invalid runtime (expected to fail)
-            var result = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "DontStart_InProc8_SpecifiedRuntime_ForDotnetIsolated")
+            var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc8_SpecifiedRuntime_ForDotnetIsolated", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 

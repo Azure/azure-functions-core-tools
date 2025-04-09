@@ -21,15 +21,16 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_InProc_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_InProc_SuccessfulFunctionExecution";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_SuccessfulFunctionExecution");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
@@ -49,12 +50,13 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
 
             // Modify host.json to set log level to Debug
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -62,7 +64,7 @@ namespace Func.E2ETests.func_start.Tests
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -82,12 +84,13 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
+            string testName = "Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue";
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
 
             // Modify host.json to set log level with filter
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -95,7 +98,7 @@ namespace Func.E2ETests.func_start.Tests
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue");
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
