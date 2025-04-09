@@ -8,7 +8,7 @@ namespace Func.TestFramework.Commands
         private string _funcPath;
         private string _testName;
 
-        public FuncStartCommand(string funcPath, ITestOutputHelper log, string testName = "") : base(log)
+        public FuncStartCommand(string funcPath, string testName, ITestOutputHelper log) : base(log)
         {
             _funcPath = funcPath;
             _testName = testName;

@@ -21,10 +21,22 @@ namespace Func.TestFramework.Helpers
                     .Execute(args);
 
 
-                   var fileWriter = funcInitCommand.FileWriter;
-
-                   LogLine(fileWriter, $"stdout: {funcInitResult.StdOut}", log);
-                   LogLine(fileWriter, $"stderr: {funcInitResult.StdErr}", log);
+                   if (!string.IsNullOrEmpty(funcInitCommand.LogFilePath))
+                   {
+                       using (var writer = new StreamWriter(funcInitCommand.LogFilePath, true))
+                       {
+                           try
+                           {
+                               LogLine(writer, $"stdout: {funcInitResult.StdOut}", log);
+                               LogLine(writer, $"stderr: {funcInitResult.StdErr}", log);
+                           }
+                           finally
+                           {
+                               writer.Close();
+                               writer.Dispose();
+                           }
+                       }
+                   }
 
 
                    return Task.FromResult(funcInitResult.ExitCode == 0);
@@ -43,8 +55,22 @@ namespace Func.TestFramework.Helpers
 
                    var fileWriter = funcNewCommand.FileWriter;
 
-                   LogLine(fileWriter, $"stdout: {funcNewResult.StdOut}", log);
-                   LogLine(fileWriter, $"stderr: {funcNewResult.StdErr}", log);
+                   if (!string.IsNullOrEmpty(funcNewCommand.LogFilePath))
+                   {
+                       using (var writer = new StreamWriter(funcNewCommand.LogFilePath, true))
+                       {
+                           try
+                           {
+                               LogLine(writer, $"stdout: {funcNewResult.StdOut}", log);
+                               LogLine(writer, $"stderr: {funcNewResult.StdErr}", log);
+                           }
+                           finally
+                           {
+                               writer.Close();
+                               writer.Dispose();
+                           }
+                       }
+                   }
 
                    return Task.FromResult(funcNewResult.ExitCode == 0);
                });

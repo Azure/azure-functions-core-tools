@@ -21,7 +21,10 @@ namespace Func.TestFramework.Commands
         public Action<string>? CommandOutputHandler { get; set; }
         public Func<Process, Task>? ProcessStartedHandler { get; set; }
 
-        public StreamWriter? FileWriter { get; set; } = null;
+        public StreamWriter? FileWriter { get; private set; } = null;
+
+        public string LogFilePath { get; private set; }
+
 
         protected FuncCommand(ITestOutputHelper log)
         {
@@ -110,14 +113,14 @@ namespace Func.TestFramework.Commands
 
             // Create a more unique filename to avoid conflicts
             string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
-            string logFilePath = Path.Combine(directoryToLogTo,
+            LogFilePath = Path.Combine(directoryToLogTo,
                 $"func_{spec.Arguments.First()}_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
 
             // Make sure we're only opening the file once
             try
             {
                 // Open with FileShare.Read to allow others to read but not write
-                var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                var fileStream = new FileStream(LogFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
                 FileWriter = new StreamWriter(fileStream)
                 {
                     AutoFlush = true
@@ -174,7 +177,7 @@ namespace Func.TestFramework.Commands
                 });
 
                 Log.WriteLine($"Executing '{display}':");
-                Log.WriteLine($"Output being captured to: {logFilePath}");
+                Log.WriteLine($"Output being captured to: {LogFilePath}");
 
                 var result = ((Command)command).Execute(ProcessStartedHandler, FileWriter);
 
