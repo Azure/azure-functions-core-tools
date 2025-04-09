@@ -58,7 +58,7 @@ namespace Func.E2ETests
             await RetryHelper.RetryAsync(
                () =>
                {
-                   var funcInitResult = new FuncInitCommand(FuncPath, Log)
+                   var funcInitResult = new FuncInitCommand(FuncPath, "placeholder", Log)
                     .WithWorkingDirectory(WorkingDirectory)
                     .Execute(args);
                    return Task.FromResult(funcInitResult.ExitCode == 0);
@@ -70,7 +70,7 @@ namespace Func.E2ETests
             await RetryHelper.RetryAsync(
                () =>
                {
-                   var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                   var funcNewResult = new FuncNewCommand(FuncPath, "plceholder", Log)
                     .WithWorkingDirectory(WorkingDirectory)
                     .Execute(args);
                    return Task.FromResult(funcNewResult.ExitCode == 0);
