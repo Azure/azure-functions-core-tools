@@ -177,17 +177,6 @@ namespace Func.E2ETests.Fixtures
 
             });
 
-            await RetryHelper.RetryAsync(() =>
-            {
-                // Add Http Trigger
-                var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                                    .WithWorkingDirectory(WorkingDirectory)
-                                    .Execute(new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
-
-                return Task.FromResult(funcNewResult.ExitCode == 0);
-
-            });
-
             string localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
 
             // Read the existing JSON file
