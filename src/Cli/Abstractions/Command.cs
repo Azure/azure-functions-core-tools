@@ -32,7 +32,7 @@ namespace Azure.Functions.Cli.Abstractions
         {
             return Execute(null, null);
         }
-        public CommandResult Execute(Func<Process, StreamWriter?, Task>? processStarted, StreamWriter? fileWriter)
+        public CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter)
         {
             Reporter.Verbose.WriteLine(string.Format(
                 "Running {0} {1}",
@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.Abstractions
                     {
                         try
                         {
-                            await processStarted(_process, fileWriter);
+                            await processStarted(_process);
                         }
                         catch (Exception ex)
                         {

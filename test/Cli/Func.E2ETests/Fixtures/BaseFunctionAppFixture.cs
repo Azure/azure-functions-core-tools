@@ -142,10 +142,8 @@ namespace Func.E2ETests.Fixtures
 
         public async Task InitializeAsync()
         {
-            await RetryHelper.RetryAsync(() =>
-            {
-                // Create the function
-                var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
+
+            var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
                 .Concat(TargetFramework != null
                     ? new[] { "--target-framework", TargetFramework }
                     : Array.Empty<string>())
@@ -154,29 +152,12 @@ namespace Func.E2ETests.Fixtures
                     : Array.Empty<string>())
                 .ToList();
 
-                var funcInitResult = new FuncInitCommand(FuncPath, Log)
-                                        .WithWorkingDirectory(WorkingDirectory)
-                                        .Execute(initArgs);
-                Log.WriteLine(funcInitResult.StdOut);
-                Log.WriteLine(funcInitResult.StdErr);
+            string nameOfFixture = WorkerRuntime + (TargetFramework ?? string.Empty) + (Version ?? string.Empty);
 
-                return Task.FromResult(funcInitResult.ExitCode == 0);
-            });
+            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
-            await RetryHelper.RetryAsync(() =>
-            {
-                // Add Http Trigger
-                var funcNewResult = new FuncNewCommand(FuncPath, Log)
-                                    .WithWorkingDirectory(WorkingDirectory)
-                                    .Execute(new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
-
-                Log.WriteLine(funcNewResult.StdOut);
-                Log.WriteLine(funcNewResult.StdErr);
-
-                return Task.FromResult(funcNewResult.ExitCode == 0);
-
-            });
-
+            // Enable worker indexing to maximize probability of function being found
             string localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
 
             // Read the existing JSON file

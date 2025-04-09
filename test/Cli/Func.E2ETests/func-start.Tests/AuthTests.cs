@@ -28,22 +28,20 @@ namespace Func.E2ETests.func_start.Tests
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Call func init and func new
-            await FuncInitWithRetryAsync(new[] { ".", "--worker-runtime", "dotnet-isolated" });
-            await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
-
             string methodName = "Start_DotnetIsolated_Test_EnableAuthFeature";
             string uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
+
+            // Call func init and func new
+            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, uniqueTestName, WorkingDirectory, Log, new[] { ".", "--worker-runtime", "dotnet-isolated" });
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, uniqueTestName, WorkingDirectory, Log, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
 
             string capturedContent = null;
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, methodName);
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                //fileWriter.WriteLine($"In process started handler: func.exe is {(ProcessHelper.IsFileLocked(FuncPath) ? "locked" : "not locked")}");
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger");
-                //await Task.Delay(5000);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger");
             };
 
             // Build command arguments based on enableAuth parameter

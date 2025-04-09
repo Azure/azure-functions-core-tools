@@ -34,9 +34,9 @@ namespace Func.E2ETests.func_start.Tests
 
             string? capturedOutput = null;
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "Function1?name=Test");
+                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Function1?name=Test");
             };
 
             var result = funcStartCommand
@@ -60,9 +60,9 @@ namespace Func.E2ETests.func_start.Tests
 
             string? capturedOutput = null;
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "Function2?name=Test");
+                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Function2?name=Test");
             };
 
             var result = funcStartCommand

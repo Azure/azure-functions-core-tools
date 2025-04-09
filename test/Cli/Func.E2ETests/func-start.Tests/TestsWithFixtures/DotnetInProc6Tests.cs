@@ -31,9 +31,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, _fixture.Log, "Start_InProc_Net6_SuccessfulFunctionExecution_WithSpecifyingRuntime");
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -58,9 +58,9 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand

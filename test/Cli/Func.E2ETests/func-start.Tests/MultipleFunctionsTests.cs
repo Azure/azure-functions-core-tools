@@ -25,11 +25,11 @@ namespace Func.E2ETests.func_start.Tests
             await FuncNewWithRetryAsync(new[] { ".", "--template", "Httptrigger", "--name", "http3" });
             // Call func start with specific functions
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_FunctionsStartArgument_OnlySelectedFunctionsRun");
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, funcStartCommand.FileWriter);
                     using (var client = new HttpClient())
                     {
                         // http1 should be available

@@ -54,11 +54,11 @@ namespace Func.E2ETests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port, fileWriter);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, funcStartCommand.FileWriter);
 
                     // Insert message into queue
                     await QueueStorageHelper.InsertIntoQueue("myqueue-items", "hello world");
@@ -173,9 +173,9 @@ namespace Func.E2ETests
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError");
             string capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
             };
 
             var result = funcStartCommand

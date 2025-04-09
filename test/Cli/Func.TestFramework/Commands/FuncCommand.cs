@@ -19,7 +19,9 @@ namespace Func.TestFramework.Commands
 
         //  These only work via Execute(), not when using GetProcessStartInfo()
         public Action<string>? CommandOutputHandler { get; set; }
-        public Func<Process, StreamWriter?, Task>? ProcessStartedHandler { get; set; }
+        public Func<Process, Task>? ProcessStartedHandler { get; set; }
+
+        public StreamWriter? FileWriter { get; set; } = null;
 
         protected FuncCommand(ITestOutputHelper log)
         {
@@ -112,33 +114,32 @@ namespace Func.TestFramework.Commands
                 $"func_{spec.Arguments.First()}_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
 
             // Make sure we're only opening the file once
-            StreamWriter fileWriter = null;
             try
             {
                 // Open with FileShare.Read to allow others to read but not write
                 var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
-                fileWriter = new StreamWriter(fileStream)
+                FileWriter = new StreamWriter(fileStream)
                 {
                     AutoFlush = true
                 };
 
                 // Write initial information
-                fileWriter.WriteLine($"=== Test started at {DateTime.Now} ===");
-                fileWriter.WriteLine($"Test Name: {spec.TestName}");
+                FileWriter.WriteLine($"=== Test started at {DateTime.Now} ===");
+                FileWriter.WriteLine($"Test Name: {spec.TestName}");
                 var display = $"func {string.Join(" ", spec.Arguments)}";
-                fileWriter.WriteLine($"Command: {display}");
-                fileWriter.WriteLine($"Working Directory: {spec.WorkingDirectory ?? "not specified"}");
-                fileWriter.WriteLine("====================================");
+                FileWriter.WriteLine($"Command: {display}");
+                FileWriter.WriteLine($"Working Directory: {spec.WorkingDirectory ?? "not specified"}");
+                FileWriter.WriteLine("====================================");
 
                 command.OnOutputLine(line =>
                 {
                     try
                     {
                         // Write to the file if it's still open
-                        if (fileWriter != null && fileWriter.BaseStream != null)
+                        if (FileWriter != null && FileWriter.BaseStream != null)
                         {
-                            fileWriter.WriteLine($"[STDOUT] {line}");
-                            fileWriter.Flush();
+                            FileWriter.WriteLine($"[STDOUT] {line}");
+                            FileWriter.Flush();
                         }
 
                         Log.WriteLine($"》   {line}");
@@ -155,10 +156,10 @@ namespace Func.TestFramework.Commands
                     try
                     {
                         // Write to the file if it's still open
-                        if (fileWriter != null && fileWriter.BaseStream != null)
+                        if (FileWriter != null && FileWriter.BaseStream != null)
                         {
-                            fileWriter.WriteLine($"[STDERR] {line}");
-                            fileWriter.Flush();
+                            FileWriter.WriteLine($"[STDERR] {line}");
+                            FileWriter.Flush();
                         }
 
                         if (!string.IsNullOrEmpty(line))
@@ -175,11 +176,11 @@ namespace Func.TestFramework.Commands
                 Log.WriteLine($"Executing '{display}':");
                 Log.WriteLine($"Output being captured to: {logFilePath}");
 
-                var result = ((Command)command).Execute(ProcessStartedHandler, fileWriter);
+                var result = ((Command)command).Execute(ProcessStartedHandler, FileWriter);
 
-                fileWriter.WriteLine("====================================");
-                fileWriter.WriteLine($"Command exited with code: {result.ExitCode}");
-                fileWriter.WriteLine($"=== Test ended at {DateTime.Now} ===");
+                FileWriter.WriteLine("====================================");
+                FileWriter.WriteLine($"Command exited with code: {result.ExitCode}");
+                FileWriter.WriteLine($"=== Test ended at {DateTime.Now} ===");
 
                 Log.WriteLine($"Command '{display}' exited with exit code {result.ExitCode}.");
 
@@ -188,12 +189,12 @@ namespace Func.TestFramework.Commands
             finally
             {
                 // Make sure to close and dispose the writer
-                if (fileWriter != null)
+                if (FileWriter != null)
                 {
                     try
                     {
-                        fileWriter.Close();
-                        fileWriter.Dispose();
+                        FileWriter.Close();
+                        FileWriter.Dispose();
                     }
                     catch (Exception ex)
                     {

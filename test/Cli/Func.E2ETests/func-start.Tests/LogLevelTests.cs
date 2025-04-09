@@ -34,9 +34,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -66,9 +66,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand

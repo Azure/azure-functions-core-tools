@@ -32,9 +32,9 @@ namespace Func.E2ETests.func_start.Tests
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_SuccessfulFunctionExecution");
             string? capturedContent = null;
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -64,9 +64,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
             };
 
             var result = funcStartCommand
@@ -97,9 +97,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, shouldDelayForLogs: true);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, shouldDelayForLogs: true);
             };
 
             var result = funcStartCommand

@@ -95,9 +95,9 @@ namespace Func.E2ETests.func_start.Tests
                 // Call func start
                 var funcStartCommand = new FuncStartCommand(FuncPath, Log, logFileName);
 
-                funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+                funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
-                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, "HttpTriggerFunc");
+                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTriggerFunc");
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString(), "--verbose" };
@@ -148,9 +148,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
             };
 
             var result = funcStartCommand
@@ -187,9 +187,9 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, Log, "Start_EmptyEnvVars_HandledAsExpected");
 
-            funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
+            funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
             };
 
             var result = funcStartCommand
