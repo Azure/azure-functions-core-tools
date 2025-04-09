@@ -99,7 +99,7 @@ namespace Func.E2ETests.func_start.Tests
 
             funcStartCommand.ProcessStartedHandler = async (process, fileWriter) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, fileWriter, shouldDelayForLogs: true);
             };
 
             var result = funcStartCommand

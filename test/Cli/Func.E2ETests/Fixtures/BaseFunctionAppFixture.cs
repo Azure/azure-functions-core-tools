@@ -4,9 +4,11 @@
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Moq;
+using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Xml;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -168,9 +170,39 @@ namespace Func.E2ETests.Fixtures
                                     .WithWorkingDirectory(WorkingDirectory)
                                     .Execute(new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
+                Log.WriteLine(funcNewResult.StdOut);
+                Log.WriteLine(funcNewResult.StdErr);
+
                 return Task.FromResult(funcNewResult.ExitCode == 0);
 
             });
+
+            await RetryHelper.RetryAsync(() =>
+            {
+                // Add Http Trigger
+                var funcNewResult = new FuncNewCommand(FuncPath, Log)
+                                    .WithWorkingDirectory(WorkingDirectory)
+                                    .Execute(new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
+
+                return Task.FromResult(funcNewResult.ExitCode == 0);
+
+            });
+
+            string localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
+
+            // Read the existing JSON file
+            string json = File.ReadAllText(localSettingsJson);
+
+            // Parse the JSON
+            JObject settings = JObject.Parse(json);
+
+            // Add the new setting
+            settings["AzureWebJobsFeatureFlags"] = "EnableWorkerIndexing";
+
+            // Write the updated content back to the file
+            File.WriteAllText(localSettingsJson, settings.ToString());
+
+            Log.WriteLine("Successfully updated local.settings.json");
 
         }
     }

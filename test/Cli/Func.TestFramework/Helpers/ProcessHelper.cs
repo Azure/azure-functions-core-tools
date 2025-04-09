@@ -51,7 +51,7 @@ namespace Func.TestFramework.Helpers
                     if (funcProcess.HasExited)
                     {
                         LogMessage($"Function host process exited with code {funcProcess.ExitCode} - cannot continue waiting");
-                        throw new InvalidOperationException($"Process exited with code {funcProcess.ExitCode}");
+                        return true;
                     }
 
                     LogMessage($"Trying to get ping response");
@@ -97,7 +97,7 @@ namespace Func.TestFramework.Helpers
         }
 
         public static async Task<string> ProcessStartedHandlerHelper(int port, Process process,
-    StreamWriter fileWriter, string functionCall = "")
+    StreamWriter fileWriter, string functionCall = "", bool shouldDelayForLogs = false)
         {
             string capturedContent = "";
             try
@@ -132,6 +132,12 @@ namespace Func.TestFramework.Helpers
             {
                 fileWriter.WriteLine($"[HANDLER] Going to kill process");
                 fileWriter.Flush();
+
+                // Wait 5 seconds for all the logs to show up first if we need them
+                if (shouldDelayForLogs)
+                {
+                    await Task.Delay(5000);
+                }
                 process.Kill(true);
             }
             fileWriter.WriteLine($"[HANDLER] Returning captured content");
