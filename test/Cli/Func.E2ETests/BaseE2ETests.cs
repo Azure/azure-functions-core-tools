@@ -53,28 +53,14 @@ namespace Func.E2ETests
             }
             return Task.CompletedTask;
         }
-        public async Task FuncInitWithRetryAsync(IEnumerable<string> args)
+        public async Task FuncInitWithRetryAsync(string testName, IEnumerable<string> args)
         {
-            await RetryHelper.RetryAsync(
-               () =>
-               {
-                   var funcInitResult = new FuncInitCommand(FuncPath, "placeholder", Log)
-                    .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(args);
-                   return Task.FromResult(funcInitResult.ExitCode == 0);
-               });
+            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
         }
 
-        public async Task FuncNewWithRetryAsync(IEnumerable<string> args)
+        public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args)
         {
-            await RetryHelper.RetryAsync(
-               () =>
-               {
-                   var funcNewResult = new FuncNewCommand(FuncPath, "plceholder", Log)
-                    .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(args);
-                   return Task.FromResult(funcNewResult.ExitCode == 0);
-               });
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
         }
     }
 }
