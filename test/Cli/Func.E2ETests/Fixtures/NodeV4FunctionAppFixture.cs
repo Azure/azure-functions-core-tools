@@ -7,7 +7,6 @@ namespace Func.E2ETests.Fixtures
     {
         public NodeV4FunctionAppFixture() : base("node")
         {
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node");
         }
     }
 }
