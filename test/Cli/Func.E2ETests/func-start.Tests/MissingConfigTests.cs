@@ -158,6 +158,7 @@ namespace Func.E2ETests.func_start.Tests
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
+                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                 .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate error message
@@ -198,9 +199,11 @@ namespace Func.E2ETests.func_start.Tests
 
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                         .Execute(new[] { "--port", port.ToString() });
 
             // Validate function works and doesn't show skipping message
+            result.Should().HaveStdOutContaining("Executed 'Functions.HttpTrigger' (Succeeded");
             result.Should().NotHaveStdOutContaining("Skipping 'emptySetting' from local settings as it's already defined in current environment variables.");
         }
     }
