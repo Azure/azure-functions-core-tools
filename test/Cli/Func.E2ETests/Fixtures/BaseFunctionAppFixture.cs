@@ -132,7 +132,6 @@ namespace Func.E2ETests.Fixtures
         {
             try
             {
-                Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
                 Directory.Delete(WorkingDirectory, true);
             }
             catch
@@ -156,10 +155,6 @@ namespace Func.E2ETests.Fixtures
             string nameOfFixture = WorkerRuntime + (TargetFramework ?? string.Empty) + (Version ?? string.Empty);
 
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
-            
-            // Set FUNCTIONS_WORKER_RUNTIME to ensure that correct function is created
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", WorkerRuntime);
-            
             await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
             // Enable worker indexing to maximize probability of function being found

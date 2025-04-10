@@ -37,6 +37,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             capturedContent.Should().Be("Hello, Test!");
@@ -65,6 +66,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                         .Execute(new[] { "--verbose", "--port", port.ToString(), "--runtime", "default" });
 
             capturedContent.Should().Be("Hello, Test!");
@@ -81,7 +83,6 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         {
             int port = ProcessHelper.GetAvailablePort();
             int debugPort = ProcessHelper.GetAvailablePort();
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node");
 
             // Call func start with inspect flag
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_WithInspect_DebuggerIsStarted", _fixture.Log);
@@ -93,6 +94,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                         .Execute(new[] { "--port", port.ToString(), "--verbose", "--language-worker", "--", $"\"--inspect={debugPort}\"" });
 
             // Validate debugger started
@@ -114,6 +116,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 // Call func start
                 var result = funcStartCommand
                             .WithWorkingDirectory(_fixture.WorkingDirectory)
+                            .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                             .Execute(new[] { "--port", port.ToString() });
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
@@ -143,6 +146,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
+                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                 .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
             // Validate failure message
@@ -160,6 +164,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
+                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                 .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
             // Validate failure message

@@ -38,6 +38,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
@@ -65,6 +66,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
@@ -82,6 +84,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Dotnet6_WithoutSpecifyingRuntime_ExpectedToFail", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
 
             // Validate failure message
@@ -97,6 +100,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Dotnet6_WithSpecifyingRuntime_ExpectedToFail", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "start", "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
             // Validate failure message
@@ -112,6 +116,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc8_SpecifiedRuntime_ForDotnet6InProc", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "start", "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
             // Validate failure message
@@ -127,6 +132,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet6InProc", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
 
             // Validate failure message
@@ -153,6 +159,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_InvalidHostJson_FailsWithExpectedError", _fixture.Log)
                         .WithWorkingDirectory(tempDir)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "--port", port.ToString() });
 
             // Validate error message
@@ -179,6 +186,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start
             var result = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_MissingHostJson_FailsWithExpectedError", _fixture.Log)
                         .WithWorkingDirectory(tempDir)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet")
                         .Execute(new[] { "--port", port.ToString() });
 
             // Validate error message

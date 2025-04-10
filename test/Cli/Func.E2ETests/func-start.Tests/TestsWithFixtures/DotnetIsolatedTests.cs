@@ -41,6 +41,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
@@ -68,6 +69,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
                         .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
@@ -96,6 +98,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
@@ -115,6 +118,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start with invalid runtime (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
             // Validate error message
@@ -130,6 +134,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
             // Call func start with invalid runtime (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc8_SpecifiedRuntime_ForDotnetIsolated", _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
             // Validate error message

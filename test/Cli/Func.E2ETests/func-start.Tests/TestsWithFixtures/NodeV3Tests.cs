@@ -34,6 +34,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             capturedContent.Should().Be("This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.");

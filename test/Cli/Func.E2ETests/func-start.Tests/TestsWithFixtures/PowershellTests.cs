@@ -31,7 +31,8 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
                 capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
             };
             var result = funcStartCommand
-            .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithWorkingDirectory(_fixture.WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "powershell")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
