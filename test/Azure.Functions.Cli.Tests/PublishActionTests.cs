@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.StacksApi;
 using Xunit;
 using static Azure.Functions.Cli.Actions.AzureActions.PublishFunctionAppAction;
 
@@ -185,6 +186,230 @@ namespace Azure.Functions.Cli.Tests
 
             var ex = Assert.Throws<CliException>(() => GlobalCoreToolsSettings.CurrentWorkerRuntime);
             Assert.Equal($"Worker runtime cannot be '{WorkerRuntime.None}'. Please set a valid runtime.", ex.Message);
+        }
+
+        private FunctionsStacks GetMockFunctionStacks()
+        {
+            return new FunctionsStacks
+            {
+                Languages = new List<Language>
+       {
+           new Language
+           {
+               Name = "python",
+               Properties = new Properties
+               {
+                   DisplayText = "Python",
+                   MajorVersions = new List<MajorVersion>
+                   {
+                       new MajorVersion
+                       {
+                           Value = "3",
+                           MinorVersions = new List<MinorVersion>
+                           {
+                               new MinorVersion
+                               {
+                                   Value = "3.8",
+                                   StackSettings = new StackSettings
+                                   {
+                                       LinuxRuntimeSettings = new LinuxRuntimeSettings
+                                       {
+                                           RuntimeVersion = "Python|3.8"
+                                       }
+                                   }
+                               },
+                               new MinorVersion
+                               {
+                                   Value = "3.12",
+                                   StackSettings = new StackSettings
+                                   {
+                                       LinuxRuntimeSettings = new LinuxRuntimeSettings
+                                       {
+                                           RuntimeVersion = "Python|3.12"
+                                       }
+                                   }
+                               }
+                           }
+                       }
+                   }
+               }
+           },
+           new Language
+           {
+               Name = "node",
+Properties = new Properties
+{
+   DisplayText = "Node.js",
+   MajorVersions = new List<MajorVersion>
+   {
+       new MajorVersion
+       {
+           Value = "14",
+           MinorVersions = new List<MinorVersion>
+           {
+               new MinorVersion
+               {
+                   Value = "14.17",
+                   StackSettings = new StackSettings
+                   {
+                       WindowsRuntimeSettings = new WindowsRuntimeSettings
+                       {
+                           RuntimeVersion = "Node|14.17"
+                       }
+                   }
+               },
+               new MinorVersion
+               {
+                   Value = "14.20 LTS", // Ensure an LTS version exists
+                   StackSettings = new StackSettings
+                   {
+                       WindowsRuntimeSettings = new WindowsRuntimeSettings
+                       {
+                           RuntimeVersion = "Node|14.20 LTS"
+                       }
+                   }
+               }
+           }
+       },
+       new MajorVersion
+       {
+           Value = "22",
+           MinorVersions = new List<MinorVersion>
+           {
+               new MinorVersion
+               {
+                   Value = "22.0",
+                   StackSettings = new StackSettings
+                   {
+                       WindowsRuntimeSettings = new WindowsRuntimeSettings
+                       {
+                           RuntimeVersion = "Node|22.0"
+                       }
+                   }
+               },
+               new MinorVersion
+               {
+                   Value = "22.0 LTS", // Ensure an LTS version exists
+                   StackSettings = new StackSettings
+                   {
+                       WindowsRuntimeSettings = new WindowsRuntimeSettings
+                       {
+                           RuntimeVersion = "Node|22.0 LTS"
+                       }
+                   }
+               }
+           }
+       }
+   }
+}
+           },
+           new Language
+{
+   Name = "powershell",
+   Properties = new Properties
+   {
+       DisplayText = "PowerShell",
+       MajorVersions = new List<MajorVersion>
+       {
+           new MajorVersion
+           {
+               Value = "7",
+               MinorVersions = new List<MinorVersion>
+               {
+                   new MinorVersion
+                   {
+                       Value = "7",
+                       StackSettings = new StackSettings
+                       {
+                           WindowsRuntimeSettings = new WindowsRuntimeSettings
+                           {
+                               RuntimeVersion = "PowerShell|7"
+                           }
+                       }
+                   },
+                   new MinorVersion
+                   {
+                       Value = "7.2 LTS",
+                       StackSettings = new StackSettings
+                       {
+                           WindowsRuntimeSettings = new WindowsRuntimeSettings
+                           {
+                               RuntimeVersion = "PowerShell|7.2 LTS"
+                           }
+                       }
+                   }
+               }
+           }
+       }
+   }
+}
+       }
+            };
+        }
+
+        [Theory]
+        [InlineData("node", "14", "22")] // Node.js 14 should return next supported 22
+        public void GetNextRuntimeNodeVersion_ShouldReturnCorrectVersion(string runtime, string currentVersion, string expectedNextVersion)
+        {
+            // Arrange
+            var stacks = GetMockFunctionStacks();
+            // Act
+            var (nextVersion, _) = stacks.GetNextRuntimeVersion(runtime, currentVersion, p => p.MajorVersions.Select(mv => mv.Value), isNumericVersion: true);
+            // Assert
+            Assert.Equal(expectedNextVersion, nextVersion);
+        }
+
+        [Theory]
+        [InlineData("python", "3.8", "3.12")] // Python 3.8 should return next supported 3.12
+        public void GetNextRuntimePythonVersion_ShouldReturnCorrectVersion(string runtime, string currentVersion, string expectedNextVersion)
+        {
+            // Arrange
+            var stacks = GetMockFunctionStacks();
+            // Act
+            var (nextVersion, _) = stacks.GetNextRuntimeVersion(runtime, currentVersion, p => p.MajorVersions.SelectMany(mv => mv.MinorVersions, (major, minor) => minor.Value));
+            // Assert
+            Assert.Equal(expectedNextVersion, nextVersion);
+        }
+
+        [Theory]
+        [InlineData("node", "14.17", true)]  // Test for a known valid version
+        [InlineData("node", "14.20 LTS", true)] // Test for an LTS version
+        public void GetRuntimeSettingsForNode_ShouldReturnValidSettings(string runtime, string version, bool expectedNotNull)
+        {
+            // Arrange
+            var stacks = GetMockFunctionStacks();
+            bool isLTS;
+            // Act
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.WindowsRuntimeSettings);
+            // Assert
+            Assert.Equal(expectedNotNull, settings != null);
+        }
+
+        [Theory]
+        [InlineData("python", "3.8", true)] // Python 3.8 should return runtime settings
+        public void GetRuntimeSettingsForPython_ShouldReturnValidSettings(string runtime, string version, bool expectedNotNull)
+        {
+            // Arrange
+            var stacks = GetMockFunctionStacks();
+            bool isLTS;
+            // Act
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.LinuxRuntimeSettings);
+            // Assert
+            Assert.Equal(expectedNotNull, settings != null);
+        }
+
+        [Theory]
+        [InlineData("powershell", "7", true)]  // PowerShell 7 should return runtime settings
+        [InlineData("powershell", "7.2 LTS", true)] // PowerShell 7.2 LTS should return runtime settings
+        public void GetRuntimeSettingsForPowerShell_ShouldReturnValidSettings(string runtime, string version, bool expectedNotNull)
+        {
+            // Arrange
+            var stacks = GetMockFunctionStacks();
+            bool isLTS;
+            // Act
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.WindowsRuntimeSettings);
+            // Assert
+            Assert.Equal(expectedNotNull, settings != null);
         }
 
         private class TestAzureHelperService : AzureHelperService

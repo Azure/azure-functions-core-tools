@@ -17,12 +17,21 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string GetEarlyEolUpdateMessageDotNet(string currentStackVersion, string nextStackVersion, DateTime eol, string link = "")
         {
-            return $"Upgrade your app to .NET {nextStackVersion} as .NET {currentStackVersion} will reach EOL on {FormatDate(eol)} and will no longer be supported. {link}";
+            return $"Upgrade to .NET {nextStackVersion} as .NET {currentStackVersion} will reach end-of-life on {FormatDate(eol)} and will no longer be supported. Learn more: {link}";
         }
 
         public static string GetAfterEolUpdateMessageDotNet(string currentStackVersion, string nextStackVersion, DateTime eol, string link = "")
         {
-            return $"Upgrade your app to .NET {nextStackVersion} as .NET {currentStackVersion} has reached EOL on {FormatDate(eol)} and is no longer supported. {link}";
+            return $"Upgrade to .NET {nextStackVersion} as .NET {currentStackVersion} has reached end-of-life on {FormatDate(eol)} and is no longer supported. Learn more: {link}";
+        }
+
+        public static string GetEarlyEolUpdateMessage(string displayName, string currentStackVersion, string nextStackVersion, DateTime eol, string link = "")
+        {
+            return $"Upgrade to {displayName} {nextStackVersion} as {displayName} {currentStackVersion} will reach end-of-life on {FormatDate(eol)}  and will no longer be supported. Learn more: {link}";
+        }
+        public static string GetAfterEolUpdateMessage(string displayName, string currentStackVersion, string nextStackVersion, DateTime eol, string link = "")
+        {
+            return $"Upgrade to {displayName} {nextStackVersion} as {displayName} {currentStackVersion} has reached end-of-life on {FormatDate(eol)} and is no longer supported. Learn more: {link}";
         }
 
         private static string FormatDate(DateTime dateTime)
