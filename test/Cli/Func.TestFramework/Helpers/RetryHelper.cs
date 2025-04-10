@@ -1,12 +1,13 @@
 ﻿
 using System.Diagnostics;
+using Xunit.Abstractions;
 
 
 namespace Func.TestFramework.Helpers
 {
     public static class RetryHelper
     {
-        public static async Task RetryAsync(Func<Task<bool>> condition, StreamWriter? fileWriter = null, int timeout = 180 * 1000, int pollingInterval = 2 * 1000, bool throwWhenDebugging = false, Func<string> userMessageCallback = null)
+        public static async Task RetryAsync(Func<Task<bool>> condition, StreamWriter? fileWriter = null, int timeout = 120 * 1000, int pollingInterval = 2 * 1000, bool throwWhenDebugging = false, Func<string> userMessageCallback = null, ITestOutputHelper logger = null)
         {
             DateTime start = DateTime.Now;
             int attempt = 1;
@@ -14,12 +15,13 @@ namespace Func.TestFramework.Helpers
             {
                 await Task.Delay(pollingInterval);
                 attempt += 1;
+                logger?.WriteLine($"Attempt: {attempt}");
+                Console.WriteLine($"Attempt: {attempt}");
                 fileWriter?.WriteLine($"Attempt: {attempt}");
                 fileWriter?.Flush();
 
                 bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
-                fileWriter?.WriteLine($"Should throw: {shouldThrow}");
-                fileWriter?.Flush();
+
                 if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)
                 {
                     fileWriter?.WriteLine($"Condition not reached within timeout");
@@ -31,8 +33,8 @@ namespace Func.TestFramework.Helpers
                     }
                     throw new ApplicationException(error);
                 }
-                fileWriter?.WriteLine($"Aight trying again");
-                fileWriter?.Flush();
+                logger?.WriteLine($"Trying again");
+                Console.WriteLine("Trying again");
             }
         }
 

@@ -40,7 +40,7 @@ namespace Func.TestFramework.Helpers
 
 
                    return Task.FromResult(funcInitResult.ExitCode == 0);
-               });
+               }, logger: log);
         }
 
         public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args)
@@ -53,27 +53,8 @@ namespace Func.TestFramework.Helpers
                     .WithWorkingDirectory(workingDirectory)
                     .Execute(args);
 
-                   var fileWriter = funcNewCommand.FileWriter;
-
-                   if (!string.IsNullOrEmpty(funcNewCommand.LogFilePath))
-                   {
-                       using (var writer = new StreamWriter(funcNewCommand.LogFilePath, true))
-                       {
-                           try
-                           {
-                               LogLine(writer, $"stdout: {funcNewResult.StdOut}", log);
-                               LogLine(writer, $"stderr: {funcNewResult.StdErr}", log);
-                           }
-                           finally
-                           {
-                               writer.Close();
-                               writer.Dispose();
-                           }
-                       }
-                   }
-
                    return Task.FromResult(funcNewResult.ExitCode == 0);
-               });
+               }, logger: log);
         }
 
         public static void LogLine(StreamWriter? fileWriter, string lineToWrite, ITestOutputHelper? log)
