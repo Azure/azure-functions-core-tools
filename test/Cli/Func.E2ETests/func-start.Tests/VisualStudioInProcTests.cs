@@ -13,11 +13,9 @@ namespace Func.E2ETests.func_start.Tests
         private readonly string _vsNet6ProjectPath;
         public VisualStudioInProcTests(ITestOutputHelper log) : base(log)
         {
-            // Don't use the auto-created temporary directory since we need specific VS project paths
-            DeleteWorkingDirectory = false;
             // Visual Studio test project paths - these should be configured in the test environment
-            _vsNet8ProjectPath = Environment.GetEnvironmentVariable("NET8*VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
-            _vsNet6ProjectPath = Environment.GetEnvironmentVariable("NET6*VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
+            _vsNet8ProjectPath = Environment.GetEnvironmentVariable("NET8_VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
+            _vsNet6ProjectPath = Environment.GetEnvironmentVariable("NET6_VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
         }
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]

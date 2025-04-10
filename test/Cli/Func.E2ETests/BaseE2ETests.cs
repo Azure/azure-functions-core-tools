@@ -13,7 +13,6 @@ namespace Func.E2ETests
         protected string FuncPath { get; set; }
 
         protected string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        protected bool DeleteWorkingDirectory { get; set; } = true;
 
         protected BaseE2ETest(ITestOutputHelper log)
         {
