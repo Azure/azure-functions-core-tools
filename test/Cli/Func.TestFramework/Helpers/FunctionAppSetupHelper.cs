@@ -43,16 +43,21 @@ namespace Func.TestFramework.Helpers
                }, logger: log);
         }
 
-        public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args)
+        public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string workerRuntime = null)
         {
             await RetryHelper.RetryAsync(
                () =>
                {
-                   var funcNewCommand = new FuncNewCommand(funcPath, testName, log);
-                   var funcNewResult = funcNewCommand
-                    .WithWorkingDirectory(workingDirectory)
-                    .Execute(args);
+                   var funcNewCommand = new FuncNewCommand(funcPath, testName, log)
+                       .WithWorkingDirectory(workingDirectory);
 
+                   // Only add environment variable if worker runtime is specified
+                   if (!string.IsNullOrEmpty(workerRuntime))
+                   {
+                       funcNewCommand = funcNewCommand.WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
+                   }
+
+                   var funcNewResult = funcNewCommand.Execute(args);
                    return Task.FromResult(funcNewResult.ExitCode == 0);
                }, logger: log);
         }

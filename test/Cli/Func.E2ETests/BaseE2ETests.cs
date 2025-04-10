@@ -57,7 +57,7 @@ namespace Func.E2ETests
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
         }
 
-        public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args)
+        public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args, string workerRuntime = null)
         {
             await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
         }

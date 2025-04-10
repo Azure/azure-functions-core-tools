@@ -23,7 +23,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }, "node");
 
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
@@ -39,6 +39,7 @@ namespace Func.E2ETests.func_start.Tests
             };
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                         .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate we see detailed worker logs
@@ -55,7 +56,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }, "node");
 
             // Modify host.json to set log level
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -70,6 +71,7 @@ namespace Func.E2ETests.func_start.Tests
             };
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
+                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                         .Execute(new[] { "--port", port.ToString() });
 
             // Validate minimal worker logs due to "None" log level
