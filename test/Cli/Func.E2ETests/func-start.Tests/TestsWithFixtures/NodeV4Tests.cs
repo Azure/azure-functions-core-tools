@@ -24,7 +24,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost()
         {
             int port = ProcessHelper.GetAvailablePort();
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node");
+
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost", _fixture.Log);
 
@@ -52,7 +52,7 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost()
         {
             int port = ProcessHelper.GetAvailablePort();
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node");
+
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost", _fixture.Log);
 
@@ -103,7 +103,6 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task Start_PortInUse_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node");
 
             // Start a listener on the port to simulate it being in use
             var tcpListener = new TcpListener(IPAddress.Any, port);
@@ -138,7 +137,6 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp()
         {
             int port = ProcessHelper.GetAvailablePort();
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node");
 
             // Call func start (expected to fail)
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp", _fixture.Log);
@@ -156,7 +154,6 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
         public async Task DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp()
         {
             int port = ProcessHelper.GetAvailablePort();
-            Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node");
 
             // Call func start (expected to fail)
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp", _fixture.Log);
