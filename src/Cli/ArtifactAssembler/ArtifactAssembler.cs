@@ -277,7 +277,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
             FileUtilities.CopyDirectory(inProcArtifactDirPath, createDirectory ? Path.Combine(consolidatedArtifactDirPath, Constants.InProc8DirectoryName) : consolidatedArtifactDirPath);
             Directory.Delete(inProcArtifactDirPath, true);
 
-            return (artifactDirName, consolidatedArtifactDirPath);
+            return await Task.FromResult((artifactDirName, consolidatedArtifactDirPath));
         }
 
         private async Task CreateCliCoreToolsAsync()
@@ -365,6 +365,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
 
             Console.WriteLine("Finished assembling CLI Core Tools artifacts");
             Console.WriteLine();
+            await Task.CompletedTask;
         }
 
         private (string artifactDirectory, string version) GetArtifactDirectoryAndVersionNumber(string extractedRootDirectory, string artifactName)
@@ -420,6 +421,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
                 FileUtilities.ExtractToDirectory(zipFile, destinationDir);
                 File.Delete(zipFile);
             }
+            await Task.CompletedTask;
         }
     }
 }

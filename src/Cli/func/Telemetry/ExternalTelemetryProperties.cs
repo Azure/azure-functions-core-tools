@@ -24,17 +24,14 @@ namespace Azure.Functions.Cli.Telemetry
         /// </summary>
         internal static string GetInstallationType()
         {
-            if (RuntimeEnvironment.OperatingSystemPlatform != Platform.Windows)
-            {
-                return "";
-            }
-
             const string Key = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
             const string ValueName = @"InstallationType";
 
             try
             {
-                return (string)Registry.GetValue(Key, ValueName, defaultValue: "");
+                return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) 
+                    ? Registry.GetValue(Key, ValueName, defaultValue: "") as string
+                    : "";
             }
             // Catch everything: this is for telemetry only.
             catch (Exception e)
