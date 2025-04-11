@@ -42,12 +42,13 @@ namespace Func.TestFramework.Helpers
             {
                 await Task.Delay(pollingInterval);
                 attempt += 1;
-                logger?.WriteLine($"Attempt: {attempt}");
+                logger?.WriteLine($"Attempt within retry: {attempt}");
 
                 bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
 
                 if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)
                 {
+                    logger?.WriteLine($"Throwing condition not reached within timeout");
                     string error = "Condition not reached within timeout.";
                     if (userMessageCallback != null)
                     {
