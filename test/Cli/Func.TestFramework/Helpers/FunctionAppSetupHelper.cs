@@ -21,24 +21,6 @@ namespace Func.TestFramework.Helpers
                     .Execute(args);
 
 
-                   if (!string.IsNullOrEmpty(funcInitCommand.LogFilePath))
-                   {
-                       using (var writer = new StreamWriter(funcInitCommand.LogFilePath, true))
-                       {
-                           try
-                           {
-                               LogLine(writer, $"stdout: {funcInitResult.StdOut}", log);
-                               LogLine(writer, $"stderr: {funcInitResult.StdErr}", log);
-                           }
-                           finally
-                           {
-                               writer.Close();
-                               writer.Dispose();
-                           }
-                       }
-                   }
-
-
                    return Task.FromResult(funcInitResult.ExitCode == 0);
                }, logger: log);
         }
@@ -48,16 +30,16 @@ namespace Func.TestFramework.Helpers
             await RetryHelper.RetryAsync(
                () =>
                {
-                   var funcNewCommand = new FuncNewCommand(funcPath, testName, log)
-                       .WithWorkingDirectory(workingDirectory);
+                   var funcNewCommand = new FuncNewCommand(funcPath, testName, log);
 
-                   // Only add environment variable if worker runtime is specified
                    if (!string.IsNullOrEmpty(workerRuntime))
                    {
-                       funcNewCommand = funcNewCommand.WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
+                      funcNewCommand = (FuncNewCommand) funcNewCommand.WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
                    }
-
-                   var funcNewResult = funcNewCommand.Execute(args);
+                   
+                   var funcNewResult = funcNewCommand
+                                        .WithWorkingDirectory(workingDirectory)
+                                        .Execute(args);
                    return Task.FromResult(funcNewResult.ExitCode == 0);
                }, logger: log);
         }

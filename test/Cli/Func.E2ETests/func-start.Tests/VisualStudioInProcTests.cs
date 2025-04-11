@@ -1,10 +1,14 @@
-﻿using FluentAssertions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using FluentAssertions;
 using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
+
 namespace Func.E2ETests.func_start.Tests
 {
     public class VisualStudioInProcTests : BaseE2ETest
@@ -19,7 +23,7 @@ namespace Func.E2ETests.func_start.Tests
         }
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
-        public async Task Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
+        public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
             string testName = "Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution";
@@ -40,7 +44,7 @@ namespace Func.E2ETests.func_start.Tests
         }
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
-        public async Task Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution()
+        public void Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
             string testName = "Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution";

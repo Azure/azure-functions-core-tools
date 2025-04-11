@@ -1,4 +1,7 @@
-﻿using FluentAssertions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using FluentAssertions;
 using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
@@ -143,7 +146,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", functionName, "--language", "node" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", functionName, "--language", "node" }, workerRuntime: "node");
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
@@ -178,7 +181,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
 
             // Add empty setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)

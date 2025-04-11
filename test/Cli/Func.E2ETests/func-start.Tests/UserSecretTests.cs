@@ -1,4 +1,7 @@
-﻿using FluentAssertions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using FluentAssertions;
 using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
@@ -7,7 +10,7 @@ using System.Diagnostics;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests
+namespace Func.E2ETests.func_start.Tests
 {
     public class UserSecretsTests : BaseE2ETest
     {

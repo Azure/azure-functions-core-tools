@@ -1,15 +1,12 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using Azure.Functions.Cli.StacksApi;
-using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Moq;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Xml;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -160,7 +157,7 @@ namespace Func.E2ETests.Fixtures
             var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }
                                 .Concat(!WorkerRuntime.Contains("dotnet") ? new[] { "--language", WorkerRuntime } : Array.Empty<string>())
                                 .ToArray();
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs);
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, WorkerRuntime);
 
             // Enable worker indexing to maximize probability of function being found
             string localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
@@ -176,9 +173,6 @@ namespace Func.E2ETests.Fixtures
 
             // Write the updated content back to the file
             File.WriteAllText(localSettingsJson, settings.ToString());
-
-            Log.WriteLine("Successfully updated local.settings.json");
-
         }
     }
 }

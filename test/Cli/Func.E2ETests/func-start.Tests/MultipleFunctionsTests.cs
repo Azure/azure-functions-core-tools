@@ -1,11 +1,14 @@
-﻿using FluentAssertions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using FluentAssertions;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using System.Net;
 using Xunit.Abstractions;
 using Xunit;
-using Grpc.Net.Client.Configuration;
+
 namespace Func.E2ETests.func_start.Tests
 {
     public class MultipleFunctionsTests : BaseE2ETest

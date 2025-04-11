@@ -1,4 +1,7 @@
-﻿using FluentAssertions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using FluentAssertions;
 using Func.E2ETests.Fixtures;
 using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
@@ -6,8 +9,6 @@ using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
-using Microsoft.VisualStudio.TestPlatform.Utilities;
-using System.Reflection;
 
 namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 {

@@ -1,10 +1,13 @@
-﻿using FluentAssertions;
-using Func.E2ETests.Traits;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using FluentAssertions;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
+
 namespace Func.E2ETests.func_start.Tests
 {
     public class LogLevelTests : BaseE2ETest
@@ -23,7 +26,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
 
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
@@ -56,7 +59,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
 
             // Modify host.json to set log level
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");

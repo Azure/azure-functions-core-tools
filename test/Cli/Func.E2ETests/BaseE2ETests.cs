@@ -1,11 +1,12 @@
-﻿
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
 using Func.TestFramework.Helpers;
-using Func.TestFramework.Commands;
 using System.Runtime.InteropServices;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests
+namespace Func.E2ETests.func_start.Tests
 {
     public abstract class BaseE2ETest : IAsyncLifetime
     {
@@ -59,7 +60,7 @@ namespace Func.E2ETests
 
         public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args, string workerRuntime = null)
         {
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args, workerRuntime);
         }
     }
 }
