@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using Azure.Functions.Cli.StacksApi;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Moq;
@@ -155,7 +156,11 @@ namespace Func.E2ETests.Fixtures
             string nameOfFixture = WorkerRuntime + (TargetFramework ?? string.Empty) + (Version ?? string.Empty);
 
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, new List<string> { "--template", "HttpTrigger", "--name", "HttpTrigger" });
+
+            var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }
+                                .Concat(!WorkerRuntime.Contains("dotnet") ? new[] { "--language", WorkerRuntime } : Array.Empty<string>())
+                                .ToArray();
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs);
 
             // Enable worker indexing to maximize probability of function being found
             string localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");

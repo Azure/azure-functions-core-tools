@@ -23,7 +23,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }, "node");
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" });
 
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
@@ -56,7 +56,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }, "node");
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" });
 
             // Modify host.json to set log level
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");

@@ -87,8 +87,11 @@ namespace Func.E2ETests.func_start.Tests
                 // Initialize function app using retry helper
                 await FuncInitWithRetryAsync(logFileName, new[] { ".", "--worker-runtime", language });
 
+                var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
+                                    .Concat(!language.Contains("dotnet") ? new[] { "--language", language } : Array.Empty<string>())
+                                    .ToArray();
                 // Add HTTP trigger using retry helper
-                await FuncNewWithRetryAsync(logFileName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerFunc" });
+                await FuncNewWithRetryAsync(logFileName, funcNewArgs);
 
                 // Delete local.settings.json
                 var localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
@@ -140,7 +143,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", functionName });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", functionName, "--language", "node" });
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
@@ -175,7 +178,7 @@ namespace Func.E2ETests.func_start.Tests
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node" });
 
             // Add empty setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
