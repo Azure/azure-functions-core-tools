@@ -12,8 +12,8 @@ namespace CoreToolsHost
             public nint size;
             public char* host_path;
             public char* dotnet_root;
-            
-             public hostfxr_initialize_parameters()
+
+            public hostfxr_initialize_parameters()
             {
                 size = sizeof(hostfxr_initialize_parameters);
                 host_path = null;
