@@ -1,4 +1,6 @@
-﻿
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
 using System.Diagnostics;
 using Xunit.Abstractions;
 
@@ -16,16 +18,11 @@ namespace Func.TestFramework.Helpers
                 await Task.Delay(pollingInterval);
                 attempt += 1;
                 logger?.WriteLine($"Attempt: {attempt}");
-                Console.WriteLine($"Attempt: {attempt}");
-                fileWriter?.WriteLine($"Attempt: {attempt}");
-                fileWriter?.Flush();
 
                 bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
 
                 if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)
                 {
-                    fileWriter?.WriteLine($"Condition not reached within timeout");
-                    fileWriter?.Flush();
                     string error = "Condition not reached within timeout.";
                     if (userMessageCallback != null)
                     {
@@ -34,7 +31,6 @@ namespace Func.TestFramework.Helpers
                     throw new ApplicationException(error);
                 }
                 logger?.WriteLine($"Trying again");
-                Console.WriteLine("Trying again");
             }
         }
 
@@ -47,16 +43,11 @@ namespace Func.TestFramework.Helpers
                 await Task.Delay(pollingInterval);
                 attempt += 1;
                 logger?.WriteLine($"Attempt: {attempt}");
-                Console.WriteLine($"Attempt: {attempt}");
-                fileWriter?.WriteLine($"Attempt: {attempt}");
-                fileWriter?.Flush();
 
                 bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
 
                 if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)
                 {
-                    fileWriter?.WriteLine($"Condition not reached within timeout");
-                    fileWriter?.Flush();
                     string error = "Condition not reached within timeout.";
                     if (userMessageCallback != null)
                     {
@@ -65,7 +56,6 @@ namespace Func.TestFramework.Helpers
                     throw new ApplicationException(error);
                 }
                 logger?.WriteLine($"Trying again");
-                Console.WriteLine("Trying again");
             }
         }
     }
