@@ -13,8 +13,8 @@ namespace Func.TestFramework.Helpers
         public static async Task FuncInitWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args)
         {
             int retryNumber = 1;
-            await RetryHelper.RetryAsync(
-               async () =>
+            await RetryHelper.Retry(
+               () =>
                {
                    try
                    {
@@ -40,8 +40,8 @@ namespace Func.TestFramework.Helpers
         public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string workerRuntime = null)
         {
             int retryNumber = 1;
-            await RetryHelper.RetryAsync(
-               async () =>
+            await RetryHelper.Retry(
+               () =>
                {
                    try
                    {
