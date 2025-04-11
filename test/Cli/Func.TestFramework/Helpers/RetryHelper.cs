@@ -38,17 +38,24 @@ namespace Func.TestFramework.Helpers
         {
             DateTime start = DateTime.Now;
             int attempt = 1;
-            while (!condition())
+
+            logger?.WriteLine($"About to evaluate condition for attempt {attempt}");
+            bool conditionResult = condition();
+            logger?.WriteLine($"Condition result for attempt {attempt}: {conditionResult}");
+
+            while (!conditionResult)
             {
                 await Task.Delay(pollingInterval);
                 attempt += 1;
                 logger?.WriteLine($"Attempt within retry: {attempt}");
 
                 bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
+                double elapsedMs = (DateTime.Now - start).TotalMilliseconds;
+                logger?.WriteLine($"Elapsed time: {elapsedMs}ms, timeout: {timeout}ms, shouldThrow: {shouldThrow}");
 
-                if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)
+                if (shouldThrow && elapsedMs > timeout)
                 {
-                    logger?.WriteLine($"Throwing condition not reached within timeout");
+                    logger?.WriteLine($"Throwing condition not reached within timeout. Current time is {DateTime.Now}");
                     string error = "Condition not reached within timeout.";
                     if (userMessageCallback != null)
                     {
@@ -56,7 +63,10 @@ namespace Func.TestFramework.Helpers
                     }
                     throw new ApplicationException(error);
                 }
-                logger?.WriteLine($"Trying again");
+
+                logger?.WriteLine($"Trying again, about to evaluate condition for attempt {attempt}");
+                conditionResult = condition();
+                logger?.WriteLine($"Condition result for attempt {attempt}: {conditionResult}");
             }
         }
     }
