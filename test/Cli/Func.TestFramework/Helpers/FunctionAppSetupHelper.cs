@@ -18,6 +18,11 @@ namespace Func.TestFramework.Helpers
                    {
                        log.WriteLine($"Actual retry number: {retryNumber}");
                        retryNumber += 1;
+                       if (retryNumber < 3)
+                       {
+                           log.WriteLine($"Retry should fail and should try again");
+                           return false;
+                       }
                        var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
                        var funcInitResult = funcInitCommand
                         .WithWorkingDirectory(workingDirectory)
