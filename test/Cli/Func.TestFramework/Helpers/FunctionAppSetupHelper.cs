@@ -13,7 +13,7 @@ namespace Func.TestFramework.Helpers
         public static async Task FuncInitWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args)
         {
             await RetryHelper.RetryAsync(
-               () =>
+               async () =>
                {
                    var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
                    var funcInitResult = funcInitCommand
@@ -21,14 +21,14 @@ namespace Func.TestFramework.Helpers
                     .Execute(args);
 
 
-                   return Task.FromResult(funcInitResult.ExitCode == 0);
+                   return funcInitResult.ExitCode == 0;
                }, logger: log);
         }
 
         public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string workerRuntime = null)
         {
             await RetryHelper.RetryAsync(
-               () =>
+               async () =>
                {
                    var funcNewCommand = new FuncNewCommand(funcPath, testName, log);
 
@@ -40,7 +40,7 @@ namespace Func.TestFramework.Helpers
                    var funcNewResult = funcNewCommand
                                         .WithWorkingDirectory(workingDirectory)
                                         .Execute(args);
-                   return Task.FromResult(funcNewResult.ExitCode == 0);
+                   return funcNewResult.ExitCode == 0;
                }, logger: log);
         }
 
