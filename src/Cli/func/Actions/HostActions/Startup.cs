@@ -157,7 +157,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
         }
 
-        public class MyHostedService : IHostedService
+        private class MyHostedService : IHostedService
         {
             private readonly IHostApplicationLifetime _appLifetime;
 
