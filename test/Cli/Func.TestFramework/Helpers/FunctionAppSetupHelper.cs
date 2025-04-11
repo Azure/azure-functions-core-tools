@@ -23,7 +23,7 @@ namespace Func.TestFramework.Helpers
                         .WithWorkingDirectory(workingDirectory)
                         .Execute(args);
 
-                       log.WriteLine($"Done executing");
+                       log.WriteLine($"Done executing. Value of funcInitResult.exitcode: {funcInitResult.ExitCode}");
 
                        return funcInitResult.ExitCode == 0;
                    }
@@ -56,7 +56,7 @@ namespace Func.TestFramework.Helpers
                                             .WithWorkingDirectory(workingDirectory)
                                             .Execute(args);
 
-                       log.WriteLine($"Done executing");
+                       log.WriteLine($"Done executing. Value of funcNewResult.exitcode: {funcNewResult.ExitCode}");
                        return funcNewResult.ExitCode == 0;
                    }
                    catch ( Exception ex )
