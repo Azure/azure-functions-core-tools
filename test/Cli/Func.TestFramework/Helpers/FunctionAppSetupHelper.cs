@@ -12,14 +12,18 @@ namespace Func.TestFramework.Helpers
     {
         public static async Task FuncInitWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args)
         {
+            int retryNumber = 1;
             await RetryHelper.RetryAsync(
                async () =>
                {
+                   log.WriteLine($"Actual retry number: {retryNumber}");
+                   retryNumber += 1;
                    var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
                    var funcInitResult = funcInitCommand
                     .WithWorkingDirectory(workingDirectory)
                     .Execute(args);
 
+                   log.WriteLine($"Done executing");
 
                    return funcInitResult.ExitCode == 0;
                }, logger: log);
@@ -27,9 +31,12 @@ namespace Func.TestFramework.Helpers
 
         public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string workerRuntime = null)
         {
+            int retryNumber = 1;
             await RetryHelper.RetryAsync(
                async () =>
                {
+                   log.WriteLine($"Actual retry number: {retryNumber}");
+                   retryNumber += 1;
                    var funcNewCommand = new FuncNewCommand(funcPath, testName, log);
 
                    if (!string.IsNullOrEmpty(workerRuntime))
@@ -40,6 +47,8 @@ namespace Func.TestFramework.Helpers
                    var funcNewResult = funcNewCommand
                                         .WithWorkingDirectory(workingDirectory)
                                         .Execute(args);
+
+                   log.WriteLine($"Done executing");
                    return funcNewResult.ExitCode == 0;
                }, logger: log);
         }
