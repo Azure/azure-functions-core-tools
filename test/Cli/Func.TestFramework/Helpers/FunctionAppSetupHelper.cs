@@ -16,16 +16,24 @@ namespace Func.TestFramework.Helpers
             await RetryHelper.RetryAsync(
                async () =>
                {
-                   log.WriteLine($"Actual retry number: {retryNumber}");
-                   retryNumber += 1;
-                   var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
-                   var funcInitResult = funcInitCommand
-                    .WithWorkingDirectory(workingDirectory)
-                    .Execute(args);
+                   try
+                   {
+                       log.WriteLine($"Actual retry number: {retryNumber}");
+                       retryNumber += 1;
+                       var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
+                       var funcInitResult = funcInitCommand
+                        .WithWorkingDirectory(workingDirectory)
+                        .Execute(args);
 
-                   log.WriteLine($"Done executing");
+                       log.WriteLine($"Done executing");
 
-                   return funcInitResult.ExitCode == 0;
+                       return funcInitResult.ExitCode == 0;
+                   }
+                   catch ( Exception ex )
+                   {
+                       log.WriteLine(ex.Message);
+                       return false;
+                   }
                }, logger: log);
         }
 
@@ -35,21 +43,29 @@ namespace Func.TestFramework.Helpers
             await RetryHelper.RetryAsync(
                async () =>
                {
-                   log.WriteLine($"Actual retry number: {retryNumber}");
-                   retryNumber += 1;
-                   var funcNewCommand = new FuncNewCommand(funcPath, testName, log);
-
-                   if (!string.IsNullOrEmpty(workerRuntime))
+                   try
                    {
-                      funcNewCommand = (FuncNewCommand) funcNewCommand.WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
-                   }
-                   
-                   var funcNewResult = funcNewCommand
-                                        .WithWorkingDirectory(workingDirectory)
-                                        .Execute(args);
+                       log.WriteLine($"Actual retry number: {retryNumber}");
+                       retryNumber += 1;
+                       var funcNewCommand = new FuncNewCommand(funcPath, testName, log);
 
-                   log.WriteLine($"Done executing");
-                   return funcNewResult.ExitCode == 0;
+                       if (!string.IsNullOrEmpty(workerRuntime))
+                       {
+                           funcNewCommand = (FuncNewCommand)funcNewCommand.WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
+                       }
+
+                       var funcNewResult = funcNewCommand
+                                            .WithWorkingDirectory(workingDirectory)
+                                            .Execute(args);
+
+                       log.WriteLine($"Done executing");
+                       return funcNewResult.ExitCode == 0;
+                   }
+                   catch ( Exception ex )
+                   {
+                       log.WriteLine(ex.Message);
+                       return false;
+                   }
                }, logger: log);
         }
 
