@@ -105,7 +105,7 @@ namespace Func.TestFramework.Commands
 
             Directory.SetCurrentDirectory(funcExeDirectory);
 
-            var directoryToLogTo = Environment.GetEnvironmentVariable("DIRECTORY_TO_LOG_TO");
+            var directoryToLogTo = Environment.GetEnvironmentVariable("DirectoryToLogTo");
             if (string.IsNullOrEmpty(directoryToLogTo))
             {
                 directoryToLogTo = Directory.GetCurrentDirectory();

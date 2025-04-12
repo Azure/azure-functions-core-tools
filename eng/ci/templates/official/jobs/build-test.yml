@@ -108,23 +108,22 @@ jobs:
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
-      DIRECTORY_TO_LOG_TO: $(Build.SourcesDirectory)
+      DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
 
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeededOrFailed()
     inputs:
       targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
-      artifactName: '*.trx'
+      artifactName: 'TestResults'
       artifactType: 'pipeline'
 
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeededOrFailed()
     inputs:
-      targetPath: '$(Build.SourcesDirectory)'
-      artifactName: '*.log'
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
+      artifactName: 'TestLogs'
       artifactType: 'pipeline'
-
 
   - template: ci/sign-files.yml@eng
     parameters:
@@ -156,18 +155,11 @@ jobs:
             }
         ]
 
-  - task: 1ES.PublishPipelineArtifact@1
-    condition: succeededOrFailed()
-    inputs:
-      targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
-      artifactName: '**/*.trx'
-      artifactType: 'pipeline'
-
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
-      testResultsFiles: '$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/TestResults/*.trx'
-      failTaskOnFailedTests: false
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true
     condition: succeededOrFailed()
 
   - template: ci/sign-files.yml@eng

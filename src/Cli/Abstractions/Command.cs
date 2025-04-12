@@ -3,8 +3,10 @@
 
 // Note that this file is copied from: https://github.com/dotnet/sdk
 // Once the dotnet cli utils package is in a published consumable state, we will migrate over to use that
-// Note that CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter) is different for how
-// the processStartedHandler is done.
+
+// Also note that CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter) is different for how
+// the processStartedHandler is implemented and called. This difference will have be accounted for when we migrate over to 
+// the dotnet cli utils package.
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -70,8 +72,9 @@ namespace Azure.Functions.Cli.Abstractions
                         }
                         catch (Exception ex)
                         {
-                            // Log the exception
-                            Console.WriteLine($"Error in process started handler: {ex}");
+                            Reporter.Verbose.WriteLine(string.Format(
+                                "Error in process started handler: ",
+                                ex.Message));
                         }
                     });
                 }
