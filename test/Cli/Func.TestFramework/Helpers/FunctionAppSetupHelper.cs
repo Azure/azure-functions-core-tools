@@ -18,11 +18,6 @@ namespace Func.TestFramework.Helpers
                    {
                        log.WriteLine($"Actual retry number: {retryNumber}");
                        retryNumber += 1;
-                       if (retryNumber < 3)
-                       {
-                           log.WriteLine($"Retry should fail and should try again");
-                           return false;
-                       }
                        var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
                        var funcInitResult = funcInitCommand
                         .WithWorkingDirectory(workingDirectory)
@@ -37,7 +32,7 @@ namespace Func.TestFramework.Helpers
                        log.WriteLine(ex.Message);
                        return false;
                    }
-               }, logger: log);
+               }, timeout: 300 * 10000, logger: log);
         }
 
         public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string workerRuntime = null)
@@ -69,7 +64,7 @@ namespace Func.TestFramework.Helpers
                        log.WriteLine(ex.Message);
                        return false;
                    }
-               }, logger: log);
+               }, timeout: 300 * 10000, logger: log);
         }
 
         public static void LogLine(StreamWriter? fileWriter, string lineToWrite, ITestOutputHelper? log)
