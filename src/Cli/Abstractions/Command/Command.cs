@@ -1,18 +1,19 @@
 ﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-// Note that this file is copied from: https://github.com/dotnet/sdk
+// Note that this file is copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/Command.cs
 // Once the dotnet cli utils package is in a published consumable state, we will migrate over to use that
 
 // Also note that CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter) is different for how
 // the processStartedHandler is implemented and called. This difference will have be accounted for when we migrate over to 
 // the dotnet cli utils package.
 
+using Azure.Functions.Cli.Abstractions.Extensions;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
-namespace Azure.Functions.Cli.Abstractions
+namespace Azure.Functions.Cli.Abstractions.Command
 {
     public class Command : ICommand
     {
@@ -101,7 +102,7 @@ namespace Azure.Functions.Cli.Abstractions
                 Debug.Assert(sw is not null);
                 var message = string.Format(
                     "{0} exited with {1} in {2} ms.",
-                    Command.FormatProcessInfo(_process.StartInfo),
+                    FormatProcessInfo(_process.StartInfo),
                     exitCode,
                     sw.ElapsedMilliseconds);
                 if (exitCode == 0)

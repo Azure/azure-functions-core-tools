@@ -1,16 +1,13 @@
 ﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-// Note that this file is copied from: https://github.com/dotnet/sdk
+// Note that this file is copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/StreamForwarder.csjkm;
 // Once the dotnet cli utils package is in a published consumable state, we will migrate over to use that
 
 using System.Text;
 
 namespace Azure.Functions.Cli.Abstractions
 {
-    // Licensed to the .NET Foundation under one or more agreements.
-    // The .NET Foundation licenses this file to you under the MIT license.
-
     public sealed class StreamForwarder
     {
         private static readonly char[] s_ignoreCharacters = new char[] { '\r' };
