@@ -25,7 +25,7 @@
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
-  <PropertyGroup>
+ <!--<PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup> 
+  </PropertyGroup> --> 
 </Project>

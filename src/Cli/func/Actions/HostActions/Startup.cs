@@ -16,7 +16,6 @@ using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.UserSecrets;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -108,7 +107,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
 
             services.AddSingleton<IDependencyValidator, ThrowingDependencyValidator>();
-            services.AddSingleton<IHostedService, MyHostedService>();
 
             return services.BuildServiceProvider();
         }
@@ -138,6 +136,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     }
                 });
             }
+
+             IApplicationLifetime applicationLifetime = app.ApplicationServices
+                .GetRequiredService<IApplicationLifetime>();
+
+            app.UseWebJobsScriptHost(applicationLifetime);
         }
 
         private class ThrowingDependencyValidator : DependencyValidator
@@ -154,32 +157,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     // in the host. This will stop invalid services in the CLI only.
                     throw new InvalidOperationException("Invalid host services.", ex);
                 }
-            }
-        }
-
-        private class MyHostedService : IHostedService
-        {
-            private readonly IHostApplicationLifetime _appLifetime;
-
-            public MyHostedService(IHostApplicationLifetime appLifetime)
-            {
-                _appLifetime = appLifetime;
-            }
-
-            public Task StartAsync(CancellationToken cancellationToken)
-            {
-                _appLifetime.ApplicationStarted.Register(() =>
-                {
-                    Console.WriteLine("Started");
-                });
-
-                return Task.CompletedTask;
-            }
-
-            public Task StopAsync(CancellationToken cancellationToken)
-            {
-                Console.WriteLine("Stopping");
-                return Task.CompletedTask;
             }
         }
     }
