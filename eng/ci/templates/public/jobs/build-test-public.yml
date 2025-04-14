@@ -14,7 +14,6 @@ jobs:
   steps:
   - pwsh: . "eng/scripts/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
-
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -47,7 +46,7 @@ jobs:
       eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
-
+    
   - pwsh: |
       eng/scripts/check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
@@ -59,7 +58,22 @@ jobs:
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
+      DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
+      artifactName: 'TestResults'
+      artifactType: 'pipeline'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
+      artifactName: 'TestLogs'
+      artifactType: 'pipeline'
 
   - task: PublishTestResults@2
     inputs:

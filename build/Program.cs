@@ -27,6 +27,8 @@ namespace Build
                 .Then(AddGoZip)
                 .Then(TestPreSignedArtifacts, skip: !args.Contains("--ci"))
                 .Then(CopyBinariesToSign, skip: !args.Contains("--ci"))
+                .Then(TestNewE2EProject)
+                .Then(TestNewE2EProjectDotnetInProc)
                 .Then(Test)
                 .Then(Zip)
                 .Then(DotnetPublishForNupkg)
