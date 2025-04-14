@@ -10,10 +10,7 @@
 
 using Azure.Functions.Cli.Abstractions.Extensions;
 using System.Diagnostics;
-<<<<<<< HEAD
 using System.Diagnostics.Metrics;
-=======
->>>>>>> 533e29a6 (Adding abstractions classes from dotnet/sdk)
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
@@ -33,21 +30,12 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
         public CommandResult Execute()
         {
-<<<<<<< HEAD
             return Execute(null, null);
         }
         public CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter)
         {
             Reporter.Verbose.WriteLine(string.Format(
                 "Running {0} {1}",
-=======
-            return Execute(null);
-        }
-        public CommandResult Execute(Action<Process>? processStarted)
-        {
-            Reporter.Verbose.WriteLine(string.Format(
-                LocalizableStrings.RunningFileNameArguments,
->>>>>>> 533e29a6 (Adding abstractions classes from dotnet/sdk)
                 _process.StartInfo.FileName,
                 _process.StartInfo.Arguments));
 
@@ -61,21 +49,14 @@ namespace Azure.Functions.Cli.Abstractions.Command
             if (CommandLoggingContext.IsVerbose)
             {
                 sw = Stopwatch.StartNew();
-<<<<<<< HEAD
                 Reporter.Verbose.WriteLine($"> {FormatProcessInfo(_process.StartInfo)}".White());
             }
 
             Task? processTask = null;
-=======
-
-                Reporter.Verbose.WriteLine($"> {Command.FormatProcessInfo(_process.StartInfo)}".White());
-            }
->>>>>>> 533e29a6 (Adding abstractions classes from dotnet/sdk)
 
             using (var reaper = new ProcessReaper(_process))
             {
                 _process.Start();
-<<<<<<< HEAD
                 if (processStarted != null)
                 {
                     processTask = Task.Run(async () =>
@@ -96,13 +77,6 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
                 Reporter.Verbose.WriteLine(string.Format(
                     "Process ID: {0}",
-=======
-                processStarted?.Invoke(_process);
-                reaper.NotifyProcessStarted();
-
-                Reporter.Verbose.WriteLine(string.Format(
-                    LocalizableStrings.ProcessId,
->>>>>>> 533e29a6 (Adding abstractions classes from dotnet/sdk)
                     _process.Id));
 
                 var taskOut = _stdOut?.BeginRead(_process.StandardOutput);
@@ -111,11 +85,8 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
                 taskOut?.Wait();
                 taskErr?.Wait();
-<<<<<<< HEAD
 
                 processTask?.Wait();
-=======
->>>>>>> 533e29a6 (Adding abstractions classes from dotnet/sdk)
             }
 
             var exitCode = _process.ExitCode;
@@ -124,13 +95,8 @@ namespace Azure.Functions.Cli.Abstractions.Command
             {
                 Debug.Assert(sw is not null);
                 var message = string.Format(
-<<<<<<< HEAD
                     "{0} exited with {1} in {2} ms.",
                     FormatProcessInfo(_process.StartInfo),
-=======
-                    LocalizableStrings.ProcessExitedWithCode,
-                    Command.FormatProcessInfo(_process.StartInfo),
->>>>>>> 533e29a6 (Adding abstractions classes from dotnet/sdk)
                     exitCode,
                     sw.ElapsedMilliseconds);
                 if (exitCode == 0)
@@ -272,17 +238,8 @@ namespace Azure.Functions.Cli.Abstractions.Command
         {
             if (_running)
             {
-<<<<<<< HEAD
                 throw new InvalidOperationException($"Unable to invoke {memberName} after the command has been run");
             }
-        }
-    }
-}
-=======
-                throw new InvalidOperationException(string.Format(
-                    LocalizableStrings.UnableToInvokeMemberNameAfterCommand,
-                    memberName));
             }
         }
     }
->>>>>>> 533e29a6 (Adding abstractions classes from dotnet/sdk)
