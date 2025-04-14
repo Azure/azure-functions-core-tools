@@ -15,9 +15,9 @@ using System.Windows.Input;
 
 namespace Azure.Functions.Cli.Abstractions.Command
 {
-    public class Command : ICommand
+    public class Command(Process? process, bool trimTrailingNewlines = false) : ICommand
     {
-        private readonly Process _process;
+        private readonly Process _process = process ?? throw new ArgumentNullException(nameof(process));
 
         private StreamForwarder? _stdOut;
 
@@ -25,22 +25,16 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
         private bool _running = false;
 
-        private bool _trimTrailingNewlines = false;
-
-        public Command(Process process, bool trimTrailingNewlines = false)
-        {
-            _trimTrailingNewlines = trimTrailingNewlines;
-            _process = process ?? throw new ArgumentNullException(nameof(process));
-        }
+        private bool _trimTrailingNewlines = trimTrailingNewlines;
 
         public CommandResult Execute()
         {
-            return Execute(null, null);
+            return Execute(null);
         }
-        public CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter)
+        public CommandResult Execute(Action<Process>? processStarted)
         {
             Reporter.Verbose.WriteLine(string.Format(
-                "Running {0} {1}",
+                LocalizableStrings.RunningFileNameArguments,
                 _process.StartInfo.FileName,
                 _process.StartInfo.Arguments));
 
@@ -50,39 +44,22 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
             _process.EnableRaisingEvents = true;
 
-            Stopwatch sw = null;
-
+            Stopwatch? sw = null;
             if (CommandLoggingContext.IsVerbose)
             {
                 sw = Stopwatch.StartNew();
-                Reporter.Verbose.WriteLine($"> {FormatProcessInfo(_process.StartInfo)}".White());
-            }
 
-            Task? processTask = null;
+                Reporter.Verbose.WriteLine($"> {Command.FormatProcessInfo(_process.StartInfo)}".White());
+            }
 
             using (var reaper = new ProcessReaper(_process))
             {
                 _process.Start();
-                if (processStarted != null)
-                {
-                    processTask = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await processStarted(_process);
-                        }
-                        catch (Exception ex)
-                        {
-                            Reporter.Verbose.WriteLine(string.Format(
-                                "Error in process started handler: ",
-                                ex.Message));
-                        }
-                    });
-                }
+                processStarted?.Invoke(_process);
                 reaper.NotifyProcessStarted();
 
                 Reporter.Verbose.WriteLine(string.Format(
-                    "Process ID: {0}",
+                    LocalizableStrings.ProcessId,
                     _process.Id));
 
                 var taskOut = _stdOut?.BeginRead(_process.StandardOutput);
@@ -91,8 +68,6 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
                 taskOut?.Wait();
                 taskErr?.Wait();
-
-                processTask?.Wait();
             }
 
             var exitCode = _process.ExitCode;
@@ -101,8 +76,8 @@ namespace Azure.Functions.Cli.Abstractions.Command
             {
                 Debug.Assert(sw is not null);
                 var message = string.Format(
-                    "{0} exited with {1} in {2} ms.",
-                    FormatProcessInfo(_process.StartInfo),
+                    LocalizableStrings.ProcessExitedWithCode,
+                    Command.FormatProcessInfo(_process.StartInfo),
                     exitCode,
                     sw.ElapsedMilliseconds);
                 if (exitCode == 0)
@@ -240,12 +215,13 @@ namespace Azure.Functions.Cli.Abstractions.Command
             _process.StartInfo.RedirectStandardError = true;
         }
 
-        private void ThrowIfRunning([CallerMemberName] string memberName = null)
+        private void ThrowIfRunning([CallerMemberName] string? memberName = null)
         {
             if (_running)
             {
-                throw new InvalidOperationException("");
+                throw new InvalidOperationException(string.Format(
+                    LocalizableStrings.UnableToInvokeMemberNameAfterCommand,
+                    memberName));
             }
         }
     }
-}
