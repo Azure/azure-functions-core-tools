@@ -204,31 +204,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 string workerRuntimeStr = Convert.ToString(workerRuntime);
                 string runtimeVersion = GetWorkerRuntimeVersion(workerRuntime, functionAppRoot);
+
                 if (!string.IsNullOrEmpty(runtimeVersion))
                 {
                     // Get runtime stacks
                     var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
                     DateTime currentDate = DateTime.Now;
-                    if (workerRuntime == WorkerRuntime.python)
+
+                    object runtimeSettings = (workerRuntime == WorkerRuntime.python) ? stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, s => s.LinuxRuntimeSettings) : stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, s => s.WindowsRuntimeSettings);
+
+                    DateTime? eolDate = runtimeSettings switch
                     {
-                        var linuxRuntimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isLinuxLTS, s => s.LinuxRuntimeSettings);
-                        DateTime eolDate = linuxRuntimeSettings.EndOfLifeDate.Value;
-                        DateTime warningThresholdDate = eolDate.AddMonths(-6);
+                        LinuxRuntimeSettings linux => linux.EndOfLifeDate,
+                        WindowsRuntimeSettings windows => windows.EndOfLifeDate,
+                        _ => null
+                    };
+
+                    if (eolDate.HasValue)
+                    {
+                        DateTime warningThresholdDate = eolDate.Value.AddMonths(-6);
                         if (currentDate > eolDate || currentDate >= warningThresholdDate)
                         {
                             //Show EOL warning message
-                            ShowEolMessageForOtherStack(stacks, linuxRuntimeSettings.EndOfLifeDate.Value, workerRuntimeStr, runtimeVersion);
-                        }
-                    }
-                    else
-                    {
-                        var runtimeSettings = stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, out bool isWindowsLTS, s => s.WindowsRuntimeSettings);
-                        DateTime eolDate = runtimeSettings.EndOfLifeDate.Value;
-                        DateTime warningThresholdDate = eolDate.AddMonths(-6);
-                        if (currentDate > eolDate || currentDate >= warningThresholdDate)
-                        {
-                            //Show EOL warning message
-                            ShowEolMessageForOtherStack(stacks, runtimeSettings.EndOfLifeDate.Value, workerRuntimeStr, runtimeVersion);
+                            ShowEolMessageForOtherStack(stacks, eolDate.Value, workerRuntimeStr, runtimeVersion);
                         }
                     }
                 }

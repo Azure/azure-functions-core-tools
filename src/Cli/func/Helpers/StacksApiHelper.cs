@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.Helpers
                 return date < DateTime.Now.AddMonths(6); 
         }
 
-        public static T GetOtherRuntimeSettings<T>(this FunctionsStacks stacks, string workerRuntime, string runtimeVersion, out bool isLTS, Func<StackSettings, T> settingsSelector)
+        public static T GetOtherRuntimeSettings<T>(this FunctionsStacks stacks, string workerRuntime, string runtimeVersion, Func<StackSettings, T> settingsSelector)
         {
             if (WorkerRuntime.java.ToString() == workerRuntime)
             {
@@ -78,8 +78,6 @@ namespace Azure.Functions.Cli.Helpers
             var minorVersion = majorVersion?.MinorVersions?
                .FirstOrDefault(mv => runtimeVersion.StartsWith(mv.Value, StringComparison.InvariantCultureIgnoreCase))
                ?? majorVersion?.MinorVersions?.LastOrDefault();
-
-            isLTS = minorVersion?.Value?.Contains("LTS") == true;
 
             return settingsSelector(minorVersion?.StackSettings);
         }

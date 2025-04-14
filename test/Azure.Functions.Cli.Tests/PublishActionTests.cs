@@ -172,8 +172,8 @@ namespace Azure.Functions.Cli.Tests
                 Assert.StartsWith($"Worker runtime cannot be null or empty.", exception.Message);
                 Assert.Equal("workerRuntime", exception.ParamName);
             }
-            else 
-            { 
+            else
+            {
                 var exception = Assert.Throws<ArgumentException>(() => WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(inputString));
                 Assert.Equal($"Worker runtime '{inputString}' is not a valid option. Options are {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}", exception.Message);
             }
@@ -378,9 +378,8 @@ Properties = new Properties
         {
             // Arrange
             var stacks = GetMockFunctionStacks();
-            bool isLTS;
             // Act
-            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.WindowsRuntimeSettings);
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, s => s.WindowsRuntimeSettings);
             // Assert
             Assert.Equal(expectedNotNull, settings != null);
         }
@@ -391,9 +390,8 @@ Properties = new Properties
         {
             // Arrange
             var stacks = GetMockFunctionStacks();
-            bool isLTS;
             // Act
-            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.LinuxRuntimeSettings);
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, s => s.LinuxRuntimeSettings);
             // Assert
             Assert.Equal(expectedNotNull, settings != null);
         }
@@ -405,9 +403,8 @@ Properties = new Properties
         {
             // Arrange
             var stacks = GetMockFunctionStacks();
-            bool isLTS;
             // Act
-            var settings = stacks.GetOtherRuntimeSettings(runtime, version, out isLTS, s => s.WindowsRuntimeSettings);
+            var settings = stacks.GetOtherRuntimeSettings(runtime, version, s => s.WindowsRuntimeSettings);
             // Assert
             Assert.Equal(expectedNotNull, settings != null);
         }
@@ -426,6 +423,50 @@ Properties = new Properties
                 UpdatedSettings = updatedSettings;
                 return Task.FromResult(new HttpResult<string, string>(string.Empty));
             }
+        }
+
+        [Theory]
+        [InlineData("node", "22", "22")] // Node.js 22 is highest → should return itself
+        [InlineData("python", "3.12", "3.12")] // Python 3.12 is highest → should return itself
+        public void GetNextRuntimeVersion_ShouldReturnCurrentIfNoNewerExists(string runtime, string currentVersion, string expectedVersion)
+        {
+            // Arrange
+            var stacks = GetMockFunctionStacks();
+            var selector = runtime == "node"
+                ? (Func<Properties, IEnumerable<string>>)(p => p.MajorVersions.Select(mv => mv.Value))
+                : p => p.MajorVersions.SelectMany(mv => mv.MinorVersions.Select(minor => minor.Value));
+            bool isNumeric = runtime == "node";
+            // Act
+            var (nextVersion, _) = stacks.GetNextRuntimeVersion(runtime, currentVersion, selector, isNumeric);
+            // Assert
+            Assert.Equal(expectedVersion, nextVersion);
+        }
+
+        [Fact]
+        public void GetNextRuntimeVersion_ShouldReturnNull_WhenNoVersionsAvailable()
+        {
+            // Arrange
+            var stacks = new FunctionsStacks
+            {
+                Languages = new List<Language>
+                {
+                    new Language
+                    {
+                        Name = "java",
+                        Properties = new Properties
+                        {
+                            DisplayText = "Java",
+                            MajorVersions = new List<MajorVersion>() // No versions
+                        }
+                    }
+                }
+            };
+            // Act
+            var (nextVersion, displayName) = stacks.GetNextRuntimeVersion(
+                "java", "11", p => p.MajorVersions.Select(mv => mv.Value), isNumericVersion: true);
+            // Assert
+            Assert.Null(nextVersion);
+            Assert.Equal("Java", displayName);
         }
     }
 }
