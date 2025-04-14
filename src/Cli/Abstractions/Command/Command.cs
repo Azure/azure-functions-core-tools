@@ -10,6 +10,7 @@
 
 using Azure.Functions.Cli.Abstractions.Extensions;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
@@ -29,12 +30,12 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
         public CommandResult Execute()
         {
-            return Execute(null);
+            return Execute(null, null);
         }
-        public CommandResult Execute(Action<Process>? processStarted)
+        public CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter)
         {
             Reporter.Verbose.WriteLine(string.Format(
-                LocalizableStrings.RunningFileNameArguments,
+                "Running {0} {1}",
                 _process.StartInfo.FileName,
                 _process.StartInfo.Arguments));
 
@@ -48,18 +49,34 @@ namespace Azure.Functions.Cli.Abstractions.Command
             if (CommandLoggingContext.IsVerbose)
             {
                 sw = Stopwatch.StartNew();
-
-                Reporter.Verbose.WriteLine($"> {Command.FormatProcessInfo(_process.StartInfo)}".White());
+                Reporter.Verbose.WriteLine($"> {FormatProcessInfo(_process.StartInfo)}".White());
             }
+
+            Task? processTask = null;
 
             using (var reaper = new ProcessReaper(_process))
             {
                 _process.Start();
-                processStarted?.Invoke(_process);
+                if (processStarted != null)
+                {
+                    processTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await processStarted(_process);
+                        }
+                        catch (Exception ex)
+                        {
+                            Reporter.Verbose.WriteLine(string.Format(
+                                "Error in process started handler: ",
+                                ex.Message));
+                        }
+                    });
+                }
                 reaper.NotifyProcessStarted();
 
                 Reporter.Verbose.WriteLine(string.Format(
-                    LocalizableStrings.ProcessId,
+                    "Process ID: {0}",
                     _process.Id));
 
                 var taskOut = _stdOut?.BeginRead(_process.StandardOutput);
@@ -68,6 +85,8 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
                 taskOut?.Wait();
                 taskErr?.Wait();
+
+                processTask?.Wait();
             }
 
             var exitCode = _process.ExitCode;
@@ -76,8 +95,8 @@ namespace Azure.Functions.Cli.Abstractions.Command
             {
                 Debug.Assert(sw is not null);
                 var message = string.Format(
-                    LocalizableStrings.ProcessExitedWithCode,
-                    Command.FormatProcessInfo(_process.StartInfo),
+                    "{0} exited with {1} in {2} ms.",
+                    FormatProcessInfo(_process.StartInfo),
                     exitCode,
                     sw.ElapsedMilliseconds);
                 if (exitCode == 0)
@@ -219,9 +238,8 @@ namespace Azure.Functions.Cli.Abstractions.Command
         {
             if (_running)
             {
-                throw new InvalidOperationException(string.Format(
-                    LocalizableStrings.UnableToInvokeMemberNameAfterCommand,
-                    memberName));
+                throw new InvalidOperationException($"Unable to invoke {memberName} after the command has been run");
             }
         }
     }
+}
