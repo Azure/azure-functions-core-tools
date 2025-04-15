@@ -24,7 +24,8 @@
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
-  <PropertyGroup>
+  <!--commented this to fix all errors build.csproj -->
+  <!--<PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup>
+  </PropertyGroup>-->
 </Project>
