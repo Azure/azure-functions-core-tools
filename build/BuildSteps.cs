@@ -329,10 +329,10 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --filter \"FullyQualifiedName~Azure.Functions.Cli.Tests.E2E.StartTests\" --logger trx");
+            Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx");
         }
 
-        public static void TestNewProject()
+        public static void TestNewE2EProject()
         {
             var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
@@ -350,7 +350,7 @@ namespace Build
             Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 --blame-hang-timeout 10m --logger \"console;verbosity=detailed\"");
         }
 
-        public static void TestNewProjectDotnetInProc()
+        public static void TestNewE2EProjectDotnetInProc()
         {
             var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
