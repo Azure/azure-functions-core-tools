@@ -1,12 +1,12 @@
-﻿using FluentAssertions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using FluentAssertions;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using System.Net;
 using Xunit.Abstractions;
 using Xunit;
-using Grpc.Net.Client.Configuration;
-using System.Diagnostics;
 
 namespace Func.E2ETests.func_start.Tests
 {
@@ -32,8 +32,8 @@ namespace Func.E2ETests.func_start.Tests
             string uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
             // Call func init and func new
-            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, uniqueTestName, WorkingDirectory, Log, new[] { ".", "--worker-runtime", "dotnet-isolated" });
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, uniqueTestName, WorkingDirectory, Log, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
+            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
+            await FuncNewWithRetryAsync(uniqueTestName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
 
             string capturedContent = null;
 
