@@ -1,16 +1,12 @@
-﻿using System;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using System.Text.Json;
-using Xunit.Abstractions;
-using FluentAssertions;
-using Azure.Functions.Cli.Abstractions;
-using Func.TestFramework.Commands;
 
 namespace Func.TestFramework.Helpers
 {

@@ -1,9 +1,7 @@
-﻿using Func.TestFramework.Commands;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using Func.TestFramework.Commands;
 using Xunit.Abstractions;
 
 namespace Func.TestFramework.Helpers
@@ -12,54 +10,61 @@ namespace Func.TestFramework.Helpers
     {
         public static async Task FuncInitWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args)
         {
-            await RetryHelper.RetryAsync(
+            int retryNumber = 1;
+            await RetryHelper.Retry(
                () =>
                {
-                   var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
-                   var funcInitResult = funcInitCommand
-                    .WithWorkingDirectory(workingDirectory)
-                    .Execute(args);
-
-
-                   if (!string.IsNullOrEmpty(funcInitCommand.LogFilePath))
+                   try
                    {
-                       using (var writer = new StreamWriter(funcInitCommand.LogFilePath, true))
-                       {
-                           try
-                           {
-                               LogLine(writer, $"stdout: {funcInitResult.StdOut}", log);
-                               LogLine(writer, $"stderr: {funcInitResult.StdErr}", log);
-                           }
-                           finally
-                           {
-                               writer.Close();
-                               writer.Dispose();
-                           }
-                       }
+                       log.WriteLine($"Actual retry number: {retryNumber}");
+                       retryNumber += 1;
+                       var funcInitCommand = new FuncInitCommand(funcPath, testName, log);
+                       var funcInitResult = funcInitCommand
+                        .WithWorkingDirectory(workingDirectory)
+                        .Execute(args);
+
+                       log.WriteLine($"Done executing. Value of funcInitResult.exitcode: {funcInitResult.ExitCode}");
+
+                       return funcInitResult.ExitCode == 0;
                    }
-
-
-                   return Task.FromResult(funcInitResult.ExitCode == 0);
-               }, logger: log);
+                   catch ( Exception ex )
+                   {
+                       log.WriteLine(ex.Message);
+                       return false;
+                   }
+               }, timeout: 300 * 10000, logger: log);
         }
 
         public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string workerRuntime = null)
         {
-            await RetryHelper.RetryAsync(
+            int retryNumber = 1;
+            await RetryHelper.Retry(
                () =>
                {
-                   var funcNewCommand = new FuncNewCommand(funcPath, testName, log)
-                       .WithWorkingDirectory(workingDirectory);
-
-                   // Only add environment variable if worker runtime is specified
-                   if (!string.IsNullOrEmpty(workerRuntime))
+                   try
                    {
-                       funcNewCommand = funcNewCommand.WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
-                   }
+                       log.WriteLine($"Actual retry number: {retryNumber}");
+                       retryNumber += 1;
+                       var funcNewCommand = new FuncNewCommand(funcPath, testName, log);
 
-                   var funcNewResult = funcNewCommand.Execute(args);
-                   return Task.FromResult(funcNewResult.ExitCode == 0);
-               }, logger: log);
+                       if (!string.IsNullOrEmpty(workerRuntime))
+                       {
+                           funcNewCommand = (FuncNewCommand)funcNewCommand.WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
+                       }
+
+                       var funcNewResult = funcNewCommand
+                                            .WithWorkingDirectory(workingDirectory)
+                                            .Execute(args);
+
+                       log.WriteLine($"Done executing. Value of funcNewResult.exitcode: {funcNewResult.ExitCode}");
+                       return funcNewResult.ExitCode == 0;
+                   }
+                   catch ( Exception ex )
+                   {
+                       log.WriteLine(ex.Message);
+                       return false;
+                   }
+               }, timeout: 300 * 10000, logger: log);
         }
 
         public static void LogLine(StreamWriter? fileWriter, string lineToWrite, ITestOutputHelper? log)

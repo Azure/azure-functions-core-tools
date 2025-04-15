@@ -1,4 +1,6 @@
-﻿
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
 using System.Diagnostics;
 using Xunit.Abstractions;
 
@@ -16,16 +18,11 @@ namespace Func.TestFramework.Helpers
                 await Task.Delay(pollingInterval);
                 attempt += 1;
                 logger?.WriteLine($"Attempt: {attempt}");
-                Console.WriteLine($"Attempt: {attempt}");
-                fileWriter?.WriteLine($"Attempt: {attempt}");
-                fileWriter?.Flush();
 
                 bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
 
                 if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)
                 {
-                    fileWriter?.WriteLine($"Condition not reached within timeout");
-                    fileWriter?.Flush();
                     string error = "Condition not reached within timeout.";
                     if (userMessageCallback != null)
                     {
@@ -34,113 +31,43 @@ namespace Func.TestFramework.Helpers
                     throw new ApplicationException(error);
                 }
                 logger?.WriteLine($"Trying again");
-                Console.WriteLine("Trying again");
             }
         }
 
-        public static async Task RetryUntilTimeoutAsync(Func<Task<bool>> operation, StreamWriter fileWriter, int pollingInterval = 2000)
+        public static async Task Retry(Func<bool> condition, StreamWriter? fileWriter = null, int timeout = 120 * 1000, int pollingInterval = 2 * 1000, bool throwWhenDebugging = false, Func<string> userMessageCallback = null, ITestOutputHelper logger = null)
         {
-            DateTime startTime = DateTime.Now;
-            int attemptCount = 0;
+            DateTime start = DateTime.Now;
+            int attempt = 1;
 
-            // Define timeout as 2 minutes (120 seconds)
-            TimeSpan timeout = TimeSpan.FromMinutes(2);
+            logger?.WriteLine($"About to evaluate condition for attempt {attempt}");
+            bool conditionResult = condition();
+            logger?.WriteLine($"Condition result for attempt {attempt}: {conditionResult}");
 
-            while (true)
+            while (!conditionResult)
             {
-                attemptCount++;
+                await Task.Delay(pollingInterval);
+                attempt += 1;
+                logger?.WriteLine($"Attempt within retry: {attempt}");
 
-                try
+                bool shouldThrow = !Debugger.IsAttached || (Debugger.IsAttached && throwWhenDebugging);
+                double elapsedMs = (DateTime.Now - start).TotalMilliseconds;
+                logger?.WriteLine($"Elapsed time: {elapsedMs}ms, timeout: {timeout}ms, shouldThrow: {shouldThrow}");
+
+                if (shouldThrow && elapsedMs > timeout)
                 {
-                    fileWriter.WriteLine($"Attempt {attemptCount}");
-                    fileWriter.Flush();
-                    // Try the operation
-                    if (await operation())
+                    logger?.WriteLine($"Throwing condition not reached within timeout. Current time is {DateTime.Now}");
+                    string error = "Condition not reached within timeout.";
+                    if (userMessageCallback != null)
                     {
-                        fileWriter.WriteLine("actually succeeded!");
-                        fileWriter.Flush();
-                        // Success! We're done
-                        return;
+                        error += " " + userMessageCallback();
                     }
-
-                    fileWriter.WriteLine($"Retry until timeout return false");
-                    fileWriter.Flush();
-                }
-                catch (Exception ex)
-                {
-                    // Log the exception but continue retrying
-                    fileWriter.WriteLine($"Attempt {attemptCount} failed with error: {ex.Message}");
-                    fileWriter.Flush();
+                    throw new ApplicationException(error);
                 }
 
-                // Check if we've timed out
-                TimeSpan elapsed = DateTime.Now - startTime;
-                if (elapsed >= timeout)
-                {
-                    fileWriter.WriteLine($"Operation timed out after {elapsed.TotalSeconds:F1} seconds and {attemptCount} attempts");
-                    fileWriter.Flush();
-                    throw new TimeoutException(
-                        $"Operation timed out after {elapsed.TotalSeconds:F1} seconds and {attemptCount} attempts");
-                }
-
-                fileWriter.WriteLine($"Gonna hit polling interval");
-                fileWriter.Flush();
-
-                // Wait before the next attempt
-                //await Task.Delay(pollingInterval);
-
-                fileWriter.WriteLine($"Done with polling interval");
-                fileWriter.Flush();
+                logger?.WriteLine($"Trying again, about to evaluate condition for attempt {attempt}");
+                conditionResult = condition();
+                logger?.WriteLine($"Condition result for attempt {attempt}: {conditionResult}");
             }
         }
-
-        public static IEnumerable<TimeSpan> TestingIntervals
-        {
-            get
-            {
-                while (true)
-                {
-                    yield return TimeSpan.FromSeconds(0);
-                }
-            }
-        }
-
-        public static async Task ExecuteAsyncWithRetry(Func<Task<bool>> action,
-            Func<bool, bool> shouldStopRetry,
-            int maxRetryCount,
-            Func<IEnumerable<Task>> timer,
-            StreamWriter fileWriter,
-            string taskDescription = "")
-        {
-            var count = 0;
-            foreach (var t in timer())
-            {
-                fileWriter.WriteLine($"Starting timer");
-                fileWriter.Flush();
-                await t;
-                count++;
-
-                fileWriter.WriteLine($"Value of count: {count}");
-                fileWriter.Flush();
-
-                bool result = await action();
-
-                if (shouldStopRetry(result))
-                {
-                    fileWriter.WriteLine($"Success! Returning");
-                    fileWriter.Flush();
-                    return;
-                }
-                fileWriter.WriteLine($"Failed; trying again");
-                fileWriter.Flush();
-
-                if (count == maxRetryCount)
-                {
-                    throw new TimeoutException("Reached max retry count");
-                }
-            }
-            throw new Exception("Timer should not be exhausted");
-        }
-
     }
 }
