@@ -92,10 +92,12 @@ namespace Azure.Functions.Cli.Telemetry
             {
                 var persistenceChannel = new PersistenceChannel.PersistenceChannel(sendersCount: _senderCount);
                 persistenceChannel.SendingInterval = TimeSpan.FromMilliseconds(1);
-                TelemetryConfiguration.Active.TelemetryChannel = persistenceChannel;
-
-                _client = new TelemetryClient();
-                _client.InstrumentationKey = Constants.TelemetryInstrumentationKey;
+                var telemetryConfiguration = new TelemetryConfiguration
+                {
+                    TelemetryChannel = persistenceChannel,
+                    ConnectionString = $"InstrumentationKey={Constants.TelemetryInstrumentationKey}"
+                };
+                _client = new TelemetryClient(telemetryConfiguration);
                 _client.Context.Session.Id = CurrentSessionId;
                 _client.Context.Device.OperatingSystem = RuntimeEnvironment.OperatingSystem;
 

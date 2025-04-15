@@ -21,11 +21,10 @@
 
   <PropertyGroup>
     <NoWarn>$(NoWarn);NU1507</NoWarn>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
-  <!-- uncomment this in a new PR and fix all errors -->
-  <!-- https://github.com/Azure/azure-functions-core-tools/issues/4320 -->
-  <!-- <PropertyGroup>
+  <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup> -->
+  </PropertyGroup>
 </Project>
