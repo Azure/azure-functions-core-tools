@@ -5,6 +5,7 @@
 // Once the dotnet cli utils package is in a published consumable state, we will migrate over to use that
 
 using Azure.Functions.Cli.Abstractions.Environment;
+using Azure.Functions.Cli.Abstractions.Logging;
 
 namespace Azure.Functions.Cli.Abstractions.Command
 {

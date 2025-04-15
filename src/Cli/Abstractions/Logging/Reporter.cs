@@ -6,7 +6,7 @@
 
 using Azure.Functions.Cli.Abstractions.Command;
 
-namespace Azure.Functions.Cli.Abstractions
+namespace Azure.Functions.Cli.Abstractions.Logging
 {
     // Simple console manager
     public class Reporter : IReporter

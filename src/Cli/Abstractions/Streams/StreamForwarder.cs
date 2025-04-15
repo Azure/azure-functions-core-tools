@@ -6,7 +6,7 @@
 
 using System.Text;
 
-namespace Azure.Functions.Cli.Abstractions
+namespace Azure.Functions.Cli.Abstractions.Streams
 {
     public sealed class StreamForwarder
     {

@@ -9,6 +9,8 @@
 // the dotnet cli utils package.
 
 using Azure.Functions.Cli.Abstractions.Extensions;
+using Azure.Functions.Cli.Abstractions.Logging;
+using Azure.Functions.Cli.Abstractions.Streams;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;

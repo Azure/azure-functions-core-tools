@@ -3,6 +3,11 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	<OutputType>Library</OutputType>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>enable</Nullable>
+	<AssemblyName>Azure.Functions.Cli.Abstractions</AssemblyName>
+	<RootNamespace>Azure.Functions.Cli.Abstractions</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
