@@ -1,4 +1,7 @@
-﻿using Azure.Functions.Cli.Abstractions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+
+using Azure.Functions.Cli.Abstractions;
 using System.Diagnostics;
 using Xunit.Abstractions;
 
@@ -102,7 +105,7 @@ namespace Func.TestFramework.Commands
 
             Directory.SetCurrentDirectory(funcExeDirectory);
 
-            var directoryToLogTo = Environment.GetEnvironmentVariable("DIRECTORY_TO_LOG_TO");
+            var directoryToLogTo = Environment.GetEnvironmentVariable("DirectoryToLogTo");
             if (string.IsNullOrEmpty(directoryToLogTo))
             {
                 directoryToLogTo = Directory.GetCurrentDirectory();
