@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.Abstractions.Logging
             OriginalForegroundColor = Console.ForegroundColor;
             _boldRecursion = ((int)OriginalForegroundColor & Light) != 0 ? 1 : 0;
 
-            _ansiEnabled = string.IsNullOrWhiteSpace(System.Environment.GetEnvironmentVariable("NO_COLOR"));
+            _ansiEnabled = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NO_COLOR"));
         }
 
         private int _boldRecursion;

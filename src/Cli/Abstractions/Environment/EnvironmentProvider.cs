@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Abstractions.Environment
         private static char[] s_pathSeparator = new char[] { Path.PathSeparator };
         private static char[] s_quote = new char[] { '"' };
         private IEnumerable<string>? _searchPaths;
-        private readonly Lazy<string> _userHomeDirectory = new(() => System.Environment.GetEnvironmentVariable("HOME") ?? string.Empty);
+        private readonly Lazy<string> _userHomeDirectory = new(() => Environment.GetEnvironmentVariable("HOME") ?? string.Empty);
         private IEnumerable<string>? _executableExtensions;
 
         public IEnumerable<string> ExecutableExtensions
@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.Abstractions.Environment
                 if (_executableExtensions == null)
                 {
                     _executableExtensions = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                        ? System.Environment.GetEnvironmentVariable("PATHEXT")?
+                        ? Environment.GetEnvironmentVariable("PATHEXT")?
                             .Split(';')
                             .Select(e => e.ToLower().Trim('"')) ?? [string.Empty]
                         : [string.Empty];
@@ -41,7 +41,7 @@ namespace Azure.Functions.Cli.Abstractions.Environment
                 {
                     var searchPaths = new List<string> { AppContext.BaseDirectory };
 
-                    searchPaths.AddRange(System.Environment
+                    searchPaths.AddRange(Environment
                         .GetEnvironmentVariable("PATH")?
                         .Split(s_pathSeparator)
                         .Select(p => p.Trim(s_quote))
@@ -114,12 +114,12 @@ namespace Azure.Functions.Cli.Abstractions.Environment
 
         public string? GetEnvironmentVariable(string name)
         {
-            return System.Environment.GetEnvironmentVariable(name);
+            return Environment.GetEnvironmentVariable(name);
         }
 
         public bool GetEnvironmentVariableAsBool(string name, bool defaultValue)
         {
-            var str = System.Environment.GetEnvironmentVariable(name);
+            var str = Environment.GetEnvironmentVariable(name);
             if (string.IsNullOrEmpty(str))
             {
                 return defaultValue;
@@ -142,17 +142,17 @@ namespace Azure.Functions.Cli.Abstractions.Environment
 
         public string? GetEnvironmentVariable(string variable, EnvironmentVariableTarget target)
         {
-            return System.Environment.GetEnvironmentVariable(variable, target);
+            return Environment.GetEnvironmentVariable(variable, target);
         }
 
         public void SetEnvironmentVariable(string variable, string value, EnvironmentVariableTarget target)
         {
-            System.Environment.SetEnvironmentVariable(variable, value, target);
+            Environment.SetEnvironmentVariable(variable, value, target);
         }
 
         public int? GetEnvironmentVariableAsNullableInt(string variable)
         {
-            if (System.Environment.GetEnvironmentVariable(variable) is string strValue && int.TryParse(strValue, out int intValue))
+            if (Environment.GetEnvironmentVariable(variable) is string strValue && int.TryParse(strValue, out int intValue))
             {
                 return intValue;
             }

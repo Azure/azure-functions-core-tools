@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Abstractions.Extensions
         private static readonly Lazy<bool> _xtermEnabled = new(
             () =>
             {
-                var environment = System.Environment.GetEnvironmentVariable("TERM");
+                var environment = Environment.GetEnvironmentVariable("TERM");
                 if (!string.IsNullOrWhiteSpace(environment))
                 {
                     return environment.IndexOf("xterm", StringComparison.OrdinalIgnoreCase) >= 0;

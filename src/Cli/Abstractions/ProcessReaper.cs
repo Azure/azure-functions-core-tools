@@ -55,8 +55,8 @@ namespace Azure.Functions.Cli.Abstractions
                 // but nested jobs are transparently implemented with respect to the Job Objects API.
                 // Note: Windows 8.1 and later may report as Windows 8 (see https://docs.microsoft.com/en-us/windows/desktop/sysinfo/operating-system-version).
                 //       However, for the purpose of this check that is still sufficient.
-                if (System.Environment.OSVersion.Version.Major > 6 ||
-                    (System.Environment.OSVersion.Version.Major == 6 && System.Environment.OSVersion.Version.Minor >= 2))
+                if (Environment.OSVersion.Version.Major > 6 ||
+                    (Environment.OSVersion.Version.Major == 6 && Environment.OSVersion.Version.Minor >= 2))
                 {
                     _job = AssignProcessToJobObject(_process.Handle);
                 }
@@ -152,7 +152,7 @@ namespace Azure.Functions.Cli.Abstractions
             // If SIGTERM was ignored by the target, then we'll still wait
             _process.WaitForExit();
 
-            System.Environment.ExitCode = _process.ExitCode;
+            Environment.ExitCode = _process.ExitCode;
         }
 
         private static bool SetKillOnJobClose(IntPtr job, bool value)
