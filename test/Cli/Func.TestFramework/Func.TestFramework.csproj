@@ -9,14 +9,13 @@
   </ItemGroup>
 
   <ItemGroup>
-	<PackageReference Include="Azure.Storage.Queues" />
-	<PackageReference Include="xunit" />
-	<PackageReference Include="FluentAssertions"/>
+    <PackageReference Include="Azure.Storage.Queues" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="FluentAssertions"/>
   </ItemGroup>
 
   <ItemGroup>
-	<ProjectReference Include="..\..\..\src\Cli\Abstractions\Azure.Functions.Cli.Abstractions.csproj" />
+    <ProjectReference Include="$(RepoSrcRoot)Cli\Abstractions\Azure.Functions.Cli.Abstractions.csproj" />
   </ItemGroup>
-
 
 </Project>

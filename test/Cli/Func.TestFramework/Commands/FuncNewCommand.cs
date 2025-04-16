@@ -7,6 +7,7 @@ namespace Func.TestFramework.Commands
 {
     public class FuncNewCommand : FuncCommand
     {
+        private readonly string CommandName = "new";
         private string _funcPath;
         private string _testName;
 
@@ -14,12 +15,11 @@ namespace Func.TestFramework.Commands
         {
             _funcPath = funcPath;
             _testName = testName;
-
         }
 
         protected override CommandInfo CreateCommand(IEnumerable<string> args)
         {
-            var arguments = new List<string> { "new" }.Concat(args).ToList();
+            var arguments = new List<string> { CommandName }.Concat(args).ToList();
 
             var commandInfo = new CommandInfo()
             {
@@ -28,6 +28,7 @@ namespace Func.TestFramework.Commands
                 WorkingDirectory = WorkingDirectory,
                 TestName = _testName,
             };
+
             return commandInfo;
         }
     }

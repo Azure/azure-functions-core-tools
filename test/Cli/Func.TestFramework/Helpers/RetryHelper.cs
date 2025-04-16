@@ -21,7 +21,7 @@ namespace Func.TestFramework.Helpers
                 if (shouldThrow && (DateTime.Now - start).TotalMilliseconds > timeout)
                 {
                     string error = "Condition not reached within timeout.";
-                    if (userMessageCallback != null)
+                    if (userMessageCallback is not null)
                     {
                         error += " " + userMessageCallback();
                     }

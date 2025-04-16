@@ -42,7 +42,5 @@ namespace Func.TestFramework.Assertions
                 .FailWith($"The command output did contain expected result: {pattern}{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
-
     }
-
 }

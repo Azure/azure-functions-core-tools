@@ -10,7 +10,6 @@ namespace Func.TestFramework.Commands
     public abstract class FuncCommand
     {
         private Dictionary<string, string> _environment = new Dictionary<string, string>();
-        private bool _doNotEscapeArguments = true;
 
         public ITestOutputHelper Log { get; }
 
@@ -22,12 +21,12 @@ namespace Func.TestFramework.Commands
 
         //  These only work via Execute(), not when using GetProcessStartInfo()
         public Action<string>? CommandOutputHandler { get; set; }
+
         public Func<Process, Task>? ProcessStartedHandler { get; set; }
 
         public StreamWriter? FileWriter { get; private set; } = null;
 
         public string LogFilePath { get; private set; }
-
 
         protected FuncCommand(ITestOutputHelper log)
         {
@@ -48,16 +47,6 @@ namespace Func.TestFramework.Commands
             return this;
         }
 
-        /// <summary>
-        /// Instructs not to escape the arguments when launching command.
-        /// This may be used to pass ready arguments line as single string argument.
-        /// </summary>
-        public FuncCommand WithRawArguments()
-        {
-            _doNotEscapeArguments = true;
-            return this;
-        }
-
         private CommandInfo CreateCommandInfo(IEnumerable<string> args)
         {
             var commandInfo = CreateCommand(args);
@@ -71,7 +60,7 @@ namespace Func.TestFramework.Commands
                 commandInfo.EnvironmentToRemove.Add(envToRemove);
             }
 
-            if (WorkingDirectory != null)
+            if (WorkingDirectory is not null)
             {
                 commandInfo.WorkingDirectory = WorkingDirectory;
             }
@@ -87,17 +76,14 @@ namespace Func.TestFramework.Commands
         public ProcessStartInfo GetProcessStartInfo(params string[] args)
         {
             var commandSpec = CreateCommandInfo(args);
-
-            var psi = commandSpec.ToProcessStartInfo();
-
-            return psi;
+            return commandSpec.ToProcessStartInfo();
         }
 
         public virtual CommandResult Execute(IEnumerable<string> args)
         {
             var spec = CreateCommandInfo(args);
             var command = spec
-                .ToCommand(_doNotEscapeArguments)
+                .ToCommand()
                 .CaptureStdOut()
                 .CaptureStdErr();
 
@@ -142,7 +128,7 @@ namespace Func.TestFramework.Commands
                     try
                     {
                         // Write to the file if it's still open
-                        if (FileWriter != null && FileWriter.BaseStream != null)
+                        if (FileWriter is not null && FileWriter.BaseStream is not null)
                         {
                             FileWriter.WriteLine($"[STDOUT] {line}");
                             FileWriter.Flush();
@@ -162,7 +148,7 @@ namespace Func.TestFramework.Commands
                     try
                     {
                         // Write to the file if it's still open
-                        if (FileWriter != null && FileWriter.BaseStream != null)
+                        if (FileWriter is not null && FileWriter.BaseStream is not null)
                         {
                             FileWriter.WriteLine($"[STDERR] {line}");
                             FileWriter.Flush();
@@ -195,7 +181,7 @@ namespace Func.TestFramework.Commands
             finally
             {
                 // Make sure to close and dispose the writer
-                if (FileWriter != null)
+                if (FileWriter is not null)
                 {
                     try
                     {

@@ -1,6 +1,8 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+// Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Commands/SdkCommandSpec.cs
+
 using Azure.Functions.Cli.Abstractions;
 using System.Diagnostics;
 
@@ -18,46 +20,41 @@ namespace Func.TestFramework
 
         public string TestName { get; set; }
 
-        private string EscapeArgs()
-        {
-            //  Note: this doesn't handle invoking .cmd files via "cmd /c" on Windows, which probably won't be necessary here
-            //  If it is, refer to the code in WindowsExePreferredCommandSpecFactory in Microsoft.DotNet.Cli.Utils
-            return "";
-        }
-
         public Command ToCommand(bool doNotEscapeArguments = false)
         {
             var process = new Process()
             {
-                StartInfo = ToProcessStartInfo(doNotEscapeArguments)
+                StartInfo = ToProcessStartInfo()
             };
-            var ret = new Command(process, trimTrailingNewlines: true);
-            return ret;
+
+            return new Command(process, trimTrailingNewlines: true);
         }
 
-        public ProcessStartInfo ToProcessStartInfo(bool doNotEscapeArguments = false)
+        public ProcessStartInfo ToProcessStartInfo()
         {
-            var ret = new ProcessStartInfo
+            var psi = new ProcessStartInfo
             {
                 FileName = FileName,
-                Arguments = doNotEscapeArguments ? string.Join(" ", Arguments) : EscapeArgs(),
+                Arguments = string.Join(" ", Arguments),
                 UseShellExecute = false
             };
+
             foreach (var kvp in Environment)
             {
-                ret.Environment[kvp.Key] = kvp.Value;
+                psi.Environment[kvp.Key] = kvp.Value;
             }
+
             foreach (var envToRemove in EnvironmentToRemove)
             {
-                ret.Environment.Remove(envToRemove);
+                psi.Environment.Remove(envToRemove);
             }
 
-            if (WorkingDirectory != null)
+            if (WorkingDirectory is not null)
             {
-                ret.WorkingDirectory = WorkingDirectory;
+                psi.WorkingDirectory = WorkingDirectory;
             }
 
-            return ret;
+            return psi;
         }
     }
 }

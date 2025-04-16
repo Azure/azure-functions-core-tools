@@ -10,6 +10,7 @@ namespace Func.TestFramework.Helpers
     public class ProcessHelper
     {
         private static string FunctionsHostUrl = "http://localhost";
+
         public static async Task WaitForFunctionHostToStart(
             Process funcProcess,
             int port,
@@ -28,7 +29,6 @@ namespace Func.TestFramework.Helpers
             }
 
             LogMessage($"Starting to wait for function host on {url} at {DateTime.Now}");
-
             LogMessage($"PID of process: {funcProcess.Id}");
             int retry = 1;
 
@@ -61,7 +61,6 @@ namespace Func.TestFramework.Helpers
                     }
 
                     LogMessage($"Returning false");
-
                     return false;
                 }
                 catch (Exception ex)
@@ -88,8 +87,8 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process,
-    StreamWriter fileWriter, string functionCall = "", bool shouldDelayForLogs = false)
+        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, 
+            StreamWriter fileWriter, string functionCall = "", bool shouldDelayForLogs = false)
         {
             string capturedContent = "";
             try
@@ -98,6 +97,7 @@ namespace Func.TestFramework.Helpers
                 fileWriter.Flush();
 
                 fileWriter.WriteLine($"[HANDLER] Process working directory: {process.StartInfo.WorkingDirectory}");
+                fileWriter.Flush();
 
                 await WaitForFunctionHostToStart(process, port, fileWriter);
 
@@ -130,6 +130,7 @@ namespace Func.TestFramework.Helpers
                 {
                     await Task.Delay(5000);
                 }
+
                 process.Kill(true);
             }
             fileWriter.WriteLine($"[HANDLER] Returning captured content");
@@ -137,6 +138,4 @@ namespace Func.TestFramework.Helpers
             return capturedContent;
         }
     }
-
-    
 }
