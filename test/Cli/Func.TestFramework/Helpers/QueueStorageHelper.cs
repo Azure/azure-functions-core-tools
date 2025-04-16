@@ -58,12 +58,14 @@ namespace Func.TestFramework.Helpers
         {
             var queueClient = CreateQueueClient(queueName);
             QueueMessage retrievedMessage = null;
+
             await RetryHelper.RetryAsync(async () =>
             {
                 Response<QueueMessage> response = await queueClient.ReceiveMessageAsync();
                 retrievedMessage = response.Value;
                 return retrievedMessage is not null;
             });
+
             await queueClient.DeleteMessageAsync(retrievedMessage.MessageId, retrievedMessage.PopReceipt);
             return retrievedMessage.Body.ToString();
         }
@@ -78,11 +80,13 @@ namespace Func.TestFramework.Helpers
                 retrievedMessages = await queueClient.ReceiveMessagesAsync(maxMessages: 3);
                 return retrievedMessages is not null;
             });
+
             foreach (QueueMessage msg in retrievedMessages)
             {
                 messages.Add(msg.Body.ToString());
                 await queueClient.DeleteMessageAsync(msg.MessageId, msg.PopReceipt);
             }
+
             return messages;
         }
     }
