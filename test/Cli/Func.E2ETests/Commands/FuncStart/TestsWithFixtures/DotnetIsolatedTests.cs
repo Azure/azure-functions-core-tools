@@ -10,7 +10,7 @@ using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
+namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
     public class DotnetIsolatedTests : IClassFixture<DotnetIsolatedFunctionAppFixture>
     {
@@ -35,8 +35,6 @@ namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                //await Task.Delay(5000);
-                //process.Kill(true);
                 capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger");
             };
 

@@ -9,7 +9,7 @@ using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
+namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("NodeV3")]
     public class NodeV3Tests : IClassFixture<NodeV3FunctionAppFixture>

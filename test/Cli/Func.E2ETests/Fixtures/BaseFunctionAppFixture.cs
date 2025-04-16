@@ -30,7 +30,7 @@ namespace Func.E2ETests.Fixtures
 
             Log = new Mock<ITestOutputHelper>().Object;
 
-            FuncPath = Environment.GetEnvironmentVariable("FUNC_PATH");
+            FuncPath = Environment.GetEnvironmentVariable(Constants.FuncPath);
 
             if (FuncPath == null)
             {
@@ -47,6 +47,7 @@ namespace Func.E2ETests.Fixtures
                     throw new ApplicationException("Could not locate the 'func' executable to use for testing. Make sure the FUNC_PATH environment variable is set to the full path of the func executable.");
                 }
             }
+
             Directory.CreateDirectory(WorkingDirectory);
         }
 
@@ -62,7 +63,7 @@ namespace Func.E2ETests.Fixtures
                 throw new ArgumentException("Template package name cannot be null or empty", nameof(templatePackageName));
             }
 
-            Log?.WriteLine($"Uninstalling dotnet template package: {templatePackageName}");
+            Log.WriteLine($"Uninstalling dotnet template package: {templatePackageName}");
 
             // Create a new process to run the dotnet uninstall command
             var process = new Process
@@ -87,7 +88,7 @@ namespace Func.E2ETests.Fixtures
                 if (e.Data != null)
                 {
                     outputBuilder.AppendLine(e.Data);
-                    Log?.WriteLine($"[dotnet template --uninstall] {e.Data}");
+                    Log.WriteLine($"[dotnet template --uninstall] {e.Data}");
                 }
             };
 
@@ -96,7 +97,7 @@ namespace Func.E2ETests.Fixtures
                 if (e.Data != null)
                 {
                     errorBuilder.AppendLine(e.Data);
-                    Log?.WriteLine($"[dotnet template --uninstall error] {e.Data}");
+                    Log.WriteLine($"[dotnet template --uninstall error] {e.Data}");
                 }
             };
 
@@ -111,17 +112,17 @@ namespace Func.E2ETests.Fixtures
 
                 if (exitCode != 0)
                 {
-                    Log?.WriteLine($"Failed to uninstall template package '{templatePackageName}'. Exit code: {exitCode}");
-                    Log?.WriteLine($"Error: {errorBuilder}");
+                    Log.WriteLine($"Failed to uninstall template package '{templatePackageName}'. Exit code: {exitCode}");
+                    Log.WriteLine($"Error: {errorBuilder}");
                     return false;
                 }
 
-                Log?.WriteLine($"Successfully uninstalled template package: {templatePackageName}");
+                Log.WriteLine($"Successfully uninstalled template package: {templatePackageName}");
                 return true;
             }
             catch (Exception ex)
             {
-                Log?.WriteLine($"Exception occurred while uninstalling template package '{templatePackageName}': {ex.Message}");
+                Log.WriteLine($"Exception occurred while uninstalling template package '{templatePackageName}': {ex.Message}");
                 return false;
             }
         }
@@ -134,6 +135,7 @@ namespace Func.E2ETests.Fixtures
             }
             catch
             {
+                // Ignore any errors when cleaning up
             }
             return Task.CompletedTask;
         }

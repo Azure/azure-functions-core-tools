@@ -9,7 +9,7 @@ using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
+namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("Powershell")]
     public class PowershellTests : IClassFixture<PowershellFunctionAppFixture>

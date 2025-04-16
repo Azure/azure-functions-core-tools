@@ -9,13 +9,14 @@ using System.Net;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests
+namespace Func.E2ETests.Commands.FuncStart
 {
     public class MultipleFunctionsTests : BaseE2ETest
     {
         public MultipleFunctionsTests(ITestOutputHelper log) : base(log)
         {
         }
+
         [Fact]
         public async Task Start_FunctionsStartArgument_OnlySelectedFunctionsRun()
         {
@@ -37,6 +38,7 @@ namespace Func.E2ETests.func_start.Tests
                 try
                 {
                     await ProcessHelper.WaitForFunctionHostToStart(process, port, funcStartCommand.FileWriter);
+                    
                     using (var client = new HttpClient())
                     {
                         // http1 should be available
@@ -55,7 +57,8 @@ namespace Func.E2ETests.func_start.Tests
                     process.Kill(true);
                 }
             };
-            var result = funcStartCommand
+
+            funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "--functions", "http2", "http1", "--port", port.ToString() });
         }

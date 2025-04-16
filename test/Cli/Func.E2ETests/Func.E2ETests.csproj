@@ -1,14 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-	<IsPackable>false</IsPackable>
-	<DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
-	<Nullable>disable</Nullable>
-	<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-	<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-
-  </PropertyGroup>
-
   <ItemGroup>
 	<PackageReference Include="FluentAssertions" />
 	<PackageReference Include="Moq" />
@@ -17,7 +8,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Cli\func\Azure.Functions.Cli.csproj" />
+    <ProjectReference Include="$(RepoSrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
     <ProjectReference Include="..\Func.TestFramework\Func.TestFramework.csproj" />
   </ItemGroup>
 

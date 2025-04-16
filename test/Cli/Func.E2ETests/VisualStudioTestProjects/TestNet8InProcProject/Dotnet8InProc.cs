@@ -10,9 +10,9 @@ using Newtonsoft.Json;
 
 namespace TestNet8InProcProject
 {
-    public static class Function1
+    public static class Dotnet8InProc
     {
-        [FunctionName("Function1")]
+        [FunctionName("Dotnet8InProc")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
             ILogger log)

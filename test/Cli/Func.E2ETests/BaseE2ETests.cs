@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests
+namespace Func.E2ETests.Commands.FuncStart
 {
     public abstract class BaseE2ETest : IAsyncLifetime
     {
@@ -18,7 +18,7 @@ namespace Func.E2ETests.func_start.Tests
         protected BaseE2ETest(ITestOutputHelper log)
         {
             Log = log;
-            FuncPath = Environment.GetEnvironmentVariable("FUNC_PATH");
+            FuncPath = Environment.GetEnvironmentVariable(Constants.FuncPath);
         }
 
         public Task InitializeAsync()
@@ -38,6 +38,7 @@ namespace Func.E2ETests.func_start.Tests
                     throw new ApplicationException("Could not locate the 'func' executable to use for testing. Make sure the FUNC_PATH environment variable is set to the full path of the func executable.");
                 }
             }
+
             Directory.CreateDirectory(WorkingDirectory);
             return Task.CompletedTask;
         }
@@ -47,12 +48,13 @@ namespace Func.E2ETests.func_start.Tests
             {
                 Directory.Delete(WorkingDirectory, true);
             }
-            catch (Exception ex)
+            catch
             {
                 // Cleanup failed but we shouldn't crash on this
             }
             return Task.CompletedTask;
         }
+
         public async Task FuncInitWithRetryAsync(string testName, IEnumerable<string> args)
         {
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
