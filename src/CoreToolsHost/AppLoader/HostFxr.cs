@@ -7,12 +7,14 @@ namespace CoreToolsHost
 {
     static partial class HostFxr
     {
+#pragma warning disable CS0649 
         public unsafe struct hostfxr_initialize_parameters
         {
             public nint size;
             public char* host_path;
             public char* dotnet_root;
         };
+#pragma warning restore CS0649
 
         [LibraryImport("hostfxr", EntryPoint = "hostfxr_initialize_for_dotnet_command_line",
 #if OS_LINUX

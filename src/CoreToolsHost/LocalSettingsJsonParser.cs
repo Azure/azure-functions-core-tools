@@ -9,7 +9,7 @@ namespace CoreToolsHost
 {
     internal static class LocalSettingsJsonParser
     {
-        internal static async Task<JsonDocument> GetLocalSettingsJsonAsJObjectAsync()
+        internal static async Task<JsonDocument?> GetLocalSettingsJsonAsJObjectAsync()
         {
             var fullPath = Path.Combine(Environment.CurrentDirectory, "local.settings.json");
 

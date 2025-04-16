@@ -5,7 +5,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
 {
     internal class Program
     {
-        static async Task<int> Main(string[] args)
+        static int Main(string[] args)
         {
             try
             {
@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
                 {
                     string? artifactName = args.Length > 0 ? args[0] : string.Empty;
                     var artifactAssembler = new ArtifactAssembler(currentWorkingDirectory, artifactName);
-                    await artifactAssembler.AssembleArtifactsAsync();
+                    artifactAssembler.Assemble();
                 }
 
                 return 0;

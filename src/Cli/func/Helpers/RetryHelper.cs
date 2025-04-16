@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     if (retryCount <= 0)
                     {
-                        throw e;
+                        throw;
                     }
                     retryCount--;
                     if (displayError)
@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     if (retryCount <= 0)
                     {
-                        throw e;
+                        throw;
                     }
                     retryCount--;
                     if (displayError)

@@ -373,7 +373,7 @@ namespace Azure.Functions.Cli
                     return action;
                 }
             }
-            catch (CliArgumentsException ex)
+            catch (CliArgumentsException)
             {
                 // TODO: we can probably display help here as well.
                 // This happens for actions that expect an ordered untyped options.
