@@ -10,7 +10,7 @@ using System.Diagnostics;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests
+namespace Func.E2ETests.Commands.FuncStart
 {
     public class UserSecretsTests : BaseE2ETest
     {
@@ -138,6 +138,7 @@ namespace Func.E2ETests.func_start.Tests
         public async Task Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError()
         {
             string azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
             {
                 Log.WriteLine("Skipping test as AzureWebJobsStorage is set");

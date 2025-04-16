@@ -9,14 +9,13 @@ using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests
+namespace Func.E2ETests.Commands.FuncStart
 {
     [Trait(TestTraits.Group, TestTraits.InProc)]
     public class InProcTests : BaseE2ETest
     {
         public InProcTests(ITestOutputHelper log) : base(log)
         {
-
         }
 
         [Fact]

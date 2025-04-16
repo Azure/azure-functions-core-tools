@@ -9,7 +9,7 @@ using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests
+namespace Func.E2ETests.Commands.FuncStart
 {
     public class VisualStudioInProcTests : BaseE2ETest
     {
@@ -17,10 +17,11 @@ namespace Func.E2ETests.func_start.Tests
         private readonly string _vsNet6ProjectPath;
         public VisualStudioInProcTests(ITestOutputHelper log) : base(log)
         {
-            // Visual Studio test project paths - these should be configured in the test environment
-            _vsNet8ProjectPath = Environment.GetEnvironmentVariable("NET8_VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
-            _vsNet6ProjectPath = Environment.GetEnvironmentVariable("NET6_VS_PROJECT_PATH") ?? Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
+            // Visual Studio test project paths
+            _vsNet8ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
+            _vsNet6ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
         }
+
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
@@ -31,10 +32,12 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             string? capturedOutput = null;
+
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Function1?name=Test");
+                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Dotnet8InProc?name=Test");
             };
+
             var result = funcStartCommand
                 .WithWorkingDirectory(_vsNet8ProjectPath)
                 .Execute(new[] { "--verbose", "--port", port.ToString() });
@@ -52,10 +55,12 @@ namespace Func.E2ETests.func_start.Tests
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             string? capturedOutput = null;
+
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Function2?name=Test");
+                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Dotnet6InProc?name=Test");
             };
+
             var result = funcStartCommand
                 .WithWorkingDirectory(_vsNet6ProjectPath)
                 .Execute(new[] { "--verbose", "--port", port.ToString() });

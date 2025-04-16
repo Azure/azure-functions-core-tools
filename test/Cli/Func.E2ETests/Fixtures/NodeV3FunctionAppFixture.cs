@@ -7,7 +7,6 @@ namespace Func.E2ETests.Fixtures
     {
         public NodeV3FunctionAppFixture() : base("node", version: "v3")
         {
-
         }
     }
 }

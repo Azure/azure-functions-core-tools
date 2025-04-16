@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 using Xunit;
 using Func.TestFramework.Helpers;
 
-namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
+namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("Dotnet8InProc")]
     [Trait(TestTraits.Group, TestTraits.InProc)]

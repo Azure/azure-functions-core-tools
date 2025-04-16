@@ -8,7 +8,7 @@ using Func.TestFramework.Helpers;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests
+namespace Func.E2ETests.Commands.FuncStart
 {
     public class AuthTests : BaseE2ETest
     {

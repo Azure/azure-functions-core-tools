@@ -11,7 +11,7 @@ using System.Net.Sockets;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.func_start.Tests.TestsWithFixtures
+namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("NodeV4")]
     public class NodeV4Tests : IClassFixture<NodeV4FunctionAppFixture>
