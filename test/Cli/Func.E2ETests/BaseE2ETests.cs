@@ -42,6 +42,7 @@ namespace Func.E2ETests.Commands.FuncStart
             Directory.CreateDirectory(WorkingDirectory);
             return Task.CompletedTask;
         }
+
         public Task DisposeAsync()
         {
             try
