@@ -280,6 +280,7 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="NuGet.Packaging" />
     <PackageReference Include="System.Formats.Asn1" />
+    <PackageReference Include="StyleCop.Analyzers" />
     <PackageReference Include="WindowsAzure.Storage" />
     <PackageReference Include="YamlDotNet" />
     <!-- Transitive dependency -->
