@@ -22,6 +22,7 @@
   <PropertyGroup>
     <NoWarn>$(NoWarn);NU1507</NoWarn>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
+    <NoWarn>$(NoWarn);NU5118</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
