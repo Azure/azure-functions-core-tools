@@ -9,4 +9,9 @@
     <PackageReference Include="WindowsAzure.Storage" />
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
+
+  <!-- setting directly to false as this project will be deprecated soon -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
 </Project>
