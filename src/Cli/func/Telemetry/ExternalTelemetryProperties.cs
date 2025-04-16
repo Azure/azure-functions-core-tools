@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Telemetry
             try
             {
                 return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) 
-                    ? Registry.GetValue(Key, ValueName, defaultValue: "") as string
+                    ? Registry.GetValue(Key, ValueName, defaultValue: string.Empty) as string
                     : string.Empty;
             }
             // Catch everything: this is for telemetry only.

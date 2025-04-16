@@ -16,10 +16,9 @@ namespace Azure.Functions.Cli.Actions.HostActions.WebHost.Security
 {
     public class CliAuthenticationHandler<TOptions> : AuthenticationHandler<TOptions> where TOptions : AuthenticationSchemeOptions, new()
     {
-        public CliAuthenticationHandler(IOptionsMonitor<TOptions> options, ILoggerFactory logger, UrlEncoder encoder, TimeProvider timeProvider) 
+        public CliAuthenticationHandler(IOptionsMonitor<TOptions> options, ILoggerFactory logger, UrlEncoder encoder) 
             : base(options, logger, encoder)
         {
-            options.CurrentValue.TimeProvider = timeProvider;
         }
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
