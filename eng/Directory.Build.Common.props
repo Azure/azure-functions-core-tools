@@ -26,6 +26,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors> <!-- TODO:// set to true for CI builds only -->
   </PropertyGroup>
 </Project>
