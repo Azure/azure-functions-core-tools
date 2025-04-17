@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Arm;
@@ -17,26 +15,36 @@ using static Azure.Functions.Cli.Common.OutputTheme;
 namespace Azure.Functions.Cli.Actions.ContainerServiceActions
 {
     [Action(Name = "deploy", Context = Context.AzureContainerApps, HelpText = "Deploy function app to Azure Container Apps")]
-    class AzureContainerAppsDeployAction : BaseAzureAction
+    internal class AzureContainerAppsDeployAction : BaseAzureAction
     {
         private readonly CreateFunctionAction _createFunctionAction;
-        
-        public string ImageName { get; private set; }
-        public string Name { get; set; } = string.Empty;
-        public string Registry { get; set; }
-        public bool BuildImage { get; set; } = true;
-        public string ResourceGroup { get; set; }
-        public string ManagedEnvironmentName { get; set; }
-        public string StorageAccountConnectionString { get; set; }
-        public string Location { get; set; }
-        public string RegistryUserName { get; set; }
-        public string RegistryPassword { get; set; }
-        public string WorkerRuntime { get; set; }
 
         public AzureContainerAppsDeployAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
         {
             _createFunctionAction = new CreateFunctionAction(templatesManager, secretsManager, contextHelpManager);
         }
+
+        public string ImageName { get; private set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Registry { get; set; }
+
+        public bool BuildImage { get; set; } = true;
+
+        public string ResourceGroup { get; set; }
+
+        public string ManagedEnvironmentName { get; set; }
+
+        public string StorageAccountConnectionString { get; set; }
+
+        public string Location { get; set; }
+
+        public string RegistryUserName { get; set; }
+
+        public string RegistryPassword { get; set; }
+
+        public string WorkerRuntime { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -64,7 +72,7 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
                 if (CurrentPathHasLocalSettings())
                 {
                     await _createFunctionAction.UpdateLanguageAndRuntime();
-                    workerRuntime = _createFunctionAction.workerRuntime;
+                    workerRuntime = _createFunctionAction.WorkerRuntime;
                 }
                 else
                 {
@@ -114,8 +122,7 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
             }
 
             var registryHost = GetHostNameFromRegistry();
-            var payload = ContainerAppsFunctionPayload.CreateInstance(Name, Location,
-                managedEnvironmentId, $"DOCKER|{resolvedImageName}", StorageAccountConnectionString, workerRuntimeName, registryHost, RegistryUserName, RegistryPassword);
+            var payload = ContainerAppsFunctionPayload.CreateInstance(Name, Location, managedEnvironmentId, $"DOCKER|{resolvedImageName}", StorageAccountConnectionString, workerRuntimeName, registryHost, RegistryUserName, RegistryPassword);
 
             var hostName = await AzureHelper.CreateFunctionAppOnContainerService(AccessToken, ManagementURL, Subscription, ResourceGroup, payload);
 
@@ -144,12 +151,12 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
                 {
                     functionApp.HostName = hostName;
                 }
-                
+
                 await AzureHelper.PrintFunctionsInfo(functionApp, AccessToken, ManagementURL, showKeys: true);
             }
         }
 
-        private (string, bool) ResolveImageName()
+        private (string ResolvedImageName, bool ShouldBuild) ResolveImageName()
         {
             if (!string.IsNullOrEmpty(ImageName))
             {
@@ -173,7 +180,9 @@ namespace Azure.Functions.Cli.Actions.ContainerServiceActions
         {
             // This condition will also cover the scenario of docker username.
             if (string.IsNullOrEmpty(Registry) || !Registry.Contains('/'))
+            {
                 return Registry;
+            }
 
             return Registry[..Registry.IndexOf("/")];
         }

@@ -1,13 +1,12 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Colors.Net;
-using Fclp;
-using Azure.Functions.Cli.Arm;
-using Azure.Functions.Cli.Interfaces;
-using static Azure.Functions.Cli.Common.OutputTheme;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using Fclp;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -17,13 +16,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
 
-        public string StorageAccountName { get; set; }
-
         public AddStorageAccountSettingAction(ISettings settings, ISecretsManager secretsManager)
         {
             _settings = settings;
             _secretsManager = secretsManager;
         }
+
+        public string StorageAccountName { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -33,7 +32,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                throw new CliArgumentsException("Must specify storage account name.",
+                throw new CliArgumentsException(
+                    "Must specify storage account name.",
                     new CliArgument { Name = nameof(StorageAccountName), Description = "Storage Account Name" });
             }
 
