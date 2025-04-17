@@ -1,5 +1,6 @@
-using System;
-using System.Linq;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
@@ -10,6 +11,7 @@ namespace Azure.Functions.Cli.Helpers
     public static class GlobalCoreToolsSettings
     {
         private static WorkerRuntime _currentWorkerRuntime;
+
         public static ProgrammingModel? CurrentProgrammingModel { get; set; }
 
         public static WorkerRuntime CurrentWorkerRuntime
@@ -21,8 +23,10 @@ namespace Azure.Functions.Cli.Helpers
                     ColoredConsole.Error.WriteLine(QuietWarningColor("Can't determine project language from files. Please use one of [--dotnet-isolated, --dotnet, --javascript, --typescript, --java, --python, --powershell, --custom]"));
                     throw new CliException($"Worker runtime cannot be '{WorkerRuntime.None}'. Please set a valid runtime.");
                 }
+
                 return _currentWorkerRuntime;
             }
+
             set
             {
                 _currentWorkerRuntime = value;
@@ -45,46 +49,46 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (args.Contains("--csharp"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.dotnet;
+                    _currentWorkerRuntime = WorkerRuntime.Dotnet;
                     CurrentLanguageOrNull = "csharp";
                 }
                 else if (args.Contains("--dotnet"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.dotnet;
+                    _currentWorkerRuntime = WorkerRuntime.Dotnet;
                 }
                 else if (args.Contains("--dotnet-isolated"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.dotnetIsolated;
+                    _currentWorkerRuntime = WorkerRuntime.DotnetIsolated;
                 }
                 else if (args.Contains("--javascript"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.node;
+                    _currentWorkerRuntime = WorkerRuntime.Node;
                     CurrentLanguageOrNull = "javascript";
                 }
                 else if (args.Contains("--typescript"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.node;
+                    _currentWorkerRuntime = WorkerRuntime.Node;
                     CurrentLanguageOrNull = "typescript";
                 }
                 else if (args.Contains("--node"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.node;
+                    _currentWorkerRuntime = WorkerRuntime.Node;
                 }
                 else if (args.Contains("--java"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.java;
+                    _currentWorkerRuntime = WorkerRuntime.Java;
                 }
                 else if (args.Contains("--python"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.python;
+                    _currentWorkerRuntime = WorkerRuntime.Python;
                 }
                 else if (args.Contains("--powershell"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.powershell;
+                    _currentWorkerRuntime = WorkerRuntime.Powershell;
                 }
                 else if (args.Contains("--custom"))
                 {
-                    _currentWorkerRuntime = WorkerRuntime.custom;
+                    _currentWorkerRuntime = WorkerRuntime.Custom;
                 }
                 else
                 {

@@ -1,15 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Helpers
 {
-    static class EnvironmentHelper
+    internal static class EnvironmentHelper
     {
         public static bool GetEnvironmentVariableAsBool(string keyName)
         {
             string val = Environment.GetEnvironmentVariable(keyName);
-            
+
             if (string.IsNullOrEmpty(val))
             {
                 return false;

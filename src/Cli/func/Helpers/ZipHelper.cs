@@ -1,11 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.IO.Compression;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
@@ -35,15 +33,15 @@ namespace Azure.Functions.Cli.Helpers
                 ColoredConsole.WriteLine(DarkYellow("Performing local build for functions project."));
             }
 
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !noBuild)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && !noBuild)
             {
                 return await PythonHelpers.GetPythonDeploymentPackage(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser), functionAppRoot, buildNativeDeps, buildOption, additionalPackages);
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && !ignoreDotNetCheck && !noBuild && buildOption != BuildOption.Remote)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet && !ignoreDotNetCheck && !noBuild && buildOption != BuildOption.Remote)
             {
                 throw new CliException("Pack command doesn't work for dotnet functions");
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && buildOption == BuildOption.Remote)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet && buildOption == BuildOption.Remote)
             {
                 // Remote build for dotnet does not require bin and obj folders. They will be generated during the oryx build
                 return await CreateZip(FileSystemHelpers.GetLocalFiles(functionAppRoot, ignoreParser, false, new string[] { "bin", "obj" }), functionAppRoot, Enumerable.Empty<string>());
@@ -103,8 +101,8 @@ namespace Azure.Functions.Cli.Helpers
             const uint centralDirectorySignature = 0x02014B50;
 
             // Unix file permissions
-            int UnixExecutablePermissions = Convert.ToInt32("100777", 8) << 16;
-            int UnixReadWritePermissions = Convert.ToInt32("100666", 8) << 16;
+            int unixExecutablePermissions = Convert.ToInt32("100777", 8) << 16;
+            int unixReadWritePermissions = Convert.ToInt32("100666", 8) << 16;
 
             var memStream = new MemoryStream();
 
@@ -115,7 +113,7 @@ namespace Azure.Functions.Cli.Helpers
                     var entryName = file.FixFileNameForZip(rootPath);
                     var entry = zip.CreateEntryFromFile(file, entryName);
 
-                    entry.ExternalAttributes = executables.Contains(entryName) ? UnixExecutablePermissions : UnixReadWritePermissions;
+                    entry.ExternalAttributes = executables.Contains(entryName) ? unixExecutablePermissions : unixReadWritePermissions;
                 }
             }
 
@@ -148,6 +146,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             int bufferPointer = 0;
             uint currentSignature = 0;
+
             // 32-byte buffer is arbitrary and is following the runtime implementation here:
             // https://github.com/dotnet/runtime/blob/ea97babd7ccfd2f6e9553093d315f26b51e4c7ac/src/libraries/System.IO.Compression/src/System/IO/Compression/ZipHelper.cs#L16
             byte[] buffer = new byte[32];

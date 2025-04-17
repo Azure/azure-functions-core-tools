@@ -1,10 +1,10 @@
-﻿using System.Linq;
-using Microsoft.Build.Construction;
-using Azure.Functions.Cli.Common;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Xml;
-using System;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
+using Microsoft.Build.Construction;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Helpers
@@ -17,6 +17,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return null;
             }
+
             string projectFilePath = ProjectHelpers.FindProjectFile(scriptPath, loggingFilterHelper, loggerFilterOptions);
             if (projectFilePath == null)
             {
@@ -36,8 +37,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 logger = new ColoredConsoleLogger("ProjectHelpers", loggingFilterHelper, loggerFilterOptions);
             }
+
             bool shouldLog = logger != null;
-            
+
             DirectoryInfo filePath = new DirectoryInfo(path);
             do
             {
@@ -46,14 +48,20 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     foreach (FileInfo file in projectFiles)
                     {
-                        if (string.Equals(file.Name, Constants.ExtensionsCsProjFile, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(file.Name, Constants.ExtensionsCsProjFile, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
                         if (shouldLog)
                         {
                             logger.LogDebug($"Found {file.FullName}. Using for user secrets file configuration.");
                         }
+
                         return file.FullName;
                     }
                 }
+
                 filePath = filePath.Parent;
             }
             while (filePath.FullName != filePath.Root.FullName);
@@ -62,6 +70,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 logger.LogDebug($"Csproj not found in {path} directory tree. Skipping user secrets file configuration.");
             }
+
             return null;
         }
 
@@ -92,7 +101,5 @@ namespace Azure.Functions.Cli.Helpers
 
             return property == null ? null : property.Value;
         }
-
-
     }
 }
