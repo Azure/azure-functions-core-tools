@@ -124,7 +124,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // The value of 'dotnet-cli-params' option should either use a leading space character or escape the double quotes explicitly.
             // Ex 1: --dotnet-cli-params " --configuration debug"
             // Ex 2: --dotnet-cli-params "\"--configuration debug"\"
-            // If you don't do this, the value with leading - or -- will be read as a key (rather than the value of 'dotnet-cli-params'). 
+            // If you don't do this, the value with leading - or -- will be read as a key (rather than the value of 'dotnet-cli-params').
             // See https://github.com/fclp/fluent-command-line-parser/issues/99 for reference.
             Parser
                 .Setup<string>("dotnet-cli-params")
@@ -161,7 +161,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Determine the appropriate default targetFramework
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
@@ -294,7 +294,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
                             result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                         }
-                        else if (workerRuntime == WorkerRuntime.dotnetIsolated)
+                        else if (workerRuntime == WorkerRuntime.DotnetIsolated)
                         {
                             // Temporary: we don't have a create option for Function apps with worker runtime as dotnet-isolated.
                             // This way we temporarily update worker runtime in Azure if locally they are using dotnet-isolated.
@@ -339,7 +339,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Special checks for python dependencies
-            if (workerRuntime == WorkerRuntime.python)
+            if (workerRuntime == WorkerRuntime.Python)
             {
                 // Check if azure-functions-worker exists in requirements.txt for Python function app
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
@@ -426,7 +426,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         internal static async Task UpdateFrameworkVersions(Site functionApp, WorkerRuntime workerRuntime, string requestedDotNetVersion, bool force, AzureHelperService helperService)
         {
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 await UpdateDotNetIsolatedFrameworkVersion(functionApp, requestedDotNetVersion, helperService);
             }
@@ -548,7 +548,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // For dedicated linux apps, we do not support run from package right now
             var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium && !functionApp.IsFlex;
 
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && !functionApp.IsLinux)
             {
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
@@ -780,7 +780,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // Get the WorkerRuntime
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 var flexSkus = await GetFlexSkus(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), new AzureHelperService(AccessToken, ManagementURL));
                 if (!flexSkus.Any(s => s.functionAppConfigProperties.Runtime.Version == _requiredNetFrameworkVersion))
@@ -884,7 +884,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishRunFromPackage(functionApp, await zipFileFactory(), $"{fileNameNoExtension}.zip");
                 return true;
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.python && !NoBuild && BuildNativeDeps)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.Python && !NoBuild && BuildNativeDeps)
             {
                 await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipFileFactory()), $"{fileNameNoExtension}.squashfs");
                 return true;
@@ -1249,7 +1249,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             string flexRuntimeVersion = null;
             if (functionApp.IsFlex)
             {
-                // if the additiona keys has runtime, it would mean that runtime is already updated. 
+                // if the additiona keys has runtime, it would mean that runtime is already updated.
                 if (!additional.ContainsKey(Constants.FunctionsWorkerRuntime))
                 {
                     if (local.ContainsKey(Constants.FunctionsWorkerRuntime))

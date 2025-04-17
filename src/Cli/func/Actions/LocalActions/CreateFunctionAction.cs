@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            // Check if the command only ran for help. 
+            // Check if the command only ran for help.
             if (!string.IsNullOrEmpty(TriggerNameForHelp))
             {
                 await ProcessHelpRequest(TriggerNameForHelp, true);
@@ -124,7 +124,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     ColoredConsole.WriteLine($"Template: {TemplateName}");
                 }
-                
+
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
@@ -139,7 +139,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNamesFromNewTemplates(Language));
                 }
 
-                // Defaulting the filename to "function_app.py" if the file name is not provided. 
+                // Defaulting the filename to "function_app.py" if the file name is not provided.
                 if (string.IsNullOrWhiteSpace(FileName))
                 {
                     FileName = "function_app.py";
@@ -188,7 +188,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     FunctionName = providedInputs[GetFunctionNameParamId];
                 }
-                
+
                 await _templatesManager.Deploy(templateJob, template, variables);
             }
             else
@@ -245,7 +245,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             var isNewNodeJsModel = IsNewNodeJsProgrammingModel(workerRuntime);
-            if (workerRuntime == WorkerRuntime.node && !isNewNodeJsModel)
+            if (workerRuntime == WorkerRuntime.Node && !isNewNodeJsModel)
             {
                 NodeJSHelpers.PrintV4AwarenessMessage();
             }
@@ -339,7 +339,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
-            else if (workerRuntime == WorkerRuntime.node)
+            else if (workerRuntime == WorkerRuntime.Node)
             {
                 // Ensuring that we only show v3 templates for node when the user has not opted into the new model
                 return _templates.Value.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
@@ -383,22 +383,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             switch (workerRuntime)
             {
-                case WorkerRuntime.dotnet:
+                case WorkerRuntime.Dotnet:
                     // use fsproj as an indication that we have a F# project
                     Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharp : Constants.Languages.CSharp;
                     return true;
-                case WorkerRuntime.dotnetIsolated:
+                case WorkerRuntime.DotnetIsolated:
                     // use fsproj as an indication that we have a F# project
                     Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharpIsolated : Constants.Languages.CSharpIsolated;
                     return true;
-                case WorkerRuntime.node:
+                case WorkerRuntime.Node:
                     // use tsconfig.json as an indicator that we have a TypeScript project
                     Language = FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "tsconfig.json")) ? Constants.Languages.TypeScript : Constants.Languages.JavaScript;
                     return true;
                 case WorkerRuntime.None:
-                case WorkerRuntime.python:
-                case WorkerRuntime.java:
-                case WorkerRuntime.powershell:
+                case WorkerRuntime.Python:
+                case WorkerRuntime.Java:
+                case WorkerRuntime.Powershell:
                 case WorkerRuntime.custom:
                 default:
                     return false;
@@ -502,7 +502,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             try
             {
-                if (workerRuntime == WorkerRuntime.node)
+                if (workerRuntime == WorkerRuntime.Node)
                 {
                     if (FileSystemHelpers.FileExists(Constants.PackageJsonFileName))
                     {

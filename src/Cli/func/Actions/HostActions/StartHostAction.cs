@@ -191,8 +191,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
-                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
+                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 UserSecretsId = ProjectHelpers.GetUserSecretsId(hostOptions.ScriptPath, loggingFilterHelper, new LoggerFilterOptions());
             }
@@ -400,7 +400,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            
+
             // Return if running is delegated to another version of Core Tools
             if (await TryHandleInProcDotNetLaunchAsync())
             {
@@ -483,7 +483,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 return false;
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet)
             {
                 // Infer host runtime by checking if .NET 8 is enabled
                 var isDotNet8Project = await IsInProcDotNet8Enabled();
@@ -491,7 +491,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var selectedRuntime = isDotNet8Project
                     ? DotnetConstants.InProc8HostRuntime
                     : DotnetConstants.InProc6HostRuntime;
-                
+
                 PrintVerboseForHostSelection(selectedRuntime);
 
                 if (selectedRuntime == DotnetConstants.InProc6HostRuntime)
@@ -532,7 +532,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var isInproc6ArgumentValue = string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase);
             var isInproc8ArgumentValue = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
 
-            if (currentWorkerRuntime == WorkerRuntime.dotnet)
+            if (currentWorkerRuntime == WorkerRuntime.Dotnet)
             {
                 if (isInproc6ArgumentValue)
                 {
@@ -541,7 +541,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
-                    ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnetIsolated}'.");
+                    ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.DotnetIsolated}'.");
                 }
 
                 if (isInproc8ArgumentValue && !await validateDotNet8ProjectEnablement())
@@ -556,7 +556,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (isInproc8ArgumentValue || isInproc6ArgumentValue)
             {
-                ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnet}'.");
+                ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.Dotnet}'.");
             }
 
             PrintVerboseForHostSelection(HostRuntime);
@@ -679,7 +679,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             EnsureWorkerRuntimeIsSet();
 
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python)
             {
                 var pythonVersion = await PythonHelpers.GetEnvironmentPythonVersion();
                 PythonHelpers.AssertPythonVersion(pythonVersion, errorIfNotSupported: true, errorIfNoVersion: true);
@@ -690,7 +690,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Powershell && !CommandChecker.CommandExists("dotnet"))
             {
                 throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
             }
@@ -842,7 +842,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString());
         }
 
-        private void PrintMigrationWarningForDotnet6Inproc() 
+        private void PrintMigrationWarningForDotnet6Inproc()
         {
             ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
         }

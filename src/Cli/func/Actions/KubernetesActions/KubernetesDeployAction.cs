@@ -214,8 +214,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         private async Task<TriggersPayload> GetTriggersLocalFiles()
         {
             var functionsPath = Environment.CurrentDirectory;
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
-                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
+                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 if (DotnetHelpers.CanDotnetBuild())
                 {
@@ -225,7 +225,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
             }
 
-            var functionsJsons = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated
+            var functionsJsons = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated
                 ? ReadFunctionsMetadata(functionsPath)
                 : ReadFunctionJsons(functionsPath);
 

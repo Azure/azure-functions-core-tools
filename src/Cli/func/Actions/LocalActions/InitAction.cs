@@ -192,7 +192,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (Csx)
             {
-                ResolvedWorkerRuntime = Helpers.WorkerRuntime.dotnet;
+                ResolvedWorkerRuntime = Helpers.WorkerRuntime.Dotnet;
             }
             else
             {
@@ -278,9 +278,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static string LanguageSelectionIfRelevant(WorkerRuntime workerRuntime)
         {
-            if (workerRuntime == Helpers.WorkerRuntime.node
-                || workerRuntime == Helpers.WorkerRuntime.dotnetIsolated
-                || workerRuntime == Helpers.WorkerRuntime.dotnet)
+            if (workerRuntime == Helpers.WorkerRuntime.Node
+                || workerRuntime == Helpers.WorkerRuntime.DotnetIsolated
+                || workerRuntime == Helpers.WorkerRuntime.Dotnet)
             {
                 if (WorkerRuntimeLanguageHelper.WorkerToSupportedLanguages.TryGetValue(workerRuntime, out IEnumerable<string> languages)
                     && languages.Count() != 0)
@@ -303,10 +303,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             switch (workerRuntime)
             {
-                case Helpers.WorkerRuntime.python:
+                case Helpers.WorkerRuntime.Python:
                     await PythonHelpers.SetupPythonProject(programmingModel, generatePythonDocumentation);
                     break;
-                case Helpers.WorkerRuntime.powershell:
+                case Helpers.WorkerRuntime.Powershell:
                     await FileSystemHelpers.WriteFileIfNotExists("profile.ps1", await StaticResources.PowerShellProfilePs1);
 
                     if (managedDependenciesOption)
@@ -340,7 +340,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         await FileSystemHelpers.WriteFileIfNotExists("requirements.psd1", requirementsContent);
                     }
                     break;
-                case Helpers.WorkerRuntime.node:
+                case Helpers.WorkerRuntime.Node:
                     await NodeJSHelpers.SetupProject(programmingModel, language);
                     break;
             }
@@ -350,11 +350,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (string.IsNullOrEmpty(TargetFramework))
             {
-                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+                if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.DotnetIsolated)
                 {
                     TargetFramework = DefaultTargetFramework;
                 }
-                else if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnet)
+                else if (ResolvedWorkerRuntime == Helpers.WorkerRuntime.Dotnet)
                 {
                     TargetFramework = DefaultInProcTargetFramework;
                 }
@@ -364,7 +364,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            var supportedFrameworks = ResolvedWorkerRuntime == Helpers.WorkerRuntime.dotnetIsolated
+            var supportedFrameworks = ResolvedWorkerRuntime == Helpers.WorkerRuntime.DotnetIsolated
                 ? TargetFrameworkHelper.GetSupportedTargetFrameworks()
                 : TargetFrameworkHelper.GetSupportedInProcTargetFrameworks();
 
@@ -372,7 +372,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 throw new CliArgumentsException($"Unable to parse target framework {TargetFramework} for worker runtime {ResolvedWorkerRuntime}. Valid options are {string.Join(", ", supportedFrameworks)}");
             }
-            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.dotnet)
+            else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.DotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.Dotnet)
             {
                 throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
@@ -389,7 +389,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", storageConnectionStringValue);
 
-            if (workerRuntime == Helpers.WorkerRuntime.powershell)
+            if (workerRuntime == Helpers.WorkerRuntime.Powershell)
             {
                 localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
             }
@@ -408,7 +408,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            if (workerRuntime == Helpers.WorkerRuntime.dotnet)
+            if (workerRuntime == Helpers.WorkerRuntime.Dotnet)
             {
                 if (csx)
                 {
@@ -423,7 +423,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotNet);
                 }
             }
-            else if (workerRuntime == Helpers.WorkerRuntime.dotnetIsolated)
+            else if (workerRuntime == Helpers.WorkerRuntime.DotnetIsolated)
             {
                 if (targetFramework == Common.TargetFramework.net7)
                 {
@@ -442,7 +442,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnetIsolated);
                 }
             }
-            else if (workerRuntime == Helpers.WorkerRuntime.node)
+            else if (workerRuntime == Helpers.WorkerRuntime.Node)
             {
                 if (language == Constants.Languages.TypeScript)
                 {
@@ -453,15 +453,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileJavaScript);
                 }
             }
-            else if (workerRuntime == Helpers.WorkerRuntime.python)
+            else if (workerRuntime == Helpers.WorkerRuntime.Python)
             {
                 await WritePythonDockerFile();
             }
-            else if (workerRuntime == Helpers.WorkerRuntime.powershell)
+            else if (workerRuntime == Helpers.WorkerRuntime.Powershell)
             {
                 await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfilePowershell72);
             }
-            else if (workerRuntime == Helpers.WorkerRuntime.custom)
+            else if (workerRuntime == Helpers.WorkerRuntime.Custom)
             {
                 await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileCustom);
             }
@@ -521,7 +521,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private static bool ResolveManagedDependencies(WorkerRuntime workerRuntime, bool? managedDependenciesOption)
         {
-            if (workerRuntime != Helpers.WorkerRuntime.powershell)
+            if (workerRuntime != Helpers.WorkerRuntime.Powershell)
             {
                 if (managedDependenciesOption.HasValue)
                 {
@@ -543,18 +543,18 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             var hostJsonContent = await StaticResources.HostJson;
 
-            if (workerRuntime == Helpers.WorkerRuntime.powershell && managedDependenciesOption)
+            if (workerRuntime == Helpers.WorkerRuntime.Powershell && managedDependenciesOption)
             {
                 hostJsonContent = await hostJsonContent.AppendContent(Constants.ManagedDependencyConfigPropertyName, StaticResources.ManagedDependenciesConfig);
             }
 
             if (extensionBundle)
             {
-                if (ResolvedProgrammingModel == Common.ProgrammingModel.V2 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.python)
+                if (ResolvedProgrammingModel == Common.ProgrammingModel.V2 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Python)
                 {
                     hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigPyStein);
                 }
-                else if (ResolvedProgrammingModel == Common.ProgrammingModel.V4 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.node)
+                else if (ResolvedProgrammingModel == Common.ProgrammingModel.V4 && ResolvedWorkerRuntime == Helpers.WorkerRuntime.Node)
                 {
                     hostJsonContent = await hostJsonContent.AppendContent(Constants.ExtensionBundleConfigPropertyName, StaticResources.BundleConfigNodeV4);
                 }
@@ -564,7 +564,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
             }
 
-            if (workerRuntime == Helpers.WorkerRuntime.custom)
+            if (workerRuntime == Helpers.WorkerRuntime.Custom)
             {
                 hostJsonContent = await hostJsonContent.AppendContent(Constants.CustomHandlerPropertyName, StaticResources.CustomHandlerConfig);
             }
@@ -588,7 +588,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async Task FetchPackages(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
         {
-            if (workerRuntime == Helpers.WorkerRuntime.node && programmingModel == Common.ProgrammingModel.V4)
+            if (workerRuntime == Helpers.WorkerRuntime.Node && programmingModel == Common.ProgrammingModel.V4)
             {
                 try
                 {
@@ -607,7 +607,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (!WorkerRuntimeLanguageHelper.IsDotnetIsolated(ResolvedWorkerRuntime) || TargetFramework == DefaultTargetFramework)
                     return;
-                
+
                 var majorDotnetVersion = StacksApiHelper.GetMajorDotnetVersionFromDotnetVersionInProject(TargetFramework);
 
                 if (majorDotnetVersion == null)
