@@ -20,12 +20,12 @@ namespace Azure.Functions.Cli.PublishHelperTests
         }
 
         [Theory]
-        [InlineData("DOCKER|mcr.microsoft.com/azure-functions/dotnet", WorkerRuntime.dotnet, true)]
-        [InlineData("DOCKER|mcr.microsoft.com/azure-functions/node", WorkerRuntime.dotnet, false)]
-        [InlineData("DOCKER|customimage", WorkerRuntime.dotnet, false)]
-        [InlineData("PYTHON|3.7", WorkerRuntime.python, true)]
-        [InlineData("PYTHON|3.7", WorkerRuntime.node, false)]
-        [InlineData("", WorkerRuntime.dotnet, true)]
+        [InlineData("DOCKER|mcr.microsoft.com/azure-functions/dotnet", WorkerRuntime.Dotnet, true)]
+        [InlineData("DOCKER|mcr.microsoft.com/azure-functions/node", WorkerRuntime.Dotnet, false)]
+        [InlineData("DOCKER|customimage", WorkerRuntime.Dotnet, false)]
+        [InlineData("PYTHON|3.7", WorkerRuntime.Python, true)]
+        [InlineData("PYTHON|3.7", WorkerRuntime.Node, false)]
+        [InlineData("", WorkerRuntime.Dotnet, true)]
         public void IsLinuxFxVersionRuntimeMatchedTest(string linuxFxVersion, WorkerRuntime runtime, bool expected)
         {
             Assert.Equal(expected, PublishHelper.IsLinuxFxVersionRuntimeMatched(linuxFxVersion, runtime));
