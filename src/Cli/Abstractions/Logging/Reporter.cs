@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/Reporter.cs
-
 using Azure.Functions.Cli.Abstractions.Command;
 
 namespace Azure.Functions.Cli.Abstractions.Logging
@@ -10,17 +9,16 @@ namespace Azure.Functions.Cli.Abstractions.Logging
     // Simple console manager
     public class Reporter : IReporter
     {
-        private static SpinLock s_spinlock = new();
-
-        //cannot use auto properties, as those are static
+        // cannot use auto properties, as those are static
 #pragma warning disable IDE0032 // Use auto property
-        private static readonly Reporter s_consoleOutReporter = new(AnsiConsole.GetOutput());
-        private static readonly Reporter s_consoleErrReporter = new(AnsiConsole.GetError());
+        private static readonly Reporter _consoleOutReporter = new(AnsiConsole.GetOutput());
+        private static readonly Reporter _consoleErrReporter = new(AnsiConsole.GetError());
 #pragma warning restore IDE0032 // Use auto property
 
-        private static IReporter s_errorReporter = s_consoleErrReporter;
-        private static IReporter s_outputReporter = s_consoleOutReporter;
-        private static IReporter s_verboseReporter = s_consoleOutReporter;
+        private static SpinLock _spinlock = default(SpinLock);
+        private static IReporter _errorReporter = _consoleErrReporter;
+        private static IReporter _outputReporter = _consoleOutReporter;
+        private static IReporter _verboseReporter = _consoleOutReporter;
 
         private readonly AnsiConsole? _console;
 
@@ -35,11 +33,15 @@ namespace Azure.Functions.Cli.Abstractions.Logging
         }
 
         public static Reporter NullReporter { get; } = new(console: null);
-        public static Reporter ConsoleOutReporter => s_consoleOutReporter;
-        public static Reporter ConsoleErrReporter => s_consoleErrReporter;
+
+        public static Reporter ConsoleOutReporter => _consoleOutReporter;
+
+        public static Reporter ConsoleErrReporter => _consoleErrReporter;
 
         public static IReporter Output { get; private set; } = NullReporter;
+
         public static IReporter Error { get; private set; } = NullReporter;
+
         public static IReporter Verbose { get; private set; } = NullReporter;
 
         /// <summary>
@@ -59,12 +61,12 @@ namespace Azure.Functions.Cli.Abstractions.Logging
         /// Sets the output reporter to <paramref name="reporter"/>.
         /// The reporter won't be applied if disabled in <see cref="CommandLoggingContext"/>.
         /// </summary>
-        /// <param name="reporter"></param>
+        /// <param name="reporter"> IReporter instance. </param>
         public static void SetOutput(IReporter reporter)
         {
             UseSpinLock(() =>
             {
-                s_outputReporter = reporter;
+                _outputReporter = reporter;
                 ResetOutput();
             });
         }
@@ -77,7 +79,7 @@ namespace Azure.Functions.Cli.Abstractions.Logging
         {
             UseSpinLock(() =>
             {
-                s_errorReporter = reporter;
+                _errorReporter = reporter;
                 ResetError();
             });
         }
@@ -90,24 +92,24 @@ namespace Azure.Functions.Cli.Abstractions.Logging
         {
             UseSpinLock(() =>
             {
-                s_verboseReporter = reporter;
+                _verboseReporter = reporter;
                 ResetVerbose();
             });
         }
 
         private static void ResetOutput()
         {
-            Output = CommandLoggingContext.OutputEnabled ? s_outputReporter : NullReporter;
+            Output = CommandLoggingContext.OutputEnabled ? _outputReporter : NullReporter;
         }
 
         private static void ResetError()
         {
-            Error = CommandLoggingContext.ErrorEnabled ? s_errorReporter : NullReporter;
+            Error = CommandLoggingContext.ErrorEnabled ? _errorReporter : NullReporter;
         }
 
         private static void ResetVerbose()
         {
-            Verbose = CommandLoggingContext.IsVerbose ? s_verboseReporter : NullReporter;
+            Verbose = CommandLoggingContext.IsVerbose ? _verboseReporter : NullReporter;
         }
 
         public void WriteLine(string message)
@@ -147,20 +149,19 @@ namespace Azure.Functions.Cli.Abstractions.Logging
 
         public void WriteLine(string format, params object?[] args) => WriteLine(string.Format(format, args));
 
-
         public static void UseSpinLock(Action action)
         {
             bool lockTaken = false;
             try
             {
-                s_spinlock.Enter(ref lockTaken);
+                _spinlock.Enter(ref lockTaken);
                 action();
             }
             finally
             {
                 if (lockTaken)
                 {
-                    s_spinlock.Exit(false);
+                    _spinlock.Exit(false);
                 }
             }
         }

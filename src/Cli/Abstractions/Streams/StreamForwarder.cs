@@ -2,15 +2,14 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/StreamForwarder.csjkm;
-
 using System.Text;
 
 namespace Azure.Functions.Cli.Abstractions.Streams
 {
     public sealed class StreamForwarder
     {
-        private static readonly char[] s_ignoreCharacters = new char[] { '\r' };
-        private static readonly char s_flushBuilderCharacter = '\n';
+        private static readonly char[] _ignoreCharacters = new char[] { '\r' };
+        private static readonly char _flushBuilderCharacter = '\n';
 
         private StringBuilder? _builder;
         private StringWriter? _capture;
@@ -26,6 +25,7 @@ namespace Azure.Functions.Cli.Abstractions.Streams
                 {
                     capture = capture?.TrimEnd('\r', '\n');
                 }
+
                 return capture;
             }
         }
@@ -72,11 +72,11 @@ namespace Azure.Functions.Cli.Abstractions.Streams
             {
                 currentCharacter = buffer[0];
 
-                if (currentCharacter == s_flushBuilderCharacter)
+                if (currentCharacter == _flushBuilderCharacter)
                 {
                     WriteBuilder();
                 }
-                else if (!s_ignoreCharacters.Contains(currentCharacter))
+                else if (!_ignoreCharacters.Contains(currentCharacter))
                 {
                     _builder.Append(currentCharacter);
                 }
@@ -133,5 +133,4 @@ namespace Azure.Functions.Cli.Abstractions.Streams
             }
         }
     }
-
 }

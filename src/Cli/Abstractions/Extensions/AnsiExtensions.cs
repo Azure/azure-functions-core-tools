@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/Extensions/AnsiExtensions.cs
-
 namespace Azure.Functions.Cli.Abstractions.Extensions
 {
     public static class AnsiExtensions
@@ -28,6 +27,7 @@ namespace Azure.Functions.Cli.Abstractions.Extensions
         {
             return "\x1B[31m" + text + "\x1B[39m";
         }
+
         public static string Green(this string text)
         {
             return "\x1B[32m" + text + "\x1B[39m";

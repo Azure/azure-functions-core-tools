@@ -2,19 +2,26 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/EnvironmentProvider.cs
-
-using Azure.Functions.Cli.Abstractions.Extensions;
 using System.Runtime.InteropServices;
+using Azure.Functions.Cli.Abstractions.Extensions;
 
 namespace Azure.Functions.Cli.Abstractions.Environment
 {
     public class EnvironmentProvider : IEnvironmentProvider
     {
-        private static char[] s_pathSeparator = new char[] { Path.PathSeparator };
-        private static char[] s_quote = new char[] { '"' };
-        private IEnumerable<string>? _searchPaths;
         private readonly Lazy<string> _userHomeDirectory = new(() => Environment.GetEnvironmentVariable("HOME") ?? string.Empty);
+        private static char[] _pathSeparator = new char[] { Path.PathSeparator };
+        private static char[] _quote = new char[] { '"' };
+        private IEnumerable<string>? _searchPaths;
         private IEnumerable<string>? _executableExtensions;
+
+        public EnvironmentProvider(
+            IEnumerable<string>? extensionsOverride = null,
+            IEnumerable<string>? searchPathsOverride = null)
+        {
+            _executableExtensions = extensionsOverride;
+            _searchPaths = searchPathsOverride;
+        }
 
         public IEnumerable<string> ExecutableExtensions
         {
@@ -43,8 +50,8 @@ namespace Azure.Functions.Cli.Abstractions.Environment
 
                     searchPaths.AddRange(Environment
                         .GetEnvironmentVariable("PATH")?
-                        .Split(s_pathSeparator)
-                        .Select(p => p.Trim(s_quote))
+                        .Split(_pathSeparator)
+                        .Select(p => p.Trim(_quote))
                         .Where(p => !string.IsNullOrWhiteSpace(p))
                         .Select(p => ExpandTildeSlash(p)) ?? []);
 
@@ -68,14 +75,6 @@ namespace Azure.Functions.Cli.Abstractions.Environment
             }
         }
 
-        public EnvironmentProvider(
-            IEnumerable<string>? extensionsOverride = null,
-            IEnumerable<string>? searchPathsOverride = null)
-        {
-            _executableExtensions = extensionsOverride;
-            _searchPaths = searchPathsOverride;
-        }
-
         public string? GetCommandPath(string commandName, params string[] extensions)
         {
             if (!extensions.Any())
@@ -85,8 +84,9 @@ namespace Azure.Functions.Cli.Abstractions.Environment
 
             var commandPath = SearchPaths.Join(
                 extensions,
-                    p => true, s => true,
-                    (p, s) => Path.Combine(p, commandName + s))
+                p => true,
+                s => true,
+                (p, s) => Path.Combine(p, commandName + s))
                 .FirstOrDefault(File.Exists);
 
             return commandPath;

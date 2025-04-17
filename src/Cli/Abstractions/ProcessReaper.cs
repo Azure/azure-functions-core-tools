@@ -2,10 +2,9 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/ProcessReaper.cs
-
-using Microsoft.Win32.SafeHandles;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace Azure.Functions.Cli.Abstractions
 {
@@ -24,7 +23,12 @@ namespace Azure.Functions.Cli.Abstractions
     /// </remarks>
     internal class ProcessReaper : IDisposable
     {
+        private Process _process;
+        private SafeWaitHandle? _job;
+        private Mutex? _shutdownMutex;
+
         /// <summary>
+        /// Initializes a new instance of the <see cref="ProcessReaper"/> class.
         /// Creates a new process reaper.
         /// </summary>
         /// <param name="process">The target process to reap if the current process terminates. The process should not yet be started.</param>
@@ -161,7 +165,7 @@ namespace Azure.Functions.Cli.Abstractions
             {
                 BasicLimitInformation = new NativeMethods.Windows.JobObjectBasicLimitInformation
                 {
-                    LimitFlags = (value ? NativeMethods.Windows.JobObjectLimitFlags.JobObjectLimitKillOnJobClose : 0)
+                    LimitFlags = value ? NativeMethods.Windows.JobObjectLimitFlags.JobObjectLimitKillOnJobClose : 0
                 }
             };
 
@@ -188,9 +192,5 @@ namespace Azure.Functions.Cli.Abstractions
                 Marshal.FreeHGlobal(informationPtr);
             }
         }
-
-        private Process _process;
-        private SafeWaitHandle? _job;
-        private Mutex? _shutdownMutex;
     }
 }

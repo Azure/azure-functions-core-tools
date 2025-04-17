@@ -2,13 +2,14 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/AnsiConsole.cs
-
 namespace Azure.Functions.Cli.Abstractions.Logging
 {
     public class AnsiConsole
     {
         private const int Light = 0x08;
+
         private readonly bool _ansiEnabled;
+        private int _boldRecursion;
 
         private AnsiConsole(TextWriter writer)
         {
@@ -20,7 +21,9 @@ namespace Azure.Functions.Cli.Abstractions.Logging
             _ansiEnabled = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NO_COLOR"));
         }
 
-        private int _boldRecursion;
+        public TextWriter Writer { get; }
+
+        public ConsoleColor OriginalForegroundColor { get; }
 
         public static AnsiConsole GetOutput()
         {
@@ -32,53 +35,16 @@ namespace Azure.Functions.Cli.Abstractions.Logging
             return new AnsiConsole(Console.Error);
         }
 
-        public TextWriter Writer { get; }
-
-        public ConsoleColor OriginalForegroundColor { get; }
-
-        private void SetColor(ConsoleColor color)
-        {
-            if (!_ansiEnabled)
-            {
-                return;
-            }
-
-            int c = (int)color;
-
-            Console.ForegroundColor =
-                c < 0 ? color :                                   // unknown, just use it
-                _boldRecursion > 0 ? (ConsoleColor)(c | Light) :  // ensure color is light
-                (ConsoleColor)(c & ~Light);                       // ensure color is dark
-        }
-
-        private void SetBold(bool bold)
-        {
-            if (!_ansiEnabled)
-            {
-                return;
-            }
-
-            _boldRecursion += bold ? 1 : -1;
-            if (_boldRecursion > 1 || _boldRecursion == 1 && !bold)
-            {
-                return;
-            }
-
-            // switches on _boldRecursion to handle boldness
-            SetColor(Console.ForegroundColor);
-        }
-
         public void WriteLine(string message)
         {
             Write(message);
             Writer.WriteLine();
         }
 
-
         public void Write(string message)
         {
             var escapeScan = 0;
-            for (; ; )
+            for (; ;)
             {
                 var escapeIndex = message.IndexOf("\x1b[", escapeScan, StringComparison.Ordinal);
                 if (escapeIndex == -1)
@@ -148,12 +114,45 @@ namespace Azure.Functions.Cli.Abstractions.Logging
                                         break;
                                 }
                             }
+
                             break;
                     }
 
                     escapeScan = endIndex + 1;
                 }
             }
+        }
+
+        private void SetColor(ConsoleColor color)
+        {
+            if (!_ansiEnabled)
+            {
+                return;
+            }
+
+            int c = (int)color;
+
+            Console.ForegroundColor =
+                c < 0 ? color : // unknown, just use it
+                _boldRecursion > 0 ? (ConsoleColor)(c | Light) : // ensure color is light
+                (ConsoleColor)(c & ~Light); // ensure color is dark
+        }
+
+        private void SetBold(bool bold)
+        {
+            if (!_ansiEnabled)
+            {
+                return;
+            }
+
+            _boldRecursion += bold ? 1 : -1;
+            if (_boldRecursion > 1 || ((_boldRecursion == 1) && !bold))
+            {
+                return;
+            }
+
+            // switches on _boldRecursion to handle boldness
+            SetColor(Console.ForegroundColor);
         }
     }
 }

@@ -2,9 +2,8 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/NativeMethods.cs
-
-using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace Azure.Functions.Cli.Abstractions
 {
@@ -12,6 +11,8 @@ namespace Azure.Functions.Cli.Abstractions
     {
         internal static class Windows
         {
+            internal const int ProcessBasicInformation = 0;
+
             internal enum JobObjectInfoClass : uint
             {
                 JobObjectExtendedLimitInformation = 9,
@@ -22,6 +23,29 @@ namespace Azure.Functions.Cli.Abstractions
             {
                 JobObjectLimitKillOnJobClose = 0x2000,
             }
+
+            [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+            internal static extern SafeWaitHandle CreateJobObjectW(IntPtr lpJobAttributes, string? lpName);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            internal static extern bool SetInformationJobObject(IntPtr hJob, JobObjectInfoClass jobObjectInformationClass, IntPtr lpJobObjectInformation, uint cbJobObjectInformationLength);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            internal static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
+
+            [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+            [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+            internal static extern IntPtr GetCommandLine();
+
+            // NOTE: this used to be unsafe but I am usign safe handle based alternative here to make this compile
+            [DllImport("ntdll.dll", SetLastError = true)]
+            [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+            internal static extern uint NtQueryInformationProcess(
+                SafeProcessHandle processHandle,
+                int processInformationClass,
+                [In, Out] byte[] processInformation,  // Use a managed byte array instead
+                uint processInformationLength,
+                out uint returnLength);
 
             [StructLayout(LayoutKind.Sequential)]
             internal struct JobObjectBasicLimitInformation
@@ -59,8 +83,6 @@ namespace Azure.Functions.Cli.Abstractions
                 public UIntPtr PeakJobMemoryUsed;
             }
 
-            internal const int ProcessBasicInformation = 0;
-
             [StructLayout(LayoutKind.Sequential)]
             internal struct PROCESS_BASIC_INFORMATION
             {
@@ -71,38 +93,15 @@ namespace Azure.Functions.Cli.Abstractions
                 public UIntPtr UniqueProcessId;
                 public UIntPtr InheritedFromUniqueProcessId;
             }
-
-            [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern SafeWaitHandle CreateJobObjectW(IntPtr lpJobAttributes, string? lpName);
-
-            [DllImport("kernel32.dll", SetLastError = true)]
-            internal static extern bool SetInformationJobObject(IntPtr hJob, JobObjectInfoClass jobObjectInformationClass, IntPtr lpJobObjectInformation, uint cbJobObjectInformationLength);
-
-            [DllImport("kernel32.dll", SetLastError = true)]
-            internal static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
-
-            [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
-            [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-            internal static extern IntPtr GetCommandLine();
-
-            // NOTE: this used to be unsafe but I am usign safe handle based alternative here to make this compile
-            [DllImport("ntdll.dll", SetLastError = true)]
-            [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-            internal static extern uint NtQueryInformationProcess(
-                SafeProcessHandle ProcessHandle,
-                int ProcessInformationClass,
-                [In, Out] byte[] ProcessInformation,  // Use a managed byte array instead
-                uint ProcessInformationLength,
-                out uint ReturnLength);
         }
 
         internal static class Posix
         {
-            [DllImport("libc", SetLastError = true)]
-            internal static extern int kill(int pid, int sig);
-
             internal const int SIGINT = 2;
             internal const int SIGTERM = 15;
+
+            [DllImport("libc", SetLastError = true)]
+            internal static extern int kill(int pid, int sig);
         }
     }
 }
