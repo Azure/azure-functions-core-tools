@@ -1,21 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Collections.Concurrent;
+using System.Globalization;
+using System.Text;
+using Azure.Functions.Cli.Common;
 using Colors.Net;
+using Colors.Net.StringColorExtensions;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Logging;
-using Azure.Functions.Cli.Common;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using System.Linq;
-using Colors.Net.StringColorExtensions;
-using System.Globalization;
-using System.IO;
-using System.Text;
-using System.Collections.Concurrent;
 
 namespace Azure.Functions.Cli.Diagnostics
 {
     public class ColoredConsoleLogger : ILogger, IDisposable
     {
+        private const string JsonLogPrefix = "azfuncjsonlog:";
         private readonly bool _verboseErrors;
         private readonly Action<string> _logJsonOutput;
         private readonly object _fileAccessLock;
@@ -26,9 +26,8 @@ namespace Azure.Functions.Cli.Diagnostics
         private static readonly LoggerRuleSelector RuleSelector = new LoggerRuleSelector();
         private static readonly Type ProviderType = typeof(ColoredConsoleLoggerProvider);
         private readonly FileStream _jsonOutputFileStream;
+        private static readonly ConcurrentDictionary<string, object> _fileAccessLocks = new ConcurrentDictionary<string, object>();
         private bool _disposed;
-        private const string JsonLogPrefix = "azfuncjsonlog:";
-        private readonly static ConcurrentDictionary<string, object> _fileAccessLocks = new ConcurrentDictionary<string, object>();
 
         public ColoredConsoleLogger(string category, LoggingFilterHelper loggingFilterHelper, LoggerFilterOptions loggerFilterOptions, string jsonOutputFilePath = null)
         {
@@ -37,7 +36,6 @@ namespace Azure.Functions.Cli.Diagnostics
             _loggingFilterHelper = loggingFilterHelper ?? throw new ArgumentNullException(nameof(loggingFilterHelper));
             _verboseErrors = StaticSettings.IsDebug;
             _logJsonOutput = message => LogToConsole(LogLevel.Information, null, message, false);
-
 
             if (jsonOutputFilePath != null)
             {
@@ -58,8 +56,7 @@ namespace Azure.Functions.Cli.Diagnostics
 
         internal LoggerFilterRule SelectRule(string categoryName, LoggerFilterOptions loggerFilterOptions)
         {
-            RuleSelector.Select(loggerFilterOptions, ProviderType, categoryName,
-                out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter);
+            RuleSelector.Select(loggerFilterOptions, ProviderType, categoryName, out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter);
 
             return new LoggerFilterRule(ProviderType.FullName, categoryName, minLevel, filter);
         }
@@ -72,6 +69,7 @@ namespace Azure.Functions.Cli.Diagnostics
             {
                 return false;
             }
+
             if (filterRule.Filter != null)
             {
                 bool enabled = filterRule.Filter(ProviderType.FullName, category, logLevel);
@@ -80,10 +78,12 @@ namespace Azure.Functions.Cli.Diagnostics
                     return false;
                 }
             }
+
             if (filterRule.LogLevel != null)
             {
                 return Utilities.DefaultLoggingFilter(category, logLevel, filterRule.LogLevel.Value, filterRule.LogLevel.Value);
             }
+
             return Utilities.DefaultLoggingFilter(category, logLevel, _loggingFilterHelper.UserLogDefaultLogLevel, _loggingFilterHelper.SystemLogDefaultLogLevel);
         }
 
@@ -106,7 +106,7 @@ namespace Azure.Functions.Cli.Diagnostics
                 _logJsonOutput(formattedMessage.Remove(0, JsonLogPrefix.Length));
                 return;
             }
-            
+
             if (DoesMessageStartsWithAllowedLogsPrefix(formattedMessage))
             {
                 LogToConsole(logLevel, exception, formattedMessage);
@@ -175,11 +175,11 @@ namespace Azure.Functions.Cli.Diagnostics
             }
         }
 
-        private static IEnumerable<RichString> SplitAndApply(string message, Func<string, RichString> Color = null)
+        private static IEnumerable<RichString> SplitAndApply(string message, Func<string, RichString> color = null)
         {
             foreach (var line in message.ToString().Split(new[] { Environment.NewLine }, StringSplitOptions.None))
             {
-                yield return Color == null ? new RichString(line) : Color(line);
+                yield return color == null ? new RichString(line) : color(line);
             }
         }
 
