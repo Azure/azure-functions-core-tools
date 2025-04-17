@@ -1,12 +1,9 @@
-using System;
-using System.Collections.Generic;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -49,7 +46,6 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 // No namespace was specified so we rely on the default namespace in .kube/config
                 // Because of that, we assume that it exists because we don't know its name
-
                 return true;
             }
 
@@ -82,14 +78,13 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 // No namespace was specified so we rely on the default namespace in .kube/config
                 // Because of that, we assume that already exists since we don't know its name
-
                 return;
             }
 
             await KubectlHelper.RunKubectl($"create namespace {@namespace}", ignoreError: false, showOutput: true);
         }
 
-        internal static async Task<(IEnumerable<IKubernetesResource>, IDictionary<string, string>)> GetFunctionsDeploymentResources(
+        internal static async Task<(IEnumerable<IKubernetesResource> ResourceList, IDictionary<string, string> FunctionKeys)> GetFunctionsDeploymentResources(
             string name,
             string imageName,
             string @namespace,
@@ -122,7 +117,8 @@ namespace Azure.Functions.Cli.Kubernetes
             {
                 int position = 0;
                 var enabledFunctions = httpFunctions.ToDictionary(k => $"AzureFunctionsJobHost__functions__{position++}", v => v.Key);
-                //Environment variables for the func app keys kubernetes secret
+
+                // Environment variables for the func app keys kubernetes secret
                 var kubernetesSecretEnvironmentVariable = FuncAppKeysHelper.FuncKeysKubernetesEnvironVariables(keysSecretCollectionName, mountKeysAsContainerVolume);
                 var additionalEnvVars = enabledFunctions.Concat(kubernetesSecretEnvironmentVariable).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 var deployment = GetDeployment(name + "-http", @namespace, imageName, pullSecret, 1, additionalEnvVars, port: 80);
@@ -229,12 +225,13 @@ namespace Azure.Functions.Cli.Kubernetes
                     resourceIndex++;
                 }
 
-                //if function keys Secrets needs to be mounted as volume in the function runtime container
+                // if function keys Secrets needs to be mounted as volume in the function runtime container
                 if (mountKeysAsContainerVolume)
                 {
                     FuncAppKeysHelper.CreateFuncAppKeysVolumeMountDeploymentResource(deployments, keysSecretCollectionName);
                 }
-                //Create the Pod identity with the role to modify the function kubernetes secret
+
+                // Create the Pod identity with the role to modify the function kubernetes secret
                 else
                 {
                     var svcActName = $"{name}-function-keys-identity-svc-act";
@@ -251,7 +248,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     result.Insert(resourceIndex, funcKeysRoleBindingDeploymentResource);
                     resourceIndex++;
 
-                    //add service account identity to the pod
+                    // add service account identity to the pod
                     foreach (var deployment in deployments)
                     {
                         deployment.Spec.Template.Spec.ServiceAccountName = svcActName;
@@ -315,8 +312,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 proxy = await KubectlHelper.RunKubectlProxy(
                     deployment,
                     service.Spec.Ports.FirstOrDefault()?.Port ?? 80,
-                    localPort
-                );
+                    localPort);
                 string baseAddress;
                 if (showServiceFqdn)
                 {
@@ -370,8 +366,8 @@ namespace Azure.Functions.Cli.Kubernetes
                                 ColoredConsole.WriteLine($"\tInvoke url: {VerboseColor(url)}");
                             }
                         }
-                        ColoredConsole.WriteLine();
 
+                        ColoredConsole.WriteLine();
                     }
                 }
             }
@@ -383,7 +379,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            //Print the master key as well for the user
+            // Print the master key as well for the user
             ColoredConsole.WriteLine($"\tMaster key: {VerboseColor($"{funcKeys["host.master"]}")}");
         }
 
@@ -420,6 +416,7 @@ namespace Azure.Functions.Cli.Kubernetes
                             ColoredConsole.Error.WriteLine(e);
                         }
                     }
+
                     await Task.Delay(new Random().Next(500, 2000));
                 }
             }
@@ -461,10 +458,10 @@ namespace Azure.Functions.Cli.Kubernetes
                 return currentImageFuncKeys;
             }
 
-            //The function keys that doesn't exist in Kubernetes yet
+            // The function keys that doesn't exist in Kubernetes yet
             IDictionary<string, string> funcKeys = currentImageFuncKeys.Except(existingFuncKeys, new KeyBasedDictionaryComparer()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-             //Merge the new keys with the keys that already exist in kubernetes
+             // Merge the new keys with the keys that already exist in kubernetes
             foreach (var commonKey in existingFuncKeys.Intersect(currentImageFuncKeys, new KeyBasedDictionaryComparer()))
             {
                 funcKeys.Add(commonKey);
@@ -473,24 +470,6 @@ namespace Azure.Functions.Cli.Kubernetes
             return funcKeys;
         }
 
-        public class QuoteNumbersEventEmitter : ChainedEventEmitter
-        {
-            public QuoteNumbersEventEmitter(IEventEmitter nextEmitter)
-                : base(nextEmitter)
-            { }
-
-            public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
-            {
-                if (eventInfo.Source.Type == typeof(string) &&
-                    (double.TryParse(eventInfo.Source.Value.ToString(), out _) ||
-                     bool.TryParse(eventInfo.Source.Value.ToString(), out _)))
-                {
-                    eventInfo.Style = ScalarStyle.DoubleQuoted;
-                }
-
-                base.Emit(eventInfo, emitter);
-            }
-        }
         internal static string SerializeResources(IEnumerable<IKubernetesResource> resources, OutputSerializationOptions outputFormat)
         {
             var sb = new StringBuilder();
@@ -513,6 +492,7 @@ namespace Azure.Functions.Cli.Kubernetes
                     sb.AppendLine("---");
                 }
             }
+
             return sb.ToString();
         }
 
@@ -578,7 +558,7 @@ namespace Azure.Functions.Cli.Kubernetes
                                     HttpGet = new HttpAction
                                     {
                                         Path = "/",
-                                        port = 80,
+                                        Port = 80,
                                         Scheme = "HTTP"
                                     },
                                     PeriodSeconds = 10,
@@ -591,7 +571,7 @@ namespace Azure.Functions.Cli.Kubernetes
                                     HttpGet = new HttpAction
                                     {
                                         Path = "/",
-                                        port = 80,
+                                        Port = 80,
                                         Scheme = "HTTP"
                                     },
                                     PeriodSeconds = 10,
@@ -706,9 +686,9 @@ namespace Azure.Functions.Cli.Kubernetes
                 {
                     new RuleV1
                     {
-                        ApiGroups = new string[]{""},
-                        Resources = new string[]{"secrets", "configMaps"},
-                        Verbs = new string[]{ "get", "list", "watch", "create", "update", "patch", "delete" }
+                        ApiGroups = [string.Empty],
+                        Resources = ["secrets", "configMaps"],
+                        Verbs = ["get", "list", "watch", "create", "update", "patch", "delete"]
                     }
                 }
             };
@@ -751,6 +731,26 @@ namespace Azure.Functions.Cli.Kubernetes
             catch
             {
                 return default;
+            }
+        }
+
+        public class QuoteNumbersEventEmitter : ChainedEventEmitter
+        {
+            public QuoteNumbersEventEmitter(IEventEmitter nextEmitter)
+                : base(nextEmitter)
+            {
+            }
+
+            public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
+            {
+                if (eventInfo.Source.Type == typeof(string) &&
+                    (double.TryParse(eventInfo.Source.Value.ToString(), out _) ||
+                     bool.TryParse(eventInfo.Source.Value.ToString(), out _)))
+                {
+                    eventInfo.Style = ScalarStyle.DoubleQuoted;
+                }
+
+                base.Emit(eventInfo, emitter);
             }
         }
     }
