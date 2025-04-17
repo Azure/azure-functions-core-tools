@@ -1,10 +1,8 @@
-
 // Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using Newtonsoft.Json;
 using Azure.Functions.Cli.Common;
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Models
 {
