@@ -28,15 +28,16 @@ namespace Func.TestFramework.Helpers
 
                        return funcInitResult.ExitCode == 0;
                    }
-                   catch ( Exception ex )
+                   catch (Exception ex)
                    {
                        log.WriteLine(ex.Message);
                        return Task.FromResult(false);
                    }
-               }, timeout: 300 * 10000);
+               },
+               timeout: 300 * 10000);
         }
 
-        public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string workerRuntime = null)
+        public static async Task FuncNewWithRetryAsync(string funcPath, string testName, string workingDirectory, ITestOutputHelper log, IEnumerable<string> args, string? workerRuntime = null)
         {
             int retryNumber = 1;
 
@@ -61,12 +62,13 @@ namespace Func.TestFramework.Helpers
                        log.WriteLine($"Done executing. Value of funcNewResult.exitcode: {funcNewResult.ExitCode}");
                        return funcNewResult.ExitCode == 0;
                    }
-                   catch ( Exception ex )
+                   catch (Exception ex)
                    {
                        log.WriteLine(ex.Message);
                        return Task.FromResult(false);
                    }
-               }, timeout: 300 * 10000);
+               },
+               timeout: 300 * 10000);
         }
     }
 }

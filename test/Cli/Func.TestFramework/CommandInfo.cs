@@ -2,23 +2,24 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Commands/SdkCommandSpec.cs
-
-using Azure.Functions.Cli.Abstractions;
 using System.Diagnostics;
+using Azure.Functions.Cli.Abstractions;
 
 namespace Func.TestFramework
 {
     public class CommandInfo
     {
-        public string FileName { get; set; }
+        public required string FileName { get; set; }
+
         public List<string> Arguments { get; set; } = new List<string>();
 
         public Dictionary<string, string> Environment { get; set; } = new Dictionary<string, string>();
 
         public List<string> EnvironmentToRemove { get; } = new List<string>();
-        public string WorkingDirectory { get; set; }
 
-        public string TestName { get; set; }
+        public required string WorkingDirectory { get; set; }
+
+        public string? TestName { get; set; }
 
         public Command ToCommand(bool doNotEscapeArguments = false)
         {
