@@ -1,8 +1,10 @@
-﻿using Azure.Functions.Cli.Kubernetes.KEDA.V1;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Kubernetes.KEDA.V1;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
-using System;
 
 namespace Azure.Functions.Cli.Kubernetes.KEDA
 {
@@ -15,16 +17,23 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
             _kedaVersion = kedaVersion;
         }
 
-        public IKubernetesResource Create(string name, string @namespace, TriggersPayload triggers,
-               DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
+        public IKubernetesResource Create(
+            string name,
+            string @namespace,
+            TriggersPayload triggers,
+            DeploymentV1Apps deployment,
+            int? pollingInterval,
+            int? cooldownPeriod,
+            int? minReplicas,
+            int? maxReplicas)
         {
             IKedaResource kedaResource;
             switch (_kedaVersion)
             {
-                case KedaVersion.v1:
+                case KedaVersion.V1:
                     kedaResource = new KedaV1Resource();
                     break;
-                case KedaVersion.v2:
+                case KedaVersion.V2:
                     kedaResource = new KedaV2Resource();
                     break;
                 default:

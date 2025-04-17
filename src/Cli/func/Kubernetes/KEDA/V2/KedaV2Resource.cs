@@ -1,7 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Globalization;
-using System.Linq;
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
@@ -12,8 +12,15 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
 {
     public class KedaV2Resource : KedaResourceBase
     {
-        public override IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
-               DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
+        public override IKubernetesResource GetKubernetesResource(
+            string name,
+            string @namespace,
+            TriggersPayload triggers,
+            DeploymentV1Apps deployment,
+            int? pollingInterval,
+            int? cooldownPeriod,
+            int? minReplicas,
+            int? maxReplicas)
         {
             return new ScaledObjectKedaV2
             {
@@ -139,7 +146,6 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V2
             }
 
             // Clean-up for all triggers
-
             metadata.Remove("type");
             metadata.Remove("name");
 

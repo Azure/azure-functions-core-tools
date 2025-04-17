@@ -1,12 +1,12 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.Generic;
 using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
 {
     public class PodTemplateV1 : BaseKubernetesResource<PodTemplateSpecV1>
     {
-
     }
 
     public class PodTemplateSpecV1 : IKubernetesSpec
@@ -29,6 +29,7 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
         [JsonProperty("volumes")]
         public IEnumerable<VolumeV1> Volumes { get; set; }
     }
+
     public class VolumeV1
     {
         [JsonProperty("name")]

@@ -1,14 +1,13 @@
-using System;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
-using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Newtonsoft.Json;
-using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Kubernetes
 {
@@ -16,11 +15,14 @@ namespace Azure.Functions.Cli.Kubernetes
     {
         public static async Task KubectlApply(object obj, bool showOutput, bool ignoreError = false, string @namespace = null)
         {
-            var payload = JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.None,
-                new Newtonsoft.Json.JsonSerializerSettings
+            var payload = JsonConvert.SerializeObject(
+                obj,
+                Formatting.None,
+                new JsonSerializerSettings
                 {
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                    NullValueHandling = NullValueHandling.Ignore
                 });
+
             await KubectlApply(payload, showOutput, ignoreError, @namespace);
         }
 
@@ -31,32 +33,35 @@ namespace Azure.Functions.Cli.Kubernetes
 
         public static async Task<T> KubectlGet<T>(string resource)
         {
-
             (var output, var error, _) = await RunKubectl($"get {resource} --output json");
             return JsonConvert.DeserializeObject<T>(output);
         }
+
         public static async Task KubectlDelete(object obj, bool showOutput, bool ignoreError = false, string @namespace = null)
         {
-            var payload = JsonConvert.SerializeObject(obj, Newtonsoft.Json.Formatting.None,
-                new Newtonsoft.Json.JsonSerializerSettings
+            var payload = JsonConvert.SerializeObject(
+                obj,
+                Formatting.None,
+                new JsonSerializerSettings
                 {
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                    NullValueHandling = NullValueHandling.Ignore
                 });
+
             await KubectlDelete(payload, showOutput, ignoreError, @namespace);
         }
-        
+
         public static async Task KubectlDelete(string content, bool showOutput, bool ignoreError = false, string @namespace = null)
         {
             await RunKubectl($"delete {(@namespace == null ? string.Empty : $"--namespace {@namespace}")} -f -", showOutput: showOutput, ignoreError: ignoreError, stdIn: content);
         }
 
-        public static async Task<(string output, string error, int exitCode)> RunKubectl(string cmd, bool ignoreError = false, bool showOutput = false, string stdIn = null, TimeSpan? timeout = null)
+        public static async Task<(string Output, string Error, int ExitCode)> RunKubectl(string cmd, bool ignoreError = false, bool showOutput = false, string stdIn = null, TimeSpan? timeout = null)
         {
             var kubectl = new Executable("kubectl", cmd);
             var sbError = new StringBuilder();
             var sbOutput = new StringBuilder();
 
-            var exitCode = await kubectl.RunAsync(l => output(l), e => error(e), stdIn: stdIn, timeout: timeout);
+            var exitCode = await kubectl.RunAsync(l => Output(l), e => Error(e), stdIn: stdIn, timeout: timeout);
 
             if (exitCode != 0 && !ignoreError)
             {
@@ -65,7 +70,7 @@ namespace Azure.Functions.Cli.Kubernetes
             }
 
             return (sbOutput.ToString().Trim(), sbError.ToString().Trim(), exitCode);
-            void output(string line)
+            void Output(string line)
             {
                 sbOutput.AppendLine(line);
                 if (showOutput && line != null && !string.IsNullOrWhiteSpace(line.Trim()))
@@ -74,7 +79,7 @@ namespace Azure.Functions.Cli.Kubernetes
                 }
             }
 
-            void error(string line)
+            void Error(string line)
             {
                 sbOutput.AppendLine(line);
                 if (showOutput && line != null && !string.IsNullOrWhiteSpace(line.Trim()))
@@ -114,7 +119,7 @@ namespace Azure.Functions.Cli.Kubernetes
 
             async Task TimeoutFunc()
             {
-                while(DateTime.Now < deadline)
+                while (DateTime.Now < deadline)
                 {
                     if (tcs.Task.IsCompleted)
                     {
@@ -141,7 +146,8 @@ namespace Azure.Functions.Cli.Kubernetes
                 {
                     return $" --namespace {@namespace}";
                 }
-                return String.Empty;
+
+                return string.Empty;
             }
 
             string GetResourceFullName(IKubernetesResource r)
