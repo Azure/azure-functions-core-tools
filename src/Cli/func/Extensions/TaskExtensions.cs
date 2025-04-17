@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Extensions
@@ -10,48 +9,55 @@ namespace Azure.Functions.Cli.Extensions
     {
         public static void Ignore(this Task task)
         {
-            task.ContinueWith(t =>
-            {
-                try
+            task.ContinueWith(
+                t =>
                 {
-                    t.Wait();
-                }
-                catch (Exception e)
-                {
-                    System.Diagnostics.Trace.TraceError($"SafeGuard Exception: {e.ToString()}");
-                }
-            }, TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted);
+                    try
+                    {
+                        t.Wait();
+                    }
+                    catch (Exception e)
+                    {
+                        System.Diagnostics.Trace.TraceError($"SafeGuard Exception: {e}");
+                    }
+                },
+                TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted);
         }
 
         public static Task IgnoreFailure(this Task task)
         {
-            return task.ContinueWith(t =>
-            {
-                try
+            return task.ContinueWith(
+                t =>
                 {
-                    t.Wait();
-                }
-                catch (Exception e)
-                {
-                    System.Diagnostics.Trace.TraceError($"SafeGuard Exception: {e.ToString()}");
-                }
-            }, TaskContinuationOptions.ExecuteSynchronously);
+                    try
+                    {
+                        t.Wait();
+                    }
+                    catch (Exception e)
+                    {
+                        System.Diagnostics.Trace.TraceError($"SafeGuard Exception: {e}");
+                    }
+                },
+                TaskContinuationOptions.ExecuteSynchronously);
         }
 
         public static Task<T> IgnoreFailure<T>(this Task<T> task)
         {
-            return task.ContinueWith(t =>
-            {
-                try
+            return task.ContinueWith(
+                t =>
                 {
-                    return t.Result;
-                }
-                catch (Exception e)
-                {
-                    System.Diagnostics.Trace.TraceError($"SafeGuard<T> Exception: {e.ToString()}");
-                }
-                return default(T);
-            }, TaskContinuationOptions.ExecuteSynchronously);
+                    try
+                    {
+                        return t.Result;
+                    }
+                    catch (Exception e)
+                    {
+                        System.Diagnostics.Trace.TraceError($"SafeGuard<T> Exception: {e}");
+                    }
+
+                    return default(T);
+                },
+                TaskContinuationOptions.ExecuteSynchronously);
         }
 
         public static async Task<IEnumerable<T>> IgnoreAndFilterFailures<T>(this IEnumerable<Task<T>> collection)

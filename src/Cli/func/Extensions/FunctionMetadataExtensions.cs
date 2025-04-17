@@ -1,5 +1,6 @@
-﻿using System;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Microsoft.Azure.WebJobs.Script.Description;
 
 namespace Azure.Functions.Cli.Extensions
