@@ -1,9 +1,8 @@
-using System;
-using System.Net.Http;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Newtonsoft.Json;
@@ -57,18 +56,28 @@ namespace Azure.Functions.Cli.Arm
                             }
                         }
                     }
+
                     return response;
                 }
                 catch (SocketException)
                 {
-                    if (socketTrials <= 0) throw;
+                    if (socketTrials <= 0)
+                    {
+                        throw;
+                    }
+
                     socketTrials--;
                 }
                 catch (Exception)
                 {
-                    if (retries <= 0) throw;
+                    if (retries <= 0)
+                    {
+                        throw;
+                    }
+
                     retries--;
                 }
+
                 await Task.Delay(_random.Next(1000, 10000));
             }
         }
@@ -93,33 +102,33 @@ namespace Azure.Functions.Cli.Arm
 
                 HttpResponseMessage response = null;
 
-                if (String.Equals(verb, "get", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(verb, "get", StringComparison.OrdinalIgnoreCase))
                 {
                     response = await client.GetAsync(uri).ConfigureAwait(false);
                 }
-                else if (String.Equals(verb, "delete", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(verb, "delete", StringComparison.OrdinalIgnoreCase))
                 {
                     response = await client.DeleteAsync(uri).ConfigureAwait(false);
                 }
-                else if (String.Equals(verb, "post", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(verb, "post", StringComparison.OrdinalIgnoreCase))
                 {
-                    response = await client.PostAsync(uri, new StringContent(payload ?? String.Empty, Encoding.UTF8, jsonContentType)).ConfigureAwait(false);
+                    response = await client.PostAsync(uri, new StringContent(payload ?? string.Empty, Encoding.UTF8, jsonContentType)).ConfigureAwait(false);
                 }
-                else if (String.Equals(verb, "put", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(verb, "put", StringComparison.OrdinalIgnoreCase))
                 {
-                    response = await client.PutAsync(uri, new StringContent(payload ?? String.Empty, Encoding.UTF8, jsonContentType)).ConfigureAwait(false);
+                    response = await client.PutAsync(uri, new StringContent(payload ?? string.Empty, Encoding.UTF8, jsonContentType)).ConfigureAwait(false);
                 }
-                else if (String.Equals(verb, "patch", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(verb, "patch", StringComparison.OrdinalIgnoreCase))
                 {
                     using (var message = new HttpRequestMessage(new HttpMethod("PATCH"), uri))
                     {
-                        message.Content = new StringContent(payload ?? String.Empty, Encoding.UTF8, jsonContentType);
+                        message.Content = new StringContent(payload ?? string.Empty, Encoding.UTF8, jsonContentType);
                         response = await client.SendAsync(message).ConfigureAwait(false);
                     }
                 }
                 else
                 {
-                    throw new InvalidOperationException(String.Format("Invalid http verb '{0}'!", verb));
+                    throw new InvalidOperationException(string.Format("Invalid http verb '{0}'!", verb));
                 }
 
                 return response;
@@ -143,6 +152,7 @@ namespace Azure.Functions.Cli.Arm
             {
                 ColoredConsole.WriteLine(DarkGray(await request.Content.ReadAsStringAsync()));
             }
+
             ColoredConsole.WriteLine();
 
             HttpResponseMessage response = await base.SendAsync(request, cancellationToken);
@@ -153,6 +163,7 @@ namespace Azure.Functions.Cli.Arm
             {
                 ColoredConsole.WriteLine(DarkGray(await response.Content.ReadAsStringAsync()));
             }
+
             ColoredConsole.WriteLine().WriteLine();
 
             return response;

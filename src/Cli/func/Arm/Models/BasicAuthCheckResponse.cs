@@ -1,14 +1,11 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static NuGet.Client.ManagedCodeConventions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Arm.Models
 {
-    class BasicAuthCheckResponse
+    internal class BasicAuthCheckResponse
     {
         [JsonProperty(PropertyName = "id")]
         public string Id { get; set; }
@@ -26,7 +23,7 @@ namespace Azure.Functions.Cli.Arm.Models
         public BasicAuthCheckResponseProperties Properties { get; set; }
     }
 
-    class BasicAuthCheckResponseProperties
+    internal class BasicAuthCheckResponseProperties
     {
         [JsonProperty(PropertyName = "allow")]
         public bool Allow { get; set; }
