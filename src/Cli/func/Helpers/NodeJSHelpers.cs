@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -54,7 +56,8 @@ namespace Azure.Functions.Cli.Helpers
             }
 
             await FileSystemHelpers.WriteFileIfNotExists(".funcignore", await StaticResources.FuncIgnore);
-            if (language == Constants.Languages.TypeScript) {
+            if (language == Constants.Languages.TypeScript)
+            {
                 await FileSystemHelpers.WriteFileIfNotExists("tsconfig.json", await StaticResources.TsConfig);
             }
         }

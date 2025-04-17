@@ -1,14 +1,12 @@
-﻿using Azure.Functions.Cli.Arm.Models;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Text;
+using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Models;
 using Colors.Net;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -50,7 +48,6 @@ namespace Azure.Functions.Cli.Helpers
             return statusCode;
         }
 
-
         public static async Task<DeployStatus> WaitForFlexDeployment(HttpClient client, Site functionApp)
         {
             ColoredConsole.WriteLine("Deployment in progress, please wait...");
@@ -64,7 +61,7 @@ namespace Azure.Functions.Cli.Helpers
                 id = await GetLatestDeploymentId(client, functionApp);
             }
 
-            while(statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown && statusCode != DeployStatus.Conflict && statusCode != DeployStatus.PartialSuccess) 
+            while (statusCode != DeployStatus.Success && statusCode != DeployStatus.Failed && statusCode != DeployStatus.Unknown && statusCode != DeployStatus.Conflict && statusCode != DeployStatus.PartialSuccess)
             {
                 try
                 {
@@ -77,7 +74,6 @@ namespace Azure.Functions.Cli.Helpers
 
                 await Task.Delay(TimeSpan.FromSeconds(Constants.KuduLiteDeploymentConstants.StatusRefreshSeconds));
             }
-
 
             // Safely printing logs after the status is confirmed.
             try
@@ -92,7 +88,6 @@ namespace Azure.Functions.Cli.Helpers
             return statusCode;
         }
 
-
         private static async Task<string> GetLatestDeploymentId(HttpClient client, Site functionApp)
         {
             var deploymentUrl = "/deployments";
@@ -100,9 +95,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 deploymentUrl = "api/deployments";
             }
-            
+
             var deployments = await InvokeRequest<List<DeploymentResponse>>(client, HttpMethod.Get, deploymentUrl);
-            
+
             if (functionApp.IsFlex)
             {
                 if (!deployments.Any())
@@ -121,11 +116,12 @@ namespace Azure.Functions.Cli.Helpers
             var latestDeployment = deployments.First();
             DeployStatus? status = latestDeployment.Status;
             if (status == DeployStatus.Building || status == DeployStatus.Deploying
-                || status == DeployStatus.Success || status == DeployStatus.Failed 
+                || status == DeployStatus.Success || status == DeployStatus.Failed
                 || status == DeployStatus.Conflict || status == DeployStatus.PartialSuccess)
             {
                 return latestDeployment.Id;
             }
+
             return null;
         }
 
@@ -143,12 +139,13 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return DeployStatus.Unknown;
             }
+
             return status.Value;
         }
 
         private static async Task<DateTime> DisplayDeploymentLog(HttpClient client, Site functionApp, string id, DateTime lastUpdate, Uri innerUrl = null, StringBuilder innerLogger = null)
         {
-            string logUrl = innerUrl != null ? innerUrl.ToString() : (functionApp.IsFlex? $"/api/deployments/{id}/log" :  $"/deployments/{id}/log");
+            string logUrl = innerUrl != null ? innerUrl.ToString() : (functionApp.IsFlex ? $"/api/deployments/{id}/log" : $"/deployments/{id}/log");
             StringBuilder sbLogger = innerLogger != null ? innerLogger : new StringBuilder();
 
             var deploymentLogs = await InvokeRequest<List<DeploymentLogResponse>>(client, HttpMethod.Get, logUrl);
@@ -189,22 +186,25 @@ namespace Azure.Functions.Cli.Helpers
         private static async Task<T> InvokeRequest<T>(HttpClient client, HttpMethod method, string url)
         {
             HttpResponseMessage response = null;
-            await RetryHelper.Retry(async () =>
-            {
-                using (var request = new HttpRequestMessage(method, new Uri(url, UriKind.RelativeOrAbsolute)))
+            await RetryHelper.Retry(
+                async () =>
                 {
-                    response = await client.SendAsync(request);
-                    response.EnsureSuccessStatusCode();
-                }
-            }, 3);
+                    using (var request = new HttpRequestMessage(method, new Uri(url, UriKind.RelativeOrAbsolute)))
+                    {
+                        response = await client.SendAsync(request);
+                        response.EnsureSuccessStatusCode();
+                    }
+                },
+                3);
 
-            if (response != null)
+            if (response is not null)
             {
                 string jsonString = await response.Content.ReadAsStringAsync();
                 return JsonConvert.DeserializeObject<T>(jsonString);
-            } else
+            }
+            else
             {
-                return default(T);
+                return default;
             }
         }
     }

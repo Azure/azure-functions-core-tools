@@ -1,12 +1,11 @@
-﻿using System;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Kubernetes.Models;
 using Colors.Net;
 using Newtonsoft.Json;
-using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -47,8 +46,10 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     throw new CliException("Got permission denied trying to run docker. Make sure the user you are running the cli from is in docker group or is root");
                 }
+
                 throw new CliException($"Could not connect to Docker.{Environment.NewLine}Error: {errorStr}");
             }
+
             return true;
         }
 
@@ -59,6 +60,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 await DockerPull(imageName);
             }
+
             var containerId = string.Empty;
             try
             {
@@ -77,7 +79,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<(string output, string error, int exitCode)> InternalRunDockerCommand(string args, bool ignoreError, string stdIn = null)
+        private static async Task<(string Output, string Error, int ExitCode)> InternalRunDockerCommand(string args, bool ignoreError, string stdIn = null)
         {
             var docker = new Executable("docker", args);
             var sbError = new StringBuilder();
@@ -88,15 +90,15 @@ namespace Azure.Functions.Cli.Helpers
             if (exitCode != 0 && !ignoreError)
             {
                 throw new CliException($"Error running {docker.Command}.\n" +
-                    $"output: {sbOutput.ToString()}\n{sbError.ToString()}");
+                    $"output: {sbOutput}\n{sbError}");
             }
 
-            return (trim(sbOutput.ToString()), trim(sbError.ToString()), exitCode);
+            return (Trim(sbOutput.ToString()), Trim(sbError.ToString()), exitCode);
 
-            string trim(string str) => str.Trim(new[] { ' ', '\n' });
+            string Trim(string str) => str.Trim([' ', '\n']);
         }
 
-        internal static async Task<(string output, string error, int exitCode)> RunDockerCommand(string args, string containerId = null, bool ignoreError = false, bool showProgress = true, string stdIn = null)
+        internal static async Task<(string Output, string Error, int ExitCode)> RunDockerCommand(string args, string containerId = null, bool ignoreError = false, bool showProgress = true, string stdIn = null)
         {
             var printArgs = string.IsNullOrWhiteSpace(containerId)
                 ? args
@@ -105,6 +107,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 ColoredConsole.Write($"Running 'docker {printArgs}'.");
             }
+
             var task = InternalRunDockerCommand(args, ignoreError, stdIn: stdIn);
 
             if (showProgress || StaticSettings.IsDebug)
@@ -114,6 +117,7 @@ namespace Azure.Functions.Cli.Helpers
                     await Task.Delay(TimeSpan.FromSeconds(1));
                     ColoredConsole.Write(".");
                 }
+
                 ColoredConsole.WriteLine("done");
             }
 
@@ -125,6 +129,7 @@ namespace Azure.Functions.Cli.Helpers
                     .WriteLine($"Output: {output}")
                     .WriteLine($"Error: {error}");
             }
+
             return (output, error, exitCode);
         }
     }

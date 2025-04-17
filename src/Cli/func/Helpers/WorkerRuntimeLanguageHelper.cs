@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
@@ -11,92 +11,95 @@ namespace Azure.Functions.Cli.Helpers
     public enum WorkerRuntime
     {
         None,
-        dotnet,
-        dotnetIsolated,
-        node,
-        python,
-        java,
-        powershell,
-        custom
+        Dotnet,
+        DotnetIsolated,
+        Node,
+        Python,
+        Java,
+        Powershell,
+        Custom
     }
 
     public static class WorkerRuntimeLanguageHelper
     {
-        private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> availableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
+        private static readonly IDictionary<WorkerRuntime, IEnumerable<string>> AvailableWorkersRuntime = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
-            { WorkerRuntime.dotnetIsolated, new [] { "dotnet-isolated", "c#-isolated", "csharp-isolated", "f#-isolated", "fsharp-isolated" } },
-            { WorkerRuntime.dotnet, new [] { "c#", "csharp", "f#", "fsharp" } },
-            { WorkerRuntime.node, new [] { "js", "javascript", "typescript", "ts" } },
-            { WorkerRuntime.python, new []  { "py" } },
-            { WorkerRuntime.java, new string[] { } },
-            { WorkerRuntime.powershell, new [] { "pwsh" } },
-            { WorkerRuntime.custom, new string[] { } }
+            { WorkerRuntime.DotnetIsolated, new[] { "dotnet-isolated", "c#-isolated", "csharp-isolated", "f#-isolated", "fsharp-isolated" } },
+            { WorkerRuntime.Dotnet, new[] { "c#", "csharp", "f#", "fsharp" } },
+            { WorkerRuntime.Node, new[] { "js", "javascript", "typescript", "ts" } },
+            { WorkerRuntime.Python, new[] { "py" } },
+            { WorkerRuntime.Java, new string[] { } },
+            { WorkerRuntime.Powershell, new[] { "pwsh" } },
+            { WorkerRuntime.Custom, new string[] { } }
         };
 
-        private static readonly IDictionary<string, WorkerRuntime> normalizeMap = availableWorkersRuntime
+        private static readonly IDictionary<string, WorkerRuntime> NormalizeMap = AvailableWorkersRuntime
             .SelectMany(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = p.Key.ToString(), value = p.Key }))
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
 
-        private static readonly IDictionary<WorkerRuntime, string> workerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
+        private static readonly IDictionary<WorkerRuntime, string> WorkerToDefaultLanguageMap = new Dictionary<WorkerRuntime, string>
         {
-            { WorkerRuntime.dotnet, Constants.Languages.CSharp },
-            { WorkerRuntime.dotnetIsolated, Constants.Languages.CSharpIsolated },
-            { WorkerRuntime.node, Constants.Languages.JavaScript },
-            { WorkerRuntime.python, Constants.Languages.Python },
-            { WorkerRuntime.powershell, Constants.Languages.Powershell },
-            { WorkerRuntime.custom, Constants.Languages.Custom },
+            { WorkerRuntime.Dotnet, Constants.Languages.CSharp },
+            { WorkerRuntime.DotnetIsolated, Constants.Languages.CSharpIsolated },
+            { WorkerRuntime.Node, Constants.Languages.JavaScript },
+            { WorkerRuntime.Python, Constants.Languages.Python },
+            { WorkerRuntime.Powershell, Constants.Languages.Powershell },
+            { WorkerRuntime.Custom, Constants.Languages.Custom },
         };
 
-        private static readonly IDictionary<string, IEnumerable<string>> languageToAlias = new Dictionary<string, IEnumerable<string>>
+        private static readonly IDictionary<string, IEnumerable<string>> LanguageToAlias = new Dictionary<string, IEnumerable<string>>
         {
             // By default node should map to javascript
-            { Constants.Languages.JavaScript, new [] { "js", "node" } },
-            { Constants.Languages.TypeScript, new [] { "ts" } },
-            { Constants.Languages.Python, new [] { "py" } },
-            { Constants.Languages.Powershell, new [] { "pwsh" } },
-            { Constants.Languages.CSharp, new [] { "csharp", "dotnet" } },
-            { Constants.Languages.CSharpIsolated, new [] { "dotnet-isolated", "dotnetIsolated" } },
+            { Constants.Languages.JavaScript, new[] { "js", "node" } },
+            { Constants.Languages.TypeScript, new[] { "ts" } },
+            { Constants.Languages.Python, new[] { "py" } },
+            { Constants.Languages.Powershell, new[] { "pwsh" } },
+            { Constants.Languages.CSharp, new[] { "csharp", "dotnet" } },
+            { Constants.Languages.CSharpIsolated, new[] { "dotnet-isolated", "dotnetIsolated" } },
             { Constants.Languages.Java, new string[] { } },
             { Constants.Languages.Custom, new string[] { } }
         };
 
-        public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = languageToAlias
+        public static readonly IDictionary<string, string> WorkerRuntimeStringToLanguage = LanguageToAlias
             .Select(p => p.Value.Select(v => new { key = v, value = p.Key }).Append(new { key = p.Key.ToString(), value = p.Key }))
             .SelectMany(i => i)
             .ToDictionary(k => k.key, v => v.value, StringComparer.OrdinalIgnoreCase);
 
         public static readonly IDictionary<WorkerRuntime, IEnumerable<string>> WorkerToSupportedLanguages = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
-            { WorkerRuntime.node, new [] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
-            { WorkerRuntime.dotnet, new [] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
-            { WorkerRuntime.dotnetIsolated, new [] { Constants.Languages.CSharpIsolated, Constants.Languages.FSharpIsolated } }
+            { WorkerRuntime.Node, new[] { Constants.Languages.JavaScript, Constants.Languages.TypeScript } },
+            { WorkerRuntime.Dotnet, new[] { Constants.Languages.CSharp, Constants.Languages.FSharp } },
+            { WorkerRuntime.DotnetIsolated, new[] { Constants.Languages.CSharpIsolated, Constants.Languages.FSharpIsolated } }
         };
 
-        public static string AvailableWorkersRuntimeString =>
-            string.Join(", ", availableWorkersRuntime.Keys
-                .Where(k => (k != WorkerRuntime.java))
-                .Select(s => s.ToString()))
-            .Replace(WorkerRuntime.dotnetIsolated.ToString(), "dotnet-isolated");
+        public static IEnumerable<WorkerRuntime> AvailableWorkersList => AvailableWorkersRuntime.Keys
+            .Where(k => k != WorkerRuntime.Java);
 
-        public static string GetRuntimeMoniker(WorkerRuntime workerRuntime) 
+        public static string AvailableWorkersRuntimeString =>
+            string.Join(", ", AvailableWorkersRuntime.Keys
+                .Where(k => (k != WorkerRuntime.Java))
+                .Select(s => s.ToString()))
+            .Replace(WorkerRuntime.DotnetIsolated.ToString(), "dotnet-isolated");
+
+        public static string GetRuntimeMoniker(WorkerRuntime workerRuntime)
         {
-            switch(workerRuntime)
+            switch (workerRuntime)
             {
                 case WorkerRuntime.None:
                     return "None";
-                case WorkerRuntime.dotnet:
+                case WorkerRuntime.Dotnet:
                     return "dotnet";
-                case WorkerRuntime.dotnetIsolated:
+                case WorkerRuntime.DotnetIsolated:
                     return "dotnet-isolated";
-                case WorkerRuntime.node:
+                case WorkerRuntime.Node:
                     return "node";
-                case WorkerRuntime.python:
+                case WorkerRuntime.Python:
                     return "python";
-                case WorkerRuntime.java:
+                case WorkerRuntime.Java:
                     return "java";
-                case WorkerRuntime.powershell:
+                case WorkerRuntime.Powershell:
                     return "powershell";
-                case WorkerRuntime.custom:
+                case WorkerRuntime.Custom:
                     return "custom";
                 default:
                     return "None";
@@ -110,10 +113,10 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (wr)
                 {
-                    case WorkerRuntime.dotnet:
+                    case WorkerRuntime.Dotnet:
                         workerToDisplayStrings[wr] = "dotnet (in-process model)";
                         break;
-                    case WorkerRuntime.dotnetIsolated:
+                    case WorkerRuntime.DotnetIsolated:
                         workerToDisplayStrings[wr] = "dotnet (isolated worker model)";
                         break;
                     default:
@@ -121,11 +124,9 @@ namespace Azure.Functions.Cli.Helpers
                         break;
                 }
             }
+
             return workerToDisplayStrings;
         }
-
-        public static IEnumerable<WorkerRuntime> AvailableWorkersList => availableWorkersRuntime.Keys
-            .Where(k => k != WorkerRuntime.java);
 
         public static WorkerRuntime NormalizeWorkerRuntime(string workerRuntime)
         {
@@ -133,9 +134,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentNullException(nameof(workerRuntime), "Worker runtime cannot be null or empty.");
             }
-            else if (normalizeMap.ContainsKey(workerRuntime))
+            else if (NormalizeMap.ContainsKey(workerRuntime))
             {
-                return normalizeMap[workerRuntime];
+                return NormalizeMap[workerRuntime];
             }
             else
             {
@@ -149,7 +150,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new ArgumentNullException(nameof(languageString), "language can't be empty");
             }
-            else if (normalizeMap.ContainsKey(languageString))
+            else if (NormalizeMap.ContainsKey(languageString))
             {
                 return WorkerRuntimeStringToLanguage[languageString];
             }
@@ -161,7 +162,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static IEnumerable<string> LanguagesForWorker(WorkerRuntime worker)
         {
-            return normalizeMap.Where(p => p.Value == worker).Select(p => p.Key);
+            return NormalizeMap.Where(p => p.Value == worker).Select(p => p.Key);
         }
 
         public static WorkerRuntime GetCurrentWorkerRuntimeLanguage(ISecretsManager secretsManager)
@@ -195,21 +196,22 @@ namespace Azure.Functions.Cli.Helpers
 
         public static string GetDefaultTemplateLanguageFromWorker(WorkerRuntime worker)
         {
-            if (!workerToDefaultLanguageMap.ContainsKey(worker))
+            if (WorkerToDefaultLanguageMap.ContainsKey(worker))
             {
                 throw new ArgumentException($"Worker runtime '{worker}' is not a valid worker for a template.");
             }
-            return workerToDefaultLanguageMap[worker];
+
+            return WorkerToDefaultLanguageMap[worker];
         }
 
         public static bool IsDotnet(WorkerRuntime worker)
         {
-            return worker == WorkerRuntime.dotnet || worker ==  WorkerRuntime.dotnetIsolated;
+            return worker == WorkerRuntime.Dotnet || worker == WorkerRuntime.DotnetIsolated;
         }
 
         public static bool IsDotnetIsolated(WorkerRuntime worker)
         {
-            return worker ==  WorkerRuntime.dotnetIsolated;
+            return worker == WorkerRuntime.DotnetIsolated;
         }
     }
 }
