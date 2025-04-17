@@ -1,20 +1,21 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using System.Diagnostics;
 using FluentAssertions;
 using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using System.Diagnostics;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart
 {
-    public class UserSecretsTests : BaseE2ETest
+    public class UserSecretsTests : BaseE2ETests
     {
-        public UserSecretsTests(ITestOutputHelper log) : base(log)
+        public UserSecretsTests(ITestOutputHelper log)
+            : base(log)
         {
         }
 
@@ -85,7 +86,7 @@ namespace Func.E2ETests.Commands.FuncStart
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError()
         {
-            string azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            string? azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
             {
                 Log.WriteLine("Skipping test as AzureWebJobsStorage is set");
@@ -137,8 +138,7 @@ namespace Func.E2ETests.Commands.FuncStart
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError()
         {
-            string azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-            
+            string? azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
             {
                 Log.WriteLine("Skipping test as AzureWebJobsStorage is set");
@@ -178,7 +178,6 @@ namespace Func.E2ETests.Commands.FuncStart
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
-            string capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -208,7 +207,7 @@ namespace Func.E2ETests.Commands.FuncStart
 
             using (var process = Process.Start(initProcess))
             {
-                process.WaitForExit();
+                process?.WaitForExit();
             }
 
             // Set each secret
@@ -225,7 +224,7 @@ namespace Func.E2ETests.Commands.FuncStart
 
                 using (var process = Process.Start(setProcess))
                 {
-                    process.WaitForExit();
+                    process?.WaitForExit();
                 }
             }
         }

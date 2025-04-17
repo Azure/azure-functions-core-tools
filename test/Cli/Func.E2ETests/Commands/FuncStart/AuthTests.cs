@@ -5,26 +5,26 @@ using FluentAssertions;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart
 {
-    public class AuthTests : BaseE2ETest
+    public class AuthTests : BaseE2ETests
     {
-        public AuthTests(ITestOutputHelper log) : base(log)
+        public AuthTests(ITestOutputHelper log)
+            : base(log)
         {
         }
 
         [Theory]
-        [InlineData("function", false, "Welcome to Azure Functions!", "response from default function should be 'Welcome to Azure Functions!'")]
-        [InlineData("function", true, "", "the call to the function is unauthorized")]
-        [InlineData("anonymous", true, "Welcome to Azure Functions!", "response from default function should be 'Welcome to Azure Functions!'")]
+        [InlineData("function", false, "Welcome to Azure Functions!")]
+        [InlineData("function", true, "")]
+        [InlineData("anonymous", true, "Welcome to Azure Functions!")]
         public async Task Start_DotnetIsolated_Test_EnableAuthFeature(
             string authLevel,
             bool enableAuth,
-            string expectedResult,
-            string becauseReason)
+            string expectedResult)
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -34,8 +34,6 @@ namespace Func.E2ETests.Commands.FuncStart
             // Call func init and func new
             await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
             await FuncNewWithRetryAsync(uniqueTestName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
-
-            string capturedContent = null;
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, methodName, Log);

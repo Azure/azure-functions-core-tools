@@ -1,12 +1,12 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using Func.TestFramework.Helpers;
-using Moq;
-using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Func.TestFramework.Helpers;
+using Moq;
+using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -14,14 +14,6 @@ namespace Func.E2ETests.Fixtures
 {
     public abstract class BaseFunctionAppFixture : IAsyncLifetime
     {
-        public ITestOutputHelper Log { get; set; }
-        public string FuncPath { get; set; }
-        public string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        public bool CleanupWorkingDirectory { get; set; } = true;
-        public string WorkerRuntime { get; set; }
-        public string? TargetFramework { get; set; }
-        public string? Version { get; set; }
-
         public BaseFunctionAppFixture(string workerRuntime, string? targetFramework = null, string? version = null)
         {
             WorkerRuntime = workerRuntime;
@@ -51,11 +43,25 @@ namespace Func.E2ETests.Fixtures
             Directory.CreateDirectory(WorkingDirectory);
         }
 
+        public ITestOutputHelper Log { get; set; }
+
+        public string? FuncPath { get; set; }
+
+        public string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+
+        public bool CleanupWorkingDirectory { get; set; } = true;
+
+        public string WorkerRuntime { get; set; }
+
+        public string? TargetFramework { get; set; }
+
+        public string? Version { get; set; }
+
         /// <summary>
-        /// Uninstalls a dotnet template package with the specified name
+        /// Uninstalls a dotnet template package with the specified name.
         /// </summary>
-        /// <param name="templatePackageName">The name of the template package to uninstall</param>
-        /// <returns>True if the uninstallation was successful, false otherwise</returns>
+        /// <param name="templatePackageName">The name of the template package to uninstall.</param>
+        /// <returns>True if the uninstallation was successful, false otherwise.</returns>
         public bool UninstallDotnetTemplate(string templatePackageName)
         {
             if (string.IsNullOrEmpty(templatePackageName))
@@ -137,12 +143,12 @@ namespace Func.E2ETests.Fixtures
             {
                 // Ignore any errors when cleaning up
             }
+
             return Task.CompletedTask;
         }
 
         public async Task InitializeAsync()
         {
-
             var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
                 .Concat(TargetFramework != null
                     ? new[] { "--target-framework", TargetFramework }

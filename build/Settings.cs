@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -41,7 +41,7 @@ namespace Build
 
         public static readonly string NewTestProjectFile = Path.Combine("..", "test", "Cli", "Func.E2ETests", "Func.E2ETests.csproj");
 
-        public static readonly string RuntimeSettings = Path.Combine("..", "test", "Cli", "Func.E2ETests", "Func.E2ETests.csproj", "Runsettings", "StartTests_dotnet_inproc.runsettings"));
+        public static readonly string RuntimeSettings = Path.Combine("..", "test", "Cli", "Func.E2ETests", "Func.E2ETests.csproj", "Runsettings", "StartTests_dotnet_inproc.runsettings");
 
         public static readonly string[] TargetRuntimes = new[] {
             "min.win-arm64",

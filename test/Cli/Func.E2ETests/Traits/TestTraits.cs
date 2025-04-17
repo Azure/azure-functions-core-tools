@@ -10,7 +10,6 @@ namespace Func.E2ETests.Traits
         /// </summary>
         public const string Group = "Group";
 
-        // Groups
         /// <summary>
         /// Tests with RequiresNestedInProcArtifacts label will not be run in the default scenario and only in the artifact consolidation pipeline
         /// Otherwise tests with this label will fail in the PR/ official core tools pipelines since the nested inproc artifacts are not present.

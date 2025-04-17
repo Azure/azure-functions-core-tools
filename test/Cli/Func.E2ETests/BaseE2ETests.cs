@@ -1,29 +1,24 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using Func.TestFramework.Helpers;
 using System.Runtime.InteropServices;
-using Xunit.Abstractions;
+using Func.TestFramework.Helpers;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart
 {
-    public abstract class BaseE2ETest : IAsyncLifetime
+    public abstract class BaseE2ETests(ITestOutputHelper log) : IAsyncLifetime
     {
-        protected ITestOutputHelper Log { get; }
-        protected string FuncPath { get; set; }
+        protected ITestOutputHelper Log { get; } = log;
+
+        protected string? FuncPath { get; set; } = Environment.GetEnvironmentVariable(Constants.FuncPath);
 
         protected string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
-        protected BaseE2ETest(ITestOutputHelper log)
-        {
-            Log = log;
-            FuncPath = Environment.GetEnvironmentVariable(Constants.FuncPath);
-        }
-
         public Task InitializeAsync()
         {
-            if (FuncPath == null)
+            if (FuncPath is null)
             {
                 // Fallback for local testing in Visual Studio, etc.
                 FuncPath = Path.Combine(Environment.CurrentDirectory, "func");
@@ -53,6 +48,7 @@ namespace Func.E2ETests.Commands.FuncStart
             {
                 // Cleanup failed but we shouldn't crash on this
             }
+
             return Task.CompletedTask;
         }
 
@@ -61,7 +57,7 @@ namespace Func.E2ETests.Commands.FuncStart
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
         }
 
-        public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args, string workerRuntime = null)
+        public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args, string? workerRuntime = null)
         {
             await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args, workerRuntime);
         }
