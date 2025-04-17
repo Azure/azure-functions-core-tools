@@ -1,19 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
-using Colors.Net;
-using Newtonsoft.Json;
-using Azure.Functions.Cli.Interfaces;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Reflection;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
-using System.Linq;
-using System.Reflection;
-using Microsoft.AspNetCore.Routing.Constraints;
-using Microsoft.CodeAnalysis;
-using System.IO.Abstractions;
-using Microsoft.Azure.WebJobs.Script;
-using static Azure.Functions.Cli.Common.OutputTheme;
+using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -26,11 +19,30 @@ namespace Azure.Functions.Cli.Common
             _secretsManager = secretsManager;
         }
 
+        /// <summary>
+        /// Gets get new templates.
+        /// </summary>
+        public Task<IEnumerable<NewTemplate>> NewTemplates
+        {
+            get
+            {
+                return GetV2Templates();
+            }
+        }
+
         public Task<IEnumerable<Template>> Templates
         {
             get
             {
                 return GetTemplates();
+            }
+        }
+
+        public Task<IEnumerable<UserPrompt>> UserPrompts
+        {
+            get
+            {
+                return GetV2UserPrompts();
             }
         }
 
@@ -165,13 +177,14 @@ namespace Azure.Functions.Cli.Common
             var fileExists = FileSystemHelpers.FileExists(filePath);
             if (fileExists)
             {
-                // Once we get the confirmation of overwriting all files then we will overwrite. 
+                // Once we get the confirmation of overwriting all files then we will overwrite.
                 var response = "n";
                 do
                 {
                     ColoredConsole.Write($"A file with the name {Path.GetFileName(filePath)} already exists. Overwrite [y/n]? [n] ");
                     response = Console.ReadLine();
-                } while (response != "n" && response != "y");
+                }
+                while (response != "n" && response != "y");
                 if (response == "n")
                 {
                     var message = "The function couldn't be created.";
@@ -208,7 +221,8 @@ namespace Azure.Functions.Cli.Common
                 {
                     ColoredConsole.Write($"A directory with the name {name} already exists. Overwrite [y/n]? [n] ");
                     response = Console.ReadLine();
-                } while (response != "n" && response != "y");
+                }
+                while (response != "n" && response != "y");
                 if (response == "n")
                 {
                     return;
@@ -228,6 +242,7 @@ namespace Azure.Functions.Cli.Common
                 ColoredConsole.WriteLine($"Writing {filePath}");
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, file.Value);
             }
+
             var functionJsonPath = Path.Combine(path, "function.json");
             ColoredConsole.WriteLine($"Writing {functionJsonPath}");
             await FileSystemHelpers.WriteAllTextToFileAsync(functionJsonPath, JsonConvert.SerializeObject(template.Function, Formatting.Indented));
@@ -254,20 +269,8 @@ namespace Azure.Functions.Cli.Common
             return str?.Replace("%functionName%", functionName) ?? str;
         }
 
-        /// <summary>
-        /// Get new templates
-        /// </summary>
-        public Task<IEnumerable<NewTemplate>> NewTemplates
-        {
-            get
-            {
-                return GetV2Templates();
-            }
-        }
-
         public async Task<IEnumerable<NewTemplate>> GetV2Templates()
         {
-            
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             string templateJson;
             if (extensionBundleManager.IsExtensionBundleConfigured())
@@ -280,14 +283,6 @@ namespace Azure.Functions.Cli.Common
             }
 
             return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(templateJson);
-        }
-
-        public Task<IEnumerable<UserPrompt>> UserPrompts
-        {
-            get
-            {
-                return GetV2UserPrompts();
-            }
         }
 
         public async Task<IEnumerable<UserPrompt>> GetV2UserPrompts()
@@ -303,7 +298,7 @@ namespace Azure.Functions.Cli.Common
             {
                 userPromptJson = await GetV2UserPromptsJson();
             }
-            
+
             return JsonConvert.DeserializeObject<UserPrompt[]>(userPromptJson);
         }
 
@@ -316,7 +311,6 @@ namespace Azure.Functions.Cli.Common
             }
             else if (action.ActionType == "AppendToFile")
             {
-                
                 await WriteFunctionBody(template, action, variables, isAppend: true);
                 return;
             }
@@ -371,11 +365,12 @@ namespace Azure.Functions.Cli.Common
                 {
                     AskToRemoveFileIfExists(filePath);
                 }
-                
+
                 var fileContent = await FileSystemHelpers.ReadAllTextFromFileAsync(filePath);
                 ColoredConsole.WriteLine($"Appending to {filePath}");
                 fileContent = $"{fileContent}{Environment.NewLine}{Environment.NewLine}{sourceContent}";
-                // Update the file. 
+
+                // Update the file.
                 await FileSystemHelpers.WriteAllTextToFileAsync(filePath, fileContent);
             }
         }
@@ -392,15 +387,17 @@ namespace Azure.Functions.Cli.Common
             foreach (var variable in variables)
             {
                 if (variable.Key == action.Source)
+                {
                     continue;
+                }
 
                 var value = variable.Value;
-                
-                // this is an special condition. Only filename without extension is replaced. 
+
+                // this is an special condition. Only filename without extension is replaced.
                 if (variable.Key == "$(BLUEPRINT_FILENAME)")
                 {
                     value = value[..^Path.GetExtension(value).Length];
-                }   
+                }
 
                 sourceContent = sourceContent.Replace(variable.Key, value);
             }
