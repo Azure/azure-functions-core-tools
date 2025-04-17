@@ -1,22 +1,23 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Security.Claims;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
-using System.Collections.Generic;
+using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
+using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text.Encodings.Web;
-using System.Threading.Tasks;
-using System.Security.Claims;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization;
-using Microsoft.Azure.WebJobs.Script.Description;
 
 namespace Azure.Functions.Cli.Actions.HostActions.WebHost.Security
 {
     public class CliAuthenticationHandler<TOptions> : AuthenticationHandler<TOptions> where TOptions : AuthenticationSchemeOptions, new()
     {
-        public CliAuthenticationHandler(IOptionsMonitor<TOptions> options, ILoggerFactory logger, UrlEncoder encoder) 
+        public CliAuthenticationHandler(IOptionsMonitor<TOptions> options, ILoggerFactory logger, UrlEncoder encoder)
             : base(options, logger, encoder)
         {
         }
