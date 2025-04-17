@@ -1,10 +1,10 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Telemetry
 {
     internal interface IDockerContainerDetector
     {
-        DockerContainer IsDockerContainer();
+        internal DockerContainer IsDockerContainer();
     }
 }

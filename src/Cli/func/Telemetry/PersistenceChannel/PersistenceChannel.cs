@@ -1,8 +1,6 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Threading;
 using Microsoft.ApplicationInsights.Channel;
 using IChannelTelemetry = Microsoft.ApplicationInsights.Channel.ITelemetry;
 
@@ -14,12 +12,10 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
     internal sealed class PersistenceChannel : ITelemetryChannel
     {
         internal const string TelemetryServiceEndpoint = "https://dc.services.visualstudio.com/v2/track";
-
         private readonly FlushManager _flushManager;
-
-        private int _disposeCount;
         private readonly BaseStorageService _storage;
         private readonly PersistenceTransmitter _transmitter;
+        private int _disposeCount;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="PersistenceChannel" /> class.
@@ -57,7 +53,6 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             set => _transmitter.SendingInterval = value;
         }
 
-
         /// <summary>
         ///     Gets or sets the maximum amount of files allowed in storage. When the limit is reached telemetries will be dropped.
         /// </summary>
@@ -68,7 +63,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         }
 
         /// <summary>
-        ///     This flag has no effect. But it is required by base class
+        ///     Gets or sets this flag has no effect. But it is required by base class.
         /// </summary>
         public bool? DeveloperMode { get; set; }
 
@@ -106,7 +101,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         }
 
         /// <summary>
-        ///     No operation, send will always flush. So nothing will be in memory
+        ///     No operation, send will always flush. So nothing will be in memory.
         /// </summary>
         public void Flush()
         {

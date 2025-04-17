@@ -1,9 +1,9 @@
-// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+
 namespace Azure.Functions.Cli.Telemetry
 {
     internal static class Sha256Hasher
@@ -31,6 +31,7 @@ namespace Azure.Functions.Cli.Telemetry
             {
                 hashString.AppendFormat("{0:x2}", x);
             }
+
             return hashString.ToString();
         }
     }

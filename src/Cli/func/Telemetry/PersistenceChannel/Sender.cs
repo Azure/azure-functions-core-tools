@@ -1,11 +1,8 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 {
@@ -22,7 +19,9 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         /// <summary>
         ///     A wait handle that flags the sender when to start sending again. The type is protected for unit test.
         /// </summary>
+#pragma warning disable SA1401 // Fields should be private
         protected readonly AutoResetEvent DelayHandler;
+#pragma warning restore SA1401 // Fields should be private
 
         /// <summary>
         ///     Holds the maximum time for the exponential back-off algorithm. The sending interval will grow on every HTTP
@@ -42,21 +41,10 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         private readonly AutoResetEvent _stoppedHandler;
 
         /// <summary>
-        ///     The number of times this object was disposed.
-        /// </summary>
-        private int _disposeCount;
-
-        /// <summary>
         ///     The amount of time to wait, in the stop method, until the last transmission is sent.
         ///     If time expires, the stop method will return even if the transmission hasn't been sent.
         /// </summary>
         private readonly TimeSpan _drainingTimeout;
-
-        /// <summary>
-        ///     A boolean value that indicates if the sender should be stopped. The sender's while loop is checking this boolean
-        ///     value.
-        /// </summary>
-        private bool _stopped;
 
         /// <summary>
         ///     The transmissions storage.
@@ -67,6 +55,17 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         ///     Holds the transmitter.
         /// </summary>
         private readonly PersistenceTransmitter _transmitter;
+
+        /// <summary>
+        ///     The number of times this object was disposed.
+        /// </summary>
+        private int _disposeCount;
+
+        /// <summary>
+        ///     A boolean value that indicates if the sender should be stopped. The sender's while loop is checking this boolean
+        ///     value.
+        /// </summary>
+        private bool _stopped;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="Sender" /> class.
@@ -95,13 +94,12 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             if (startSending)
             {
                 // It is currently possible for the long - running task to be executed(and thereby block during WaitOne) on the UI thread when
-                // called by a task scheduled on the UI thread. Explicitly specifying TaskScheduler.Default 
+                // called by a task scheduled on the UI thread. Explicitly specifying TaskScheduler.Default
                 // when calling StartNew guarantees that Sender never blocks the main thread.
-                Task.Factory.StartNew(SendLoop, CancellationToken.None, TaskCreationOptions.LongRunning,
-                        TaskScheduler.Default)
-                    .ContinueWith(
-                        t => PersistenceChannelDebugLog.WriteException(t.Exception, "Sender: Failure in SendLoop"),
-                        TaskContinuationOptions.OnlyOnFaulted);
+                Task.Factory.StartNew(SendLoop, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)
+                            .ContinueWith(
+                                t => PersistenceChannelDebugLog.WriteException(t.Exception, "Sender: Failure in SendLoop"),
+                                TaskContinuationOptions.OnlyOnFaulted);
             }
         }
 
@@ -140,13 +138,13 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         /// </summary>
         internal Task StopAsync()
         {
-            // After delayHandler is set, a sending iteration will immediately start. 
-            // Setting <c>stopped</c> to true, will cause the iteration to skip the actual sending and stop immediately. 
+            // After delayHandler is set, a sending iteration will immediately start.
+            // Setting <c>stopped</c> to true, will cause the iteration to skip the actual sending and stop immediately.
             _stopped = true;
             DelayHandler.Set();
 
             // if delayHandler was set while a transmission was being sent, the return task will wait for it to finish, for an additional second,
-            // before it will mark the task as completed. 
+            // before it will mark the task as completed.
             return Task.Run(() =>
             {
                 try
@@ -174,13 +172,13 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                     {
                         if (_stopped)
                         {
-                            // This second verification is required for cases where 'stopped' was set while peek was happening. 
-                            // Once the actual sending starts the design is to wait until it finishes and deletes the transmission. 
+                            // This second verification is required for cases where 'stopped' was set while peek was happening.
+                            // Once the actual sending starts the design is to wait until it finishes and deletes the transmission.
                             // So no extra validation is required.
                             break;
                         }
 
-                        // If there is a transmission to send - send it. 
+                        // If there is a transmission to send - send it.
                         if (transmission != null)
                         {
                             bool shouldRetry = Send(transmission, ref sendingInterval);
@@ -235,7 +233,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 
                     transmission.SendAsync().ConfigureAwait(false).GetAwaiter().GetResult();
 
-                    // After a successful sending, try immediately to send another transmission. 
+                    // After a successful sending, try immediately to send another transmission.
                     nextSendInterval = SendingInterval;
                 }
             }
@@ -301,10 +299,10 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 
             switch (httpStatusCode.Value)
             {
-                case 503: // Server in maintenance. 
+                case 503: // Server in maintenance.
                 case 408: // invalid request
-                case 500: // Internal Server Error                                                
-                case 502: // Bad Gateway, can be common when there is no network. 
+                case 500: // Internal Server Error
+                case 502: // Bad Gateway, can be common when there is no network.
                 case 511: // Network Authentication Required
                     return true;
             }
