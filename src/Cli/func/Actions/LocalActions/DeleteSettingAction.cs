@@ -1,24 +1,26 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Fclp;
-using Azure.Functions.Cli.Interfaces;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Interfaces;
+using Fclp;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
     [Action(Name = "delete", Context = Context.Settings, HelpText = "Remove a local setting")]
     [Action(Name = "remove", Context = Context.Settings, HelpText = "Remove a local setting")]
-    class DeleteSettingAction : BaseAction
+    internal class DeleteSettingAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
-        public string Name { get; set; }
-        public bool IsConnectionString { get; set; }
 
         public DeleteSettingAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
         }
+
+        public string Name { get; set; }
+
+        public bool IsConnectionString { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -30,8 +32,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (args.Length == 0)
             {
-                throw new CliArgumentsException("Must specify setting name.", base.ParseArgs(args),
-                    new CliArgument { Name = nameof(Name), Description = "Name of app setting to be deleted." });
+                throw new CliArgumentsException("Must specify setting name.", base.ParseArgs(args), new CliArgument { Name = nameof(Name), Description = "Name of app setting to be deleted." });
             }
             else
             {
