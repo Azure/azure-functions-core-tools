@@ -5,12 +5,9 @@ using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Arm.Models
 {
-    public class AppServiceConnectionString
+    public class ArmStorageKeysArray
     {
-        [JsonProperty(PropertyName = "value")]
-        public string Value { get; set; }
-
-        [JsonProperty(PropertyName = "type")]
-        public int Type { get; set; }
+        [JsonProperty(PropertyName = "keys")]
+        public ArmStorageKeys[] Keys { get; set; }
     }
 }
