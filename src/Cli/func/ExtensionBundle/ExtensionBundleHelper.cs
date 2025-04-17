@@ -1,15 +1,13 @@
-﻿using Azure.Functions.Cli.Common;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Common;
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Configuration;
-using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
-using System;
-using System.IO;
-using System.Net.Http;
-using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.ExtensionBundle
 {
@@ -24,7 +22,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             configurationHelper.Configure(options);
             return options;
         }
-        
+
         public static ExtensionBundleManager GetExtensionBundleManager()
         {
             var extensionBundleOption = GetExtensionBundleOptions();
@@ -63,7 +61,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
             {
                 // Don't do anything here.
                 // There will be another attempt by the host to download the Extension Bundle.
-                // If Extension Bundle download fails again in the host then the host will return the appropriate customer facing error. 
+                // If Extension Bundle download fails again in the host then the host will return the appropriate customer facing error.
             }
         }
     }

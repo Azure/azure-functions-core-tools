@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Microsoft.Azure.WebJobs.Script;
 using Microsoft.Extensions.Configuration;
 
@@ -21,7 +23,7 @@ namespace Azure.Functions.Cli.ExtensionBundle
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
                     { "AzureFunctionsJobHost:extensionBundle:downloadPath", ExtensionBundleHelper.GetBundleDownloadPath(bundleId) },
-                    { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "true"}
+                    { "AzureFunctionsJobHost:extensionBundle:ensureLatest", "true" }
                 });
             }
         }

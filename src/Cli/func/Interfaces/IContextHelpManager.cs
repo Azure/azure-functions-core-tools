@@ -1,17 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Interfaces
 {
     public interface IContextHelpManager
     {
-        string GetTriggerHelp(string triggerName, string language);
-        Task LoadTriggerHelp(string language, List<string> triggerNames);
-        bool IsValidTriggerNameForHelp(string triggerName);
-        bool IsValidTriggerTypeForHelp(string triggerName);
-        string GetTriggerTypeFromTriggerNameForHelp(string triggerName);
+        internal string GetTriggerHelp(string triggerName, string language);
+
+        internal Task LoadTriggerHelp(string language, List<string> triggerNames);
+
+        internal bool IsValidTriggerNameForHelp(string triggerName);
+
+        internal bool IsValidTriggerTypeForHelp(string triggerName);
+
+        internal string GetTriggerTypeFromTriggerNameForHelp(string triggerName);
     }
 }

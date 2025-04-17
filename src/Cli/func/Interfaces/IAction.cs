@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.Telemetry;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Fclp;
 using Fclp.Internals;
 
@@ -8,9 +8,12 @@ namespace Azure.Functions.Cli.Interfaces
 {
     internal interface IAction
     {
-        IEnumerable<ICommandLineOption> MatchedOptions { get; }
-        IDictionary<string, string> TelemetryCommandEvents { get; }
-        ICommandLineParserResult ParseArgs(string[] args);
-        Task RunAsync();
+        internal IEnumerable<ICommandLineOption> MatchedOptions { get; }
+
+        internal IDictionary<string, string> TelemetryCommandEvents { get; }
+
+        internal ICommandLineParserResult ParseArgs(string[] args);
+
+        internal Task RunAsync();
     }
 }

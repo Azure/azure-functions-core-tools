@@ -1,29 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using DurableTask.Core;
 
 namespace Azure.Functions.Cli.Interfaces
 {
     internal interface IDurableManager
     {
-        Task DeleteTaskHub(string connectionString, string taskHubName);
+       internal Task DeleteTaskHub(string connectionString, string taskHubName);
 
-        Task GetHistory(string connectionString, string taskHubName, string instanceId);
+       internal Task GetHistory(string connectionString, string taskHubName, string instanceId);
 
-        Task GetInstances(string connectionString, string taskHubName, DateTime createdTimeFrom, DateTime createdTimeTo, 
-            IEnumerable<OrchestrationStatus> statuses, int top, string continuationToken);
+       internal Task GetInstances(string connectionString, string taskHubName, DateTime createdTimeFrom, DateTime createdTimeTo, IEnumerable<OrchestrationStatus> statuses, int top, string continuationToken);
 
-        Task GetRuntimeStatus(string connectionString, string taskHubName, string instanceId, bool showInput, bool showOutput);
+       internal Task GetRuntimeStatus(string connectionString, string taskHubName, string instanceId, bool showInput, bool showOutput);
 
-        Task PurgeHistory(string connectionString, string taskHubName, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses);
+       internal Task PurgeHistory(string connectionString, string taskHubName, DateTime createdAfter, DateTime createdBefore, IEnumerable<OrchestrationStatus> runtimeStatuses);
 
-        Task RaiseEvent(string connectionString, string taskHubName, string instanceId, string eventName, object eventData);
+       internal Task RaiseEvent(string connectionString, string taskHubName, string instanceId, string eventName, object eventData);
 
-        Task Rewind(string connectionString, string taskHubName, string instanceId, string reason);
+       internal Task Rewind(string connectionString, string taskHubName, string instanceId, string reason);
 
-        Task StartNew(string connectionString, string taskHubName, string functionName, string instanceId, object input);
+       internal Task StartNew(string connectionString, string taskHubName, string functionName, string instanceId, object input);
 
-        Task Terminate(string connectionString, string taskHubName, string instanceId, string reason);
+       internal Task Terminate(string connectionString, string taskHubName, string instanceId, string reason);
     }
 }
