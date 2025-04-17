@@ -6,15 +6,16 @@ using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart
 {
     [Trait(TestTraits.Group, TestTraits.InProc)]
-    public class InProcTests : BaseE2ETest
+    public class InProcTests : BaseE2ETests
     {
-        public InProcTests(ITestOutputHelper log) : base(log)
+        public InProcTests(ITestOutputHelper log)
+            : base(log)
         {
         }
 

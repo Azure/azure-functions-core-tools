@@ -2,17 +2,19 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using FluentAssertions;
+using Func.E2ETests.Commands.FuncStart;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
-namespace Func.E2ETests.func_start.Tests
+namespace Func.E2ETests.Commands.FuncStart
 {
-    public class LogLevelTests : BaseE2ETest
+    public class LogLevelTests : BaseE2ETests
     {
-        public LogLevelTests(ITestOutputHelper log) : base(log)
+        public LogLevelTests(ITestOutputHelper log)
+            : base(log)
         {
         }
 

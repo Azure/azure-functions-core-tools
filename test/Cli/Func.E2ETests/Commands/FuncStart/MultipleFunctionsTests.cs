@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Func.E2ETests.Commands.FuncStart
 {
-    public class MultipleFunctionsTests : BaseE2ETest
+    public class MultipleFunctionsTests : BaseE2ETests
     {
         public MultipleFunctionsTests(ITestOutputHelper log) : base(log)
         {

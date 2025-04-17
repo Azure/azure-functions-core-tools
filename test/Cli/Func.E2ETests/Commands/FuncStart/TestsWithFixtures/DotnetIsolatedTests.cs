@@ -7,8 +7,8 @@ using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
@@ -22,16 +22,15 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
             _fixture.Log = log;
         }
 
-
         [Fact]
-        public async Task Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
+        public void Start_DotnetIsolated_Net9_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_DotnetIsolated_Net9_SuccessfulFunctionExecution", _fixture.Log);
 
-            string capturedContent = null;
+            string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -53,13 +52,13 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
-        public async Task Start_DotnetIsolated_WithRuntimeSpecified()
+        public void Start_DotnetIsolated_WithRuntimeSpecified()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_DotnetIsolated_WithRuntimeSpecified", _fixture.Log);
-            string capturedContent = null;
+            string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -72,7 +71,8 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
                         .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
-            capturedContent.Should().Be("Welcome to Azure Functions!",
+            capturedContent.Should().Be(
+                "Welcome to Azure Functions!",
                 because: "response from default function should be 'Welcome to Azure Functions!'");
 
             // Validate default host was started
@@ -82,13 +82,13 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInConsolidatedArtifactGeneration)]
-        public async Task Start_DotnetIsolated_WithoutRuntimeSpecified()
+        public void Start_DotnetIsolated_WithoutRuntimeSpecified()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_DotnetIsolated_WithoutRuntimeSpecified", _fixture.Log);
-            string capturedContent = null;
+            string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -101,7 +101,8 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
-            capturedContent.Should().Be("Welcome to Azure Functions!",
+            capturedContent.Should().Be(
+                "Welcome to Azure Functions!",
                 because: "response from default function should be 'Welcome to Azure Functions!'");
 
             // Validate default host was started
@@ -110,7 +111,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated()
+        public void DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -126,7 +127,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task DontStart_InProc8_SpecifiedRuntime_ForDotnetIsolated()
+        public void DontStart_InProc8_SpecifiedRuntime_ForDotnetIsolated()
         {
             int port = ProcessHelper.GetAvailablePort();
 

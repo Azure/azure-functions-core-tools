@@ -5,7 +5,8 @@ namespace Func.E2ETests.Fixtures
 {
     public class PowershellFunctionAppFixture : BaseFunctionAppFixture
     {
-        public PowershellFunctionAppFixture() : base("powershell")
+        public PowershellFunctionAppFixture()
+            : base("powershell")
         {
         }
     }

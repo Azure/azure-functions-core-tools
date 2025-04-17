@@ -6,14 +6,15 @@ using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart
 {
-    public class MissingConfigTests : BaseE2ETest
+    public class MissingConfigTests : BaseE2ETests
     {
-        public MissingConfigTests(ITestOutputHelper log) : base(log)
+        public MissingConfigTests(ITestOutputHelper log)
+            : base(log)
         {
         }
 
@@ -93,6 +94,7 @@ namespace Func.E2ETests.Commands.FuncStart
                 var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
                                     .Concat(!language.Contains("dotnet") ? new[] { "--language", language } : Array.Empty<string>())
                                     .ToArray();
+
                 // Add HTTP trigger using retry helper
                 await FuncNewWithRetryAsync(logFileName, funcNewArgs);
 
@@ -123,6 +125,7 @@ namespace Func.E2ETests.Commands.FuncStart
                 {
                     result.Should().HaveStdOutContaining("HttpTriggerFunc: [GET,POST] http://localhost:");
                 }
+
                 result.Should().HaveStdOutContaining("Executed 'Functions.HttpTriggerFunc' (Succeeded");
             }
             finally
@@ -192,7 +195,7 @@ namespace Func.E2ETests.Commands.FuncStart
             // Modify settings file to have empty value
             string settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
             string settingsContent = File.ReadAllText(settingsPath);
-            settingsContent = settingsContent.Replace("EMPTY_VALUE", "");
+            settingsContent = settingsContent.Replace("EMPTY_VALUE", string.Empty);
             File.WriteAllText(settingsPath, settingsContent);
 
             // Call func start

@@ -1,15 +1,15 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using System.Net;
+using System.Net.Sockets;
 using FluentAssertions;
 using Func.E2ETests.Fixtures;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using System.Net;
-using System.Net.Sockets;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
@@ -17,6 +17,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
     public class NodeV4Tests : IClassFixture<NodeV4FunctionAppFixture>
     {
         private readonly NodeV4FunctionAppFixture _fixture;
+
         public NodeV4Tests(NodeV4FunctionAppFixture fixture, ITestOutputHelper log)
         {
             _fixture = fixture;
@@ -24,7 +25,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost()
+        public void Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -53,7 +54,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost()
+        public void Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -82,7 +83,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task Start_WithInspect_DebuggerIsStarted()
+        public void Start_WithInspect_DebuggerIsStarted()
         {
             int port = ProcessHelper.GetAvailablePort();
             int debugPort = ProcessHelper.GetAvailablePort();
@@ -105,7 +106,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task Start_PortInUse_FailsWithExpectedError()
+        public void Start_PortInUse_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -116,6 +117,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
             {
                 tcpListener.Start();
                 var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_PortInUse_FailsWithExpectedError", _fixture.Log);
+
                 // Call func start
                 var result = funcStartCommand
                             .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -140,7 +142,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp()
+        public void DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -158,7 +160,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp()
+        public void DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp()
         {
             int port = ProcessHelper.GetAvailablePort();
 

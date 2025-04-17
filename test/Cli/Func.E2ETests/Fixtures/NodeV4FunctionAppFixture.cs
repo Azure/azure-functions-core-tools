@@ -5,7 +5,8 @@ namespace Func.E2ETests.Fixtures
 {
     public class NodeV4FunctionAppFixture : BaseFunctionAppFixture
     {
-        public NodeV4FunctionAppFixture() : base("node")
+        public NodeV4FunctionAppFixture()
+            : base("node")
         {
         }
     }

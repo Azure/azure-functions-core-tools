@@ -7,18 +7,18 @@ using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
-    [Collection("Dotnet6InProc")]
+    [Collection("DotnetInProc6")]
     [Trait(TestTraits.Group, TestTraits.InProc)]
-    public class Dotnet6InProcTests : IClassFixture<Dotnet6InProcFunctionAppFixture>
+    public class DotnetInProc6Tests : IClassFixture<Dotnet6InProcFunctionAppFixture>
     {
         private readonly Dotnet6InProcFunctionAppFixture _fixture;
 
-        public Dotnet6InProcTests(Dotnet6InProcFunctionAppFixture fixture, ITestOutputHelper log)
+        public DotnetInProc6Tests(Dotnet6InProcFunctionAppFixture fixture, ITestOutputHelper log)
         {
             _fixture = fixture;
             _fixture.Log = log;
@@ -26,13 +26,13 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task Start_InProc_Net6_SuccessfulFunctionExecution_WithSpecifyingRuntime()
+        public void Start_InProc_Net6_SuccessfulFunctionExecution_WithSpecifyingRuntime()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net6_SuccessfulFunctionExecution_WithSpecifyingRuntime", _fixture.Log);
-            string capturedContent = null;
+            string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -53,14 +53,14 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task Start_InProc_Net6_SuccessfulFunctionExecution_WithoutSpecifyingRuntime()
+        public void Start_InProc_Net6_SuccessfulFunctionExecution_WithoutSpecifyingRuntime()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net6_SuccessfulFunctionExecution_WithoutSpecifyingRuntime", _fixture.Log);
 
-            string capturedContent = null;
+            string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
@@ -80,7 +80,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task Start_InProc_Dotnet6_WithoutSpecifyingRuntime_ExpectedToFail()
+        public void Start_InProc_Dotnet6_WithoutSpecifyingRuntime_ExpectedToFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -96,7 +96,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task Start_InProc_Dotnet6_WithSpecifyingRuntime_ExpectedToFail()
+        public void Start_InProc_Dotnet6_WithSpecifyingRuntime_ExpectedToFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -112,7 +112,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task DontStart_InProc8_SpecifiedRuntime_ForDotnet6InProc()
+        public void DontStart_InProc8_SpecifiedRuntime_ForDotnet6InProc()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -128,7 +128,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet6InProc()
+        public void DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet6InProc()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -145,7 +145,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task Start_InProc_InvalidHostJson_FailsWithExpectedError()
+        public void Start_InProc_InvalidHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -177,7 +177,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task Start_InProc_MissingHostJson_FailsWithExpectedError()
+        public void Start_InProc_MissingHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
 

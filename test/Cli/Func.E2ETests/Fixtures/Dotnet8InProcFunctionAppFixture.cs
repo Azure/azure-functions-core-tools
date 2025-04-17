@@ -5,7 +5,8 @@ namespace Func.E2ETests.Fixtures
 {
     public class Dotnet8InProcFunctionAppFixture : BaseFunctionAppFixture
     {
-        public Dotnet8InProcFunctionAppFixture() : base("dotnet", targetFramework: "net8.0")
+        public Dotnet8InProcFunctionAppFixture()
+            : base("dotnet", targetFramework: "net8.0")
         {
             UninstallDotnetTemplate("Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
         }

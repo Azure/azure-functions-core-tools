@@ -6,8 +6,8 @@ using Func.E2ETests.Fixtures;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
-using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
 {
@@ -15,6 +15,7 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
     public class PowershellTests : IClassFixture<PowershellFunctionAppFixture>
     {
         private readonly PowershellFunctionAppFixture _fixture;
+
         public PowershellTests(PowershellFunctionAppFixture fixture, ITestOutputHelper log)
         {
             _fixture = fixture;
@@ -22,9 +23,10 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public async Task Start_PowershellApp_SuccessfulFunctionExecution()
+        public void Start_PowershellApp_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
+
             // Call func start
             var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_PowershellApp_SuccessfulFunctionExecution", _fixture.Log);
             string? capturedContent = null;
