@@ -1,13 +1,11 @@
-using System;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
@@ -41,8 +39,15 @@ namespace Azure.Functions.Cli.Actions.HostActions
         private const int DefaultTimeout = 20;
         private readonly ISecretsManager _secretsManager;
         private readonly IProcessManager _processManager;
-        private IConfigurationRoot _hostJsonConfig;
         private readonly KeyVaultReferencesManager _keyVaultReferencesManager;
+        private IConfigurationRoot _hostJsonConfig;
+
+        public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
+        {
+            _secretsManager = secretsManager;
+            _processManager = processManager;
+            _keyVaultReferencesManager = new KeyVaultReferencesManager();
+        }
 
         public int Port { get; set; }
 
@@ -77,13 +82,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
         public string JsonOutputFile { get; set; }
 
         public string HostRuntime { get; set; }
-
-        public StartHostAction(ISecretsManager secretsManager, IProcessManager processManager)
-        {
-            _secretsManager = secretsManager;
-            _processManager = processManager;
-            _keyVaultReferencesManager = new KeyVaultReferencesManager();
-        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -180,19 +178,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
             var parserResult = base.ParseArgs(args);
             bool verboseLoggingArgExists = parserResult.UnMatchedOptions.Any(o => o.LongName.Equals("verbose", StringComparison.OrdinalIgnoreCase));
+
             // Input args do not contain --verbose flag
             if (!VerboseLogging.Value && verboseLoggingArgExists)
             {
                 VerboseLogging = null;
             }
+
             return parserResult;
         }
 
         private async Task<IWebHost> BuildWebHost(ScriptApplicationHostOptions hostOptions, Uri listenAddress, Uri baseAddress, X509Certificate2 certificate)
         {
             LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(_hostJsonConfig, VerboseLogging);
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
-                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
+                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 UserSecretsId = ProjectHelpers.GetUserSecretsId(hostOptions.ScriptPath, loggingFilterHelper, new LoggerFilterOptions());
             }
@@ -215,6 +215,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     });
                 });
             }
+
             return defaultBuilder
                 .ConfigureKestrel(o =>
                 {
@@ -232,12 +233,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     loggingBuilder.ClearProviders();
                     loggingBuilder.Services.AddSingleton<ILoggerProvider>(p =>
                     {
-                        //Cache LoggerFilterOptions to be used by the logger to filter logs based on content
+                        // Cache LoggerFilterOptions to be used by the logger to filter logs based on content
                         var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>().Value;
+
                         // Set min level to SystemLogDefaultLogLevel.
                         filterOptions.MinLevel = loggingFilterHelper.SystemLogDefaultLogLevel;
                         return new ColoredConsoleLoggerProvider(loggingFilterHelper, filterOptions, JsonOutputFile);
                     });
+
                     // This is needed to filter system logs only for known categories
                     loggingBuilder.AddDefaultWebJobsFilters<ColoredConsoleLoggerProvider>(LogLevel.Trace);
 
@@ -294,7 +297,6 @@ namespace Azure.Functions.Cli.Actions.HostActions
             // when running locally in CLI we want the host to run in debug mode
             // which optimizes host responsiveness
             settings.Add("AZURE_FUNCTIONS_ENVIRONMENT", "Development");
-
 
             // Inject the .NET Worker startup hook if debugging the worker
             if (DotNetIsolatedDebug != null && DotNetIsolatedDebug.Value)
@@ -400,7 +402,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            
+
             // Return if running is delegated to another version of Core Tools
             if (await TryHandleInProcDotNetLaunchAsync())
             {
@@ -453,10 +455,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 DisplayFunctionsInfoUtilities.DisplayFunctionsInfo(scriptHost.Functions, httpOptions.Value, baseUri);
             }
+
             if (VerboseLogging == null || !VerboseLogging.Value)
             {
                 ColoredConsole.WriteLine(AdditionalInfoColor("For detailed output, run func with --verbose flag."));
             }
+
             await runTask;
         }
 
@@ -483,7 +487,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 return false;
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet)
             {
                 // Infer host runtime by checking if .NET 8 is enabled
                 var isDotNet8Project = await IsInProcDotNet8Enabled();
@@ -491,7 +495,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 var selectedRuntime = isDotNet8Project
                     ? DotnetConstants.InProc8HostRuntime
                     : DotnetConstants.InProc6HostRuntime;
-                
+
                 PrintVerboseForHostSelection(selectedRuntime);
 
                 if (selectedRuntime == DotnetConstants.InProc6HostRuntime)
@@ -514,7 +518,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
             return false;
         }
 
-        internal async Task ValidateHostRuntimeAsync(WorkerRuntime currentWorkerRuntime,
+        internal async Task ValidateHostRuntimeAsync(
+            WorkerRuntime currentWorkerRuntime,
             Func<Task<bool>> validateDotNet8ProjectEnablement = null)
         {
             validateDotNet8ProjectEnablement ??= IsInProcDotNet8Enabled;
@@ -532,7 +537,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var isInproc6ArgumentValue = string.Equals(HostRuntime, DotnetConstants.InProc6HostRuntime, StringComparison.OrdinalIgnoreCase);
             var isInproc8ArgumentValue = string.Equals(HostRuntime, DotnetConstants.InProc8HostRuntime, StringComparison.OrdinalIgnoreCase);
 
-            if (currentWorkerRuntime == WorkerRuntime.dotnet)
+            if (currentWorkerRuntime == WorkerRuntime.Dotnet)
             {
                 if (isInproc6ArgumentValue)
                 {
@@ -541,7 +546,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
-                    ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnetIsolated}'.");
+                    ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.DotnetIsolated}'.");
                 }
 
                 if (isInproc8ArgumentValue && !await validateDotNet8ProjectEnablement())
@@ -552,11 +557,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ThrowCliException($"For the '{DotnetConstants.InProc6HostRuntime}' runtime, the '{Constants.InProcDotNet8EnabledSetting}' environment variable cannot be be set. See https://aka.ms/azure-functions/dotnet/net8-in-process.");
                 }
-
             }
             else if (isInproc8ArgumentValue || isInproc6ArgumentValue)
             {
-                ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.dotnet}'.");
+                ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.Dotnet}'.");
             }
 
             PrintVerboseForHostSelection(HostRuntime);
@@ -566,6 +570,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             throw new CliException($"This version of the Azure Functions Core Tools requires your project to reference version {DotnetConstants.InProcFunctionsMinSdkVersion} or later of {DotnetConstants.InProcFunctionsSdk}. Please update to the latest version. For more information, see: {DotnetConstants.InProcFunctionsDocsLink}");
         }
+
         private void PrintVerboseForHostSelection(string hostRuntime)
         {
             if (VerboseLogging.GetValueOrDefault())
@@ -579,7 +584,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var funcExecutableDirectory = Path.GetDirectoryName(typeof(StartHostAction).Assembly.Location)!;
             var executableName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? DotnetConstants.WindowsExecutableName : DotnetConstants.LinuxExecutableName;
 
-            return Path.Combine(funcExecutableDirectory, (isNet8 ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName), executableName);
+            return Path.Combine(funcExecutableDirectory, isNet8 ? DotnetConstants.InProc8DirectoryName : DotnetConstants.InProc6DirectoryName, executableName);
         }
 
         private void StartHostAsChildProcess(bool shouldStartNet8ChildProcess)
@@ -614,6 +619,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 {
                     ColoredConsole.WriteLine(VerboseColor($"Started child process with ID: {childProcess.Id}"));
                 }
+
                 childProcess!.OutputDataReceived += (sender, e) =>
                 {
                     if (!string.IsNullOrEmpty(e.Data))
@@ -660,16 +666,16 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
         private void ValidateAndBuildHostJsonConfigurationIfFileExists(ScriptApplicationHostOptions hostOptions)
         {
-            bool IsPreCompiledApp = IsPreCompiledFunctionApp();
+            bool isPreCompiledApp = IsPreCompiledFunctionApp();
             var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
-            if (IsPreCompiledApp && !File.Exists(hostJsonPath))
+            if (isPreCompiledApp && !File.Exists(hostJsonPath))
             {
                 throw new CliException($"Host.json file in missing. Please make sure host.json file is present at {Environment.CurrentDirectory}");
             }
 
-            //BuildHostJsonConfigutation only if host.json file exists.
+            // BuildHostJsonConfigutation only if host.json file exists.
             _hostJsonConfig = Utilities.BuildHostJsonConfigutation(hostOptions);
-            if (IsPreCompiledApp && Utilities.JobHostConfigSectionExists(_hostJsonConfig, ConfigurationSectionNames.ExtensionBundle))
+            if (isPreCompiledApp && Utilities.JobHostConfigSectionExists(_hostJsonConfig, ConfigurationSectionNames.ExtensionBundle))
             {
                 throw new CliException($"Extension bundle configuration should not be present for the function app with pre-compiled functions. Please remove extension bundle configuration from host.json: {Path.Combine(Environment.CurrentDirectory, "host.json")}");
             }
@@ -679,7 +685,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             EnsureWorkerRuntimeIsSet();
 
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python)
             {
                 var pythonVersion = await PythonHelpers.GetEnvironmentPythonVersion();
                 PythonHelpers.AssertPythonVersion(pythonVersion, errorIfNotSupported: true, errorIfNoVersion: true);
@@ -690,7 +696,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 await DotnetHelpers.BuildAndChangeDirectory(Path.Combine("bin", "output"), string.Empty);
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.powershell && !CommandChecker.CommandExists("dotnet"))
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Powershell && !CommandChecker.CommandExists("dotnet"))
             {
                 throw new CliException("Dotnet is required for PowerShell Functions. Please install dotnet (.NET Core SDK) for your system from https://www.microsoft.com/net/download");
             }
@@ -714,11 +720,13 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     string extension = Path.GetExtension(functionMetadata?.ScriptFile)?.ToLowerInvariant().TrimStart('.');
                     isPrecompiled = isPrecompiled || (!string.IsNullOrEmpty(extension) && extension == "dll");
                 }
+
                 if (isPrecompiled)
                 {
                     break;
                 }
             }
+
             return isPrecompiled;
         }
 
@@ -769,8 +777,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                                 {
                                     ColoredConsole.WriteLine(WarningColor($"Warning: '{token.Key}' property in '{filePath}' is empty."));
                                 }
-                                else if (token.Key == "connection" && !ConnectionExists(secrets, appSettingName) ||
-                                        token.Key != "connection" && !secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase)))
+                                else if ((token.Key == "connection" && !ConnectionExists(secrets, appSettingName)) ||
+                                        (token.Key != "connection" && !secrets.Any(v => v.Key.Equals(appSettingName, StringComparison.OrdinalIgnoreCase))))
                                 {
                                     ColoredConsole
                                         .WriteLine(WarningColor($"Warning: Cannot find value named '{appSettingName}' in {SecretsManager.AppSettingsFileName} that matches '{token.Key}' property set on '{binding["type"]?.ToString()}' in '{filePath}'. " +
@@ -810,10 +818,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 connectionStringSection = configuration?.GetSection(connectionStringKey);
             }
+
             return connectionStringSection.Exists();
         }
 
-        private async Task<(Uri listenUri, Uri baseUri, X509Certificate2 cert)> Setup()
+        private async Task<(Uri ListenUri, Uri BaseUri, X509Certificate2 Cert)> Setup()
         {
             var protocol = UseHttps ? "https" : "http";
             X509Certificate2 cert = UseHttps
@@ -842,7 +851,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, GlobalCoreToolsSettings.CurrentWorkerRuntime.ToString());
         }
 
-        private void PrintMigrationWarningForDotnet6Inproc() 
+        private void PrintMigrationWarningForDotnet6Inproc()
         {
             ColoredConsole.WriteLine(WarningColor($".NET 6 is no longer supported. Please consider migrating to a supported version. For more information, see https://aka.ms/azure-functions/dotnet/net8-in-process. If you intend to target .NET 8 on the in-process model, make sure that '{Constants.InProcDotNet8EnabledSetting}' is set to '1' in {Constants.LocalSettingsJsonFileName}.\n"));
         }

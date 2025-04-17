@@ -1,5 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
@@ -7,21 +8,20 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "purge-history", Context = Context.Durable, HelpText = "Purge orchestration instance state, history, and blob storage for orchestrations older than the specified threshold time.")]
-    class DurablePurgeHistory : BaseDurableAction
+    internal class DurablePurgeHistory : BaseDurableAction
     {
-
         private readonly IDurableManager _durableManager;
+
+        public DurablePurgeHistory(IDurableManager durableManager)
+        {
+            _durableManager = durableManager;
+        }
 
         private DateTime CreatedTimeFrom { get; set; }
 
         private DateTime CreatedTimeTo { get; set; }
 
         private string Statuses { get; set; }
-
-        public DurablePurgeHistory(IDurableManager durableManager)
-        {
-            _durableManager = durableManager;
-        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -48,7 +48,5 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         {
             await _durableManager.PurgeHistory(ConnectionString, TaskHubName, CreatedTimeFrom, CreatedTimeTo, DurableManager.ParseStatuses(Statuses));
         }
-
-
     }
 }

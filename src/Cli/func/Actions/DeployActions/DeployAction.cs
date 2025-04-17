@@ -1,8 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Actions.DeployActions.Platforms;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -10,34 +8,43 @@ using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using Microsoft.Azure.WebJobs.Script;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
     [Action(Name = "deploy", ShowInHelp = false)]
     internal class DeployAction : BaseAction
     {
-        public string Registry { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Platform { get; set; } = string.Empty;
-        public int MinInstances { get; set; } = 1;
-        public int MaxInstances { get; set; } = 1000;
-        public double CPU { get; set; } = 0.1;
-        public int Memory { get; set; } = 128;
-        public string Port { get; set; } = "80";
-        public string Namespace { get; set; } = "azure-functions";
-        public string FolderName { get; set; } = string.Empty;
-        public string PullSecret  { get; set; } = string.Empty;
-
-        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes", "knative" };
         private readonly ITemplatesManager _templatesManager;
 
         public DeployAction(ITemplatesManager templatesManager)
         {
             _templatesManager = templatesManager;
         }
+
+        public string Registry { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Platform { get; set; } = string.Empty;
+
+        public int MinInstances { get; set; } = 1;
+
+        public int MaxInstances { get; set; } = 1000;
+
+        public double CPU { get; set; } = 0.1;
+
+        public int Memory { get; set; } = 128;
+
+        public string Port { get; set; } = "80";
+
+        public string Namespace { get; set; } = "azure-functions";
+
+        public string FolderName { get; set; } = string.Empty;
+
+        public string PullSecret { get; set; } = string.Empty;
+
+        public List<string> Platforms { get; set; } = new List<string>() { "kubernetes", "knative" };
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -48,7 +55,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             Parser
                 .Setup<string>("platform")
-                .WithDescription("Hosting platform for the function app. Valid options: " + String.Join(",", Platforms))
+                .WithDescription("Hosting platform for the function app. Valid options: " + string.Join(",", Platforms))
                 .Callback(t => Platform = t).Required();
 
             Parser
@@ -95,7 +102,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (!Platforms.Contains(Platform))
             {
-                ColoredConsole.Error.WriteLine(ErrorColor($"platform {Platform} is not supported. Valid options are: {String.Join(",", Platforms)}"));
+                ColoredConsole.Error.WriteLine(ErrorColor($"platform {Platform} is not supported. Valid options are: {string.Join(",", Platforms)}"));
                 return;
             }
 

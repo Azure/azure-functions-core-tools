@@ -1,5 +1,6 @@
-using System;
-using System.Collections.Generic;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
@@ -8,15 +9,12 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
     {
         public static IHostingPlatform CreatePlatform(string name)
         {
-            switch (name)
+            return name switch
             {
-                case "kubernetes":
-                    return new KubernetesPlatform();
-                case "knative":
-                    return new KnativePlatform();
-                default:
-                    return null;
-            }
+                "kubernetes" => new KubernetesPlatform(),
+                "knative" => new KnativePlatform(),
+                _ => null,
+            };
         }
     }
 }

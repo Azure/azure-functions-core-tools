@@ -1,30 +1,25 @@
-﻿using System.Threading.Tasks;
-using Fclp;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
-using System;
-using System.Collections.Generic;
+using Fclp;
 using Fclp.Internals;
-using System.Linq;
-using Azure.Functions.Cli.Telemetry;
-using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Common;
-using Colors.Net;
 
 namespace Azure.Functions.Cli.Actions
 {
-    abstract class BaseAction : IAction
+    internal abstract class BaseAction : IAction
     {
-        protected FluentCommandLineParser Parser { get; private set; }
-
-        public IEnumerable<ICommandLineOption> MatchedOptions { get; private set; }
-
-        public IDictionary<string, string> TelemetryCommandEvents { get; private set; }
-
         public BaseAction()
         {
             Parser = new FluentCommandLineParser();
             TelemetryCommandEvents = new Dictionary<string, string>();
         }
+
+        protected FluentCommandLineParser Parser { get; private set; }
+
+        public IEnumerable<ICommandLineOption> MatchedOptions { get; private set; }
+
+        public IDictionary<string, string> TelemetryCommandEvents { get; private set; }
 
         public virtual ICommandLineParserResult ParseArgs(string[] args)
         {
