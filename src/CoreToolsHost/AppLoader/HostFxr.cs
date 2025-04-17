@@ -1,13 +1,13 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
 
 namespace CoreToolsHost
 {
-    static partial class HostFxr
+    internal static partial class HostFxr
     {
-#pragma warning disable CS0649 
+#pragma warning disable CS0649
         public unsafe struct hostfxr_initialize_parameters
         {
             public nint size;
@@ -23,6 +23,7 @@ namespace CoreToolsHost
             StringMarshalling = StringMarshalling.Utf16
 #endif
         )]
+
         public unsafe static partial int Initialize(
             int argc,
             string[] argv,
@@ -40,6 +41,7 @@ namespace CoreToolsHost
             StringMarshalling = StringMarshalling.Utf16
 #endif
         )]
+
         public static partial int SetAppContextData(IntPtr host_context_handle, string name, string value);
 
         [LibraryImport("hostfxr", EntryPoint = "hostfxr_close")]
