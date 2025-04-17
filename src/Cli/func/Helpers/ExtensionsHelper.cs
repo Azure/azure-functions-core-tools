@@ -1,27 +1,23 @@
-﻿using Azure.Functions.Cli.Common;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Threading.Tasks;
-using System.Linq;
-using Newtonsoft.Json;
-using Microsoft.Azure.WebJobs.Script.Description;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
+using Microsoft.Azure.WebJobs.Script.Description;
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Helpers
 {
-    class ExtensionsHelper
+    internal class ExtensionsHelper
     {
         public static async Task<string> EnsureExtensionsProjectExistsAsync(ISecretsManager secretsManager, bool csx, string extensionsDir = null)
         {
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet && !csx)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet && !csx)
             {
                 return DotnetHelpers.GetCsprojOrFsproj();
             }
 
-            if (String.IsNullOrEmpty(extensionsDir))
+            if (string.IsNullOrEmpty(extensionsDir))
             {
                 extensionsDir = Environment.CurrentDirectory;
             }
@@ -32,6 +28,7 @@ namespace Azure.Functions.Cli.Helpers
                 FileSystemHelpers.EnsureDirectory(extensionsDir);
                 await FileSystemHelpers.WriteAllTextToFileAsync(extensionsProj, await StaticResources.ExtensionsProject);
             }
+
             return extensionsProj;
         }
 
@@ -48,6 +45,7 @@ namespace Azure.Functions.Cli.Helpers
                     bindings.Add(binding.Type.ToLower());
                 }
             }
+
             return bindings;
         }
 
@@ -71,6 +69,5 @@ namespace Azure.Functions.Cli.Helpers
 
             return packages.Values;
         }
-
     }
 }

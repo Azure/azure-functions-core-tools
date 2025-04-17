@@ -1,19 +1,13 @@
-﻿using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Extensions;
-using Colors.Net;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json.Nodes;
-using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Extensions;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -38,9 +32,9 @@ namespace Azure.Functions.Cli.Helpers
             return isOlderVersion ? Constants.OldCoreToolsVersionMessage : string.Empty;
         }
 
-        // Check that current core tools is the latest version. 
-        // To ensure that it doesn't block other tasks. The HTTP Request timeout is only 1 second. 
-        // We simply ingnore the exception if for any reason the check fails. 
+        // Check that current core tools is the latest version.
+        // To ensure that it doesn't block other tasks. The HTTP Request timeout is only 1 second.
+        // We simply ingnore the exception if for any reason the check fails.
         public static async Task<bool> IsRunningAnOlderVersion(HttpClient client = null)
         {
             try
@@ -97,7 +91,7 @@ namespace Azure.Functions.Cli.Helpers
                         {
                             sb.AppendLine($"You are currently using Core Tools version {Constants.CliVersion} which is installed at {fileInfo.Directory}.");
                         }
-                        
+
                         return sb.ToString();
                     }
                 }
@@ -108,7 +102,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch (Exception)
             {
-                // ignore the error. We don't want to throw exception becasue of version check. 
+                // ignore the error. We don't want to throw exception becasue of version check.
             }
 
             return string.Empty;
@@ -120,6 +114,4 @@ namespace Azure.Functions.Cli.Helpers
             public string TagName { get; set; }
         }
     }
-
-    
 }

@@ -1,10 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Runtime.InteropServices;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -38,6 +37,7 @@ namespace Azure.Functions.Cli.Helpers
                     // If any problem with this selection wizard, we ignore and continue with the generic selection wizard
                 }
             }
+
             return DisplaySelectionWizardUnix(options);
         }
 
@@ -125,8 +125,10 @@ namespace Azure.Functions.Cli.Helpers
                             ColoredConsole.WriteLine($"\r{TitleColor(optionsArray[i].ToString())}");
                         }
                     }
+
                     current = next;
                 }
+
                 Console.SetCursorPosition(0, topPos + current - 1);
                 var key = Console.ReadKey(true);
                 if (key.Key == ConsoleKey.UpArrow)
