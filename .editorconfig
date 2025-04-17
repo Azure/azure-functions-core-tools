@@ -11,7 +11,7 @@ indent_style = space
 
 # Code files
 [*.{cs,csx,vb,vbx}]
-file_header_template = Copyright (c) .NET Foundation. All rights reserved.\r\nLicensed under the MIT License. See License.txt in the project root for license information.
+file_header_template = Copyright (c) .NET Foundation. All rights reserved.\r\nLicensed under the MIT License. See LICENSE in the project root for license information.
 xml_header = false
 indent_size = 4
 insert_final_newline = true
