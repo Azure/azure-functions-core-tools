@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Text.RegularExpressions;
 
 namespace Azure.Functions.Cli.Common
@@ -39,10 +40,12 @@ namespace Azure.Functions.Cli.Common
                     {
                         line = line.Substring(1);
                     }
+
                     if (line.StartsWith("/"))
                     {
                         line = line.Substring(1);
                     }
+
                     if (isNegative)
                     {
                         lists[1].Add(line);
@@ -51,6 +54,7 @@ namespace Azure.Functions.Cli.Common
                     {
                         lists[0].Add(line);
                     }
+
                     return lists;
                 })
                 .Select(l =>
@@ -81,6 +85,7 @@ namespace Azure.Functions.Cli.Common
             {
                 input = input.Substring(1);
             }
+
             return _negative[0].IsMatch(input) || !_positive[0].IsMatch(input);
         }
 
@@ -90,6 +95,7 @@ namespace Azure.Functions.Cli.Common
             {
                 input = input.Substring(1);
             }
+
             return !(_negative[0].IsMatch(input) || !_positive[0].IsMatch(input));
         }
 

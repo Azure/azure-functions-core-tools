@@ -1,10 +1,8 @@
-﻿using Azure.Functions.Cli.Common;
-using System.Linq;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Text.RegularExpressions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Collections.Concurrent;
-using System.IO;
+using System.Text.RegularExpressions;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -31,7 +29,8 @@ namespace Azure.Functions.Cli.Common
             Regex rx = new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
             var packages = new ConcurrentBag<PythonPackage>();
 
-            fileContent.Split('\r', '\n').Where(l => !string.IsNullOrWhiteSpace(l)).AsParallel().ForAll(line => {
+            fileContent.Split('\r', '\n').Where(l => !string.IsNullOrWhiteSpace(l)).AsParallel().ForAll(line =>
+            {
                 Match match = rx.Match(line);
 
                 if (match.Success)
