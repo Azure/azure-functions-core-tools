@@ -1,7 +1,6 @@
-﻿using System;
-using System.IO;
-using System.Net.Http;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
@@ -39,6 +38,7 @@ namespace Azure.Functions.Cli
             {
                 await Task.Delay(500);
             }
+
             return new HttpClient() { BaseAddress = server, Timeout = timeout };
         }
 
@@ -74,11 +74,12 @@ namespace Azure.Functions.Cli
 
                         answer = Console.ReadLine()?.Trim()?.ToLowerInvariant();
                         answer = string.IsNullOrEmpty(answer) ? "yes" : answer;
-                    } while (answer != "yes" && answer != "no");
+                    }
+                    while (answer != "yes" && answer != "no");
                     _settings.DisplayLaunchingRunServerWarning = answer == "yes" ? true : false;
                 }
 
-                //TODO: factor out to PlatformHelper.LaunchInNewConsole and implement for Mac using AppleScript
+                // TODO: factor out to PlatformHelper.LaunchInNewConsole and implement for Mac using AppleScript
                 var exeName = System.Reflection.Assembly.GetEntryAssembly().Location;
                 var exe = PlatformHelper.IsWindows
                     ? new Executable(exeName, $"host start -p {Port + iteration} --pause-on-error", streamOutput: false, shareConsole: true)

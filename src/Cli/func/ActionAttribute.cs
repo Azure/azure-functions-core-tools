@@ -1,9 +1,10 @@
-﻿using System;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    sealed class ActionAttribute : Attribute
+    internal sealed class ActionAttribute : Attribute
     {
         public Context Context { get; set; }
 
