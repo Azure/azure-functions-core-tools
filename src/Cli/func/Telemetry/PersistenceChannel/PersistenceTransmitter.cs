@@ -1,10 +1,5 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 {
@@ -14,11 +9,6 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
     internal class PersistenceTransmitter : IDisposable
     {
         /// <summary>
-        ///     The number of times this object was disposed.
-        /// </summary>
-        private int _disposeCount;
-
-        /// <summary>
         ///     A list of senders that sends transmissions.
         /// </summary>
         private readonly List<Sender> _senders = new List<Sender>();
@@ -27,6 +17,11 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         ///     The storage that is used to persist all the transmissions.
         /// </summary>
         private readonly BaseStorageService _storage;
+
+        /// <summary>
+        ///     The number of times this object was disposed.
+        /// </summary>
+        private int _disposeCount;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="PersistenceTransmitter" /> class.

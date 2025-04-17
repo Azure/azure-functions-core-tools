@@ -1,16 +1,12 @@
-// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Linq;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
-using System.Net.NetworkInformation;
 using System.ComponentModel;
-using Azure.Functions.Cli.Common;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Telemetry
 {
@@ -61,6 +57,7 @@ namespace Azure.Functions.Cli.Telemetry
             {
                 return macAddress;
             }
+
             return null;
         }
 
@@ -146,6 +143,7 @@ namespace Azure.Functions.Cli.Telemetry
                     break;
                 }
             }
+
             return macs;
         }
     }

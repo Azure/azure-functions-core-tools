@@ -1,8 +1,7 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
@@ -10,8 +9,10 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
     internal abstract class SnapshottingCollection<TItem, TCollection> : ICollection<TItem>
         where TCollection : class, ICollection<TItem>
     {
+#pragma warning disable SA1401 // Fields should be private
         protected readonly TCollection Collection;
         protected TCollection snapshot;
+#pragma warning restore SA1401 // Fields should be private
 
         protected SnapshottingCollection(TCollection collection)
         {

@@ -1,9 +1,6 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.ApplicationInsights.Channel;
 
 namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
@@ -18,7 +15,11 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         ///     If there was a concurrent Abstract Data Type Set it would have been used instead.
         ///     However, since there is no concurrent Set, dictionary is used and the second value is ignored.
         /// </remarks>
+#pragma warning disable SA1401 // Fields should be private
+#pragma warning disable SA1306 // Field names should begin with lower-case letter
         protected IDictionary<string, string> PeekedTransmissions;
+#pragma warning restore SA1306 // Field names should begin with lower-case letter
+#pragma warning restore SA1401 // Fields should be private
 
         /// <summary>
         ///     Gets or sets the maximum size of the storage in bytes. When limit is reached, the Enqueue method will drop new
@@ -34,7 +35,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         internal abstract string StorageDirectoryPath { get; }
 
         /// <summary>
-        ///     Initializes the <see cref="BaseStorageService" />
+        ///     Initializes the <see cref="BaseStorageService" />.
         /// </summary>
         /// <param name="desireStorageDirectoryPath">A folder name. Under this folder all the transmissions will be saved.</param>
         internal abstract void Init(string desireStorageDirectoryPath);

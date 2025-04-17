@@ -1,37 +1,15 @@
-// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using RuntimeEnvironment = Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment;
-using RuntimeInformation = System.Runtime.InteropServices.RuntimeInformation;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
+using RuntimeEnvironment = Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment;
+using RuntimeInformation = System.Runtime.InteropServices.RuntimeInformation;
 
 namespace Azure.Functions.Cli.Telemetry
 {
     internal class TelemetryCommonProperties
     {
-        public TelemetryCommonProperties(
-            Func<string> getCurrentDirectory = null,
-            Func<string, string> hasher = null,
-            Func<string> getMACAddress = null,
-            IDockerContainerDetector dockerContainerDetector = null,
-            ISettings persistentSettings = null)
-        {
-            _getCurrentDirectory = getCurrentDirectory ?? Directory.GetCurrentDirectory;
-            _hasher = hasher ?? Sha256Hasher.Hash;
-            _getMACAddress = getMACAddress ?? MACAddressGetter.GetMACAddress;
-            _dockerContainerDetector = dockerContainerDetector ?? new DockerContainerDetectorForTelemetry();
-            _persistentSettings = persistentSettings ?? new PersistentSettings(global: true);
-        }
-
-        private readonly IDockerContainerDetector _dockerContainerDetector;
-        private Func<string> _getCurrentDirectory;
-        private Func<string, string> _hasher;
-        private Func<string> _getMACAddress;
-        private ISettings _persistentSettings;
         private const string OSVersion = "OS Version";
         private const string OSPlatform = "OS Platform";
         private const string OutputRedirected = "Output Redirected";
@@ -46,27 +24,45 @@ namespace Azure.Functions.Cli.Telemetry
         private const string ProductType = "Product Type";
         private const string LibcRelease = "Libc Release";
         private const string LibcVersion = "Libc Version";
-
         private const string TelemetryProfileEnvironmentVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_PROFILE";
+        private readonly IDockerContainerDetector _dockerContainerDetector;
+        private readonly Func<string> _getCurrentDirectory;
+        private readonly Func<string, string> _hasher;
+        private readonly Func<string> _getMACAddress;
+        private readonly ISettings _persistentSettings;
+
+        public TelemetryCommonProperties(
+            Func<string> getCurrentDirectory = null,
+            Func<string, string> hasher = null,
+            Func<string> getMACAddress = null,
+            IDockerContainerDetector dockerContainerDetector = null,
+            ISettings persistentSettings = null)
+        {
+            _getCurrentDirectory = getCurrentDirectory ?? Directory.GetCurrentDirectory;
+            _hasher = hasher ?? Sha256Hasher.Hash;
+            _getMACAddress = getMACAddress ?? MACAddressGetter.GetMACAddress;
+            _dockerContainerDetector = dockerContainerDetector ?? new DockerContainerDetectorForTelemetry();
+            _persistentSettings = persistentSettings ?? new PersistentSettings(global: true);
+        }
 
         public Dictionary<string, string> GetTelemetryCommonProperties()
         {
             return new Dictionary<string, string>
             {
-                {OSVersion, RuntimeEnvironment.OperatingSystemVersion},
-                {OSPlatform, RuntimeEnvironment.OperatingSystemPlatform.ToString()},
-                {OutputRedirected, Console.IsOutputRedirected.ToString()},
-                {RuntimeId, RuntimeEnvironment.GetRuntimeIdentifier()},
-                {ProductVersion, Constants.CliVersion},
-                {TelemetryProfile, Environment.GetEnvironmentVariable(TelemetryProfileEnvironmentVariable)},
-                {DockerContainer, IsDockerContainerCache()},
-                {CurrentPathHash, _hasher(_getCurrentDirectory())},
-                {MachineId, MachineIdCache()},
-                {KernelVersion, GetKernelVersion()},
-                {InstallationType, ExternalTelemetryProperties.GetInstallationType()},
-                {ProductType, ExternalTelemetryProperties.GetProductType()},
-                {LibcRelease, ExternalTelemetryProperties.GetLibcRelease()},
-                {LibcVersion, ExternalTelemetryProperties.GetLibcVersion()}
+                { OSVersion, RuntimeEnvironment.OperatingSystemVersion },
+                { OSPlatform, RuntimeEnvironment.OperatingSystemPlatform.ToString() },
+                { OutputRedirected, Console.IsOutputRedirected.ToString() },
+                { RuntimeId, RuntimeEnvironment.GetRuntimeIdentifier() },
+                { ProductVersion, Constants.CliVersion },
+                { TelemetryProfile, Environment.GetEnvironmentVariable(TelemetryProfileEnvironmentVariable) },
+                { DockerContainer, IsDockerContainerCache() },
+                { CurrentPathHash, _hasher(_getCurrentDirectory()) },
+                { MachineId, MachineIdCache() },
+                { KernelVersion, GetKernelVersion() },
+                { InstallationType, ExternalTelemetryProperties.GetInstallationType() },
+                { ProductType, ExternalTelemetryProperties.GetProductType() },
+                { LibcRelease, ExternalTelemetryProperties.GetLibcRelease() },
+                { LibcVersion, ExternalTelemetryProperties.GetLibcVersion() }
             };
         }
 
@@ -139,7 +135,7 @@ namespace Azure.Functions.Cli.Telemetry
         ///     Windows.10.Core  Microsoft Windows 10.0.14393
         ///     Windows.10.Nano  Microsoft Windows 10.0.14393
         ///     Windows.7        Microsoft Windows 6.1.7601 S
-        ///     Windows.81       Microsoft Windows 6.3.9600
+        ///     Windows.81       Microsoft Windows 6.3.9600 .
         /// </summary>
         private static string GetKernelVersion()
         {
