@@ -1,14 +1,14 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/StreamForwarder.csjkm;
 using System.Text;
 
-namespace Azure.Functions.Cli.Abstractions.Streams
+namespace Azure.Functions.Cli.Abstractions
 {
     public sealed class StreamForwarder
     {
-        private static readonly char[] _ignoreCharacters = new char[] { '\r' };
+        private static readonly char[] _ignoreCharacters = ['\r'];
         private static readonly char _flushBuilderCharacter = '\n';
 
         private StringBuilder? _builder;

@@ -1,17 +1,16 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/EnvironmentProvider.cs
 using System.Runtime.InteropServices;
-using Azure.Functions.Cli.Abstractions.Extensions;
 
-namespace Azure.Functions.Cli.Abstractions.Environment
+namespace Azure.Functions.Cli.Abstractions
 {
     public class EnvironmentProvider : IEnvironmentProvider
     {
-        private readonly Lazy<string> _userHomeDirectory = new(() => Environment.GetEnvironmentVariable("HOME") ?? string.Empty);
-        private static char[] _pathSeparator = new char[] { Path.PathSeparator };
-        private static char[] _quote = new char[] { '"' };
+        private readonly Lazy<string> _userHomeDirectory = new(static () => Environment.GetEnvironmentVariable("HOME") ?? string.Empty);
+        private static readonly char[] _pathSeparator = [Path.PathSeparator];
+        private static readonly char[] _quote = ['"'];
         private IEnumerable<string>? _searchPaths;
         private IEnumerable<string>? _executableExtensions;
 
@@ -48,7 +47,7 @@ namespace Azure.Functions.Cli.Abstractions.Environment
                 {
                     var searchPaths = new List<string> { AppContext.BaseDirectory };
 
-                    searchPaths.AddRange(Environment
+                    searchPaths.AddRange(Env
                         .GetEnvironmentVariable("PATH")?
                         .Split(_pathSeparator)
                         .Select(p => p.Trim(_quote))
