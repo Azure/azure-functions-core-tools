@@ -242,6 +242,7 @@ dotnet_diagnostic.SA1127.severity = none # Generic type constraints should be on
 dotnet_diagnostic.SA1204.severity = none # Static elements should appear before instance elements
 dotnet_diagnostic.SA1309.severity = none # Field names should not begin with underscore
 dotnet_diagnostic.SA1413.severity = none # Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1405.severity = none # Debug.Assert should provide message text
 dotnet_diagnostic.SA1600.severity = none # Elements should be documented
 dotnet_diagnostic.SA1601.severity = none # Partial elements should be documented
 dotnet_diagnostic.SA1602.severity = none # Enumeration items should be documented

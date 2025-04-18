@@ -1,25 +1,20 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/4a81a96a9f1bd661592975c8269e078f6e3f18c9/src/Cli/Microsoft.DotNet.Cli.Utils/Command.cs
 
 // Also note that CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter) is different for how
-// the processStartedHandler is implemented and called. This difference will have be accounted for when we migrate over to 
+// the processStartedHandler is implemented and called. This difference will have be accounted for when we migrate over to
 // the dotnet cli utils package.
-
-using Azure.Functions.Cli.Abstractions.Extensions;
-using Azure.Functions.Cli.Abstractions.Logging;
-using Azure.Functions.Cli.Abstractions.Streams;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
-using System.Windows.Input;
 
-namespace Azure.Functions.Cli.Abstractions.Command
+namespace Azure.Functions.Cli.Abstractions
 {
     public class Command(Process? process, bool trimTrailingNewlines = false) : ICommand
     {
         private readonly Process _process = process ?? throw new ArgumentNullException(nameof(process));
+        private readonly bool _trimTrailingNewlines = trimTrailingNewlines;
 
         private StreamForwarder? _stdOut;
 
@@ -27,12 +22,15 @@ namespace Azure.Functions.Cli.Abstractions.Command
 
         private bool _running = false;
 
-        private bool _trimTrailingNewlines = trimTrailingNewlines;
+        public string CommandName => _process.StartInfo.FileName;
+
+        public string CommandArgs => _process.StartInfo.Arguments;
 
         public CommandResult Execute()
         {
             return Execute(null, null);
         }
+
         public CommandResult Execute(Func<Process, Task>? processStarted, StreamWriter? fileWriter)
         {
             Reporter.Verbose.WriteLine(string.Format(
@@ -74,6 +72,7 @@ namespace Azure.Functions.Cli.Abstractions.Command
                         }
                     });
                 }
+
                 reaper.NotifyProcessStarted();
 
                 Reporter.Verbose.WriteLine(string.Format(
@@ -162,6 +161,7 @@ namespace Azure.Functions.Cli.Abstractions.Command
                     _stdOut?.ForwardTo(writeLine: to.WriteLine);
                 }
             }
+
             return this;
         }
 
@@ -182,6 +182,7 @@ namespace Azure.Functions.Cli.Abstractions.Command
                     _stdErr?.ForwardTo(writeLine: to.WriteLine);
                 }
             }
+
             return this;
         }
 
@@ -202,10 +203,6 @@ namespace Azure.Functions.Cli.Abstractions.Command
             _stdErr?.ForwardTo(writeLine: handler);
             return this;
         }
-
-        public string CommandName => _process.StartInfo.FileName;
-
-        public string CommandArgs => _process.StartInfo.Arguments;
 
         public ICommand SetCommandArgs(string commandArgs)
         {
