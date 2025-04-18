@@ -99,7 +99,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async override Task RunAsync()
         {
-            // Check if the command only ran for help. 
+            // Check if the command only ran for help.
             if (!string.IsNullOrEmpty(TriggerNameForHelp))
             {
                 await ProcessHelpRequest(TriggerNameForHelp, true);
@@ -124,7 +124,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     ColoredConsole.WriteLine($"Template: {TemplateName}");
                 }
-                
+
                 ColoredConsole.Write("Function name: ");
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
@@ -139,7 +139,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNamesFromNewTemplates(Language));
                 }
 
-                // Defaulting the filename to "function_app.py" if the file name is not provided. 
+                // Defaulting the filename to "function_app.py" if the file name is not provided.
                 if (string.IsNullOrWhiteSpace(FileName))
                 {
                     FileName = "function_app.py";
@@ -156,7 +156,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     }
                 }
 
-                var providedInputs = new Dictionary<string, string>() { { GetFunctionNameParamId, FunctionName }, { HttpTriggerAuthLevelParamId, AuthorizationLevel?.ToString() } };
+                var providedInputs = new Dictionary<string, string>()
+                {
+                    { GetFunctionNameParamId, FunctionName },
+                    { HttpTriggerAuthLevelParamId, AuthorizationLevel?.ToString().ToUpper() }
+                };
+
                 var jobName = "appendToFile";
                 if (FileName != PySteinFunctionAppPy)
                 {
@@ -188,7 +193,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     FunctionName = providedInputs[GetFunctionNameParamId];
                 }
-                
+
                 await _templatesManager.Deploy(templateJob, template, variables);
             }
             else
