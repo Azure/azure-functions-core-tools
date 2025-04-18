@@ -6,7 +6,7 @@ using System.Diagnostics;
 using Azure.Functions.Cli.Abstractions.Command;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.TestFramework.Commands
+namespace Azure.Functions.Cli.Test.Framework.Commands
 {
     public abstract class FuncCommand(ITestOutputHelper log)
     {

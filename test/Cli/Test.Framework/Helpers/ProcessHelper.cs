@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 
-namespace Azure.Functions.Cli.TestFramework.Helpers
+namespace Azure.Functions.Cli.Test.Framework.Helpers
 {
     public class ProcessHelper
     {

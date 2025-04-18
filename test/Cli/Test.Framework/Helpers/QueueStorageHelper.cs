@@ -4,7 +4,7 @@
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 
-namespace Azure.Functions.Cli.TestFramework.Helpers
+namespace Azure.Functions.Cli.Test.Framework.Helpers
 {
     public static class QueueStorageHelper
     {

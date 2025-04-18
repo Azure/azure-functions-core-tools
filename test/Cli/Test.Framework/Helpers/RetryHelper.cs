@@ -3,7 +3,7 @@
 
 using System.Diagnostics;
 
-namespace Azure.Functions.Cli.TestFramework.Helpers
+namespace Azure.Functions.Cli.Test.Framework.Helpers
 {
     public static class RetryHelper
     {

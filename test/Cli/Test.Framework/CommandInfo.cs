@@ -5,23 +5,23 @@
 using System.Diagnostics;
 using Azure.Functions.Cli.Abstractions.Command;
 
-namespace Azure.Functions.Cli.TestFramework
+namespace Azure.Functions.Cli.Test.Framework
 {
     public class CommandInfo
     {
         public required string FileName { get; set; }
 
-        public List<string> Arguments { get; set; } = new List<string>();
+        public List<string> Arguments { get; set; } = [];
 
-        public Dictionary<string, string> Environment { get; set; } = new Dictionary<string, string>();
+        public Dictionary<string, string> Environment { get; set; } = [];
 
-        public List<string> EnvironmentToRemove { get; } = new List<string>();
+        public List<string> EnvironmentToRemove { get; } = [];
 
         public required string WorkingDirectory { get; set; }
 
         public string? TestName { get; set; }
 
-        public Command ToCommand(bool doNotEscapeArguments = false)
+        public Command ToCommand()
         {
             var process = new Process()
             {
@@ -40,12 +40,12 @@ namespace Azure.Functions.Cli.TestFramework
                 UseShellExecute = false
             };
 
-            foreach (var kvp in Environment)
+            foreach (KeyValuePair<string, string> kvp in Environment)
             {
                 psi.Environment[kvp.Key] = kvp.Value;
             }
 
-            foreach (var envToRemove in EnvironmentToRemove)
+            foreach (string envToRemove in EnvironmentToRemove)
             {
                 psi.Environment.Remove(envToRemove);
             }
