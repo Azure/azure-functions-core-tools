@@ -1,20 +1,16 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Assertions/CommandResultAssertions.cs
+using Azure.Functions.Cli.Abstractions.Command;
 using FluentAssertions;
 using FluentAssertions.Execution;
 
-namespace Func.TestFramework.Assertions
+namespace Azure.Functions.Cli.TestFramework.Assertions
 {
-    public class CommandResultAssertions
+    public class CommandResultAssertions(CommandResult commandResult)
     {
-        private CommandResult _commandResult;
-
-        public CommandResultAssertions(CommandResult commandResult)
-        {
-            _commandResult = commandResult;
-        }
+        private readonly CommandResult _commandResult = commandResult;
 
         public CommandResultAssertions ExitWith(int expectedExitCode)
         {

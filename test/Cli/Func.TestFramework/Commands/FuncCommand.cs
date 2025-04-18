@@ -1,39 +1,33 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Commands/TestCommand.cs
-
-using Azure.Functions.Cli.Abstractions;
 using System.Diagnostics;
+using Azure.Functions.Cli.Abstractions.Command;
 using Xunit.Abstractions;
 
-namespace Func.TestFramework.Commands
+namespace Azure.Functions.Cli.TestFramework.Commands
 {
-    public abstract class FuncCommand
+    public abstract class FuncCommand(ITestOutputHelper log)
     {
-        private Dictionary<string, string> _environment = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _environment = [];
 
-        public ITestOutputHelper Log { get; }
+        public ITestOutputHelper Log { get; } = log;
 
-        public string WorkingDirectory { get; set; }
+        public string? WorkingDirectory { get; set; }
 
-        public List<string> Arguments { get; set; } = new List<string>();
+        public List<string> Arguments { get; set; } = [];
 
-        public List<string> EnvironmentToRemove { get; } = new List<string>();
+        public List<string> EnvironmentToRemove { get; } = [];
 
-        //  These only work via Execute(), not when using GetProcessStartInfo()
+        // These only work via Execute(), not when using GetProcessStartInfo()
         public Action<string>? CommandOutputHandler { get; set; }
 
         public Func<Process, Task>? ProcessStartedHandler { get; set; }
 
         public StreamWriter? FileWriter { get; private set; } = null;
 
-        public string LogFilePath { get; private set; }
-
-        protected FuncCommand(ITestOutputHelper log)
-        {
-            Log = log;
-        }
+        public string? LogFilePath { get; private set; }
 
         protected abstract CommandInfo CreateCommand(IEnumerable<string> args);
 
@@ -51,13 +45,13 @@ namespace Func.TestFramework.Commands
 
         private CommandInfo CreateCommandInfo(IEnumerable<string> args)
         {
-            var commandInfo = CreateCommand(args);
-            foreach (var kvp in _environment)
+            CommandInfo commandInfo = CreateCommand(args);
+            foreach (KeyValuePair<string, string> kvp in _environment)
             {
                 commandInfo.Environment[kvp.Key] = kvp.Value;
             }
 
-            foreach (var envToRemove in EnvironmentToRemove)
+            foreach (string envToRemove in EnvironmentToRemove)
             {
                 commandInfo.EnvironmentToRemove.Add(envToRemove);
             }
@@ -67,9 +61,9 @@ namespace Func.TestFramework.Commands
                 commandInfo.WorkingDirectory = WorkingDirectory;
             }
 
-            if (Arguments.Any())
+            if (Arguments.Count != 0)
             {
-                commandInfo.Arguments = Arguments.Concat(commandInfo.Arguments).ToList();
+                commandInfo.Arguments = [.. Arguments, .. commandInfo.Arguments];
             }
 
             return commandInfo;
@@ -77,23 +71,26 @@ namespace Func.TestFramework.Commands
 
         public ProcessStartInfo GetProcessStartInfo(params string[] args)
         {
-            var commandSpec = CreateCommandInfo(args);
+            CommandInfo commandSpec = CreateCommandInfo(args);
             return commandSpec.ToProcessStartInfo();
         }
 
         public virtual CommandResult Execute(IEnumerable<string> args)
         {
-            var spec = CreateCommandInfo(args);
-            var command = spec
+            CommandInfo spec = CreateCommandInfo(args);
+            ICommand command = spec
                 .ToCommand()
                 .CaptureStdOut()
                 .CaptureStdErr();
 
-            var funcExeDirectory = Path.GetDirectoryName(spec.FileName);
+            string? funcExeDirectory = Path.GetDirectoryName(spec.FileName);
 
-            Directory.SetCurrentDirectory(funcExeDirectory);
+            if (!string.IsNullOrEmpty(funcExeDirectory))
+            {
+                Directory.SetCurrentDirectory(funcExeDirectory);
+            }
 
-            var directoryToLogTo = Environment.GetEnvironmentVariable("DirectoryToLogTo");
+            string? directoryToLogTo = Environment.GetEnvironmentVariable("DirectoryToLogTo");
             if (string.IsNullOrEmpty(directoryToLogTo))
             {
                 directoryToLogTo = Directory.GetCurrentDirectory();
@@ -103,8 +100,9 @@ namespace Func.TestFramework.Commands
             Directory.CreateDirectory(directoryToLogTo);
 
             // Create a more unique filename to avoid conflicts
-            string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
-            LogFilePath = Path.Combine(directoryToLogTo,
+            string uniqueId = Guid.NewGuid().ToString("N")[..8];
+            LogFilePath = Path.Combine(
+                directoryToLogTo,
                 $"func_{spec.Arguments.First()}_{spec.TestName}_{DateTime.Now:yyyyMMdd_HHmmss}_{uniqueId}.log");
 
             // Make sure we're only opening the file once
@@ -120,7 +118,7 @@ namespace Func.TestFramework.Commands
                 // Write initial information
                 FileWriter.WriteLine($"=== Test started at {DateTime.Now} ===");
                 FileWriter.WriteLine($"Test Name: {spec.TestName}");
-                var display = $"func {string.Join(" ", spec.Arguments)}";
+                string? display = $"func {string.Join(" ", spec.Arguments)}";
                 FileWriter.WriteLine($"Command: {display}");
                 FileWriter.WriteLine($"Working Directory: {spec.WorkingDirectory ?? "not specified"}");
                 FileWriter.WriteLine("====================================");
@@ -170,7 +168,7 @@ namespace Func.TestFramework.Commands
                 Log.WriteLine($"Executing '{display}':");
                 Log.WriteLine($"Output being captured to: {LogFilePath}");
 
-                var result = ((Command)command).Execute(ProcessStartedHandler, FileWriter);
+                CommandResult result = ((Command)command).Execute(ProcessStartedHandler, FileWriter);
 
                 FileWriter.WriteLine("====================================");
                 FileWriter.WriteLine($"Command exited with code: {result.ExitCode}");
@@ -205,7 +203,7 @@ namespace Func.TestFramework.Commands
 
             if (!string.IsNullOrEmpty(result.StdErr))
             {
-                log.WriteLine("");
+                log.WriteLine(string.Empty);
                 log.WriteLine("StdErr:");
                 log.WriteLine(result.StdErr);
             }

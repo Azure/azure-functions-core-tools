@@ -1,7 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-namespace Func.TestFramework.Helpers
+namespace Azure.Functions.Cli.TestFramework.Helpers
 {
     public static class LogWatcher
     {
@@ -20,39 +20,43 @@ namespace Func.TestFramework.Helpers
             }
             else
             {
-                var timer = new Timer(state =>
-                {
-                    try
+                var timer = new Timer(
+                    state =>
                     {
-                        // Save the current position
-                        long currentPosition = stdout.BaseStream.Position;
-
-                        // Check if there's new content
-                        if (stdout.Peek() > -1)
+                        try
                         {
-                            string newContent = stdout.ReadToEnd();
-                            if (newContent.Contains(expectedOutput))
-                            {
-                                tcs.TrySetResult(true);
-                                return;
-                            }
+                            // Save the current position
+                            long currentPosition = stdout.BaseStream.Position;
 
-                            // Reset position back to the end
-                            stdout.BaseStream.Position = stdout.BaseStream.Length;
+                            // Check if there's new content
+                            if (stdout.Peek() > -1)
+                            {
+                                string newContent = stdout.ReadToEnd();
+                                if (newContent.Contains(expectedOutput))
+                                {
+                                    tcs.TrySetResult(true);
+                                    return;
+                                }
+
+                                // Reset position back to the end
+                                stdout.BaseStream.Position = stdout.BaseStream.Length;
+                            }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        tcs.TrySetException(ex);
-                    }
-                }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+                        catch (Exception ex)
+                        {
+                            tcs.TrySetException(ex);
+                        }
+                    },
+                    null,
+                    TimeSpan.Zero,
+                    TimeSpan.FromSeconds(1));
 
                 // Cancel the waiting task if the timeout is reached
                 cancellationTokenSource.Token.Register(() =>
-                {
-                    tcs.TrySetCanceled();
-                    timer.Dispose();
-                });
+                    {
+                        tcs.TrySetCanceled();
+                        timer.Dispose();
+                    });
             }
 
             await tcs.Task;

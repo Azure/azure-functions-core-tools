@@ -21,7 +21,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.Abstrac
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreToolsHost", "src\CoreToolsHost\CoreToolsHost.csproj", "{0333D5B6-B628-4605-A51E-D0AEE4C3F1FC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Func.TestFramework", "test\Cli\Func.TestFramework\Func.TestFramework.csproj", "{40C7D05D-93E9-40E9-AC37-2B36C5854477}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.TestFramework", "test\Cli\Func.TestFramework\Azure.Functions.Cli.TestFramework.csproj", "{40C7D05D-93E9-40E9-AC37-2B36C5854477}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

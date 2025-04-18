@@ -1,9 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
 
-namespace Func.TestFramework.Helpers
+namespace Azure.Functions.Cli.TestFramework.Helpers
 {
     public static class RetryHelper
     {

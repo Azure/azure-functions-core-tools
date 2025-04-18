@@ -1,24 +1,22 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
-using System.Net.Sockets;
 using System.Net;
+using System.Net.Sockets;
 
-namespace Func.TestFramework.Helpers
+namespace Azure.Functions.Cli.TestFramework.Helpers
 {
     public class ProcessHelper
     {
-        private static string FunctionsHostUrl = "http://localhost";
+        private static readonly string _functionsHostUrl = "http://localhost";
 
         public static async Task WaitForFunctionHostToStart(
             Process funcProcess,
             int port,
-            StreamWriter fileWriter,
-            string? functionCall = null,
-            int timeout = 120 * 1000)
+            StreamWriter fileWriter)
         {
-            var url = $"{FunctionsHostUrl}:{port.ToString()}";
+            string url = $"{_functionsHostUrl}:{port}";
             using var httpClient = new HttpClient();
 
             void LogMessage(string message)
@@ -32,7 +30,7 @@ namespace Func.TestFramework.Helpers
             LogMessage($"PID of process: {funcProcess.Id}");
             int retry = 1;
 
-            await RetryHelper.RetryAsync((async () =>
+            await RetryHelper.RetryAsync(async () =>
             {
                 try
                 {
@@ -50,7 +48,7 @@ namespace Func.TestFramework.Helpers
 
                     // Try ping endpoint
                     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                    var pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);
+                    HttpResponseMessage pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);
 
                     LogMessage($"Got ping response");
 
@@ -68,12 +66,12 @@ namespace Func.TestFramework.Helpers
                     LogMessage($"Error checking host status: {ex.Message}");
                     return false;
                 }
-            }));
+            });
         }
 
         public static int GetAvailablePort()
         {
-            TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
+            var listener = new TcpListener(IPAddress.Loopback, 0);
             try
             {
                 listener.Start();
@@ -87,10 +85,9 @@ namespace Func.TestFramework.Helpers
             }
         }
 
-        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, 
-            StreamWriter fileWriter, string functionCall = "", bool shouldDelayForLogs = false)
+        public static async Task<string> ProcessStartedHandlerHelper(int port, Process process, StreamWriter fileWriter, string functionCall = "", bool shouldDelayForLogs = false)
         {
-            string capturedContent = "";
+            string capturedContent = string.Empty;
             try
             {
                 fileWriter.WriteLine("[HANDLER] Starting process started handler helper");
@@ -106,13 +103,11 @@ namespace Func.TestFramework.Helpers
 
                 if (!string.IsNullOrEmpty(functionCall))
                 {
-                    using (var client = new HttpClient())
-                    {
-                        var response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
-                        capturedContent = await response.Content.ReadAsStringAsync();
-                        fileWriter.WriteLine($"[HANDLER] Captured content: {capturedContent}");
-                        fileWriter.Flush();
-                    }
+                    using var client = new HttpClient();
+                    HttpResponseMessage response = await client.GetAsync($"http://localhost:{port}/api/{functionCall}");
+                    capturedContent = await response.Content.ReadAsStringAsync();
+                    fileWriter.WriteLine($"[HANDLER] Captured content: {capturedContent}");
+                    fileWriter.Flush();
                 }
             }
             catch (Exception ex)
@@ -133,6 +128,7 @@ namespace Func.TestFramework.Helpers
 
                 process.Kill(true);
             }
+
             fileWriter.WriteLine($"[HANDLER] Returning captured content");
             fileWriter.Flush();
             return capturedContent;

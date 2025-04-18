@@ -1,25 +1,24 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Xunit.Abstractions;
 
-namespace Func.TestFramework.Commands
+namespace Azure.Functions.Cli.TestFramework.Commands
 {
-    public class FuncStartCommand : FuncCommand
+    public class FuncStartCommand(string funcPath, string testName, ITestOutputHelper log) : FuncCommand(log)
     {
-        private readonly string CommandName = "start";
-        private string _funcPath;
-        private string _testName;
-
-        public FuncStartCommand(string funcPath, string testName, ITestOutputHelper log) : base(log)
-        {
-            _funcPath = funcPath;
-            _testName = testName;
-        }
+        private readonly string _commandName = "start";
+        private readonly string _funcPath = funcPath;
+        private readonly string _testName = testName;
 
         protected override CommandInfo CreateCommand(IEnumerable<string> args)
         {
-            var arguments = new List<string> { CommandName }.Concat(args).ToList();
+            var arguments = new List<string> { _commandName }.Concat(args).ToList();
+
+            if (WorkingDirectory is null)
+            {
+                throw new InvalidOperationException("Working Directory must be set");
+            }
 
             var commandInfo = new CommandInfo()
             {
