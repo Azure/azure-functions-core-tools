@@ -8,10 +8,35 @@ Write-Host "Root directory: $rootDir"
 ls $rootDir
 
 # Set the path to test project (.csproj) and runtime settings
-$testProjectPath = ".\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
-$runtimeSettings = ".\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact_consolidation_visualstudio.runsettings"
+$testProjectPath = ".\test\Cli\Func.E2ETests\Func.E2ETests.csproj"
+$runtimeSettings = ".\test\Cli\Func.E2ETests\Runsettings\StartTests_artifact_consolidation_visualstudio.runsettings"
 
 [System.Environment]::SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet", "Process")
+
+# Build the test project
+Write-Host "Building test project: $absoluteTestProjectPath"
+dotnet build $absoluteTestProjectPath
+
+# Path for Visual Studio test projects (convert to absolute paths)
+$net8VsProjectPath = ".\test\Cli\Func.E2ETests\VisualStudioTestProjects\TestNet8InProcProject"
+$net6VsProjectPath = ".\test\Cli\Func.E2ETests\VisualStudioTestProjects\TestNet6InProcProject"
+
+# Resolve paths to absolute paths
+$absoluteNet8VsProjectPath = (Resolve-Path -Path $net8VsProjectPath -ErrorAction SilentlyContinue).Path
+if (-not $absoluteNet8VsProjectPath) {
+    $absoluteNet8VsProjectPath = (Join-Path -Path (Get-Location) -ChildPath $net8VsProjectPath)
+    Write-Host "Absolute NET8 VS project path (constructed): $absoluteNet8VsProjectPath"
+} else {
+    Write-Host "Absolute NET8 VS project path (resolved): $absoluteNet8VsProjectPath"
+}
+
+$absoluteNet6VsProjectPath = (Resolve-Path -Path $net6VsProjectPath -ErrorAction SilentlyContinue).Path
+if (-not $absoluteNet6VsProjectPath) {
+    $absoluteNet6VsProjectPath = (Join-Path -Path (Get-Location) -ChildPath $net6VsProjectPath)
+    Write-Host "Absolute NET6 VS project path (constructed): $absoluteNet6VsProjectPath"
+} else {
+    Write-Host "Absolute NET6 VS project path (resolved): $absoluteNet6VsProjectPath"
+}
 
 dotnet build $testProjectPath
 
@@ -30,6 +55,10 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
         
             # Set the environment variable FUNC_PATH to the func.exe or func path
             [System.Environment]::SetEnvironmentVariable("FUNC_PATH", $funcExePath.FullName, "Process")
+
+             # Set the environment variables for test projects - use the absolute paths
+            [System.Environment]::SetEnvironmentVariable("NET8_VS_PROJECT_PATH", $absoluteNet8VsProjectPath, "Process")
+            [System.Environment]::SetEnvironmentVariable("NET6_VS_PROJECT_PATH", $absoluteNet6VsProjectPath, "Process")
         
             # Run dotnet test with the environment variable set
             Write-Host "Running 'dotnet test' on test project: $testProjectPath"
