@@ -1,4 +1,7 @@
-﻿using System.ComponentModel;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.ComponentModel;
 
 namespace Azure.Functions.Cli
 {
@@ -46,7 +49,9 @@ namespace Azure.Functions.Cli
         AzureContainerApps,
     }
 
+#pragma warning disable SA1649 // File name should match first type name
     internal static class ContextEnumExtensions
+#pragma warning restore SA1649 // File name should match first type name
     {
         public static string ToLowerCaseString(this Context context)
         {

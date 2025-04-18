@@ -57,16 +57,16 @@ namespace Azure.Functions.Cli.Tests
             {
                 if (isCiEnv)
                 {
-                    Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "90l99");
+                    Environment.SetEnvironmentVariable(LoggingFilterHelper.CiBuildNumber, "90l99");
                 }
                 var testConfiguration = TestUtils.CreateSetupWithConfiguration(null);
                 LoggingFilterHelper loggingFilterHelper = new LoggingFilterHelper(testConfiguration, verboseLogging);
                 Assert.Equal(expected, loggingFilterHelper.IsCiEnvironment(verboseLogging.HasValue));
-               
+
             }
             finally
             {
-                Environment.SetEnvironmentVariable(LoggingFilterHelper.Ci_Build_Number, "");
+                Environment.SetEnvironmentVariable(LoggingFilterHelper.CiBuildNumber, "");
             }
         }
     }

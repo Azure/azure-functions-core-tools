@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Tests
 {
     public class PublishActionTests
     {
-        TestAzureHelperService _helperService = new TestAzureHelperService();
+        private readonly TestAzureHelperService _helperService = new TestAzureHelperService();
 
         [Theory]
         [InlineData(null, "6.0")]
@@ -30,7 +30,7 @@ namespace Azure.Functions.Cli.Tests
                 LinuxFxVersion = initialLinuxFxVersion
             };
 
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, expectedNetFrameworkVersion, false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, expectedNetFrameworkVersion, false, _helperService);
 
             // update it to empty
             var setting = _helperService.UpdatedSettings.Single();
@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.Tests
                 Kind = "linux"
             };
 
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, specifiedVersion, false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, specifiedVersion, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.Tests
         {
             var site = new Site("test");
 
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, specifiedVersion, false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, specifiedVersion, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
@@ -80,7 +80,7 @@ namespace Azure.Functions.Cli.Tests
                 Kind = "linux"
             };
 
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, null, false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, null, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.LinuxFxVersion, setting.Key);
@@ -93,7 +93,7 @@ namespace Azure.Functions.Cli.Tests
             // If not specified, assume 8.0
             var site = new Site("test");
 
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, null, false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, null, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
@@ -109,7 +109,7 @@ namespace Azure.Functions.Cli.Tests
             };
 
             // If not supported specified, assume 8.0
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnet, null, false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.Dotnet, null, false, _helperService);
 
             var setting = _helperService.UpdatedSettings.Single();
             Assert.Equal(Constants.DotnetFrameworkVersion, setting.Key);
@@ -124,7 +124,7 @@ namespace Azure.Functions.Cli.Tests
                 NetFrameworkVersion = "v8.0"
             };
 
-            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnet, null, false, _helperService);
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.Dotnet, null, false, _helperService);
 
             // Should be a no-op as site is already v6.0
             Assert.Null(_helperService.UpdatedSettings);
@@ -138,16 +138,16 @@ namespace Azure.Functions.Cli.Tests
             var site = new Site("test");
 
             var exception = await Assert.ThrowsAsync<CliException>(() =>
-                PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.dotnetIsolated, specifiedVersion, false, _helperService));
+                PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, specifiedVersion, false, _helperService));
 
             Assert.StartsWith($"The dotnet-version value of '{specifiedVersion}' is invalid.", exception.Message);
         }
 
         [Theory]
-        [InlineData("dotnet-isolated", WorkerRuntime.dotnetIsolated)]
-        [InlineData("c#-isolated", WorkerRuntime.dotnetIsolated)]
-        [InlineData("csharp", WorkerRuntime.dotnet)]
-        [InlineData("typescript", WorkerRuntime.node)]
+        [InlineData("dotnet-isolated", WorkerRuntime.DotnetIsolated)]
+        [InlineData("c#-isolated", WorkerRuntime.DotnetIsolated)]
+        [InlineData("csharp", WorkerRuntime.Dotnet)]
+        [InlineData("typescript", WorkerRuntime.Node)]
         public void NormalizeWorkerRuntime_ReturnsExpectedWorkerRuntime(string input, WorkerRuntime expected)
         {
 
@@ -171,8 +171,8 @@ namespace Azure.Functions.Cli.Tests
                 Assert.StartsWith($"Worker runtime cannot be null or empty.", exception.Message);
                 Assert.Equal("workerRuntime", exception.ParamName);
             }
-            else 
-            { 
+            else
+            {
                 var exception = Assert.Throws<ArgumentException>(() => WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(inputString));
                 Assert.Equal($"Worker runtime '{inputString}' is not a valid option. Options are {WorkerRuntimeLanguageHelper.AvailableWorkersRuntimeString}", exception.Message);
             }
