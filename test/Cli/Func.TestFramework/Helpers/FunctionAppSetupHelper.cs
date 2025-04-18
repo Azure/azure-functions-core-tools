@@ -47,14 +47,14 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                 timeout: 300 * 10000);
         }
 
-        public static Task FuncInitWithRetryAsync(
+        public static async Task FuncInitWithRetryAsync(
             string funcPath,
             string testName,
             string workingDirectory,
             ITestOutputHelper log,
             IEnumerable<string> args)
         {
-            return ExecuteCommandWithRetryAsync(
+            await ExecuteCommandWithRetryAsync(
                 funcPath,
                 testName,
                 workingDirectory,
@@ -63,7 +63,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                 (path, name, logger) => new FuncInitCommand(path, name, logger));
         }
 
-        public static Task FuncNewWithRetryAsync(
+        public static async Task FuncNewWithRetryAsync(
             string funcPath,
             string testName,
             string workingDirectory,
@@ -71,7 +71,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
             IEnumerable<string> args,
             string? workerRuntime = null)
         {
-            return ExecuteCommandWithRetryAsync(
+            await ExecuteCommandWithRetryAsync(
                 funcPath,
                 testName,
                 workingDirectory,
