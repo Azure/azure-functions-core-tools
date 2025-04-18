@@ -159,7 +159,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var providedInputs = new Dictionary<string, string>()
                 {
                     { GetFunctionNameParamId, FunctionName },
-                    { HttpTriggerAuthLevelParamId, AuthorizationLevel?.ToString().ToUpper() }
+                    { HttpTriggerAuthLevelParamId, AuthorizationLevel?.ToString().ToUpperInvariant() }
                 };
 
                 var jobName = "appendToFile";
