@@ -1,10 +1,10 @@
-﻿using System;
-using System.Threading.Tasks;
-using Colors.Net;
-using Azure.Functions.Cli.Arm;
-using Azure.Functions.Cli.Interfaces;
-using static Azure.Functions.Cli.Common.OutputTheme;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "fetch", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Retrieve App Settings from your Azure-hosted Function App and store locally")]
     internal class FetchAppSettingsAction : BaseFunctionAppAction
     {
-        private ISecretsManager _secretsManager;
+        private readonly ISecretsManager _secretsManager;
 
         public FetchAppSettingsAction(ISecretsManager secretsManager)
         {
@@ -37,9 +37,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 foreach (var connectionString in functionApp.ConnectionStrings)
                 {
                     ColoredConsole.WriteLine($"Loading {connectionString.Key} = *****");
-                    _secretsManager.SetConnectionString(connectionString.Key, connectionString.Value.value);
+                    _secretsManager.SetConnectionString(connectionString.Key, connectionString.Value.Value);
                 }
-
             }
             else
             {

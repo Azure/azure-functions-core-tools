@@ -1,9 +1,7 @@
-﻿using Azure.Functions.Cli.Interfaces;
-using NuGet.Common;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.Constants;
 
 namespace Azure.Functions.Cli.Common
@@ -12,7 +10,8 @@ namespace Azure.Functions.Cli.Common
     {
         private IDictionary<string, string> _triggerHelp;
         private IDictionary<string, string> _triggerNameMap;
-        private IList<string> _triggerHelpSupportedLanguages => new List<string>() { Languages.JavaScript, Languages.TypeScript, Languages.Python };
+
+        private IList<string> TriggerHelpSupportedLanguages => new List<string>() { Languages.JavaScript, Languages.TypeScript, Languages.Python };
 
         public string GetTriggerHelp(string triggerName, string language)
         {
@@ -35,7 +34,7 @@ namespace Azure.Functions.Cli.Common
         {
             CreateTemplateMapForHelp(triggerNames);
 
-            if (!_triggerHelpSupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
+            if (!TriggerHelpSupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
             {
                 throw new CliException("Only Python, JavaScript and TypeScript support this help command at the moment.");
             }

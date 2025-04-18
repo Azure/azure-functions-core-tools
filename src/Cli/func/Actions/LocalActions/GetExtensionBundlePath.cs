@@ -1,5 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
 using Colors.Net;
@@ -38,8 +39,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     throw new CliException("Unable to locate extension bundle.", e);
                 }
-
-
             }
             else
             {

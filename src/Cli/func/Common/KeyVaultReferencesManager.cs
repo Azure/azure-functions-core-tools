@@ -1,19 +1,19 @@
-using System;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.RegularExpressions;
-using Colors.Net;
 using Azure.Core;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
+using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
 {
-    class KeyVaultReferencesManager
+    internal class KeyVaultReferencesManager
     {
-        private const string vaultUriSuffix = "vault.azure.net";
+        private const string VaultUriSuffix = "vault.azure.net";
         private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft\.KeyVault\((?<ReferenceString>.*)\)$", RegexOptions.Compiled);
         private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
         private readonly TokenCredential credential = new DefaultAzureCredential();
@@ -63,6 +63,7 @@ namespace Azure.Functions.Cli.Common
             {
                 return null;
             }
+
             // Determine if the secret value is attempting to use a key vault reference
             var keyVaultReferenceMatch = BasicKeyVaultReferenceRegex.Match(value);
             if (keyVaultReferenceMatch.Success)
@@ -84,8 +85,10 @@ namespace Azure.Functions.Cli.Common
                 {
                     ColoredConsole.WriteLine(WarningColor($"Unable to parse the Key Vault reference for setting: {key}"));
                 }
+
                 return result;
             }
+
             return null;
         }
 
@@ -103,6 +106,7 @@ namespace Azure.Functions.Cli.Common
                     Version = secretIdentifier.Version
                 };
             }
+
             var vaultName = GetValueFromVaultReference("VaultName", vaultReference);
             var secretName = GetValueFromVaultReference("SecretName", vaultReference);
             var version = GetValueFromVaultReference("SecretVersion", vaultReference);
@@ -110,11 +114,12 @@ namespace Azure.Functions.Cli.Common
             {
                 return new ParseSecretResult
                 {
-                    Uri = new Uri($"https://{vaultName}.{vaultUriSuffix}"),
+                    Uri = new Uri($"https://{vaultName}.{VaultUriSuffix}"),
                     Name = secretName,
                     Version = version
                 };
             }
+
             return null;
         }
 
@@ -126,6 +131,7 @@ namespace Azure.Functions.Cli.Common
             {
                 return match.Groups["Value"].Value;
             }
+
             return null;
         }
 
@@ -137,7 +143,9 @@ namespace Azure.Functions.Cli.Common
         internal class ParseSecretResult
         {
             public Uri Uri { get; set; }
+
             public string Name { get; set; }
+
             public string Version { get; set; }
         }
     }

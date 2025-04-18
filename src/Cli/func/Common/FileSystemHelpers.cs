@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.IO.Abstractions;
-using System.Linq;
-using System.Threading.Tasks;
 using Colors.Net;
 
 namespace Azure.Functions.Cli.Common
 {
     internal static class FileSystemHelpers
     {
-        private static IFileSystem _default = new FileSystem();
+        private static readonly IFileSystem _default = new FileSystem();
         private static IFileSystem _instance;
 
         public static IFileSystem Instance
@@ -125,6 +123,7 @@ namespace Azure.Functions.Cli.Common
             {
                 CreateDirectory(path);
             }
+
             return path;
         }
 
@@ -133,25 +132,25 @@ namespace Azure.Functions.Cli.Common
             DeleteFileSystemInfo(Instance.DirectoryInfo.FromDirectoryName(path), ignoreErrors);
         }
 
-        public static IEnumerable<string> GetLocalFiles(string path, GitIgnoreParser ignoreParser = null, bool returnIgnored = false,
-            IEnumerable<string> additionalIgnoredDirectories = null)
+        public static IEnumerable<string> GetLocalFiles(string path, GitIgnoreParser ignoreParser = null, bool returnIgnored = false, IEnumerable<string> additionalIgnoredDirectories = null)
         {
-            List<string> ignoredDirectories = new List<string>{ ".git", ".vscode" };
+            List<string> ignoredDirectories = new List<string> { ".git", ".vscode" };
             if (additionalIgnoredDirectories != null)
             {
                 ignoredDirectories.AddRange(additionalIgnoredDirectories);
             }
+
             var ignoredFiles = new[] { ".funcignore", ".gitignore", "local.settings.json", "project.lock.json" };
 
             foreach (var file in FileSystemHelpers.GetFiles(path, ignoredDirectories, ignoredFiles))
             {
-                if (preCondition(file))
+                if (PreCondition(file))
                 {
                     yield return file;
                 }
             }
 
-            bool preCondition(string file)
+            bool PreCondition(string file)
             {
                 var fileName = file.Replace(path, string.Empty).Trim(Path.DirectorySeparatorChar).Replace("\\", "/");
                 return (returnIgnored ? ignoreParser?.Denies(fileName) : ignoreParser?.Accepts(fileName)) ?? true;
@@ -174,7 +173,7 @@ namespace Azure.Functions.Cli.Common
             {
                 yield break;
             }
-                
+
             foreach (var directory in Instance.Directory.GetDirectories(directoryPath, "*", SearchOption.TopDirectoryOnly))
             {
                 var directoryName = Path.GetFileName(directory);
@@ -207,7 +206,10 @@ namespace Azure.Functions.Cli.Common
             }
             catch
             {
-                if (!ignoreErrors) throw;
+                if (!ignoreErrors)
+                {
+                    throw;
+                }
             }
 
             var directoryInfo = fileSystemInfo as DirectoryInfoBase;
@@ -234,7 +236,10 @@ namespace Azure.Functions.Cli.Common
             }
             catch
             {
-                if (!ignoreErrors) throw;
+                if (!ignoreErrors)
+                {
+                    throw;
+                }
             }
         }
 
@@ -246,7 +251,10 @@ namespace Azure.Functions.Cli.Common
             }
             catch
             {
-                if (!ignoreErrors) throw;
+                if (!ignoreErrors)
+                {
+                    throw;
+                }
             }
         }
     }

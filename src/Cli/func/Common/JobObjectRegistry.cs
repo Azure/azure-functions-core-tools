@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -85,11 +84,14 @@ namespace Azure.Functions.Cli.Common
             {
                 CloseHandle(_handle);
             }
+
             _handle = IntPtr.Zero;
         }
     }
 
+#pragma warning disable SA1201 // Elements should appear in the correct order
     public enum JobObjectInfoType
+#pragma warning restore SA1201 // Elements should appear in the correct order
     {
         AssociateCompletionPortInformation = 7,
         BasicLimitInformation = 2,
@@ -128,9 +130,9 @@ namespace Azure.Functions.Cli.Common
     [StructLayout(LayoutKind.Sequential)]
     public struct SECURITY_ATTRIBUTES
     {
-        public uint nLength;
-        public IntPtr lpSecurityDescriptor;
-        public int bInheritHandle;
+        public uint NLength;
+        public IntPtr LpSecurityDescriptor;
+        public int BInheritHandle;
     }
 
     [StructLayout(LayoutKind.Sequential)]

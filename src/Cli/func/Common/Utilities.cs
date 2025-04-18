@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Diagnostics;
 using Colors.Net;
@@ -95,7 +93,7 @@ namespace Azure.Functions.Cli
 
             foreach (char character in unsanitized.Substring(1))
             {
-                if (!char.IsLetterOrDigit(character) && !(allowed.Contains(character)))
+                if (!char.IsLetterOrDigit(character) && !allowed.Contains(character))
                 {
                     sanitized.Append(fillerChar);
                 }
@@ -111,6 +109,7 @@ namespace Azure.Functions.Cli
             {
                 Match match = Regex.Match(sanitizedString, removeRegex);
                 string matchString;
+
                 // Keep removing the matching regex until no more match is found
                 while (!string.IsNullOrEmpty(matchString = match.Value))
                 {
@@ -118,6 +117,7 @@ namespace Azure.Functions.Cli
                     match = Regex.Match(sanitizedString, removeRegex);
                 }
             }
+
             return sanitizedString;
         }
 
@@ -195,9 +195,10 @@ namespace Azure.Functions.Cli
                     return true;
                 }
             }
-            catch 
-            { 
+            catch
+            {
             }
+
             outLogLevel = LogLevel.Information;
             return false;
         }
@@ -212,7 +213,11 @@ namespace Azure.Functions.Cli
                     return true;
                 }
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
+
             return false;
         }
 
@@ -226,14 +231,14 @@ namespace Azure.Functions.Cli
         }
 
         /// <summary>
-        /// For user logs, returns true if actualLevel of the log is >= default user log level - Information unless overridden in host.json
-        /// For system logs, returns true if actualLevel of the log is >= default system log level - Warning unless overridden in host.json
+        /// For user logs, returns true if actualLevel of the log is >= default user log level - Information unless overridden in host.json.
+        /// For system logs, returns true if actualLevel of the log is >= default system log level - Warning unless overridden in host.json.
         /// </summary>
-        /// <param name="category"></param>
-        /// <param name="actualLevel"></param>
-        /// <param name="userLogMinLevel"></param>
-        /// <param name="systemLogMinLevel"></param>
-        /// <returns></returns>
+        /// <param name="category">Category.</param>
+        /// <param name="actualLevel">Actual log Level.</param>
+        /// <param name="userLogMinLevel">User minimum log level.</param>
+        /// <param name="systemLogMinLevel">System minimum log level.</param>
+        /// <returns>See summary.</returns>
         internal static bool DefaultLoggingFilter(string category, LogLevel actualLevel, LogLevel userLogMinLevel, LogLevel systemLogMinLevel)
         {
             if (LogCategories.IsFunctionUserCategory(category)
@@ -242,11 +247,13 @@ namespace Azure.Functions.Cli
             {
                 return actualLevel >= userLogMinLevel;
             }
+
             if (IsSystemLogCategory(category))
             {
                 // System logs
                 return actualLevel >= systemLogMinLevel;
             }
+
             // consider any other category as user log
             return actualLevel >= userLogMinLevel;
         }
@@ -280,7 +287,10 @@ namespace Azure.Functions.Cli
                     return bool.TryParse(value, out bool isValue) && isValue;
                 }
             }
-            catch { }
+            catch
+            {
+            }
+
             return false;
         }
     }

@@ -1,11 +1,12 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "delete-task-hub", Context = Context.Durable, HelpText = "Delete all storage artifacts in the durable task hub")]
-    class DurableDeleteTaskHub : BaseDurableAction
+    internal class DurableDeleteTaskHub : BaseDurableAction
     {
         private readonly IDurableManager _durableManager;
 

@@ -1,5 +1,6 @@
-using System;
-using System.Threading.Tasks;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Kubernetes;
 using Azure.Functions.Cli.Kubernetes.KEDA;
 using Colors.Net;
@@ -18,7 +19,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             return base.ParseArgs(args);
         }
 
-        public async override Task RunAsync()
+        public override async Task RunAsync()
         {
             var isInstalled = await KedaHelper.IsInstalled(Namespace);
             if (isInstalled == false)

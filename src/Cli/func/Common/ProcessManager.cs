@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
-using System.Linq;
 using Azure.Functions.Cli.Interfaces;
 
 namespace Azure.Functions.Cli.Common
@@ -8,6 +9,7 @@ namespace Azure.Functions.Cli.Common
     internal class ProcessManager : IProcessManager
     {
         private IList<Process> _childProcesses;
+
         public IProcessInfo GetCurrentProcess()
         {
             return new ProcessInfo(Process.GetCurrentProcess());
@@ -45,7 +47,7 @@ namespace Azure.Functions.Cli.Common
             _childProcesses ??= new List<Process>();
 
             // be graceful if someone calls this method with the same process multiple times.
-            if (_childProcesses.Any(p=>p.Id == childProcess.Id))
+            if (_childProcesses.Any(p => p.Id == childProcess.Id))
             {
                 return false;
             }

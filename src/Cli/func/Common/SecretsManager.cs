@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using Newtonsoft.Json;
-using Azure.Functions.Cli.Interfaces;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Helpers;
-using Newtonsoft.Json.Linq;
+using Azure.Functions.Cli.Interfaces;
 using Microsoft.Azure.WebJobs.Script;
 
 namespace Azure.Functions.Cli.Common
@@ -105,7 +101,6 @@ namespace Azure.Functions.Cli.Common
                 }
 
                 settingsFile.Commit();
-
             }
         }
 

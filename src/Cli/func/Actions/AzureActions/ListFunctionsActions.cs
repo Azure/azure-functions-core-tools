@@ -1,17 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.Arm;
-using Colors.Net;
-using static Azure.Functions.Cli.Common.OutputTheme;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Helpers;
-using System.Net.Http;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Interfaces;
-using Azure.Functions.Cli.Arm.Models;
-using System.Net.Http.Headers;
+using Colors.Net;
 using Fclp;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {

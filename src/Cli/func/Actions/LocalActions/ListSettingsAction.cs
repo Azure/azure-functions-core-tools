@@ -1,29 +1,31 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using Azure.Functions.Cli.Interfaces;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions
 {
     [Action(Name = "list", Context = Context.Settings, HelpText = "List local settings")]
-    class ListSettingsAction : BaseAction
+    internal class ListSettingsAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
-        public bool ShowValues { get; set; }
 
         public ListSettingsAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
         }
 
+        public bool ShowValues { get; set; }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
                 .Setup<bool>('a', "showValue")
                 .Callback(a => ShowValues = a)
-                .WithDescription("Specifying this shows decrypted settings."); 
+                .WithDescription("Specifying this shows decrypted settings.");
             return base.ParseArgs(args);
         }
 

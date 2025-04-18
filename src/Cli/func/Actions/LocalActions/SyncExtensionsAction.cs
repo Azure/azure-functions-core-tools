@@ -1,7 +1,6 @@
-﻿using System;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
@@ -19,15 +18,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly ISecretsManager _secretsManager;
         private readonly bool _showExtensionBundleWarning;
 
-        public string ConfigPath { get; set; } = string.Empty;
-        public string OutputPath { get; set; } = Path.GetFullPath("bin");
-        public bool Csx { get; set; }
-
         public SyncExtensionsAction(ISecretsManager secretsManager, bool showExtensionBundleWarning = true)
         {
             _secretsManager = secretsManager;
             _showExtensionBundleWarning = showExtensionBundleWarning;
         }
+
+        public string ConfigPath { get; set; } = string.Empty;
+
+        public string OutputPath { get; set; } = Path.GetFullPath("bin");
+
+        public bool Csx { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -49,7 +50,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return base.ParseArgs(args);
         }
 
-        public async override Task RunAsync()
+        public override async Task RunAsync()
         {
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             if (extensionBundleManager.IsExtensionBundleConfigured())
@@ -59,6 +60,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}"));
                 }
+
                 return;
             }
 

@@ -1,63 +1,83 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Kubernetes;
 using Azure.Functions.Cli.Kubernetes.KEDA;
 using Azure.Functions.Cli.Kubernetes.Models;
-using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
 using Fclp;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
     [Action(Name = "delete", Context = Context.Kubernetes, HelpText = "")]
-    class KubernetesDeleteAction : BaseAction
+    internal class KubernetesDeleteAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
-
-        public string Registry { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Namespace { get; set; } = "default";
-        public string PullSecret { get; set; } = string.Empty;
-        public bool UseConfigMap { get; set; }
-        public bool NoDocker { get; set; }
-        public bool DryRun { get; private set; }
-        public string ImageName { get; private set; }
-        public string ConfigMapName { get; private set; }
-        public string SecretsCollectionName { get; private set; }
-        public string KeysSecretCollectionName { get; private set; }
-        public bool MountFuncKeysAsContainerVolume { get; private set; }
-        public int? PollingInterval { get; private set; }
-        public int? CooldownPeriod { get; private set; }
-        public string ServiceType { get; set; } = "LoadBalancer";
-        public IEnumerable<string> ServiceTypes { get; set; } = new string[] { "ClusterIP", "NodePort", "LoadBalancer" };
-        public bool IgnoreErrors { get; private set; } = false;
-        public int? MaxReplicaCount { get; private set; }
-        public int? MinReplicaCount { get; private set; }
-        public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
-        public bool ShowServiceFqdn { get; set; } = false;
 
         public KubernetesDeleteAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
         }
 
+        public string Registry { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Namespace { get; set; } = "default";
+
+        public string PullSecret { get; set; } = string.Empty;
+
+        public bool UseConfigMap { get; set; }
+
+        public bool NoDocker { get; set; }
+
+        public bool DryRun { get; private set; }
+
+        public string ImageName { get; private set; }
+
+        public string ConfigMapName { get; private set; }
+
+        public string SecretsCollectionName { get; private set; }
+
+        public string KeysSecretCollectionName { get; private set; }
+
+        public bool MountFuncKeysAsContainerVolume { get; private set; }
+
+        public int? PollingInterval { get; private set; }
+
+        public int? CooldownPeriod { get; private set; }
+
+        public string ServiceType { get; set; } = "LoadBalancer";
+
+        public IEnumerable<string> ServiceTypes { get; set; } = new string[] { "ClusterIP", "NodePort", "LoadBalancer" };
+
+        public bool IgnoreErrors { get; private set; } = false;
+
+        public int? MaxReplicaCount { get; private set; }
+
+        public int? MinReplicaCount { get; private set; }
+
+        public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.V2;
+
+        public bool ShowServiceFqdn { get; set; } = false;
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            SetFlag<string>("name", "The name used for the deployment and other artifacts in kubernetes", n =>
+            SetFlag<string>(
+            "name",
+            "The name used for the deployment and other artifacts in kubernetes",
+            n =>
             {
                 KubernetesHelper.ValidateKubernetesName(n);
                 Name = n;
-            }, isRequired: true);
+            },
+            isRequired: true);
+
             SetFlag<string>("image-name", "Image to use for the pod deployment and to read functions from", n => ImageName = n);
-            SetFlag<KedaVersion>("keda-version", $"Defines the version of KEDA to use. Default: {Kubernetes.KEDA.KedaVersion.v2}. Options are: {Kubernetes.KEDA.KedaVersion.v1} or {Kubernetes.KEDA.KedaVersion.v2}", n => KedaVersion = n);
+            SetFlag<KedaVersion>("keda-version", $"Defines the version of KEDA to use. Default: {Kubernetes.KEDA.KedaVersion.V2}. Options are: {Kubernetes.KEDA.KedaVersion.V1} or {Kubernetes.KEDA.KedaVersion.V2}", n => KedaVersion = n);
             SetFlag<string>("registry", "When set, a docker build is run and the image is pushed to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: default", ns => Namespace = ns);
             SetFlag<int>("polling-interval", "The polling interval for checking non-http triggers. Default: 30 (seconds)", p => PollingInterval = p);
@@ -74,6 +94,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     throw new CliArgumentsException($"serviceType {ServiceType} is not supported. Valid options are: {string.Join(",", ServiceTypes)}");
                 }
+
                 ServiceType = s;
             });
             SetFlag<bool>("use-config-map", "Use a ConfigMap/V1 instead of a Secret/V1 object for function app settings configurations", c => UseConfigMap = c);
@@ -117,11 +138,12 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     tasks.Add(KubectlHelper.KubectlDelete(resource, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace));
                 }
+
                 Task.WaitAll(tasks.ToArray());
             }
         }
 
-        private (string, bool) ResolveImageName()
+        private (string ImageName, bool ShouldBuild) ResolveImageName()
         {
             if (!string.IsNullOrEmpty(Registry))
             {
@@ -131,6 +153,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             {
                 return (ImageName, false);
             }
+
             throw new CliArgumentsException("either --image-name or --registry is required.");
         }
     }

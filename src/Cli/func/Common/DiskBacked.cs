@@ -1,4 +1,7 @@
-﻿using System.Text;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Text;
 using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Common
@@ -18,9 +21,18 @@ namespace Azure.Functions.Cli.Common
 
     internal class DiskBacked<T> where T : new()
     {
-        private readonly string _path;
-        private string _encryptionReason;
         private const string DefaultEncryptionReason = nameof(DiskBacked);
+        private readonly string _path;
+        private readonly string _encryptionReason;
+
+        private DiskBacked(T value, string path, string encryptionReason = null)
+        {
+            Value = value;
+            _path = path;
+            _encryptionReason = encryptionReason;
+        }
+
+        public T Value { get; private set; }
 
         public static DiskBacked<T> Create(string path)
         {
@@ -31,8 +43,10 @@ namespace Azure.Functions.Cli.Common
                 {
                     value = new T();
                 }
+
                 return new DiskBacked<T>(value, path);
             }
+
             return new DiskBacked<T>(new T(), path);
         }
 
@@ -48,15 +62,6 @@ namespace Azure.Functions.Cli.Common
             }
 
             return new DiskBacked<T>(new T(), path, encryptionReason);
-        }
-
-        public T Value { get; private set; }
-
-        private DiskBacked(T value, string path, string encryptionReason = null)
-        {
-            Value = value;
-            _path = path;
-            _encryptionReason = encryptionReason;
         }
 
         public void Commit()

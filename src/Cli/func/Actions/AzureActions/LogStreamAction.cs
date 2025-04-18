@@ -1,23 +1,20 @@
-﻿using System;
-using System.IO;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
-using System.Threading.Tasks;
-using Colors.Net;
-using Fclp;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
+using Colors.Net;
+using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
-using System.Collections.Generic;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
     [Action(Name = "logstream", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Show interactive streaming logs for an Azure-hosted Function App")]
-    class LogStreamAction : BaseFunctionAppAction
+    internal class LogStreamAction : BaseFunctionAppAction
     {
         private const string ApplicationInsightsIKeySetting = "APPINSIGHTS_INSTRUMENTATIONKEY";
         private const string LiveMetricsUriTemplate = "https://portal.azure.com/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/{0}/ResourceId/{1}";
@@ -40,6 +37,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var subscriptions = await AzureHelper.GetSubscriptions(AccessToken, ManagementURL);
             ColoredConsole.WriteLine("Retrieving Function App...");
             var functionApp = await AzureHelper.GetFunctionApp(FunctionAppName, AccessToken, ManagementURL, Slot, Subscription, allSubs: subscriptions);
+
             if (UseBrowser)
             {
                 await OpenLiveStreamInBrowser(functionApp, subscriptions);
@@ -51,17 +49,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Log stream is not currently supported in Linux Consumption Apps. " +
                     "Please use --browser to open Azure Application Insights Live Stream in the Azure portal.");
             }
-            
+
             using (var client = new HttpClient())
             {
                 var isBasicAuthAllowed = true;
+
                 try
                 {
                     isBasicAuthAllowed = await AzureHelper.IsBasicAuthAllowedForSCM(functionApp, AccessToken, ManagementURL);
                 }
                 catch (Exception)
                 {
-                    // ignore: We don't want to fail the command on basic auth check. There is extremely low likelihood of getting the exception here. 
+                    // ignore: We don't want to fail the command on basic auth check. There is extremely low likelihood of getting the exception here.
                 }
 
                 if (isBasicAuthAllowed)
@@ -73,9 +72,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
                 }
-                
+
                 client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
                 var response = await client.GetStreamAsync(new Uri($"https://{functionApp.ScmUri}/api/logstream/application"));
+
                 using (var reader = new StreamReader(response))
                 {
                     var buffer = new char[4096];
@@ -84,7 +84,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         count = await reader.ReadAsync(buffer, 0, buffer.Length);
                         ColoredConsole.Write(new string(buffer.Take(count).ToArray()));
-                    } while (count != 0);
+                    }
+                    while (count != 0);
                 }
             }
         }

@@ -1,21 +1,22 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "terminate", Context = Context.Durable, HelpText = "Terminate the specified orchestration instance")]
-    class DurableTerminate : BaseDurableActionWithId
+    internal class DurableTerminate : BaseDurableActionWithId
     {
-        private string Reason { get; set; }
-
         private readonly IDurableManager _durableManager;
 
         public DurableTerminate(IDurableManager durableManager)
         {
             _durableManager = durableManager;
         }
+
+        private string Reason { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

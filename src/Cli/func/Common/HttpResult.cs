@@ -1,18 +1,14 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Common
 {
-    public class HttpResult<TSuccessResult, TErrorResult>
+    public class HttpResult<TSuccessResult, TErrorResult>(TSuccessResult successResult, TErrorResult errorResult = default)
     {
-        public TSuccessResult SuccessResult { get; private set; }
-        public TErrorResult ErrorResult { get; private set; }
+        public TSuccessResult SuccessResult { get; private set; } = successResult;
 
-        public bool IsSuccessful => EqualityComparer<TErrorResult>.Default.Equals(ErrorResult, default(TErrorResult));
+        public TErrorResult ErrorResult { get; private set; } = errorResult;
 
-        public HttpResult(TSuccessResult successResult, TErrorResult errorResult = default(TErrorResult))
-        {
-            SuccessResult = successResult;
-            ErrorResult = errorResult;
-        }
+        public bool IsSuccessful => EqualityComparer<TErrorResult>.Default.Equals(ErrorResult, default);
     }
 }

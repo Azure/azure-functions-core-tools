@@ -1,5 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
@@ -7,12 +8,8 @@ using Fclp;
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "raise-event", Context = Context.Durable, HelpText = "Raise an event to the specified orchestration instance")]
-    class DurableRaiseEvent : BaseDurableActionWithId
+    internal class DurableRaiseEvent : BaseDurableActionWithId
     {
-        private string EventName { get; set; }
-
-        private string EventData { get; set; }
-
         private readonly IDurableManager _durableManager;
 
         public DurableRaiseEvent(IDurableManager durableManager)
@@ -20,12 +17,16 @@ namespace Azure.Functions.Cli.Actions.DurableActions
             _durableManager = durableManager;
         }
 
+        private string EventName { get; set; }
+
+        private string EventData { get; set; }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
                  .Setup<string>("event-name")
                  .WithDescription("Name of the event to raise")
-                 .SetDefault($"Event_{(Guid.NewGuid().ToString("N"))}")
+                 .SetDefault($"Event_{Guid.NewGuid():N}")
                  .Callback(n => EventName = n);
             Parser
                .Setup<string>("event-data")
