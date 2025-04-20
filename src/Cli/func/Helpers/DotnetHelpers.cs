@@ -242,14 +242,14 @@ namespace Azure.Functions.Cli.Helpers
         public static string GetCsprojOrFsproj()
         {
             EnsureDotnet();
-            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj").ToList();
+            var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj", excludedDirectories: ["obj"]).ToList();
             if (csProjFiles.Count == 1)
             {
                 return csProjFiles.First();
             }
             else
             {
-                var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").ToList();
+                var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj", excludedDirectories: ["obj"]).ToList();
                 if (fsProjFiles.Count == 1)
                 {
                     return fsProjFiles.First();
