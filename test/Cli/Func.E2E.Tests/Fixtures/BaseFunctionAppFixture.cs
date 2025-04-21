@@ -4,7 +4,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using Func.TestFramework.Helpers;
+using Azure.Functions.Cli.E2E.Tests;
+using Azure.Functions.Cli.TestFramework.Helpers;
 using Moq;
 using Newtonsoft.Json.Linq;
 using Xunit;

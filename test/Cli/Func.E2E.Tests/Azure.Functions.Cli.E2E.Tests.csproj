@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RepoSrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
-    <ProjectReference Include="..\Func.TestFramework\Func.TestFramework.csproj" />
+    <ProjectReference Include="..\TestFramework\Azure.Functions.Cli.TestFramework.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

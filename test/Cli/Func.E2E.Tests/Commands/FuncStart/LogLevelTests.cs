@@ -1,11 +1,10 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using Azure.Functions.Cli.TestFramework.Assertions;
+using Azure.Functions.Cli.TestFramework.Commands;
+using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Azure.Functions.Cli.E2E.Tests.Commands.FuncStart;
-using Func.TestFramework.Assertions;
-using Func.TestFramework.Commands;
-using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -26,7 +25,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
 
             // Add debug log level setting
-            var funcSettingsResult = new FuncSettingsCommand(FuncPath, Log)
+            var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
                                     .WithWorkingDirectory(WorkingDirectory)
                                     .Execute(new[] { "add", "AzureFunctionsJobHost__logging__logLevel__Default", "Debug" });
             funcSettingsResult.Should().ExitWith(0);

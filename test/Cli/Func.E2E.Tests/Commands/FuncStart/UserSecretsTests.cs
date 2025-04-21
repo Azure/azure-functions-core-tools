@@ -2,11 +2,11 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using System.Diagnostics;
+using Azure.Functions.Cli.TestFramework.Assertions;
+using Azure.Functions.Cli.TestFramework.Commands;
+using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
 using Func.E2ETests.Traits;
-using Func.TestFramework.Assertions;
-using Func.TestFramework.Commands;
-using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
