@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // Copied from: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Assertions/CommandResultExtensions.cs
-using Azure.Functions.Cli.Abstractions.Command;
+using Azure.Functions.Cli.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Assertions
 {

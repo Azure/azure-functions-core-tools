@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                         // Apply any additional configuration
                         configureCommand?.Invoke(command);
 
-                        Abstractions.Command.CommandResult result = command
+                        Abstractions.CommandResult result = command
                             .WithWorkingDirectory(workingDirectory)
                             .Execute(args);
 
