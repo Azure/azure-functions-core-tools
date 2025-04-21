@@ -1,20 +1,16 @@
-﻿using Azure.Functions.Cli.Common;
-using Colors.Net;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Colors.Net;
 
 namespace Azure.Functions.Cli.Helpers
 {
     public static class NpmHelper
     {
-
-        public async static Task Install()
+        public static async Task Install()
         {
             await RunNpmCommand("install", true);
         }
@@ -36,7 +32,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static async Task<(string output, string error, int exitCode)> InternalRunCommand(string command, string args, bool ignoreError, string stdIn = null)
+        private static async Task<(string Output, string Error, int ExitCode)> InternalRunCommand(string command, string args, bool ignoreError, string stdIn = null)
         {
             var npm = new Executable(command, args);
             var sbError = new StringBuilder();
@@ -50,9 +46,9 @@ namespace Azure.Functions.Cli.Helpers
                     $"output: {sbOutput.ToString()}\n{sbError.ToString()}");
             }
 
-            return (trim(sbOutput.ToString()), trim(sbError.ToString()), exitCode);
+            return (Trim(sbOutput.ToString()), Trim(sbError.ToString()), exitCode);
 
-            string trim(string str) => str.Trim(new[] { ' ', '\n' });
+            string Trim(string str) => str.Trim([' ', '\n']);
         }
     }
 }
