@@ -1,65 +1,71 @@
-using System.Collections.Generic;
-using Newtonsoft.Json;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Kubernetes.Models.Knative
 {
-
+#pragma warning disable SA1649 // File name should match first type name
     public class Env
+#pragma warning restore SA1649 // File name should match first type name
     {
-        public string name { get; set; }
-        public string value { get; set; }
+        public string Name { get; set; }
+
+        public string Value { get; set; }
     }
 
     public class KnativeContainer
     {
-        public string image { get; set; }
-        public List<Env> env { get; set; }
+        public string Image { get; set; }
+
+        public List<Env> Env { get; set; }
     }
 
     public class RevisionTemplateSpec
     {
-        public KnativeContainer container { get; set; }
+        public KnativeContainer Container { get; set; }
     }
 
     public class RevisionTemplateMetadata
     {
-        public Dictionary<string,string> annotations { get; set; }
+        public Dictionary<string, string> Annotations { get; set; }
     }
 
     public class RevisionTemplate
     {
-        public RevisionTemplateSpec spec { get; set; }
-        public RevisionTemplateMetadata metadata { get; set; }
+        public RevisionTemplateSpec Spec { get; set; }
 
+        public RevisionTemplateMetadata Metadata { get; set; }
     }
 
     public class Configuration
     {
-        public RevisionTemplate revisionTemplate { get; set; }
+        public RevisionTemplate RevisionTemplate { get; set; }
     }
 
     public class RunLatest
     {
-        public Configuration configuration { get; set; }
+        public Configuration Configuration { get; set; }
     }
 
     public class KnativeSpec
     {
-        public RunLatest runLatest { get; set; }
+        public RunLatest RunLatest { get; set; }
     }
 
     public class KnativeService
     {
-        public string apiVersion { get; set; }
-        public string kind { get; set; }
-        public KnativeSpec spec { get; set; }
+        public string ApiVersion { get; set; }
 
-        public Metadata metadata { get; set; }
+        public string Kind { get; set; }
+
+        public KnativeSpec Spec { get; set; }
+
+        public Metadata Metadata { get; set; }
     }
 
     public class Metadata
     {
-        public string name { get; set; }
-        public string @namespace { get; set; }
+        public string Name { get; set; }
+
+        public string @Namespace { get; set; }
     }
 }
