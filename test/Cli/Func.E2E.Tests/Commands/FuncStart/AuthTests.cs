@@ -8,15 +8,10 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
-    public class AuthTests : BaseE2ETests
+    public class AuthTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public AuthTests(ITestOutputHelper log)
-            : base(log)
-        {
-        }
-
         [Theory]
         [InlineData("function", false, "Welcome to Azure Functions!")]
         [InlineData("function", true, "")]
@@ -28,8 +23,8 @@ namespace Func.E2ETests.Commands.FuncStart
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            string methodName = "Start_DotnetIsolated_Test_EnableAuthFeature";
-            string uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
+            var methodName = "Start_DotnetIsolated_Test_EnableAuthFeature";
+            var uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
             // Call func init and func new
             await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
@@ -45,9 +40,7 @@ namespace Func.E2ETests.Commands.FuncStart
             // Build command arguments based on enableAuth parameter
             var commandArgs = new List<string> { "start", "--verbose", "--port", port.ToString() };
             if (enableAuth)
-            {
                 commandArgs.Add("--enableAuth");
-            }
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
@@ -55,13 +48,9 @@ namespace Func.E2ETests.Commands.FuncStart
 
             // Validate expected output content
             if (string.IsNullOrEmpty(expectedResult))
-            {
                 result.Should().HaveStdOutContaining("\"status\": \"401\"");
-            }
             else
-            {
                 result.Should().HaveStdOutContaining("Selected out-of-process host.");
-            }
         }
     }
 }

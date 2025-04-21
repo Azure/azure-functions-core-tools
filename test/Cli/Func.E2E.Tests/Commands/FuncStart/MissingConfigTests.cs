@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using Azure.Functions.Cli.E2E.Tests;
 using FluentAssertions;
 using Func.E2ETests.Traits;
 using Func.TestFramework.Assertions;
@@ -9,21 +10,16 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
-    public class MissingConfigTests : BaseE2ETests
+    public class MissingConfigTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public MissingConfigTests(ITestOutputHelper log)
-            : base(log)
-        {
-        }
-
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_InvalidHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_InProc_InvalidHostJson_FailsWithExpectedError";
+            var testName = "Start_InProc_InvalidHostJson_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -32,8 +28,8 @@ namespace Func.E2ETests.Commands.FuncStart
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
             // Create invalid host.json
-            string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
-            string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
+            var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
+            var hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
@@ -50,7 +46,7 @@ namespace Func.E2ETests.Commands.FuncStart
         public async Task Start_InProc_MissingHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_InProc_MissingHostJson_FailsWithExpectedError";
+            var testName = "Start_InProc_MissingHostJson_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -59,7 +55,7 @@ namespace Func.E2ETests.Commands.FuncStart
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
 
             // Delete host.json
-            string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
+            var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
             File.Delete(hostJsonPath);
 
             // Call func start
@@ -79,12 +75,10 @@ namespace Func.E2ETests.Commands.FuncStart
         {
             try
             {
-                string methodName = "Start_MissingLocalSettingsJson_BehavesAsExpected";
-                string logFileName = $"{methodName}_{language}_{runtimeParameter}";
+                var methodName = "Start_MissingLocalSettingsJson_BehavesAsExpected";
+                var logFileName = $"{methodName}_{language}_{runtimeParameter}";
                 if (setRuntimeViaEnvironment)
-                {
                     Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
-                }
 
                 int port = ProcessHelper.GetAvailablePort();
 
@@ -112,9 +106,7 @@ namespace Func.E2ETests.Commands.FuncStart
 
                 var startCommand = new List<string> { "--port", port.ToString(), "--verbose" };
                 if (!string.IsNullOrEmpty(runtimeParameter))
-                {
                     startCommand.Add(runtimeParameter);
-                }
 
                 var result = funcStartCommand
                     .WithWorkingDirectory(WorkingDirectory)
@@ -122,9 +114,7 @@ namespace Func.E2ETests.Commands.FuncStart
 
                 // Validate output contains expected function URL
                 if (invokeFunction)
-                {
                     result.Should().HaveStdOutContaining("HttpTriggerFunc: [GET,POST] http://localhost:");
-                }
 
                 result.Should().HaveStdOutContaining("Executed 'Functions.HttpTriggerFunc' (Succeeded");
             }
@@ -132,9 +122,7 @@ namespace Func.E2ETests.Commands.FuncStart
             {
                 // Clean up environment variable
                 if (setRuntimeViaEnvironment)
-                {
                     Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
-                }
             }
         }
 
@@ -143,7 +131,7 @@ namespace Func.E2ETests.Commands.FuncStart
         {
             int port = ProcessHelper.GetAvailablePort();
             var functionName = "HttpTriggerJS";
-            string testName = "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError";
+            var testName = "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError";
 
             // Initialize Node.js function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
@@ -178,7 +166,7 @@ namespace Func.E2ETests.Commands.FuncStart
         public async Task Start_EmptyEnvVars_HandledAsExpected()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_EmptyEnvVars_HandledAsExpected";
+            var testName = "Start_EmptyEnvVars_HandledAsExpected";
 
             // Initialize Node.js function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
@@ -193,8 +181,8 @@ namespace Func.E2ETests.Commands.FuncStart
             funcSettingsResult.Should().ExitWith(0);
 
             // Modify settings file to have empty value
-            string settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
-            string settingsContent = File.ReadAllText(settingsPath);
+            var settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
+            var settingsContent = File.ReadAllText(settingsPath);
             settingsContent = settingsContent.Replace("EMPTY_VALUE", string.Empty);
             File.WriteAllText(settingsPath, settingsContent);
 

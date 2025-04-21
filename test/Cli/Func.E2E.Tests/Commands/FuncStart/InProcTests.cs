@@ -9,16 +9,11 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
     [Trait(TestTraits.Group, TestTraits.InProc)]
-    public class InProcTests : BaseE2ETests
+    public class InProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public InProcTests(ITestOutputHelper log)
-            : base(log)
-        {
-        }
-
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_SuccessfulFunctionExecution()

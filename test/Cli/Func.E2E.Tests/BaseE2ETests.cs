@@ -1,16 +1,16 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
 using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests
 {
     public abstract class BaseE2ETests(ITestOutputHelper log) : IAsyncLifetime
     {
-        protected ITestOutputHelper Log { get; } = log;
+        protected ITestOutputHelper? Log { get; } = log;
 
         protected string? FuncPath { get; set; } = Environment.GetEnvironmentVariable(Constants.FuncPath);
 

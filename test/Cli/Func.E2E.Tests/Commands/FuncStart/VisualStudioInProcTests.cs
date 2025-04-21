@@ -9,27 +9,19 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
-    public class VisualStudioInProcTests : BaseE2ETests
+    public class VisualStudioInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private readonly string _vsNet8ProjectPath;
-        private readonly string _vsNet6ProjectPath;
-
-        public VisualStudioInProcTests(ITestOutputHelper log)
-            : base(log)
-        {
-            // Visual Studio test project paths
-            _vsNet8ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
-            _vsNet6ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
-        }
+        private readonly string _vsNet8ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet8InProcProject");
+        private readonly string _vsNet6ProjectPath = Path.GetFullPath("../VisualStudioTestProjects/TestNet6InProcProject");
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution";
+            var testName = "Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution";
 
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
@@ -54,7 +46,7 @@ namespace Func.E2ETests.Commands.FuncStart
         public void Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution";
+            var testName = "Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution";
 
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);

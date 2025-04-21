@@ -10,22 +10,17 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
-    public class UserSecretsTests : BaseE2ETests
+    public class UserSecretsTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public UserSecretsTests(ITestOutputHelper log)
-            : base(log)
-        {
-        }
-
         [Theory]
         [InlineData("dotnet")]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution(string language)
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution";
+            var testName = "Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution";
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
@@ -37,18 +32,18 @@ namespace Func.E2ETests.Commands.FuncStart
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
-            string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
-            string queueCode = File.ReadAllText(queueCodePath);
+            var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
+            var queueCode = File.ReadAllText(queueCodePath);
             queueCode = queueCode.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
             File.WriteAllText(queueCodePath, queueCode);
 
             // Clear local.settings.json
-            string settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
-            string settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"" + language + "\", \"AzureWebJobsSecretStorageType\": \"files\"} }";
+            var settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
+            var settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"" + language + "\", \"AzureWebJobsSecretStorageType\": \"files\"} }";
             File.WriteAllText(settingsPath, settingsContent);
 
             // Set up user secrets
-            Dictionary<string, string> userSecrets = new Dictionary<string, string>
+            var userSecrets = new Dictionary<string, string>
             {
                 { "AzureWebJobsStorage", "UseDevelopmentStorage=true" },
                 { "ConnectionStrings:MyQueueConn", "UseDevelopmentStorage=true" }
@@ -86,7 +81,7 @@ namespace Func.E2ETests.Commands.FuncStart
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError()
         {
-            string? azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
             {
                 Log.WriteLine("Skipping test as AzureWebJobsStorage is set");
@@ -94,7 +89,7 @@ namespace Func.E2ETests.Commands.FuncStart
             }
 
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError";
+            var testName = "Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -106,18 +101,18 @@ namespace Func.E2ETests.Commands.FuncStart
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
-            string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
-            string queueCode = File.ReadAllText(queueCodePath);
+            var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
+            var queueCode = File.ReadAllText(queueCodePath);
             queueCode = queueCode.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
             File.WriteAllText(queueCodePath, queueCode);
 
             // Clear local.settings.json
-            string settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
-            string settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"dotnet\"} }";
+            var settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
+            var settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"dotnet\"} }";
             File.WriteAllText(settingsPath, settingsContent);
 
             // Set up user secrets with missing AzureWebJobsStorage
-            Dictionary<string, string> userSecrets = new Dictionary<string, string>
+            var userSecrets = new Dictionary<string, string>
             {
                 { "ConnectionStrings:MyQueueConn", "UseDevelopmentStorage=true" }
             };
@@ -138,7 +133,7 @@ namespace Func.E2ETests.Commands.FuncStart
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError()
         {
-            string? azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
             {
                 Log.WriteLine("Skipping test as AzureWebJobsStorage is set");
@@ -146,7 +141,7 @@ namespace Func.E2ETests.Commands.FuncStart
             }
 
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError";
+            var testName = "Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError";
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -158,18 +153,18 @@ namespace Func.E2ETests.Commands.FuncStart
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
 
             // Modify queue code to use connection string
-            string queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
-            string queueCode = File.ReadAllText(queueCodePath);
+            var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
+            var queueCode = File.ReadAllText(queueCodePath);
             queueCode = queueCode.Replace("Connection = \"\"", "Connection = \"ConnectionStrings:MyQueueConn\"");
             File.WriteAllText(queueCodePath, queueCode);
 
             // Clear local.settings.json
-            string settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
-            string settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"dotnet\"} }";
+            var settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
+            var settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"dotnet\"} }";
             File.WriteAllText(settingsPath, settingsContent);
 
             // Set up user secrets with AzureWebJobsStorage but missing MyQueueConn
-            Dictionary<string, string> userSecrets = new Dictionary<string, string>
+            var userSecrets = new Dictionary<string, string>
             {
                 { "AzureWebJobsStorage", "UseDevelopmentStorage=true" }
             };
@@ -206,9 +201,7 @@ namespace Func.E2ETests.Commands.FuncStart
             };
 
             using (var process = Process.Start(initProcess))
-            {
                 process?.WaitForExit();
-            }
 
             // Set each secret
             foreach (var secret in secrets)
@@ -223,9 +216,7 @@ namespace Func.E2ETests.Commands.FuncStart
                 };
 
                 using (var process = Process.Start(setProcess))
-                {
                     process?.WaitForExit();
-                }
             }
         }
     }

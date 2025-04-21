@@ -11,7 +11,7 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("NodeV4")]
     public class NodeV4Tests : IClassFixture<NodeV4FunctionAppFixture>

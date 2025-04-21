@@ -10,7 +10,7 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     public class DotnetIsolatedTests : IClassFixture<DotnetIsolatedFunctionAppFixture>
     {

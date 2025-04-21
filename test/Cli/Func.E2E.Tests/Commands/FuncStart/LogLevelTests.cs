@@ -2,22 +2,17 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using FluentAssertions;
-using Func.E2ETests.Commands.FuncStart;
+using Azure.Functions.Cli.E2E.Tests.Commands.FuncStart;
 using Func.TestFramework.Assertions;
 using Func.TestFramework.Commands;
 using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
-    public class LogLevelTests : BaseE2ETests
+    public class LogLevelTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public LogLevelTests(ITestOutputHelper log)
-            : base(log)
-        {
-        }
-
         [Fact]
         public async Task Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue()
         {

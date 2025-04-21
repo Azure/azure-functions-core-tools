@@ -9,19 +9,15 @@ using System.Net;
 using Xunit.Abstractions;
 using Xunit;
 
-namespace Func.E2ETests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
-    public class MultipleFunctionsTests : BaseE2ETests
+    public class MultipleFunctionsTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public MultipleFunctionsTests(ITestOutputHelper log) : base(log)
-        {
-        }
-
         [Fact]
         public async Task Start_FunctionsStartArgument_OnlySelectedFunctionsRun()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_FunctionsStartArgument_OnlySelectedFunctionsRun";
+            var testName = "Start_FunctionsStartArgument_OnlySelectedFunctionsRun";
 
             // Initialize JavaScript function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "javascript" });

@@ -10,7 +10,7 @@ using Func.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("DotnetInProc6")]
     [Trait(TestTraits.Group, TestTraits.InProc)]
@@ -155,8 +155,8 @@ namespace Func.E2ETests.Commands.FuncStart.TestsWithFixtures
             CopyDirectoryHelpers.CopyDirectory(_fixture.WorkingDirectory, tempDir);
 
             // Create invalid host.json
-            string hostJsonPath = Path.Combine(tempDir, "host.json");
-            string hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
+            var hostJsonPath = Path.Combine(tempDir, "host.json");
+            var hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
