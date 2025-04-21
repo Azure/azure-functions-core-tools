@@ -1,5 +1,5 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -23,9 +23,9 @@ namespace Func.E2ETests.Fixtures
 
             Log = new Mock<ITestOutputHelper>().Object;
 
-            FuncPath = Environment.GetEnvironmentVariable(Constants.FuncPath);
+            FuncPath = Environment.GetEnvironmentVariable(Constants.FuncPath) ?? string.Empty;
 
-            if (FuncPath == null)
+            if (string.IsNullOrEmpty(FuncPath))
             {
                 // Fallback for local testing in Visual Studio, etc.
                 FuncPath = Path.Combine(Environment.CurrentDirectory, "func");
@@ -46,7 +46,7 @@ namespace Func.E2ETests.Fixtures
 
         public ITestOutputHelper Log { get; set; }
 
-        public string? FuncPath { get; set; }
+        public string FuncPath { get; set; }
 
         public string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
@@ -161,12 +161,12 @@ namespace Func.E2ETests.Fixtures
 
             string nameOfFixture = WorkerRuntime + (TargetFramework ?? string.Empty) + (Version ?? string.Empty);
 
-            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
+            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath!, nameOfFixture, WorkingDirectory, Log, initArgs);
 
             var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }
                                 .Concat(!WorkerRuntime.Contains("dotnet") ? new[] { "--language", WorkerRuntime } : Array.Empty<string>())
                                 .ToArray();
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, WorkerRuntime);
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath!, nameOfFixture, WorkingDirectory, Log, funcNewArgs, WorkerRuntime);
 
             // Enable worker indexing to maximize probability of function being found
             string localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");

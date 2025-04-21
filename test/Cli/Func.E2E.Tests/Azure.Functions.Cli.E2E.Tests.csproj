@@ -3,6 +3,14 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include=".runsettings\start_tests\artifact_consolidation_pipeline\visualstudio.runsettings" />
+    <None Include=".runsettings\start_tests\ci_pipeline\default.runsettings" />
+    <None Include=".runsettings\start_tests\ci_pipeline\dotnet_inproc.runsettings" />
+    <None Include=".runsettings\start_tests\artifact_consolidation_pipeline\default.runsettings" />
+    <None Include=".runsettings\start_tests\artifact_consolidation_pipeline\dotnet_inproc.runsettings" />
+  </ItemGroup>
   
   <ItemGroup>
     <PackageReference Include="FluentAssertions" />
@@ -18,7 +26,7 @@
   </ItemGroup>
 
   <PropertyGroup>
-	<RunSettingsFilePath>$(MSBuildProjectDirectory)\Runsettings\StartTests_default.runsettings</RunSettingsFilePath>
+	<RunSettingsFilePath>$(MSBuildProjectDirectory)\.runsettings\start_tests\ci_pipeline\default.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
 </Project>
