@@ -1,16 +1,14 @@
-﻿using System;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Security.Principal;
+using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.NativeMethods;
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
-using System.Text;
-using System.Threading.Tasks;
-using System.Security.Cryptography;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -98,7 +96,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             const string DEFAULT_PASSWORD = "localcert";
 
-            var certFileNames = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName().Replace(".", String.Empty));
+            var certFileNames = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName().Replace(".", string.Empty));
             var output = new StringBuilder();
 
             ColoredConsole.WriteLine("Generating a self signed certificate using openssl");
@@ -143,7 +141,11 @@ namespace Azure.Functions.Cli.Helpers
 
         private static void EncodeLength(BinaryWriter stream, int length)
         {
-            if (length < 0) throw new ArgumentOutOfRangeException("length", "Length must be non-negative");
+            if (length < 0)
+            {
+                throw new ArgumentOutOfRangeException("length", "Length must be non-negative");
+            }
+
             if (length < 0x80)
             {
                 // Short form
@@ -159,6 +161,7 @@ namespace Azure.Functions.Cli.Helpers
                     temp >>= 8;
                     bytesRequired++;
                 }
+
                 stream.Write((byte)(bytesRequired | 0x80));
                 for (var i = bytesRequired - 1; i >= 0; i--)
                 {
