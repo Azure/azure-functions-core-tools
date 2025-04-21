@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V1.Models;
 using Azure.Functions.Cli.Kubernetes.Models;
@@ -11,8 +11,15 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
 {
     public class KedaV1Resource : KedaResourceBase
     {
-        public override IKubernetesResource GetKubernetesResource(string name, string @namespace, TriggersPayload triggers,
-            DeploymentV1Apps deployment, int? pollingInterval, int? cooldownPeriod, int? minReplicas, int? maxReplicas)
+        public override IKubernetesResource GetKubernetesResource(
+            string name,
+            string @namespace,
+            TriggersPayload triggers,
+            DeploymentV1Apps deployment,
+            int? pollingInterval,
+            int? cooldownPeriod,
+            int? minReplicas,
+            int? maxReplicas)
         {
             return new ScaledObjectKedaV1
             {
@@ -22,7 +29,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
                     Namespace = @namespace,
                     Labels = new Dictionary<string, string>
                     {
-                        {"deploymentName", deployment.Metadata.Name}
+                        { "deploymentName", deployment.Metadata.Name }
                     }
                 },
                 Spec = new ScaledObjectSpecV1Alpha1
@@ -57,8 +64,8 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA.V1
         {
             IDictionary<string, string> metadata = t.ToObject<Dictionary<string, JToken>>()
                 .Where(i => i.Value.Type == JTokenType.String)
-                .ToDictionary(k => k.Key, v => v.Value.ToString()); 
-            
+                .ToDictionary(k => k.Key, v => v.Value.ToString());
+
             if (t["type"].ToString().Equals("rabbitMQTrigger", StringComparison.InvariantCultureIgnoreCase))
             {
                 metadata["host"] = metadata["connectionStringSetting"];
