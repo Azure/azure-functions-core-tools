@@ -9,7 +9,7 @@ namespace CoreToolsHost
     {
         private static bool _isVerbose = false;
 
-        public static async Task Main(string[] args)
+        internal static async Task Main(string[] args)
         {
             _isVerbose = args.Contains(DotnetConstants.Verbose);
 
