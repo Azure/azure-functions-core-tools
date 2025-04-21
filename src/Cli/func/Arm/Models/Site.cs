@@ -1,11 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Arm.Models
 {
     public class Site
     {
+        public Site(string siteId)
+        {
+            SiteId = siteId;
+        }
+
         public string SiteId { get; private set; }
 
         public string SiteName { get; set; }
@@ -48,11 +52,6 @@ namespace Azure.Functions.Cli.Arm.Models
 
         public bool IsKubeApp
             => Kind?.IndexOf("kubernetes", StringComparison.OrdinalIgnoreCase) >= 0;
-
-        public Site(string siteId)
-        {
-            SiteId = siteId;
-        }
 
         public FunctionAppConfig FunctionAppConfig { get; set; }
     }

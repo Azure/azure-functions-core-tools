@@ -1,53 +1,85 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Arm.Models
 {
     internal class ArmWebsite
     {
-        public IEnumerable<string> enabledHostNames { get; set; }
+        [JsonProperty(PropertyName = "enabledHostNames")]
+        public IEnumerable<string> EnabledHostNames { get; set; }
 
-        public string sku { get; set; }
+        [JsonProperty(PropertyName = "sku")]
+        public string Sku { get; set; }
 
-        public FunctionAppConfig functionAppConfig { get; set; }
+        [JsonProperty(PropertyName = "functionAppConfig")]
+        public FunctionAppConfig FunctionAppConfig { get; set; }
     }
 
     public class Authentication
     {
-        public string type { get; set; }
-        public object userAssignedIdentityResourceId { get; set; }
-        public string storageAccountConnectionStringName { get; set; }
+        [JsonProperty(PropertyName = "type")]
+        public string Type { get; set; }
+
+        [JsonProperty(PropertyName = "userAssignedIdentityResourceId")]
+        public object UserAssignedIdentityResourceId { get; set; }
+
+        [JsonProperty(PropertyName = "storageAccountConnectionStringName")]
+        public string StorageAccountConnectionStringName { get; set; }
     }
 
     public class Deployment
     {
-        public Storage storage { get; set; }
+        [JsonProperty(PropertyName = "storage")]
+        public Storage Storage { get; set; }
     }
 
     public class FunctionAppConfig
     {
-        public Deployment deployment { get; set; }
-        public Runtime runtime { get; set; }
-        public ScaleAndConcurrency scaleAndConcurrency { get; set; }
+        [JsonProperty(PropertyName = "deployment")]
+        public Deployment Deployment { get; set; }
+
+        [JsonProperty(PropertyName = "runtime")]
+        public Runtime Runtime { get; set; }
+
+        [JsonProperty(PropertyName = "scaleAndConcurrency")]
+        public ScaleAndConcurrency ScaleAndConcurrency { get; set; }
     }
 
     public class Runtime
     {
-        public string name { get; set; }
-        public string version { get; set; }
+        [JsonProperty(PropertyName = "name")]
+        public string Name { get; set; }
+
+        [JsonProperty(PropertyName = "version")]
+        public string Version { get; set; }
     }
 
     public class ScaleAndConcurrency
     {
-        public List<object> alwaysReady { get; set; }
-        public int maximumInstanceCount { get; set; }
-        public int instanceMemoryMB { get; set; }
-        public object triggers { get; set; }
+        [JsonProperty(PropertyName = "alwaysReady")]
+        public List<object> AlwaysReady { get; set; }
+
+        [JsonProperty(PropertyName = "maximumInstanceCount")]
+        public int MaximumInstanceCount { get; set; }
+
+        [JsonProperty(PropertyName = "instanceMemoryMB")]
+        public int InstanceMemoryMB { get; set; }
+
+        [JsonProperty(PropertyName = "triggers")]
+        public object Triggers { get; set; }
     }
 
     public class Storage
     {
-        public string type { get; set; }
-        public string value { get; set; }
-        public Authentication authentication { get; set; }
+        [JsonProperty(PropertyName = "type")]
+        public string Type { get; set; }
+
+        [JsonProperty(PropertyName = "value")]
+        public string Value { get; set; }
+
+        [JsonProperty(PropertyName = "authentication")]
+        public Authentication Authentication { get; set; }
     }
 }
