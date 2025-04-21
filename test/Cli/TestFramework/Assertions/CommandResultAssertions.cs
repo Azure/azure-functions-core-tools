@@ -6,7 +6,7 @@ using Azure.Functions.Cli.Abstractions.Command;
 using FluentAssertions;
 using FluentAssertions.Execution;
 
-namespace Azure.Functions.Cli.Test.Framework.Assertions
+namespace Azure.Functions.Cli.TestFramework.Assertions
 {
     public class CommandResultAssertions(CommandResult commandResult)
     {

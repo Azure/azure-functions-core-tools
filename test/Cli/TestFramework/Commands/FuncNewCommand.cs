@@ -3,11 +3,11 @@
 
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.Test.Framework.Commands
+namespace Azure.Functions.Cli.TestFramework.Commands
 {
-    public class FuncSettingsCommand(string funcPath, string testName, ITestOutputHelper log) : FuncCommand(log)
+    public class FuncNewCommand(string funcPath, string testName, ITestOutputHelper log) : FuncCommand(log)
     {
-        private readonly string _commandName = "settings";
+        private readonly string _commandName = "new";
         private readonly string _funcPath = funcPath;
         private readonly string _testName = testName;
 

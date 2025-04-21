@@ -5,7 +5,7 @@
 using System.Diagnostics;
 using Azure.Functions.Cli.Abstractions.Command;
 
-namespace Azure.Functions.Cli.Test.Framework
+namespace Azure.Functions.Cli.TestFramework
 {
     public class CommandInfo
     {
