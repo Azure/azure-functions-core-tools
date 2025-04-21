@@ -1,20 +1,18 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
 using System.Globalization;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.ApplicationInsights.Channel;
 
 namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 {
     internal class StorageTransmission : Transmission, IDisposable
     {
+#pragma warning disable SA1401 // Fields should be private
         internal Action<StorageTransmission> Disposing;
+#pragma warning restore SA1401 // Fields should be private
 
-        protected StorageTransmission(string fullPath, Uri address, byte[] content, string contentType,
-            string contentEncoding)
+        protected StorageTransmission(string fullPath, Uri address, byte[] content, string contentType, string contentEncoding)
             : base(address, content, contentType, contentEncoding)
         {
             FullFilePath = fullPath;
@@ -74,21 +72,18 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             string line = await reader.ReadLineAsync().ConfigureAwait(false);
             if (string.IsNullOrEmpty(line))
             {
-                throw new FormatException(string.Format(CultureInfo.InvariantCulture, "{0} header is expected.",
-                    headerName));
+                throw new FormatException(string.Format(CultureInfo.InvariantCulture, "{0} header is expected.", headerName));
             }
 
             string[] parts = line.Split(':');
             if (parts.Length != 2)
             {
-                throw new FormatException(string.Format(CultureInfo.InvariantCulture,
-                    "Unexpected header format. {0} header is expected. Actual header: {1}", headerName, line));
+                throw new FormatException(string.Format(CultureInfo.InvariantCulture, "Unexpected header format. {0} header is expected. Actual header: {1}", headerName, line));
             }
 
             if (parts[0] != headerName)
             {
-                throw new FormatException(string.Format(CultureInfo.InvariantCulture,
-                    "{0} header is expected. Actual header: {1}", headerName, line));
+                throw new FormatException(string.Format(CultureInfo.InvariantCulture, "{0} header is expected. Actual header: {1}", headerName, line));
             }
 
             return parts[1].Trim();

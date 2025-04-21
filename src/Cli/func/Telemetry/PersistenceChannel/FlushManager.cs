@@ -1,7 +1,6 @@
-﻿// // Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
 using Microsoft.ApplicationInsights.Channel;
 using Microsoft.ApplicationInsights.Extensibility.Implementation;
 using IChannelTelemetry = Microsoft.ApplicationInsights.Channel.ITelemetry;
@@ -36,7 +35,6 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         /// </remarks>
         internal Uri EndpointAddress { get; set; }
 
-
         /// <summary>
         ///     Persist the in-memory telemetry items.
         /// </summary>
@@ -44,7 +42,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         {
             if (telemetryItem != null)
             {
-                byte[] data = JsonSerializer.Serialize(new[] {telemetryItem});
+                byte[] data = JsonSerializer.Serialize(new[] { telemetryItem });
                 Transmission transmission = new Transmission(
                     EndpointAddress,
                     data,
