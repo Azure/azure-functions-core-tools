@@ -1,9 +1,10 @@
-﻿using Azure.Functions.Cli.Exceptions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Text.RegularExpressions;
+using Azure.Functions.Cli.Exceptions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Extensions
 {
@@ -35,7 +36,7 @@ namespace Azure.Functions.Cli.Extensions
                 throw new System.ArgumentException($"{nameof(imageName)} cannot be null or empty", nameof(imageName));
             }
 
-            string cleanImageName = new Regex(@"[^\d\w_]").Replace(imageName, "");
+            string cleanImageName = new Regex(@"[^\d\w_]").Replace(imageName, string.Empty);
             if (string.IsNullOrWhiteSpace(cleanImageName))
             {
                 throw new ImageNameFormatException(imageName);

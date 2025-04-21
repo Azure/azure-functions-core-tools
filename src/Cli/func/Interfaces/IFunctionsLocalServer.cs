@@ -1,11 +1,10 @@
-﻿using System;
-using System.Net.Http;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Interfaces
 {
     internal interface IFunctionsLocalServer
     {
-        Task<HttpClient> ConnectAsync(TimeSpan timeout, bool noInteractive);
+        internal Task<HttpClient> ConnectAsync(TimeSpan timeout, bool noInteractive);
     }
 }
