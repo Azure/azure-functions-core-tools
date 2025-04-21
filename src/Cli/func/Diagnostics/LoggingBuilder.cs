@@ -1,4 +1,7 @@
-﻿using Azure.Functions.Cli.Common;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Common;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.ApplicationInsights.Extensibility.Implementation;
@@ -11,8 +14,8 @@ namespace Azure.Functions.Cli.Diagnostics
 {
     internal class LoggingBuilder : IConfigureBuilder<ILoggingBuilder>
     {
-        private LoggingFilterHelper _loggingFilterHelper;
         private readonly string _jsonOutputFile;
+        private readonly LoggingFilterHelper _loggingFilterHelper;
 
         public LoggingBuilder(LoggingFilterHelper loggingFilterHelper, string jsonOutputFile)
         {
@@ -24,7 +27,7 @@ namespace Azure.Functions.Cli.Diagnostics
         {
             builder.Services.AddSingleton<ILoggerProvider>(p =>
             {
-                //Cache LoggerFilterOptions to be used by the logger to filter logs based on content
+                // Cache LoggerFilterOptions to be used by the logger to filter logs based on content
                 var filterOptions = p.GetService<IOptions<LoggerFilterOptions>>();
                 return new ColoredConsoleLoggerProvider(_loggingFilterHelper, filterOptions.Value, _jsonOutputFile);
             });
