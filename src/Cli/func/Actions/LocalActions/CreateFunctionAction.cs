@@ -1,19 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.IO.Abstractions;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Exceptions;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
-using Microsoft.Azure.AppService.Proxy.Common.Context;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
@@ -129,7 +122,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 FunctionName = FunctionName ?? Console.ReadLine();
                 ColoredConsole.WriteLine(FunctionName);
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
-                await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel);
+                try
+                {
+                    await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel);
+                }
+                catch (CsTemplateNotFoundException)
+                {
+                    if (_templates.Value
+                        .Where(x => x.Metadata.Language.Equals(Languages.CSharp, StringComparison.InvariantCultureIgnoreCase))
+                        .Any(x => x.Metadata.Name.Equals(TemplateName, StringComparison.InvariantCultureIgnoreCase)))
+                    {
+                        throw new CsxTemplateReferredWithoutCsxOptionException(TemplateName);
+                    }
+
+                    throw;
+                }
             }
             else if (IsNewPythonProgrammingModel())
             {

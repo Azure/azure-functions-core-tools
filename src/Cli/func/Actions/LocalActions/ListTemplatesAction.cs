@@ -1,7 +1,5 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.Interfaces;
+﻿using Azure.Functions.Cli.Interfaces;
+using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Fclp;
 using static Azure.Functions.Cli.Common.OutputTheme;
@@ -45,6 +43,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     ColoredConsole.WriteLine($"  {template.Metadata.Name}");
                 }
+
+                if (Constants.Languages.CSharp.Equals(languageGrouping.Key, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    ColoredConsole.WriteLine($"(Use the templates above with 'func function new ls--csx --template' command within in-process model projects.)");
+                    ColoredConsole.WriteLine($"(More templates are available for C#. To list those run 'func funciton new' command without '--template'.)");
+                }
+
                 ColoredConsole.WriteLine();
             }
         }
