@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             bool enableAuth,
             string expectedResult)
         {
-            int port = ProcessHelper.GetAvailablePort();
+            var port = ProcessHelper.GetAvailablePort();
 
             var methodName = nameof(Start_DotnetIsolated_Test_EnableAuthFeature);
             var uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";

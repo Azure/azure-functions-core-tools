@@ -9,7 +9,7 @@ using Func.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 {
     public class VisualStudioInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
         {
-            int port = ProcessHelper.GetAvailablePort();
+            var port = ProcessHelper.GetAvailablePort();
             var testName = nameof(Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution);
 
             // Call func start (on existing VS project)
@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public void Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution()
         {
-            int port = ProcessHelper.GetAvailablePort();
+            var port = ProcessHelper.GetAvailablePort();
             var testName = nameof(Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution);
 
             // Call func start (on existing VS project)

@@ -9,49 +9,16 @@ using Func.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
+namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 {
-    [Trait(TestTraits.Group, TestTraits.InProc)]
-    public class InProcTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class BaseLogLevelTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task Start_InProc_SuccessfulFunctionExecution()
+        public async Task RunLogLevelOverridenViaHostJsonTest(string language, string testName)
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = nameof(Start_InProc_SuccessfulFunctionExecution);
 
-            // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
-
-            // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
-
-            // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
-            string? capturedContent = null;
-
-            funcStartCommand.ProcessStartedHandler = async (process) =>
-            {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
-            };
-
-            var result = funcStartCommand
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "--port", port.ToString() });
-
-            capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
-        }
-
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
-        {
-            int port = ProcessHelper.GetAvailablePort();
-            string testName = nameof(Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue);
-
-            // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
+            // Initialize function app using retry helper
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
 
             // Add HTTP trigger using retry helper
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
@@ -77,15 +44,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             result.Should().HaveStdOutContaining("Host configuration applied.");
         }
 
-        [Fact]
-        [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public async Task Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
+        public async Task RunLogLevelOverridenWithFilterTest(string language, string testName)
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = nameof(Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue);
 
-            // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
+            // Initialize function app using retry helper
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
 
             // Add HTTP trigger using retry helper
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
@@ -111,5 +75,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             result.Should().HaveStdOutContaining("Found the following functions:");
             result.Should().NotHaveStdOutContaining("Reading host configuration file");
         }
+
+        // Add more shared test methods as needed for LogLevel tests
     }
 }
