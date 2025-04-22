@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_FunctionsStartArgument_OnlySelectedFunctionsRun()
         {
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_FunctionsStartArgument_OnlySelectedFunctionsRun";
+            var testName = nameof(Start_FunctionsStartArgument_OnlySelectedFunctionsRun);
 
             // Initialize JavaScript function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "javascript" });

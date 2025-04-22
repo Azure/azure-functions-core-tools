@@ -31,7 +31,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime", _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime), _fixture.Log);
 
             string? capturedContent = null;
 
@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime", _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime), _fixture.Log);
 
             string? capturedContent = null;
 
@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_Net8InProc_ExpectedToFail_WithSpecifyingRuntime", _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Net8InProc_ExpectedToFail_WithSpecifyingRuntime), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -104,7 +104,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_Net8InProc_ExpectedToFail_WithoutSpecifyingRuntime", _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Net8InProc_ExpectedToFail_WithoutSpecifyingRuntime), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -122,7 +122,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_InProc6_SpecifiedRuntime_ForDotnet8InProc", _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_InProc6_SpecifiedRuntime_ForDotnet8InProc), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -140,7 +140,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet8InProc", _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet8InProc), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)

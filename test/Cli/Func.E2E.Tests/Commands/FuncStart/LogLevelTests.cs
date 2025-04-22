@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue";
+            string testName = nameof(Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue);
 
             // Initialize Node.js function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue";
+            string testName = nameof(Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue);
 
             // Initialize Node.js function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });

@@ -12,13 +12,13 @@ namespace Azure.Functions.Cli.E2E.Tests
     {
         protected ITestOutputHelper? Log { get; } = log;
 
-        protected string? FuncPath { get; set; } = Environment.GetEnvironmentVariable(Constants.FuncPath);
+        protected string FuncPath { get; set; } = Environment.GetEnvironmentVariable(Constants.FuncPath) ?? string.Empty;
 
         protected string WorkingDirectory { get; set; } = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
         public Task InitializeAsync()
         {
-            if (FuncPath is null)
+            if (string.IsNullOrEmpty(FuncPath))
             {
                 // Fallback for local testing in Visual Studio, etc.
                 FuncPath = Path.Combine(Environment.CurrentDirectory, "func");

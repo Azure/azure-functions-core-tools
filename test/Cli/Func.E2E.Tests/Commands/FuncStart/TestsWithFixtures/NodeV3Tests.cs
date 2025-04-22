@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, "Start_NodeJsApp_V3_SuccessfulFunctionExecution", _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_NodeJsApp_V3_SuccessfulFunctionExecution), _fixture.Log);
 
             string? capturedContent = null;
 

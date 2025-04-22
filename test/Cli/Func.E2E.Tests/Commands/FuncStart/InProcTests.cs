@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_InProc_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_InProc_SuccessfulFunctionExecution";
+            string testName = nameof(Start_InProc_SuccessfulFunctionExecution);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -48,7 +48,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue";
+            string testName = nameof(Start_InProc_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -82,7 +82,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
         {
             int port = ProcessHelper.GetAvailablePort();
-            string testName = "Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue";
+            string testName = nameof(Start_InProc_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });

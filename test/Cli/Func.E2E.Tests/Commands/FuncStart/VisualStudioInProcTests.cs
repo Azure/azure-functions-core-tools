@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution";
+            var testName = nameof(Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution);
 
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public void Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution";
+            var testName = nameof(Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution);
 
             // Call func start (on existing VS project)
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);

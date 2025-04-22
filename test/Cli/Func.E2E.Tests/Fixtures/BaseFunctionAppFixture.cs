@@ -161,27 +161,30 @@ namespace Func.E2ETests.Fixtures
 
             string nameOfFixture = WorkerRuntime + (TargetFramework ?? string.Empty) + (Version ?? string.Empty);
 
-            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath!, nameOfFixture, WorkingDirectory, Log, initArgs);
+            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
 
             var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }
                                 .Concat(!WorkerRuntime.Contains("dotnet") ? new[] { "--language", WorkerRuntime } : Array.Empty<string>())
                                 .ToArray();
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath!, nameOfFixture, WorkingDirectory, Log, funcNewArgs, WorkerRuntime);
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, WorkerRuntime);
 
-            // Enable worker indexing to maximize probability of function being found
-            string localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
+            // Enable worker indexing to maximize probability of function being found if target framework is not dotnet or dotnet-isolated
+            if (TargetFramework is not null && !TargetFramework.StartsWith("dotnet"))
+            {
+                string localSettingsJson = Path.Combine(WorkingDirectory, Constants.LocalSettingsJson);
 
-            // Read the existing JSON file
-            string json = File.ReadAllText(localSettingsJson);
+                // Read the existing JSON file
+                string json = File.ReadAllText(localSettingsJson);
 
-            // Parse the JSON
-            JObject settings = JObject.Parse(json);
+                // Parse the JSON
+                JObject settings = JObject.Parse(json);
 
-            // Add the new setting
-            settings["AzureWebJobsFeatureFlags"] = "EnableWorkerIndexing";
+                // Add the new setting
+                settings[Constants.AzureWebJobsFeatureFlags] = Constants.EnableWorkerIndexing;
 
-            // Write the updated content back to the file
-            File.WriteAllText(localSettingsJson, settings.ToString());
+                // Write the updated content back to the file
+                File.WriteAllText(localSettingsJson, settings.ToString());
+            }
         }
     }
 }

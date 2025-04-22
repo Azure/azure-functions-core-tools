@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_InProc_InvalidHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_InProc_InvalidHostJson_FailsWithExpectedError";
+            var testName = nameof(Start_InProc_InvalidHostJson_FailsWithExpectedError);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_InProc_MissingHostJson_FailsWithExpectedError()
         {
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_InProc_MissingHostJson_FailsWithExpectedError";
+            var testName = nameof(Start_InProc_MissingHostJson_FailsWithExpectedError);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -74,7 +74,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         {
             try
             {
-                var methodName = "Start_MissingLocalSettingsJson_BehavesAsExpected";
+                var methodName = nameof(Start_MissingLocalSettingsJson_BehavesAsExpected);
                 var logFileName = $"{methodName}_{language}_{runtimeParameter}";
                 if (setRuntimeViaEnvironment)
                     Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
@@ -130,7 +130,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         {
             int port = ProcessHelper.GetAvailablePort();
             var functionName = "HttpTriggerJS";
-            var testName = "Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError";
+            var testName = nameof(Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError);
 
             // Initialize Node.js function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
@@ -165,7 +165,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_EmptyEnvVars_HandledAsExpected()
         {
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_EmptyEnvVars_HandledAsExpected";
+            var testName = nameof(Start_EmptyEnvVars_HandledAsExpected);
 
             // Initialize Node.js function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });

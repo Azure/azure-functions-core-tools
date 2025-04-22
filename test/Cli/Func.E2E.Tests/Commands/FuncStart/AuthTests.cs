@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            var methodName = "Start_DotnetIsolated_Test_EnableAuthFeature";
+            var methodName = nameof(Start_DotnetIsolated_Test_EnableAuthFeature);
             var uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
             // Call func init and func new

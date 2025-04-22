@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         public async Task Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution(string language)
         {
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution";
+            var testName = nameof(Start_Dotnet_WithUserSecrets_SuccessfulFunctionExecution);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             }
 
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError";
+            var testName = nameof(Start_Dotnet_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
@@ -141,7 +141,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             }
 
             int port = ProcessHelper.GetAvailablePort();
-            var testName = "Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError";
+            var testName = nameof(Start_Dotnet_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError);
 
             // Initialize dotnet function app using retry helper
             await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
