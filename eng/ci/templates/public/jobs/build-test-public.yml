@@ -65,13 +65,6 @@ jobs:
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeededOrFailed()
     inputs:
-      targetPath: 'D:/a/_work/1/s/test/Cli/Func.E2ETests/TestResults'
-      artifactName: 'TestResults'
-      artifactType: 'pipeline'
-
-  - task: 1ES.PublishPipelineArtifact@1
-    condition: succeededOrFailed()
-    inputs:
       targetPath: '$(Build.SourcesDirectory)/TestLogs'
       artifactName: 'TestLogs'
       artifactType: 'pipeline'
