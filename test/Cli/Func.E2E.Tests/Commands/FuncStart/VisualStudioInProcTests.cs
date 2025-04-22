@@ -13,8 +13,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
     public class VisualStudioInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private readonly string _vsNet8ProjectPath = Path.GetFullPath("../../../TestFunctionApps/VisualStudioTestProjects/TestNet8InProcProject");
-        private readonly string _vsNet6ProjectPath = Path.GetFullPath("../../../TestFunctionApps/VisualStudioTestProjects/TestNet6InProcProject");
+        private readonly string _vsNet8ProjectPath = Path.Combine("..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet8InProcProject");
+        private readonly string _vsNet6ProjectPath = Path.Combine("..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet6InProcProject");
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]

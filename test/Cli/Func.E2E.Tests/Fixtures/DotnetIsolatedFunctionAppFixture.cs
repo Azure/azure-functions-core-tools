@@ -8,7 +8,7 @@ namespace Func.E2ETests.Fixtures
         public DotnetIsolatedFunctionAppFixture()
             : base("dotnet-isolated")
         {
-            UninstallDotnetTemplate("Microsoft.AzureFunctions.ProjectTemplate.CSharp.3.x");
+            //UninstallDotnetTemplate("Microsoft.AzureFunctions.ProjectTemplate.CSharp.3.x");
         }
     }
 }
