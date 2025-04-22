@@ -10,13 +10,21 @@ namespace Azure.Functions.Cli.Helpers
 {
     public enum WorkerRuntime
     {
+        [DisplayString("none")]
         None,
+        [DisplayString("dotnet")]
         Dotnet,
+        [DisplayString("dotnet-isolated")]
         DotnetIsolated,
+        [DisplayString("node")]
         Node,
+        [DisplayString("python")]
         Python,
+        [DisplayString("java")]
         Java,
+        [DisplayString("powershell")]
         Powershell,
+        [DisplayString("custom")]
         Custom
     }
 

@@ -546,7 +546,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
 
                 if (string.Equals(HostRuntime, "default", StringComparison.OrdinalIgnoreCase))
                 {
-                    ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.DotnetIsolated}'.");
+                    ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.DotnetIsolated.GetDisplayString()}'.");
                 }
 
                 if (isInproc8ArgumentValue && !await validateDotNet8ProjectEnablement())
@@ -560,7 +560,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else if (isInproc8ArgumentValue || isInproc6ArgumentValue)
             {
-                ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.Dotnet}'.");
+                ThrowCliException($"The provided value is only valid for the worker runtime '{WorkerRuntime.Dotnet.GetDisplayString()}'.");
             }
 
             PrintVerboseForHostSelection(HostRuntime);

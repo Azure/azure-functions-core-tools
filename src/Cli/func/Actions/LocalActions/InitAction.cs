@@ -199,7 +199,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (!supportedProgrammingModels.Contains(ResolvedProgrammingModel))
                 {
                     throw new CliArgumentsException(
-                        $"The {ResolvedProgrammingModel.ToString()} programming model is not supported for worker runtime {ResolvedWorkerRuntime.ToString()}. Supported programming models for worker runtime {ResolvedWorkerRuntime.ToString()} are:\n{EnumerationHelper.Join<ProgrammingModel>("\n", supportedProgrammingModels)}");
+                        $"The {ResolvedProgrammingModel.GetDisplayString()} programming model is not supported for worker runtime {ResolvedWorkerRuntime.GetDisplayString()}. Supported programming models for worker runtime {ResolvedWorkerRuntime.GetDisplayString()} are:\n{EnumerationHelper.Join("\n", supportedProgrammingModels)}");
                 }
             }
 
@@ -367,7 +367,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (!supportedFrameworks.Contains(TargetFramework, StringComparer.InvariantCultureIgnoreCase))
             {
-                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework} for worker runtime {ResolvedWorkerRuntime}. Valid options are {string.Join(", ", supportedFrameworks)}");
+                throw new CliArgumentsException($"Unable to parse target framework {TargetFramework} for worker runtime {ResolvedWorkerRuntime.GetDisplayString()}. Valid options are {string.Join(", ", supportedFrameworks)}");
             }
             else if (ResolvedWorkerRuntime != Helpers.WorkerRuntime.DotnetIsolated && ResolvedWorkerRuntime != Helpers.WorkerRuntime.Dotnet)
             {
