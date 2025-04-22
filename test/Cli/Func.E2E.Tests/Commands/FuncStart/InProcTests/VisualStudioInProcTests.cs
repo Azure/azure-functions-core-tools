@@ -11,13 +11,13 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 {
+    [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
     public class VisualStudioInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         private readonly string _vsNet8ProjectPath = Path.Combine("..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet8InProcProject");
         private readonly string _vsNet6ProjectPath = Path.Combine("..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet6InProcProject");
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
         {
             var port = ProcessHelper.GetAvailablePort();
@@ -42,7 +42,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
         }
 
         [Fact]
-        [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
         public void Start_InProc_Net6_VisualStudio_SuccessfulFunctionExecution()
         {
             var port = ProcessHelper.GetAvailablePort();

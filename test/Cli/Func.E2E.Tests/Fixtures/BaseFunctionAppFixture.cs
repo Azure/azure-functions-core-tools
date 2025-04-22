@@ -168,6 +168,7 @@ namespace Func.E2ETests.Fixtures
                                 .ToArray();
             await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, WorkerRuntime);
 
+            /*
             // Enable worker indexing to maximize probability of function being found if target framework is not dotnet or dotnet-isolated
             if (TargetFramework is not null && !TargetFramework.StartsWith("dotnet"))
             {
@@ -185,6 +186,7 @@ namespace Func.E2ETests.Fixtures
                 // Write the updated content back to the file
                 File.WriteAllText(localSettingsJson, settings.ToString());
             }
+            */
         }
     }
 }
