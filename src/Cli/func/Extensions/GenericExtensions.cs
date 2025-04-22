@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Extensions
         {
             object selectedSource = null;
 
-            if (source is null && selector is not null)
+            if (source != null && selector != null)
             {
                 selectedSource = selector(source);
             }
