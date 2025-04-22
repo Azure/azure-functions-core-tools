@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static string FormatDate(DateTime dateTime)
         {
-            return dateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return dateTime.ToString(CultureInfo.CurrentCulture);
         }
     }
 }
