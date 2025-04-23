@@ -24,11 +24,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
         }
 
         [Theory]
-        [InlineData("dotnet", "--worker-runtime None", "Use the up/down arrow keys to select a worker runtime:", false, false, false)] // Runtime parameter set to None, worker runtime prompt displayed
-        [InlineData("dotnet", "", $"Use the up/down arrow keys to select a worker runtime:", false, false, false)] // Runtime parameter not provided, worker runtime prompt displayed
-        public async Task Start_InProc_MissingLocalSettingsJson_BehavesAsExpected(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment, bool shouldWaitForHost)
+        [InlineData("dotnet", "--worker-runtime None", "Use the up/down arrow keys to select a worker runtime:", false, false)] // Runtime parameter set to None, worker runtime prompt displayed
+        [InlineData("dotnet", "", $"Use the up/down arrow keys to select a worker runtime:", false, false)] // Runtime parameter not provided, worker runtime prompt displayed
+        public async Task Start_InProc_MissingLocalSettingsJson_BehavesAsExpected(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment)
         {
-            await RunMissingLocalSettingsJsonTest(language, runtimeParameter, expectedOutput, invokeFunction, setRuntimeViaEnvironment, nameof(Start_InProc_MissingLocalSettingsJson_BehavesAsExpected), shouldWaitForHost);
+            await RunMissingLocalSettingsJsonTest(language, runtimeParameter, expectedOutput, invokeFunction, setRuntimeViaEnvironment, nameof(Start_InProc_MissingLocalSettingsJson_BehavesAsExpected));
         }
     }
 }

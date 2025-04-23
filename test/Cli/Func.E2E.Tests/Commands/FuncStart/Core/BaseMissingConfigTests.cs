@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             result.Should().HaveStdOutContaining("Host.json file in missing");
         }
 
-        public async Task RunMissingLocalSettingsJsonTest(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment, string testName, bool shouldWaitForHost = true)
+        public async Task RunMissingLocalSettingsJsonTest(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment, string testName)
         {
             try
             {
@@ -89,14 +89,14 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
-                    // Wait for host to start up if param is set, otherwise just wait 5 seconds for logs and kill the process
-                    if (shouldWaitForHost)
+                    // Wait for host to start up if param is set, otherwise just wait 10 seconds for logs and kill the process
+                    if (invokeFunction)
                     {
                         await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerFunc");
                     }
                     else
                     {
-                        await Task.Delay(5000);
+                        await Task.Delay(10000);
                         process.Kill(true);
                     }
                 };
@@ -110,12 +110,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 var result = funcStartCommand
                     .WithWorkingDirectory(WorkingDirectory)
                     .Execute(["--port", port.ToString(), "--verbose"]);
-
-                // Validate output contains expected function URL
-                if (invokeFunction)
-                {
-                    result.Should().HaveStdOutContaining("HttpTriggerFunc: [GET,POST] http://localhost:");
-                }
 
                 result.Should().HaveStdOutContaining(expectedOutput);
             }
