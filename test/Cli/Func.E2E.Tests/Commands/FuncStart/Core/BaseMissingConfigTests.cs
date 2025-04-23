@@ -60,60 +60,71 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
         public async Task RunMissingLocalSettingsJsonTest(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment, string testName)
         {
-            var logFileName = $"{testName}_{language}_{runtimeParameter}";
-
-            var port = ProcessHelper.GetAvailablePort();
-
-            // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
-
-            var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
-                                .Concat(!language.Contains("dotnet") ? ["--language", language] : Array.Empty<string>())
-                                .ToArray();
-
-            // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(logFileName, funcNewArgs);
-
-            // Delete local.settings.json
-            var localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
-            File.Delete(localSettingsJson);
-
-            // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, logFileName, Log ?? throw new ArgumentNullException(nameof(Log)));
-
-            funcStartCommand.ProcessStartedHandler = async (process) =>
+            try
             {
-                // Wait for host to start up if param is set, otherwise just wait 10 seconds for logs and kill the process
-                if (invokeFunction)
+                var logFileName = $"{testName}_{language}_{runtimeParameter}";
+
+                var port = ProcessHelper.GetAvailablePort();
+
+                // Initialize function app using retry helper
+                await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
+
+                var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
+                                    .Concat(!language.Contains("dotnet") ? ["--language", language] : Array.Empty<string>())
+                                    .ToArray();
+
+                // Add HTTP trigger using retry helper
+                await FuncNewWithRetryAsync(logFileName, funcNewArgs);
+
+                // Delete local.settings.json
+                var localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
+                File.Delete(localSettingsJson);
+
+                // Call func start
+                var funcStartCommand = new FuncStartCommand(FuncPath, logFileName, Log ?? throw new ArgumentNullException(nameof(Log)));
+
+                funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
-                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerFunc");
-                }
-                else
+                    // Wait for host to start up if param is set, otherwise just wait 10 seconds for logs and kill the process
+                    if (invokeFunction)
+                    {
+                        await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerFunc");
+                    }
+                    else
+                    {
+                        await Task.Delay(10000);
+                        process.Kill(true);
+                    }
+                };
+
+                var startCommand = new List<string> { "--port", port.ToString(), "--verbose" };
+                if (!string.IsNullOrEmpty(runtimeParameter))
                 {
-                    await Task.Delay(10000);
-                    process.Kill(true);
+                    startCommand.Add(runtimeParameter);
                 }
-            };
 
-            var startCommand = new List<string> { "--port", port.ToString(), "--verbose" };
-            if (!string.IsNullOrEmpty(runtimeParameter))
-            {
-                startCommand.Add(runtimeParameter);
+                // Configure the command execution
+                var commandSetup = funcStartCommand
+                    .WithWorkingDirectory(WorkingDirectory);
+
+                // Conditionally set environment variable only if required
+                if (setRuntimeViaEnvironment)
+                {
+                    commandSetup = commandSetup.WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language);
+                }
+
+                var result = commandSetup.Execute(startCommand);
+
+                result.Should().HaveStdOutContaining(expectedOutput);
             }
-
-            // Configure the command execution
-            var commandSetup = funcStartCommand
-                .WithWorkingDirectory(WorkingDirectory);
-
-            // Conditionally set environment variable only if required
-            if (setRuntimeViaEnvironment)
+            finally
             {
-                commandSetup = commandSetup.WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language);
+                // Clean up environment variable
+                if (setRuntimeViaEnvironment)
+                {
+                    Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
+                }
             }
-
-            var result = commandSetup.Execute(["--port", port.ToString(), "--verbose"]);
-
-            result.Should().HaveStdOutContaining(expectedOutput);
         }
     }
 }
