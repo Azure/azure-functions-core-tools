@@ -5,8 +5,6 @@ using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Traits;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
@@ -29,7 +27,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var result = new FuncStartCommand(FuncPath, testName, Log)
+            var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "--port", port.ToString() });
 
@@ -52,7 +50,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             File.Delete(hostJsonPath);
 
             // Call func start
-            var result = new FuncStartCommand(FuncPath, testName, Log)
+            var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "--port", port.ToString() });
 
@@ -67,7 +65,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 var logFileName = $"{testName}_{language}_{runtimeParameter}";
                 if (setRuntimeViaEnvironment)
                 {
-                    Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", language);
+                    Environment.SetEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language);
                 }
 
                 var port = ProcessHelper.GetAvailablePort();
@@ -87,16 +85,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 File.Delete(localSettingsJson);
 
                 // Call func start
-                var funcStartCommand = new FuncStartCommand(FuncPath, logFileName, Log);
+                var funcStartCommand = new FuncStartCommand(FuncPath, logFileName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
-                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTriggerFunc");
+                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerFunc");
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString(), "--verbose" };
                 if (!string.IsNullOrEmpty(runtimeParameter))
+                {
                     startCommand.Add(runtimeParameter);
+                }
 
                 var result = funcStartCommand
                     .WithWorkingDirectory(WorkingDirectory)
@@ -104,7 +104,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
                 // Validate output contains expected function URL
                 if (invokeFunction)
+                {
                     result.Should().HaveStdOutContaining("HttpTriggerFunc: [GET,POST] http://localhost:");
+                }
 
                 result.Should().HaveStdOutContaining("Executed 'Functions.HttpTriggerFunc' (Succeeded");
                 result.Should().HaveStdOutContaining(expectedOutput);
@@ -113,7 +115,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             {
                 // Clean up environment variable
                 if (setRuntimeViaEnvironment)
-                    Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
+                {
+                    Environment.SetEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, null);
+                }
             }
         }
     }

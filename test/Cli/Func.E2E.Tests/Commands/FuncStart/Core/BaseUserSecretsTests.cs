@@ -6,7 +6,6 @@ using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -48,13 +47,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             SetupUserSecrets(userSecrets);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port, funcStartCommand.FileWriter);
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
 
                     // Insert message into queue
                     await QueueStorageHelper.InsertIntoQueue("myqueue-items", "hello world");
@@ -78,7 +77,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
             {
-                Log.WriteLine("Skipping test as AzureWebJobsStorage is set");
+                Log?.WriteLine("Skipping test as AzureWebJobsStorage is set");
                 return;
             }
 
@@ -113,7 +112,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             SetupUserSecrets(userSecrets);
 
             // Call func start for HTTP function only
-            var result = new FuncStartCommand(FuncPath, testName, Log)
+            var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { "start", "--functions", "http1", "--port", port.ToString() });
 
@@ -127,7 +126,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var azureWebJobsStorage = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
             if (!string.IsNullOrEmpty(azureWebJobsStorage))
             {
-                Log.WriteLine("Skipping test as AzureWebJobsStorage is set");
+                Log?.WriteLine("Skipping test as AzureWebJobsStorage is set");
                 return;
             }
 
@@ -150,7 +149,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
             // Clear local.settings.json
             var settingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
-            var settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"" + languageWorker + "\"} }"; ;
+            var settingsContent = "{ \"IsEncrypted\": false, \"Values\": { \"FUNCTIONS_WORKER_RUNTIME\": \"" + languageWorker + "\"} }";
             File.WriteAllText(settingsPath, settingsContent);
 
             // Set up user secrets with AzureWebJobsStorage but missing MyQueueConn
@@ -162,11 +161,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             SetupUserSecrets(userSecrets);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
             };
 
             var result = funcStartCommand
@@ -191,7 +190,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             };
 
             using (var process = Process.Start(initProcess))
+            {
                 process?.WaitForExit();
+            }
 
             // Set each secret
             foreach (var secret in secrets)
@@ -206,7 +207,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 };
 
                 using (var process = Process.Start(setProcess))
+                {
                     process?.WaitForExit();
+                }
             }
         }
 
@@ -221,7 +224,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 var methodName = nameof(Start_MissingLocalSettingsJson_BehavesAsExpected);
                 var logFileName = $"{methodName}_{language}_{runtimeParameter}";
                 if (setRuntimeViaEnvironment)
-                    Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated");
+                {
+                    Environment.SetEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated");
+                }
 
                 var port = ProcessHelper.GetAvailablePort();
 
@@ -240,16 +245,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 File.Delete(localSettingsJson);
 
                 // Call func start
-                var funcStartCommand = new FuncStartCommand(FuncPath, logFileName, Log);
+                var funcStartCommand = new FuncStartCommand(FuncPath, logFileName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
-                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTriggerFunc");
+                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerFunc");
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString(), "--verbose" };
                 if (!string.IsNullOrEmpty(runtimeParameter))
+                {
                     startCommand.Add(runtimeParameter);
+                }
 
                 var result = funcStartCommand
                     .WithWorkingDirectory(WorkingDirectory)
@@ -257,7 +264,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
                 // Validate output contains expected function URL
                 if (invokeFunction)
+                {
                     result.Should().HaveStdOutContaining("HttpTriggerFunc: [GET,POST] http://localhost:");
+                }
 
                 result.Should().HaveStdOutContaining("Executed 'Functions.HttpTriggerFunc' (Succeeded");
             }
@@ -265,7 +274,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             {
                 // Clean up environment variable
                 if (setRuntimeViaEnvironment)
-                    Environment.SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", null);
+                {
+                    Environment.SetEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, null);
+                }
             }
         }
 
@@ -289,16 +300,16 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             await File.WriteAllTextAsync(filePath, functionJson);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
             };
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                 .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate error message
@@ -318,7 +329,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
 
             // Add empty setting
-            var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
+            var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                                     .WithWorkingDirectory(WorkingDirectory)
                                     .Execute(new[] { "add", "emptySetting", "EMPTY_VALUE" });
             funcSettingsResult.Should().ExitWith(0);
@@ -330,16 +341,16 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             File.WriteAllText(settingsPath, settingsContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                         .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate function works and doesn't show skipping message

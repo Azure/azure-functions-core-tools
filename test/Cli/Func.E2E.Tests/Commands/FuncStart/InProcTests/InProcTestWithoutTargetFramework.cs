@@ -27,12 +27,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
             await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand

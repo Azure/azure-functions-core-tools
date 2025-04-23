@@ -3,11 +3,11 @@
 
 using System.Net;
 using System.Net.Sockets;
+using Azure.Functions.Cli.E2E.Tests.Fixtures;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Fixtures;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -41,7 +41,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             capturedContent.Should().Be("Hello, Test!");
@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                         .Execute(new[] { "--verbose", "--port", port.ToString(), "--runtime", "default" });
 
             capturedContent.Should().Be("Hello, Test!");
@@ -98,7 +98,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                         .Execute(new[] { "--port", port.ToString(), "--verbose", "--language-worker", "--", $"\"--inspect={debugPort}\"" });
 
             // Validate debugger started
@@ -121,7 +121,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
                 // Call func start
                 var result = funcStartCommand
                             .WithWorkingDirectory(_fixture.WorkingDirectory)
-                            .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                            .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                             .Execute(new[] { "--port", port.ToString() });
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
@@ -151,7 +151,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
-                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                 .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
             // Validate failure message
@@ -169,7 +169,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
-                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                 .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
             // Validate failure message

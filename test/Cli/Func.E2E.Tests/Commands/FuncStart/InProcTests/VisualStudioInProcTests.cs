@@ -1,5 +1,5 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Dotnet8InProc?name=Test");
+                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "Dotnet8InProc?name=Test");
             };
 
             var result = funcStartCommand
@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "Dotnet6InProc?name=Test");
+                capturedOutput = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "Dotnet6InProc?name=Test");
             };
 
             var result = funcStartCommand

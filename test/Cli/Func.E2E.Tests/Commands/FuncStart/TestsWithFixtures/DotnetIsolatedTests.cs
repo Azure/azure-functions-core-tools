@@ -1,11 +1,11 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.E2E.Tests.Fixtures;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Fixtures;
 using Func.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
@@ -39,7 +39,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
@@ -67,7 +67,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
                         .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
@@ -97,7 +97,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--port", port.ToString() });
 
             // Validate that getting http endpoint works
@@ -118,7 +118,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             // Call func start with invalid runtime (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_InProc6_SpecifiedRuntime_ForDotnetIsolated), _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
 
             // Validate error message
@@ -134,7 +134,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             // Call func start with invalid runtime (expected to fail)
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_InProc8_SpecifiedRuntime_ForDotnetIsolated), _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
                         .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
 
             // Validate error message

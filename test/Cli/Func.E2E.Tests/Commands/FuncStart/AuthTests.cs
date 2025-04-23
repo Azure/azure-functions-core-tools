@@ -34,13 +34,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var funcStartCommand = new FuncStartCommand(FuncPath, methodName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger");
             };
 
             // Build command arguments based on enableAuth parameter
             var commandArgs = new List<string> { "start", "--verbose", "--port", port.ToString() };
             if (enableAuth)
+            {
                 commandArgs.Add("--enableAuth");
+            }
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
@@ -48,9 +50,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 
             // Validate expected output content
             if (string.IsNullOrEmpty(expectedResult))
+            {
                 result.Should().HaveStdOutContaining("\"status\": \"401\"");
+            }
             else
+            {
                 result.Should().HaveStdOutContaining("Selected out-of-process host.");
+            }
         }
     }
 }

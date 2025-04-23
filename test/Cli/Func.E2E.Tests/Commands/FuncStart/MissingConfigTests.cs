@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                 .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate error message
@@ -105,7 +105,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                         .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate function works and doesn't show skipping message

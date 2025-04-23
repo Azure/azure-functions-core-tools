@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.E2E.Tests
 {
     public abstract class BaseE2ETests(ITestOutputHelper log) : IAsyncLifetime
     {
-        protected ITestOutputHelper? Log { get; } = log;
+        protected ITestOutputHelper Log { get; } = log;
 
         protected string FuncPath { get; set; } = Environment.GetEnvironmentVariable(Constants.FuncPath) ?? string.Empty;
 

@@ -5,8 +5,6 @@ using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Traits;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
@@ -28,12 +26,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             string hostJsonContent = "{\"version\": \"2.0\",\"logging\": {\"logLevel\": {\"Default\": \"Debug\"}}}";
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
-            // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
             };
 
             var result = funcStartCommand
@@ -60,11 +57,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, shouldDelayForLogs: true);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), shouldDelayForLogs: true);
             };
 
             var result = funcStartCommand
@@ -75,7 +72,5 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             result.Should().HaveStdOutContaining("Found the following functions:");
             result.Should().NotHaveStdOutContaining("Reading host configuration file");
         }
-
-        // Add more shared test methods as needed for LogLevel tests
     }
 }

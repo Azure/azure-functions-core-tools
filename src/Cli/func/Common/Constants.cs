@@ -1,11 +1,11 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
 {
-    internal static class Constants
+    public static class Constants
     {
         public const string StorageConnectionStringTemplate = "DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}";
         public const string FunctionsStorageAccountNamePrefix = "AzureFunctions";

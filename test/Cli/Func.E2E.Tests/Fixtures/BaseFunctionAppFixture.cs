@@ -5,17 +5,17 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using Azure.Functions.Cli.E2E.Tests;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using Moq;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Func.E2ETests.Fixtures
+namespace Azure.Functions.Cli.E2E.Tests.Fixtures
 {
     public abstract class BaseFunctionAppFixture : IAsyncLifetime
     {
-        public BaseFunctionAppFixture(string workerRuntime, string? targetFramework = null, string? version = null)
+        public BaseFunctionAppFixture(WorkerRuntime workerRuntime, string? targetFramework = null, string? version = null)
         {
             WorkerRuntime = workerRuntime;
             TargetFramework = targetFramework;
@@ -52,7 +52,7 @@ namespace Func.E2ETests.Fixtures
 
         public bool CleanupWorkingDirectory { get; set; } = true;
 
-        public string WorkerRuntime { get; set; }
+        public WorkerRuntime WorkerRuntime { get; set; }
 
         public string? TargetFramework { get; set; }
 
@@ -150,7 +150,8 @@ namespace Func.E2ETests.Fixtures
 
         public async Task InitializeAsync()
         {
-            var initArgs = new List<string> { ".", "--worker-runtime", WorkerRuntime }
+            var workerRuntime = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(WorkerRuntime);
+            var initArgs = new List<string> { ".", "--worker-runtime", workerRuntime }
                 .Concat(TargetFramework != null
                     ? new[] { "--target-framework", TargetFramework }
                     : Array.Empty<string>())
@@ -164,29 +165,9 @@ namespace Func.E2ETests.Fixtures
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
 
             var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }
-                                .Concat(!WorkerRuntime.Contains("dotnet") ? new[] { "--language", WorkerRuntime } : Array.Empty<string>())
+                                .Concat((WorkerRuntime != WorkerRuntime.dotnet && WorkerRuntime != WorkerRuntime.dotnetIsolated) ? new[] { "--language", workerRuntime } : Array.Empty<string>())
                                 .ToArray();
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, WorkerRuntime);
-
-            /*
-            // Enable worker indexing to maximize probability of function being found if target framework is not dotnet or dotnet-isolated
-            if (TargetFramework is not null && !TargetFramework.StartsWith("dotnet"))
-            {
-                string localSettingsJson = Path.Combine(WorkingDirectory, Constants.LocalSettingsJson);
-
-                // Read the existing JSON file
-                string json = File.ReadAllText(localSettingsJson);
-
-                // Parse the JSON
-                JObject settings = JObject.Parse(json);
-
-                // Add the new setting
-                settings[Constants.AzureWebJobsFeatureFlags] = Constants.EnableWorkerIndexing;
-
-                // Write the updated content back to the file
-                File.WriteAllText(localSettingsJson, settings.ToString());
-            }
-            */
+            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, workerRuntime);
         }
     }
 }

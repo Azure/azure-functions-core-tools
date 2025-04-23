@@ -51,7 +51,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             };
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                         .Execute(new[] { "--port", port.ToString(), "--verbose" });
 
             // Validate we see detailed worker logs
@@ -83,7 +83,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             };
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
-                        .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
+                        .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
                         .Execute(new[] { "--port", port.ToString() });
 
             // Validate minimal worker logs due to "None" log level
