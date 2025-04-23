@@ -49,7 +49,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             result.Should().NotHaveStdOutContaining("Content root path:");
 
             // Validate out-of-process host was started
-            result.Should().StartDefaultHost();
+            result.Should().StartOutOfProcessHost();
         }
 
         [Fact]
@@ -168,7 +168,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
+                .Execute(["--verbose", "--runtime", "inproc8", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);

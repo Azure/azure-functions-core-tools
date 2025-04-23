@@ -43,7 +43,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                .Execute(new[] { "--verbose", "--port", port.ToString() });
+                .Execute(["--verbose", "--port", port.ToString()]);
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                .Execute(new[] { "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
+                .Execute(["--verbose", "--runtime", "inproc8", "--port", port.ToString()]);
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
@@ -89,7 +89,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                .Execute(new[] { "start", "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
+                .Execute(["start", "--verbose", "--runtime", "inproc8", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -107,7 +107,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
+                .Execute(["start", "--verbose", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -125,7 +125,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                .Execute(new[] { "start", "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
+                .Execute(["start", "--verbose", "--runtime", "inproc6", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -143,7 +143,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
+                .Execute(["start", "--verbose", "--runtime", "default", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);

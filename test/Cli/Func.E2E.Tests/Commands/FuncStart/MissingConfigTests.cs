@@ -42,10 +42,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v3"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", functionName, "--language", "node" }, workerRuntime: "node");
+            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", functionName, "--language", "node"], workerRuntime: "node");
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
@@ -64,7 +64,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                .Execute(new[] { "--port", port.ToString(), "--verbose" });
+                .Execute(["--port", port.ToString(), "--verbose"]);
 
             // Validate error message
             result.Should().HaveStdOutContaining("The binding type(s) 'http2' were not found in the configured extension bundle. Please ensure the type is correct and the correct version of extension bundle is configured.");
@@ -77,15 +77,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_EmptyEnvVars_HandledAsExpected);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
+            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Add empty setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
                                     .WithWorkingDirectory(WorkingDirectory)
-                                    .Execute(new[] { "add", "emptySetting", "EMPTY_VALUE" });
+                                    .Execute(["add", "emptySetting", "EMPTY_VALUE"]);
             funcSettingsResult.Should().ExitWith(0);
 
             // Modify settings file to have empty value
@@ -105,7 +105,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--port", port.ToString(), "--verbose" });
+                        .Execute(["--port", port.ToString(), "--verbose"]);
 
             // Validate function works and doesn't show skipping message
             result.Should().NotHaveStdOutContaining("Skipping 'emptySetting' from local settings as it's already defined in current environment variables.");

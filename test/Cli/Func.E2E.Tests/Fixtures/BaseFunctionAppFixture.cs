@@ -75,10 +75,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
             var initArgs = new List<string> { ".", "--worker-runtime", workerRuntime }
                 .Concat(TargetFramework != null
                     ? new[] { "--target-framework", TargetFramework }
-                    : Array.Empty<string>())
+                    : [])
                 .Concat(Version != null
                     ? new[] { "-m", Version }
-                    : Array.Empty<string>())
+                    : [])
                 .ToList();
 
             string nameOfFixture = WorkerRuntime + (TargetFramework ?? string.Empty) + (Version ?? string.Empty);
@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
             await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, initArgs);
 
             var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" }
-                                .Concat((WorkerRuntime != WorkerRuntime.dotnet && WorkerRuntime != WorkerRuntime.dotnetIsolated) ? new[] { "--language", workerRuntime } : Array.Empty<string>())
+                                .Concat((WorkerRuntime != WorkerRuntime.dotnet && WorkerRuntime != WorkerRuntime.dotnetIsolated) ? ["--language", workerRuntime] : Array.Empty<string>())
                                 .ToArray();
             await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, nameOfFixture, WorkingDirectory, Log, funcNewArgs, workerRuntime);
         }

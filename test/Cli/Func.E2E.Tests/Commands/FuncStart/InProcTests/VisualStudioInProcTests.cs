@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_vsNet8ProjectPath)
-                .Execute(new[] { "--verbose", "--port", port.ToString() });
+                .Execute(["--verbose", "--port", port.ToString()]);
             capturedOutput.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate .NET 8 host was loaded
@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_vsNet6ProjectPath)
-                .Execute(new[] { "--verbose", "--port", port.ToString() });
+                .Execute(["--verbose", "--port", port.ToString()]);
             capturedOutput.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate .NET 6 host was loaded

@@ -38,12 +38,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "powershell")
-                        .Execute(new[] { "--verbose", "--port", port.ToString() });
+                        .Execute(["--verbose", "--port", port.ToString()]);
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate out-of-process host was started
-            result.Should().StartDefaultHost();
+            result.Should().StartOutOfProcessHost();
         }
     }
 }

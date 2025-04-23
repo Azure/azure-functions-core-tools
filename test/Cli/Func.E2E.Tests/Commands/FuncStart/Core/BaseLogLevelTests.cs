@@ -16,10 +16,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Modify host.json to set log level to Debug
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -35,7 +35,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "start", "--port", port.ToString() });
+                .Execute(["start", "--port", port.ToString()]);
 
             // Validate host configuration was applied
             result.Should().HaveStdOutContaining("Host configuration applied.");
@@ -46,10 +46,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Modify host.json to set log level with filter
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "--port", port.ToString() });
+                .Execute(["--port", port.ToString()]);
 
             // Validate we see some logs but not others due to filters
             result.Should().HaveStdOutContaining("Found the following functions:");

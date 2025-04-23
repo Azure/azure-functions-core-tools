@@ -18,13 +18,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var port = ProcessHelper.GetAvailablePort();
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
 
             // Modify queue code to use connection string
             var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -66,7 +66,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "start", "--build", "--port", port.ToString() });
+                .Execute(["start", "--build", "--port", port.ToString()]);
 
             // Validate user secrets are used
             result.Should().HaveStdOutContaining("Using for user secrets file configuration.");
@@ -84,13 +84,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", languageWorker });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", languageWorker]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
 
             // Modify queue code to use connection string
             var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -114,7 +114,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             // Call func start for HTTP function only
             var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "start", "--functions", "http1", "--port", port.ToString() });
+                .Execute(["start", "--functions", "http1", "--port", port.ToString()]);
 
             // Validate error message
             result.Should().HaveStdOutContaining("Missing value for AzureWebJobsStorage in local.settings.json");
@@ -133,13 +133,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var port = ProcessHelper.GetAvailablePort();
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", languageWorker });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", languageWorker]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "http1" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "QueueTrigger", "--name", "queue1" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
 
             // Modify queue code to use connection string
             var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -170,7 +170,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "--port", port.ToString() });
+                .Execute(["--port", port.ToString()]);
 
             // Validate warning message about missing connection string
             result.Should().HaveStdOutContaining("Warning: Cannot find value named 'ConnectionStrings:MyQueueConn' in local.settings.json");
@@ -206,10 +206,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                     UseShellExecute = false
                 };
 
-                using (var process = Process.Start(setProcess))
-                {
-                    process?.WaitForExit();
-                }
+                using var process = Process.Start(setProcess);
+                process?.WaitForExit();
             }
         }
 
@@ -231,10 +229,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 var port = ProcessHelper.GetAvailablePort();
 
                 // Initialize function app using retry helper
-                await FuncInitWithRetryAsync(logFileName, new[] { ".", "--worker-runtime", language });
+                await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
 
                 var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
-                                    .Concat(!language.Contains("dotnet") ? new[] { "--language", language } : Array.Empty<string>())
+                                    .Concat(!language.Contains("dotnet") ? ["--language", language] : Array.Empty<string>())
                                     .ToArray();
 
                 // Add HTTP trigger using retry helper
@@ -260,7 +258,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
                 var result = funcStartCommand
                     .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(startCommand.ToArray());
+                    .Execute([.. startCommand]);
 
                 // Validate output contains expected function URL
                 if (invokeFunction)
@@ -288,10 +286,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var testName = nameof(Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v3" });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v3"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", functionName, "--language", "node" }, workerRuntime: "node");
+            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", functionName, "--language", "node"], workerRuntime: "node");
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
@@ -310,7 +308,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                .Execute(new[] { "--port", port.ToString(), "--verbose" });
+                .Execute(["--port", port.ToString(), "--verbose"]);
 
             // Validate error message
             result.Should().HaveStdOutContaining("The binding type(s) 'http2' were not found in the configured extension bundle. Please ensure the type is correct and the correct version of extension bundle is configured.");
@@ -323,15 +321,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var testName = nameof(Start_EmptyEnvVars_HandledAsExpected);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
+            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Add empty setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                                     .WithWorkingDirectory(WorkingDirectory)
-                                    .Execute(new[] { "add", "emptySetting", "EMPTY_VALUE" });
+                                    .Execute(["add", "emptySetting", "EMPTY_VALUE"]);
             funcSettingsResult.Should().ExitWith(0);
 
             // Modify settings file to have empty value
@@ -351,7 +349,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--port", port.ToString(), "--verbose" });
+                        .Execute(["--port", port.ToString(), "--verbose"]);
 
             // Validate function works and doesn't show skipping message
             result.Should().NotHaveStdOutContaining("Skipping 'emptySetting' from local settings as it's already defined in current environment variables.");

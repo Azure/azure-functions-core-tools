@@ -46,7 +46,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(commandArgs.ToArray());
+                .Execute([.. commandArgs]);
 
             // Validate expected output content
             if (string.IsNullOrEmpty(expectedResult))
@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             }
             else
             {
-                result.Should().StartDefaultHost();
+                result.Should().StartOutOfProcessHost();
             }
         }
     }

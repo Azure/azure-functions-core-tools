@@ -54,9 +54,16 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
             return new AndConstraint<CommandResultAssertions>(this);
         }
 
-        public AndConstraint<CommandResultAssertions> StartDefaultHost()
+        public AndConstraint<CommandResultAssertions> StartOutOfProcessHost()
         {
             Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("4.10") && _commandResult.StdOut.Contains("Selected out-of-process host."))
+                .FailWith($"The command output did not contain expected result for out of process host.{Environment.NewLine}");
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
+
+        public AndConstraint<CommandResultAssertions> StartDefaultHost()
+        {
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains("Selected default host."))
                 .FailWith($"The command output did not contain expected result for default host.{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }

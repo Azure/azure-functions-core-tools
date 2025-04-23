@@ -32,15 +32,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
+            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
                                     .WithWorkingDirectory(WorkingDirectory)
-                                    .Execute(new[] { "add", "AzureFunctionsJobHost__logging__logLevel__Default", "Debug" });
+                                    .Execute(["add", "AzureFunctionsJobHost__logging__logLevel__Default", "Debug"]);
             funcSettingsResult.Should().ExitWith(0);
 
             // Call func start
@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--port", port.ToString(), "--verbose" });
+                        .Execute(["--port", port.ToString(), "--verbose"]);
 
             // Validate we see detailed worker logs
             result.Should().HaveStdOutContaining("Workers Directory set to");
@@ -65,10 +65,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "-m", "v4" });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node" }, workerRuntime: "node");
+            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Modify host.json to set log level
             var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -84,7 +84,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--port", port.ToString() });
+                        .Execute(["--port", port.ToString()]);
 
             // Validate minimal worker logs due to "None" log level
             result.Should().HaveStdOutContaining("Worker process started and initialized");

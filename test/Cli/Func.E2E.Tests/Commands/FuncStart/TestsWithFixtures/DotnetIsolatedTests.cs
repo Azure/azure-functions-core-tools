@@ -40,13 +40,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
-                        .Execute(new[] { "--verbose", "--port", port.ToString() });
+                        .Execute(["--verbose", "--port", port.ToString()]);
 
             // Validate that getting http endpoint works
             capturedContent.Should().Be("Welcome to Azure Functions!");
 
             // Validate out-of-process host was started
-            result.Should().StartDefaultHost();
+            result.Should().StartOutOfProcessHost();
         }
 
         [Fact]
@@ -75,7 +75,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
                 because: "response from default function should be 'Welcome to Azure Functions!'");
 
             // Validate default host was started
-            result.Should().HaveStdOutContaining("Selected default host.");
+            result.Should().StartDefaultHost();
         }
 
         [Fact]
@@ -104,7 +104,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
                 because: "response from default function should be 'Welcome to Azure Functions!'");
 
             // Validate default host was started
-            result.Should().StartDefaultHost();
+            result.Should().StartOutOfProcessHost();
         }
 
         [Fact]

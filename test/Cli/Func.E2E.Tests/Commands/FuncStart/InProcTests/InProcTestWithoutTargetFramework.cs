@@ -21,10 +21,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
             var testName = nameof(Start_InProc_SuccessfulFunctionExecution);
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "dotnet" });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger"]);
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "--port", port.ToString() });
+                .Execute(["--port", port.ToString()]);
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
         }

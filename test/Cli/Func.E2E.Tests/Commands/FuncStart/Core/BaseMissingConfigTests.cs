@@ -16,10 +16,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Create invalid host.json
             var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             // Call func start
             var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "--port", port.ToString() });
+                .Execute(["--port", port.ToString()]);
 
             // Validate error message
             result.Should().HaveStdOutContaining("Extension bundle configuration should not be present");
@@ -40,10 +40,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", language });
+            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTriggerCSharp" });
+            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Delete host.json
             var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -52,7 +52,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             // Call func start
             var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(new[] { "--port", port.ToString() });
+                .Execute(["--port", port.ToString()]);
 
             // Validate error message
             result.Should().HaveStdOutContaining("Host.json file in missing");
@@ -71,10 +71,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 var port = ProcessHelper.GetAvailablePort();
 
                 // Initialize function app using retry helper
-                await FuncInitWithRetryAsync(logFileName, new[] { ".", "--worker-runtime", language });
+                await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
 
                 var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
-                                    .Concat(!language.Contains("dotnet") ? new[] { "--language", language } : Array.Empty<string>())
+                                    .Concat(!language.Contains("dotnet") ? ["--language", language] : Array.Empty<string>())
                                     .ToArray();
 
                 // Add HTTP trigger using retry helper
@@ -109,7 +109,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
                 var result = funcStartCommand
                     .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(startCommand.ToArray());
+                    .Execute(["--port", port.ToString(), "--verbose"]);
 
                 // Validate output contains expected function URL
                 if (invokeFunction)
