@@ -47,7 +47,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)
@@ -79,7 +79,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
             var result = funcStartCommand
                         .WithWorkingDirectory(WorkingDirectory)

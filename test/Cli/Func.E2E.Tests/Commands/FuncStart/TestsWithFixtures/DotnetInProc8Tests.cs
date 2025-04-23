@@ -2,11 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2E.Tests.Fixtures;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -26,18 +26,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public void Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime()
+        public void Start_InProc_Net8_WithoutSpecifyingRuntime_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Net8_SuccessfulFunctionExecution_WithoutSpecifyingRuntime), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Net8_WithoutSpecifyingRuntime_SuccessfulFunctionExecution), _fixture.Log);
 
             string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -48,24 +48,23 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate inproc8 host was started
-            result.Should().HaveStdOutContaining("Starting child process for inproc8 model host.");
-            result.Should().HaveStdOutContaining("Selected inproc8 host.");
+            result.Should().StartInProc8Host();
         }
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
-        public void Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime()
+        public void Start_InProc_Net8_WithSpecifyingRuntime_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Net8_SuccessfulFunctionExecution_WithSpecifyingRuntime), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Net8_WithSpecifyingRuntime_SuccessfulFunctionExecution), _fixture.Log);
 
             string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
@@ -76,17 +75,16 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate inproc8 host was started
-            result.Should().HaveStdOutContaining("Starting child process for inproc8 model host.");
-            result.Should().HaveStdOutContaining("Selected inproc8 host.");
+            result.Should().StartInProc8Host();
         }
 
         [Fact]
-        public void Start_Net8InProc_ExpectedToFail_WithSpecifyingRuntime()
+        public void Start_Net8InProc_WithSpecifyingRuntime_ExpectedToFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Net8InProc_ExpectedToFail_WithSpecifyingRuntime), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Net8InProc_WithSpecifyingRuntime_ExpectedToFail), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -99,12 +97,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public void Start_Net8InProc_ExpectedToFail_WithoutSpecifyingRuntime()
+        public void Start_Net8InProc_WithoutSpecifyingRuntime_ExpectedToFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Net8InProc_ExpectedToFail_WithoutSpecifyingRuntime), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Net8InProc_WithoutSpecifyingRuntime_ExpectedToFail), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -117,12 +115,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public void DontStart_InProc6_SpecifiedRuntime_ForDotnet8InProc()
+        public void Start_Dotnet8InProcApp_With_InProc6Runtime_ShouldFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_InProc6_SpecifiedRuntime_ForDotnet8InProc), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Dotnet8InProcApp_With_InProc6Runtime_ShouldFail), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -135,12 +133,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public void DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet8InProc()
+        public void Start_Dotnet8InProcApp_With_DefaultRuntime_ShouldFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_DefaultRuntime_SpecifiedRuntime_ForDotnet8InProc), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Dotnet8InProcApp_With_DefaultRuntime_ShouldFail), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)

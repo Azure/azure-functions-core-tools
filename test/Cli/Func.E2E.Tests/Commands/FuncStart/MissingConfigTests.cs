@@ -6,7 +6,6 @@ using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,15 +14,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
     public class MissingConfigTests(ITestOutputHelper log) : BaseMissingConfigTests(log)
     {
         [Fact(Skip="Test fails and needs to be investiagted on why it does.")]
-        public async Task Start_Dotnet_Isolated_InvalidHostJson_FailsWithExpectedError()
+        public async Task Start_DotnetIsolated_InvalidHostJson_FailsWithExpectedError()
         {
-            await RunInvalidHostJsonTest("dotnet-isolated", nameof(Start_Dotnet_Isolated_InvalidHostJson_FailsWithExpectedError));
+            await RunInvalidHostJsonTest("dotnet-isolated", nameof(Start_DotnetIsolated_InvalidHostJson_FailsWithExpectedError));
         }
 
         [Fact(Skip = "Test fails and needs to be investiagted on why it does.")]
-        public async Task Start_Dotnet_Isolated_MissingHostJson_FailsWithExpectedError()
+        public async Task Start_DotnetIsolated_MissingHostJson_FailsWithExpectedError()
         {
-            await RunMissingHostJsonTest("dotnet-isolated", nameof(Start_Dotnet_Isolated_MissingHostJson_FailsWithExpectedError));
+            await RunMissingHostJsonTest("dotnet-isolated", nameof(Start_DotnetIsolated_MissingHostJson_FailsWithExpectedError));
         }
 
         [Theory]
@@ -59,7 +58,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
             };
 
             var result = funcStartCommand
@@ -100,7 +99,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter);
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
             };
 
             var result = funcStartCommand

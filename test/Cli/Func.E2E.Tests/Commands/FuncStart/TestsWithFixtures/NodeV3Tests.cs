@@ -34,13 +34,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--verbose", "--port", port.ToString() });
+                        .Execute(["--verbose", "--port", port.ToString()]);
 
             capturedContent.Should().Be("This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.");
         }

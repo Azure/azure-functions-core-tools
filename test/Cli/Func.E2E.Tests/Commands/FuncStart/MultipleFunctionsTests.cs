@@ -33,16 +33,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             {
                 try
                 {
-                    await ProcessHelper.WaitForFunctionHostToStart(process, port, funcStartCommand.FileWriter);
-                    
+                    await ProcessHelper.WaitForFunctionHostToStart(process, port, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)));
+
                     using (var client = new HttpClient())
                     {
                         // http1 should be available
                         var response1 = await client.GetAsync($"http://localhost:{port}/api/http1?name=Test");
                         response1.StatusCode.Should().Be(HttpStatusCode.OK);
+
                         // http2 should be available
                         var response2 = await client.GetAsync($"http://localhost:{port}/api/http2?name=Test");
                         response2.StatusCode.Should().Be(HttpStatusCode.OK);
+
                         // http3 should not be available
                         var response3 = await client.GetAsync($"http://localhost:{port}/api/http3?name=Test");
                         response3.StatusCode.Should().Be(HttpStatusCode.NotFound);

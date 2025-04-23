@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+	<DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,11 +24,11 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RepoSrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
-    <ProjectReference Include="..\TestFramework\Azure.Functions.Cli.TestFramework.csproj" />
+    <ProjectReference Include="$(RepoTestRoot)Cli\TestFramework\Azure.Functions.Cli.TestFramework.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
-	<RunSettingsFilePath>$(MSBuildProjectDirectory)\.runsettings\start_tests\ci_pipeline\default.runsettings</RunSettingsFilePath>
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)\.runsettings\start_tests\ci_pipeline\default.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
 </Project>

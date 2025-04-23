@@ -36,6 +36,7 @@ There are two main types of tests for the `func start` command:
 ❗ **Dotnet isolated templates and dotnet in-proc templates CANNOT be run in parallel**
 
 - Use traits to distinguish between dotnet-isolated and dotnet-inproc tests
+- Refer to TestTraits.cs for trait names and explanations on when they should be used
 - This ensures they run sequentially rather than in parallel
 
 ### Node.js Tests
@@ -154,9 +155,17 @@ else
 }
 ```
 
+You may also create a custom condition and then call the method like so:
+
+```csharp
+// Validate inproc6 host was started
+result.Should().StartInProc6Host();
+
+```
+
 ## Testing with Fixtures
 
-The steps are similar for creating a `func start` test with a fixture, except you can skip the setup logic that calls `func init` and `func new` as the fixture handles this for you.
+The steps are similar for creating a `func start` test with a fixture, except you can skip the setup logic that calls `func init` and `func new` as the fixture handles this for you. Please ensure that the test that are being added to the fixture DO NOT change the environment or add any extra variables or config, as that may cause problems with the existing tests.
 
 ## Complete Example
 
@@ -203,3 +212,19 @@ public async Task Start_DotnetIsolated_Test_EnableAuthFeature(
     }
 }
 ```
+
+## How to Build and Run Tests Locally
+
+## How to Build and Run Tests Locally
+
+1. Run `dotnet build` on `Azure.Functions.Cli.E2E.Tests.csproj`.
+
+2. Navigate to `CORE_TOOLS_REPO_ROOT\out\bin\Azure.Functions.Cli.E2E.Tests\debug` and add a `templates` file if it doesn't already exist. Copy the existing templates file from the core tools installation on your local machine to the debug directory.
+
+3. To test in-proc artifacts, copy the `inproc6` and `inproc8` directories by either:
+   - Building the `inproc` branch locally and manually copying the folders into the debug folder, or
+   - Copying these folders from the core tools installation on your local machine to the debug folder.
+
+4. Execute the tests using the `dotnet test` command or Visual Studio Test Explorer. Note that only tests requiring default artifacts (not in-proc artifacts) will run by default. 
+
+5. To run a specific test with runtime settings, use: `dotnet test {PATH_TO_E2E_TEST_PROJECT} --filter "TestCategory=InProc"`.`

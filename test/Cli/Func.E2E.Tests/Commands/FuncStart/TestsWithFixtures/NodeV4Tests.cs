@@ -25,61 +25,59 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public void Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost()
+        public void Start_WithoutSpecifyingDefaultHost_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_NodeJsApp_SuccessfulFunctionExecution_WithoutSpecifyingDefaultHost), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_WithoutSpecifyingDefaultHost_SuccessfulFunctionExecution), _fixture.Log);
 
             string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--verbose", "--port", port.ToString() });
+                        .Execute(["--verbose", "--port", port.ToString()]);
 
             capturedContent.Should().Be("Hello, Test!");
 
             result.Should().NotHaveStdOutContaining("Content root path:");
 
             // Validate out-of-process host was started
-            result.Should().HaveStdOutContaining("4.10");
-            result.Should().HaveStdOutContaining("Selected out-of-process host.");
+            result.Should().StartDefaultHost();
         }
 
         [Fact]
-        public void Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost()
+        public void Start_WithSpecifyingDefaultHost_SuccessfulFunctionExecution()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_NodeJsApp_SuccessfulFunctionExecution_WithSpecifyingDefaultHost), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_WithSpecifyingDefaultHost_SuccessfulFunctionExecution), _fixture.Log);
 
             string? capturedContent = null;
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--verbose", "--port", port.ToString(), "--runtime", "default" });
+                        .Execute(["--verbose", "--port", port.ToString(), "--runtime", "default"]);
 
             capturedContent.Should().Be("Hello, Test!");
 
             result.Should().NotHaveStdOutContaining("Content root path:");
 
             // Validate out-of-process host was started
-            result.Should().HaveStdOutContaining("4.10");
-            result.Should().HaveStdOutContaining("Selected default host.");
+            result.Should().StartDefaultHost();
         }
 
         [Fact]
@@ -93,13 +91,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
 
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                        .Execute(new[] { "--port", port.ToString(), "--verbose", "--language-worker", "--", $"\"--inspect={debugPort}\"" });
+                        .Execute(["--port", port.ToString(), "--verbose", "--language-worker", "--", $"\"--inspect={debugPort}\""]);
 
             // Validate debugger started
             result.Should().HaveStdOutContaining($"Debugger listening on ws://127.0.0.1:{debugPort}");
@@ -122,7 +120,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
                 var result = funcStartCommand
                             .WithWorkingDirectory(_fixture.WorkingDirectory)
                             .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                            .Execute(new[] { "--port", port.ToString() });
+                            .Execute(["--port", port.ToString()]);
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
@@ -142,17 +140,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public void DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp()
+        public void Start_NonDotnetApp_With_InProc6Runtime_ShouldFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_InProc6_SpecifiedRuntime_ForNonDotnetApp), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_NonDotnetApp_With_InProc6Runtime_ShouldFail), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "node")
-                .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
+                .Execute(["--verbose", "--runtime", "inproc6", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -160,12 +158,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
         }
 
         [Fact]
-        public void DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp()
+        public void Start_NonDotnetApp_With_InProc8Runtime_ShouldFail()
         {
             int port = ProcessHelper.GetAvailablePort();
 
             // Call func start (expected to fail)
-            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(DontStart_InProc8_SpecifiedRuntime_ForNonDotnetApp), _fixture.Log);
+            var funcStartCommand = new FuncStartCommand(_fixture.FuncPath, nameof(Start_NonDotnetApp_With_InProc8Runtime_ShouldFail), _fixture.Log);
 
             var result = funcStartCommand
                 .WithWorkingDirectory(_fixture.WorkingDirectory)

@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core;
-using Func.E2ETests.Traits;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -1,10 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text;
-using Azure.Functions.Cli.E2E.Tests;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using Moq;

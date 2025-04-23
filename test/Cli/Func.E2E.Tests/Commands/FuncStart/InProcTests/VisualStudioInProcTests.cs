@@ -1,11 +1,11 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
-using Func.E2ETests.Traits;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -14,8 +14,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
     [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
     public class VisualStudioInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        private readonly string _vsNet8ProjectPath = Path.Combine("..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet8InProcProject");
-        private readonly string _vsNet6ProjectPath = Path.Combine("..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet6InProcProject");
+        private readonly string _vsNet8ProjectPath = Environment.GetEnvironmentVariable(Constants.VisualStudioNet8ProjectPath) ?? Path.Combine("..", "..", "..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet8InProcProject");
+        private readonly string _vsNet6ProjectPath = Environment.GetEnvironmentVariable(Constants.VisualStudioNet6ProjectPath) ?? Path.Combine("..", "..", "..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet6InProcProject");
 
         [Fact]
         public void Start_InProc_Net8_VisualStudio_SuccessfulFunctionExecution()
@@ -38,7 +38,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
             capturedOutput.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate .NET 8 host was loaded
-            result.Should().HaveStdOutContaining("Loading .NET 8 host");
+            result.Should().LoadNet8HostVisualStudio();
         }
 
         [Fact]
@@ -62,7 +62,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
             capturedOutput.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate .NET 6 host was loaded
-            result.Should().HaveStdOutContaining("Loading .NET 6 host");
+            result.Should().LoadNet6HostVisualStudio();
         }
     }
 }

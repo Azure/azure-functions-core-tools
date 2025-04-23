@@ -33,7 +33,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter, "HttpTrigger?name=Test");
+                capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger?name=Test");
             };
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
@@ -43,8 +43,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
             // Validate out-of-process host was started
-            result.Should().HaveStdOutContaining("4.10");
-            result.Should().HaveStdOutContaining("Selected out-of-process host.");
+            result.Should().StartDefaultHost();
         }
     }
 }

@@ -8,18 +8,14 @@ Write-Host "Root directory: $rootDir"
 ls $rootDir
 
 # Set the path to test project (.csproj) and runtime settings
-$testProjectPath = ".\test\Cli\Func.E2ETests\Func.E2ETests.csproj"
-$runtimeSettings = ".\test\Cli\Func.E2ETests\Runsettings\StartTests_artifact_consolidation_visualstudio.runsettings"
+$testProjectPath = ".\test\Cli\Func.E2E.Tests\Azure.Functions.Cli.E2E.Tests.csproj"
+$runtimeSettings = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\visualstudio.runsettings"
 
 [System.Environment]::SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet", "Process")
 
-# Build the test project
-Write-Host "Building test project: $absoluteTestProjectPath"
-dotnet build $absoluteTestProjectPath
-
 # Path for Visual Studio test projects (convert to absolute paths)
-$net8VsProjectPath = ".\test\Cli\Func.E2ETests\VisualStudioTestProjects\TestNet8InProcProject"
-$net6VsProjectPath = ".\test\Cli\Func.E2ETests\VisualStudioTestProjects\TestNet6InProcProject"
+$net8VsProjectPath = ".\test\TestFunctionApps\VisualStudioTestProjects\TestNet8InProcProject"
+$net6VsProjectPath = ".\test\TestFunctionApps\VisualStudioTestProjects\TestNet6InProcProject"
 
 # Resolve paths to absolute paths
 $absoluteNet8VsProjectPath = (Resolve-Path -Path $net8VsProjectPath -ErrorAction SilentlyContinue).Path
@@ -38,6 +34,7 @@ if (-not $absoluteNet6VsProjectPath) {
     Write-Host "Absolute NET6 VS project path (resolved): $absoluteNet6VsProjectPath"
 }
 
+# Build the test project
 dotnet build $testProjectPath
 
 # Loop through each subdirectory within the parent directory

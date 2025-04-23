@@ -16,25 +16,25 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         [InlineData("function", false, "Welcome to Azure Functions!")]
         [InlineData("function", true, "")]
         [InlineData("anonymous", true, "Welcome to Azure Functions!")]
-        public async Task Start_DotnetIsolated_Test_EnableAuthFeature(
+        public async Task Start_DotnetIsolated_EnableAuthFeature(
             string authLevel,
             bool enableAuth,
             string expectedResult)
         {
             var port = ProcessHelper.GetAvailablePort();
 
-            var methodName = nameof(Start_DotnetIsolated_Test_EnableAuthFeature);
+            var methodName = nameof(Start_DotnetIsolated_EnableAuthFeature);
             var uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
             // Call func init and func new
-            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
-            await FuncNewWithRetryAsync(uniqueTestName, new[] { ".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
+            await FuncInitWithRetryAsync(uniqueTestName, [".", "--worker-runtime", "dotnet-isolated"]);
+            await FuncNewWithRetryAsync(uniqueTestName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel]);
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, methodName, Log);
             funcStartCommand.ProcessStartedHandler = async (process) =>
             {
-                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTrigger");
+                await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand)), "HttpTrigger");
             };
 
             // Build command arguments based on enableAuth parameter
@@ -55,7 +55,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             }
             else
             {
-                result.Should().HaveStdOutContaining("Selected out-of-process host.");
+                result.Should().StartDefaultHost();
             }
         }
     }

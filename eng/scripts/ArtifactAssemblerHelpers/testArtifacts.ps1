@@ -8,9 +8,9 @@ Write-Host "$rootDir"
 ls $rootDir
 
 # Set the path to test project (.csproj) and runtime settings
-$testProjectPath = ".\test\Cli\Func.E2ETests\Func.E2ETests.csproj"
-$defaultRuntimeSettings = ".\test\Cli\Func.E2ETests\Runsettings\StartTests_artifact_consolidation.runsettings"
-$inProcRuntimeSettings = ".\test\Cli\Func.E2ETests\Runsettings\StartTests_dotnet_inproc_artifact_consolidation.runsettings"
+$testProjectPath = ".\test\Cli\Func.E2E.Tests\Azure.Functions.Cli.E2E.Tests.csproj"
+$defaultRuntimeSettings = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\default.runsettings"
+$inProcRuntimeSettings = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\dotnet_inproc.runsettings"
 
 dotnet build $testProjectPath
 

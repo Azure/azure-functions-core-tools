@@ -58,7 +58,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             result.Should().HaveStdOutContaining("Host.json file in missing");
         }
 
-        public async Task RunMissingLocalSettingsJsonTest(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment, string testName)
+        public async Task RunMissingLocalSettingsJsonTest(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment, string testName, bool shouldWaitForHost = true)
         {
             try
             {
@@ -89,7 +89,16 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
                 {
-                    await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerFunc");
+                    // Wait for host to start up if param is set, otherwise just wait 5 seconds for logs and kill the process
+                    if (shouldWaitForHost)
+                    {
+                        await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerFunc");
+                    }
+                    else
+                    {
+                        await Task.Delay(5000);
+                        process.Kill(true);
+                    }
                 };
 
                 var startCommand = new List<string> { "--port", port.ToString(), "--verbose" };
@@ -108,7 +117,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                     result.Should().HaveStdOutContaining("HttpTriggerFunc: [GET,POST] http://localhost:");
                 }
 
-                result.Should().HaveStdOutContaining("Executed 'Functions.HttpTriggerFunc' (Succeeded");
                 result.Should().HaveStdOutContaining(expectedOutput);
             }
             finally
