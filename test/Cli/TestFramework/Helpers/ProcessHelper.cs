@@ -44,13 +44,9 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                         return true;
                     }
 
-                    LogMessage($"Trying to get ping response");
-
                     // Try ping endpoint
                     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     HttpResponseMessage pingResponse = await httpClient.GetAsync($"{url}/admin/host/ping", cts.Token);
-
-                    LogMessage($"Got ping response");
 
                     if (pingResponse.IsSuccessStatusCode)
                     {
@@ -58,7 +54,6 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                         return true;
                     }
 
-                    LogMessage($"Returning false");
                     return false;
                 }
                 catch (Exception ex)

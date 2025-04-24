@@ -4,6 +4,7 @@
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <RepoEngRoot>$(RepoRoot)eng/</RepoEngRoot>
     <RepoSrcRoot>$(RepoRoot)src/</RepoSrcRoot>
+    <RepoTestRoot>$(RepoRoot)test/</RepoTestRoot>
   </PropertyGroup>
 
   <!-- artifacts -->

@@ -108,7 +108,15 @@ jobs:
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+      DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
+      artifactName: 'TestLogs'
+      artifactType: 'pipeline'
 
   - template: ci/sign-files.yml@eng
     parameters:

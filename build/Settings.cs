@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -38,6 +38,10 @@ namespace Build
         public static readonly string TestProjectFile = Path.Combine(TestProjectPath, "Azure.Functions.Cli.Tests.csproj");
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
+
+        public static readonly string NewTestProjectFile = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", "Azure.Functions.Cli.E2E.Tests.csproj");
+
+        public static readonly string RuntimeSettings = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", ".runsettings", "start_tests", "ci_pipeline", "dotnet_inproc.runsettings");
 
         public static readonly string[] TargetRuntimes = new[] {
             "min.win-arm64",
