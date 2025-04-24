@@ -1,6 +1,5 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
-
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
 
@@ -8,30 +7,33 @@ namespace CoreToolsHost
 {
     internal class Program
     {
-        static bool isVerbose = false;
-        
-        static async Task Main(string[] args)
-        {
-            isVerbose = args.Contains(DotnetConstants.Verbose);
+        private static bool _isVerbose = false;
 
-            Logger.LogVerbose(isVerbose, "Starting CoreToolsHost");
+        public static async Task Main(string[] args)
+        {
+            _isVerbose = args.Contains(DotnetConstants.Verbose);
+
+            Logger.LogVerbose(_isVerbose, "Starting CoreToolsHost");
 
             var localSettingsJson = await LocalSettingsJsonParser.GetLocalSettingsJsonAsJObjectAsync();
 
             if (localSettingsJson is null)
             {
-                Logger.LogVerbose(isVerbose, "No local.settings.json file was found");
+                Logger.LogVerbose(_isVerbose, "No local.settings.json file was found");
             }
 
-            bool projectOptsIntoDotnet8 = 
+            bool projectOptsIntoDotnet8 =
+
                 // local.settings.json must be the source of the configuration
                 localSettingsJson is not null && localSettingsJson.RootElement.TryGetProperty("Values", out JsonElement valuesElement)
+
                 // The runtime must be specified as "dotnet"
                 && ElementExistsWithValue(valuesElement, EnvironmentVariables.FunctionsWorkerRuntime, DotnetConstants.DotnetWorkerRuntime)
+
                 // The .NET 8 enablement configuration must be provided
                 && ElementExistsWithValue(valuesElement, EnvironmentVariables.FunctionsInProcNet8Enabled, "1");
 
-            Logger.LogVerbose(isVerbose, $"Loading .NET {(projectOptsIntoDotnet8 ? 8 : 6)} host");
+            Logger.LogVerbose(_isVerbose, $"Loading .NET {(projectOptsIntoDotnet8 ? 8 : 6)} host");
 
             try
             {
@@ -48,19 +50,19 @@ namespace CoreToolsHost
         private static bool ElementExistsWithValue(JsonElement element, string key, string value)
         {
             return !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value)
-                && element.TryGetProperty(key, out JsonElement property) 
-                && !string.IsNullOrEmpty(property.ToString()) 
-                && string.Equals(property.ToString(), value, StringComparison.OrdinalIgnoreCase);   
+                && element.TryGetProperty(key, out JsonElement property)
+                && !string.IsNullOrEmpty(property.ToString())
+                && string.Equals(property.ToString(), value, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void LoadHostAssembly(AppLoader appLoader, string[] args, bool isNet8InProc)
         {
             string filePath = Path.Combine(
                 AppContext.BaseDirectory, // current directory
-                isNet8InProc ? DotnetConstants.InProc8DirectoryName: DotnetConstants.InProc6DirectoryName,
+                isNet8InProc ? DotnetConstants.InProc8DirectoryName : DotnetConstants.InProc6DirectoryName,
                 DotnetConstants.ExecutableName);
 
-            Logger.LogVerbose(isVerbose, $"File path to load: {filePath}");
+            Logger.LogVerbose(_isVerbose, $"File path to load: {filePath}");
 
             appLoader.RunApplication(filePath, args);
         }
