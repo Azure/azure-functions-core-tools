@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
@@ -14,27 +15,38 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
     public class MissingConfigTests(ITestOutputHelper log) : BaseMissingConfigTests(log)
     {
         [Fact(Skip="Test fails and needs to be investiagted on why it does.")]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
         public async Task Start_DotnetIsolated_InvalidHostJson_FailsWithExpectedError()
         {
             await RunInvalidHostJsonTest("dotnet-isolated", nameof(Start_DotnetIsolated_InvalidHostJson_FailsWithExpectedError));
         }
 
         [Fact(Skip = "Test fails and needs to be investiagted on why it does.")]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
         public async Task Start_DotnetIsolated_MissingHostJson_FailsWithExpectedError()
         {
             await RunMissingHostJsonTest("dotnet-isolated", nameof(Start_DotnetIsolated_MissingHostJson_FailsWithExpectedError));
         }
 
         [Theory]
-        [InlineData("dotnet-isolated", "--dotnet-isolated", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)] // Runtime parameter set (dni), successful startup & invocation
-        [InlineData("node", "--node", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)] // Runtime parameter set (node), successful startup & invocation
-        [InlineData("dotnet-isolated", "", "HttpTriggerFunc: [GET,POST] http://localhost:", true, true)] // Runtime value is set via environment variable, successful startup & invocation
-        public async Task Start_MissingLocalSettingsJson_BehavesAsExpected(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment)
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
+        [InlineData("dotnet-isolated", "--dotnet-isolated", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)]
+        [InlineData("dotnet-isolated", "", "HttpTriggerFunc: [GET,POST] http://localhost:", true, true)]
+        public async Task Start_MissingLocalSettingsJson_DotnetIsolated_BehavesAsExpected(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment)
         {
-            await RunMissingLocalSettingsJsonTest(language, runtimeParameter, expectedOutput, invokeFunction, setRuntimeViaEnvironment, nameof(Start_MissingLocalSettingsJson_BehavesAsExpected));
+            await RunMissingLocalSettingsJsonTest(language, runtimeParameter, expectedOutput, invokeFunction, setRuntimeViaEnvironment, nameof(Start_MissingLocalSettingsJson_DotnetIsolated_BehavesAsExpected));
+        }
+
+        [Theory]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
+        [InlineData("node", "--node", "HttpTriggerFunc: [GET,POST] http://localhost:", true, false)]
+        public async Task Start_MissingLocalSettingsJson_Node_BehavesAsExpected(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment)
+        {
+            await RunMissingLocalSettingsJsonTest(language, runtimeParameter, expectedOutput, invokeFunction, setRuntimeViaEnvironment, nameof(Start_MissingLocalSettingsJson_Node_BehavesAsExpected));
         }
 
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError()
         {
             var port = ProcessHelper.GetAvailablePort();
@@ -71,6 +83,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         }
 
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task Start_EmptyEnvVars_HandledAsExpected()
         {
             var port = ProcessHelper.GetAvailablePort();

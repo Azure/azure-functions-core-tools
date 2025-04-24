@@ -9,6 +9,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 {
     [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
     public class LogLevelTests(ITestOutputHelper log) : BaseLogLevelTests(log)
     {
         [Fact]

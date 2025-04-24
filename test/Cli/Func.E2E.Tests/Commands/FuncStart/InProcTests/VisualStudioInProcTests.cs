@@ -12,6 +12,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
 {
     [Trait(TestTraits.Group, TestTraits.UseInVisualStudioConsolidatedArtifactGeneration)]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
     public class VisualStudioInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         private readonly string _vsNet8ProjectPath = Environment.GetEnvironmentVariable(Constants.VisualStudioNet8ProjectPath) ?? Path.Combine("..", "..", "..", "..", "..", "TestFunctionApps", "VisualStudioTestProjects", "TestNet8InProcProject");

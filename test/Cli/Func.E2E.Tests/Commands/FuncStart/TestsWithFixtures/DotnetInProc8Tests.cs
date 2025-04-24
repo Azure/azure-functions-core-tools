@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("DotnetInProc8")]
-    [Trait(TestTraits.Group, TestTraits.InProc)]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
     public class DotnetInProc8Tests : IClassFixture<Dotnet8InProcFunctionAppFixture>
     {
         private readonly Dotnet8InProcFunctionAppFixture _fixture;

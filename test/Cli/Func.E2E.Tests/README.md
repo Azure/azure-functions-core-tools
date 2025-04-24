@@ -227,5 +227,6 @@ public async Task Start_DotnetIsolated_Test_EnableAuthFeature(
 
 4. Execute the tests using the `dotnet test` command or Visual Studio Test Explorer. Note that only tests requiring default artifacts (not in-proc artifacts) will run by default. 
    - To run individual tests, use the `--filter` option with the test name. For example: `dotnet test --filter FullyQualifiedName~Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Start_MissingLocalSettingsJson_BehavesAsExpected`.
+   - To filter tests by languge, use the `--filter` option with the language name. For example: `dotnet test --filter WorkerRuntime=DotnetIsolated`.
 
-5. To run a specific test with runtime settings, use: `dotnet test {PATH_TO_E2E_TEST_PROJECT} --filter "TestCategory=InProc"`.`
+5. To run a specific test with runtime settings, use: `dotnet test {PATH_TO_E2E_TEST_PROJECT} --settings {PATH_TO_RUNSETTINGS_FILE}.`
