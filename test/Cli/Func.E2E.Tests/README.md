@@ -215,16 +215,17 @@ public async Task Start_DotnetIsolated_Test_EnableAuthFeature(
 
 ## How to Build and Run Tests Locally
 
-## How to Build and Run Tests Locally
-
 1. Run `dotnet build` on `Azure.Functions.Cli.E2E.Tests.csproj`.
 
-2. Navigate to `CORE_TOOLS_REPO_ROOT\out\bin\Azure.Functions.Cli.E2E.Tests\debug` and add a `templates` file if it doesn't already exist. Copy the existing templates file from the core tools installation on your local machine to the debug directory.
+2. Navigate to `CORE_TOOLS_REPO_ROOT\out\bin\Azure.Functions.Cli.E2E.Tests\debug` and add a `templates` file if it doesn't already exist. There are two options for how to obtain the contents of the templates folder:
+   - Copy the existing templates file from the core tools installation on your local machine to the debug directory.
+   - Run the `Build.csproj` project to generate the `templates` folder within the debug directory of the build project. Copy that file over to the debug directory for the E2E tests.
 
 3. To test in-proc artifacts, copy the `inproc6` and `inproc8` directories by either:
    - Building the `inproc` branch locally and manually copying the folders into the debug folder, or
    - Copying these folders from the core tools installation on your local machine to the debug folder.
 
 4. Execute the tests using the `dotnet test` command or Visual Studio Test Explorer. Note that only tests requiring default artifacts (not in-proc artifacts) will run by default. 
+   - To run individual tests, use the `--filter` option with the test name. For example: `dotnet test --filter FullyQualifiedName~Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Start_MissingLocalSettingsJson_BehavesAsExpected`.
 
 5. To run a specific test with runtime settings, use: `dotnet test {PATH_TO_E2E_TEST_PROJECT} --filter "TestCategory=InProc"`.`
