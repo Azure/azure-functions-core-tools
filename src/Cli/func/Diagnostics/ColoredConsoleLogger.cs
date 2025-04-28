@@ -22,9 +22,9 @@ namespace Azure.Functions.Cli.Diagnostics
         private readonly string _category;
         private readonly LoggingFilterHelper _loggingFilterHelper;
         private readonly LoggerFilterOptions _loggerFilterOptions;
-        private readonly string[] allowedLogsPrefixes = new string[] { "Worker process started and initialized.", "Host lock lease acquired by instance ID" };
-        private static readonly LoggerRuleSelector RuleSelector = new LoggerRuleSelector();
-        private static readonly Type ProviderType = typeof(ColoredConsoleLoggerProvider);
+        private readonly string[] _allowedLogsPrefixes = ["Worker process started and initialized.", "Host lock lease acquired by instance ID"];
+        private static readonly LoggerRuleSelector _ruleSelector = new LoggerRuleSelector();
+        private static readonly Type _providerType = typeof(ColoredConsoleLoggerProvider);
         private readonly FileStream _jsonOutputFileStream;
         private static readonly ConcurrentDictionary<string, object> _fileAccessLocks = new ConcurrentDictionary<string, object>();
         private bool _disposed;
@@ -56,9 +56,9 @@ namespace Azure.Functions.Cli.Diagnostics
 
         internal LoggerFilterRule SelectRule(string categoryName, LoggerFilterOptions loggerFilterOptions)
         {
-            RuleSelector.Select(loggerFilterOptions, ProviderType, categoryName, out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter);
+            _ruleSelector.Select(loggerFilterOptions, _providerType, categoryName, out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter);
 
-            return new LoggerFilterRule(ProviderType.FullName, categoryName, minLevel, filter);
+            return new LoggerFilterRule(_providerType.FullName, categoryName, minLevel, filter);
         }
 
         internal bool IsEnabled(string category, LogLevel logLevel)
@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.Diagnostics
 
             if (filterRule.Filter != null)
             {
-                bool enabled = filterRule.Filter(ProviderType.FullName, category, logLevel);
+                bool enabled = filterRule.Filter(_providerType.FullName, category, logLevel);
                 if (!enabled)
                 {
                     return false;
@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Diagnostics
                 throw new ArgumentNullException(nameof(formattedMessage));
             }
 
-            return allowedLogsPrefixes.Any(s => formattedMessage.StartsWith(s, StringComparison.OrdinalIgnoreCase));
+            return _allowedLogsPrefixes.Any(s => formattedMessage.StartsWith(s, StringComparison.OrdinalIgnoreCase));
         }
 
         private IEnumerable<RichString> GetMessageString(LogLevel level, string formattedMessage, Exception exception)

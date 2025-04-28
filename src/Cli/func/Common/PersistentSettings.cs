@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Common
 {
     internal class PersistentSettings : ISettings
     {
-        private static readonly string PersistentSettingsPath =
+        private static readonly string _persistentSettingsPath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azurefunctions", "config");
 
         private readonly DiskBacked<Dictionary<string, object>> _store;
@@ -24,8 +24,8 @@ namespace Azure.Functions.Cli.Common
         {
             if (global)
             {
-                FileSystemHelpers.EnsureDirectory(Path.GetDirectoryName(PersistentSettingsPath));
-                _store = DiskBacked.Create<Dictionary<string, object>>(PersistentSettingsPath);
+                FileSystemHelpers.EnsureDirectory(Path.GetDirectoryName(_persistentSettingsPath));
+                _store = DiskBacked.Create<Dictionary<string, object>>(_persistentSettingsPath);
             }
             else
             {

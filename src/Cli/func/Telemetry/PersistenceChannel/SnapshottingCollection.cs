@@ -10,8 +10,11 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         where TCollection : class, ICollection<TItem>
     {
 #pragma warning disable SA1401 // Fields should be private
+#pragma warning disable SA1306 // Field names should begin with lower-case letter
         protected readonly TCollection Collection;
-        protected TCollection snapshot;
+
+        protected TCollection Snapshot;
+#pragma warning restore SA1306 // Field names should begin with lower-case letter
 #pragma warning restore SA1401 // Fields should be private
 
         protected SnapshottingCollection(TCollection collection)
@@ -29,7 +32,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             lock (Collection)
             {
                 Collection.Add(item);
-                snapshot = default(TCollection);
+                Snapshot = default(TCollection);
             }
         }
 
@@ -38,7 +41,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             lock (Collection)
             {
                 Collection.Clear();
-                snapshot = default(TCollection);
+                Snapshot = default(TCollection);
             }
         }
 
@@ -59,7 +62,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 bool removed = Collection.Remove(item);
                 if (removed)
                 {
-                    snapshot = default(TCollection);
+                    Snapshot = default(TCollection);
                 }
 
                 return removed;
@@ -80,13 +83,13 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 
         protected TCollection GetSnapshot()
         {
-            TCollection localSnapshot = snapshot;
+            TCollection localSnapshot = Snapshot;
             if (localSnapshot == null)
             {
                 lock (Collection)
                 {
-                    snapshot = CreateSnapshot(Collection);
-                    localSnapshot = snapshot;
+                    Snapshot = CreateSnapshot(Collection);
+                    localSnapshot = Snapshot;
                 }
             }
 

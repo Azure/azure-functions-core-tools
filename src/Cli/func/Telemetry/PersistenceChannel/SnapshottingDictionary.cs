@@ -24,7 +24,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 lock (Collection)
                 {
                     Collection[key] = value;
-                    snapshot = null;
+                    Snapshot = null;
                 }
             }
         }
@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             lock (Collection)
             {
                 Collection.Add(key, value);
-                snapshot = null;
+                Snapshot = null;
             }
         }
 
@@ -50,7 +50,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 bool removed = Collection.Remove(key);
                 if (removed)
                 {
-                    snapshot = null;
+                    Snapshot = null;
                 }
 
                 return removed;

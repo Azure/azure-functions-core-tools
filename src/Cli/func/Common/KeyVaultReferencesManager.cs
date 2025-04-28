@@ -14,9 +14,9 @@ namespace Azure.Functions.Cli.Common
     internal class KeyVaultReferencesManager
     {
         private const string VaultUriSuffix = "vault.azure.net";
-        private static readonly Regex BasicKeyVaultReferenceRegex = new Regex(@"^@Microsoft\.KeyVault\((?<ReferenceString>.*)\)$", RegexOptions.Compiled);
-        private readonly ConcurrentDictionary<string, SecretClient> clients = new ConcurrentDictionary<string, SecretClient>();
-        private readonly TokenCredential credential = new DefaultAzureCredential();
+        private static readonly Regex _basicKeyVaultReferenceRegex = new Regex(@"^@Microsoft\.KeyVault\((?<ReferenceString>.*)\)$", RegexOptions.Compiled);
+        private readonly ConcurrentDictionary<string, SecretClient> _clients = new ConcurrentDictionary<string, SecretClient>();
+        private readonly TokenCredential _credential = new DefaultAzureCredential();
 
         public void ResolveKeyVaultReferences(IDictionary<string, string> settings)
         {
@@ -65,7 +65,7 @@ namespace Azure.Functions.Cli.Common
             }
 
             // Determine if the secret value is attempting to use a key vault reference
-            var keyVaultReferenceMatch = BasicKeyVaultReferenceRegex.Match(value);
+            var keyVaultReferenceMatch = _basicKeyVaultReferenceRegex.Match(value);
             if (keyVaultReferenceMatch.Success)
             {
                 var referenceString = keyVaultReferenceMatch.Groups["ReferenceString"].Value;
@@ -137,7 +137,7 @@ namespace Azure.Functions.Cli.Common
 
         private SecretClient GetSecretClient(Uri vaultUri)
         {
-            return clients.GetOrAdd(vaultUri.ToString(), _ => new SecretClient(vaultUri, credential));
+            return _clients.GetOrAdd(vaultUri.ToString(), _ => new SecretClient(vaultUri, _credential));
         }
 
         internal class ParseSecretResult

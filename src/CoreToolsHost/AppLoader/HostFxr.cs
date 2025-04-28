@@ -33,11 +33,13 @@ namespace CoreToolsHost
         [LibraryImport("hostfxr", EntryPoint = "hostfxr_close")]
         public static partial int Close(IntPtr hostContextHandle);
 
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value null
         public unsafe struct HostFXRInitializeParameters
         {
             public nint Size;
             public char* HostPath;
             public char* DotnetRoot;
         }
+#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value null
     }
 }

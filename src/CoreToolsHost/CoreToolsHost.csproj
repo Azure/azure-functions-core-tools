@@ -13,6 +13,7 @@
     <OptimizationPreference>Speed</OptimizationPreference>
     <AssemblyName>func</AssemblyName>
     <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup>
