@@ -1,5 +1,5 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
 
@@ -11,14 +11,14 @@ namespace CoreToolsHost
     // export COREHOST_TRACE=1
 
     /// <summary>
-    /// Manages loading hostfxr
+    /// Manages loading hostfxr.
     /// </summary>
     internal sealed class AppLoader : IDisposable
     {
         private IntPtr _hostfxrHandle = IntPtr.Zero;
         private IntPtr _hostContextHandle = IntPtr.Zero;
         private bool _disposed;
-        private bool isVerbose = false;
+        private bool _isVerbose = false;
 
         internal int RunApplication(string? assemblyPath, string[] commandLineArgs)
         {
@@ -26,16 +26,16 @@ namespace CoreToolsHost
 
             unsafe
             {
-                var parameters = new NetHost.get_hostfxr_parameters
+                var parameters = new NetHost.HostFxrParameters
                 {
-                    size = sizeof(NetHost.get_hostfxr_parameters),
-                    assembly_path = GetCharArrayPointer(assemblyPath)
+                    Size = sizeof(NetHost.HostFxrParameters),
+                    AssemblyPath = GetCharArrayPointer(assemblyPath)
                 };
 
-                isVerbose = commandLineArgs.Contains(DotnetConstants.Verbose);
+                _isVerbose = commandLineArgs.Contains(DotnetConstants.Verbose);
 
                 var hostfxrFullPath = NetHost.GetHostFxrPath(&parameters);
-                Logger.LogVerbose(isVerbose, $"hostfxr path:{hostfxrFullPath}");
+                Logger.LogVerbose(_isVerbose, $"hostfxr path:{hostfxrFullPath}");
 
                 _hostfxrHandle = NativeLibrary.Load(hostfxrFullPath);
 
@@ -45,7 +45,7 @@ namespace CoreToolsHost
                     return -1;
                 }
 
-                Logger.LogVerbose(isVerbose, $"hostfxr loaded.");
+                Logger.LogVerbose(_isVerbose, $"hostfxr loaded.");
 
                 var commandLineArguments = commandLineArgs.Prepend(assemblyPath).ToArray();
                 var error = HostFxr.Initialize(commandLineArguments.Length, commandLineArguments, IntPtr.Zero, out _hostContextHandle);
@@ -60,7 +60,8 @@ namespace CoreToolsHost
                 {
                     return error;
                 }
-                Logger.LogVerbose(isVerbose, $"hostfxr initialized with {assemblyPath}");
+
+                Logger.LogVerbose(_isVerbose, $"hostfxr initialized with {assemblyPath}");
 
                 return HostFxr.Run(_hostContextHandle);
             }
@@ -84,14 +85,14 @@ namespace CoreToolsHost
                 if (_hostfxrHandle != IntPtr.Zero)
                 {
                     NativeLibrary.Free(_hostfxrHandle);
-                    Logger.LogVerbose(isVerbose, $"Freed hostfxr library handle");
+                    Logger.LogVerbose(_isVerbose, $"Freed hostfxr library handle");
                     _hostfxrHandle = IntPtr.Zero;
                 }
 
                 if (_hostContextHandle != IntPtr.Zero)
                 {
                     HostFxr.Close(_hostContextHandle);
-                    Logger.LogVerbose(isVerbose, $"Closed hostcontext handle");
+                    Logger.LogVerbose(_isVerbose, $"Closed hostcontext handle");
                     _hostContextHandle = IntPtr.Zero;
                 }
 
