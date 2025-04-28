@@ -1,28 +1,21 @@
-﻿using Azure.Functions.Cli.Common;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Text.RegularExpressions;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
-using static Azure.Functions.Cli.Common.OutputTheme;
 using static Azure.Functions.Cli.Common.Constants;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions
 {
-    internal interface IUserInputHandler
-    {
-        public void RunUserInputActions(IDictionary<string, string> providedValues, IList<TemplateJobInput> inputs, IDictionary<string, string> variables);
-        public bool ValidateResponse(UserPrompt userPrompt, string response);
-        public void PrintInputLabel(UserPrompt userPrompt, string defaultValue);
-    }
-    
     internal class UserInputHandler : IUserInputHandler
     {
-        Lazy<IEnumerable<UserPrompt>> _userPrompts;
-        IDictionary<string, string> _newTemplateLabelMap;
-        private ITemplatesManager _templatesManager;
+        private readonly Lazy<IEnumerable<UserPrompt>> _userPrompts;
+        private readonly IDictionary<string, string> _newTemplateLabelMap;
+        private readonly ITemplatesManager _templatesManager;
 
         public UserInputHandler(ITemplatesManager templatesManager)
         {
@@ -109,7 +102,7 @@ namespace Azure.Functions.Cli.Actions
 
             if (!isValid && response != string.Empty)
             {
-                ColoredConsole.WriteLine(ErrorColor($"{this.LabelMap(userPrompt.Label)} is not valid."));
+                ColoredConsole.WriteLine(ErrorColor($"{LabelMap(userPrompt.Label)} is not valid."));
             }
 
             return isValid;
@@ -128,7 +121,9 @@ namespace Azure.Functions.Cli.Actions
         private string LabelMap(string label)
         {
             if (!_newTemplateLabelMap.ContainsKey(label))
+            {
                 return label;
+            }
 
             return _newTemplateLabelMap[label];
         }
@@ -162,7 +157,7 @@ namespace Azure.Functions.Cli.Actions
                 { "$eventGrid_name_label", "EventGrid Name" },
                 { "$chat_model_name_label", "Chat Model Name" },
                 { "$embeddings_model_name_label", "Embeddings Model Name" },
-                { "rag_collection_name_label", "Collection Name"},
+                { "rag_collection_name_label", "Collection Name" },
                 { "$rag_connection_label", "Connection Name" }
             };
         }

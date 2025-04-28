@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using DurableTask.AzureStorage;
@@ -13,8 +10,8 @@ using DurableTask.Core.History;
 using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using static Colors.Net.StringStaticMethods;
 using static Azure.Functions.Cli.Common.OutputTheme;
+using static Colors.Net.StringStaticMethods;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -27,7 +24,7 @@ namespace Azure.Functions.Cli.Common
 
     internal class DurableManager : IDurableManager
     {
-        private ISecretsManager _secretsManager;
+        private readonly ISecretsManager _secretsManager;
 
         private AzureStorageOrchestrationService _orchestrationService;
 
@@ -47,14 +44,13 @@ namespace Azure.Functions.Cli.Common
 
         public const string MinimumDurableAzureStorageExtensionVersion = "1.4.0";
 
-        public readonly static DateTime CreatedAfterDefault = DateTime.MinValue;
-        public readonly static DateTime CreatedBeforeDefault = DateTime.MaxValue.AddDays(-1); // subtract one to avoid overflow/timezone error
-
+        public static readonly DateTime CreatedAfterDefault = DateTime.MinValue;
+        public static readonly DateTime CreatedBeforeDefault = DateTime.MaxValue.AddDays(-1); // subtract one to avoid overflow/timezone error
 
         public DurableManager(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
-            this.IsValid = TrySetConnectionStringAndTaskHubName();
+            IsValid = TrySetConnectionStringAndTaskHubName();
         }
 
         public BackendType BackendType { get; private set; } = BackendType.AzureStorage;
@@ -102,7 +98,7 @@ namespace Azure.Functions.Cli.Common
                                 {
                                     if (Enum.TryParse(typeValue.Value<string>(), ignoreCase: true, out BackendType backendType))
                                     {
-                                        this.BackendType = backendType;
+                                        BackendType = backendType;
                                     }
                                 }
 
@@ -164,15 +160,15 @@ namespace Azure.Functions.Cli.Common
 
         private void Initialize(out AzureStorageOrchestrationService orchestrationService, out TaskHubClient taskHubClient, string connectionStringKey = null, string taskHubName = null)
         {
-            if (!this.IsValid)
+            if (!IsValid)
             {
                 throw new CliException($"The command failed due to a configuration issue. See previous error messages for details.");
             }
 
-            if (this.BackendType != BackendType.AzureStorage)
+            if (BackendType != BackendType.AzureStorage)
             {
                 throw new CliException(
-                    $"The {this.BackendType} storage provider for Durable Functions is not yet supported by this command. " +
+                    $"The {BackendType} storage provider for Durable Functions is not yet supported by this command. " +
                     $"However, it may be supported by an SDK API or an HTTP API. " +
                     $"To learn about alternate ways issue commands for Durable Functions, see https://aka.ms/durable-functions-instance-management.");
             }
@@ -260,7 +256,7 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                status.Output = (showOutput) ? status.Output : null;
+                status.Output = showOutput ? status.Output : null;
                 ColoredConsole.WriteLine(JsonConvert.SerializeObject(status, Formatting.Indented));
             }
         }

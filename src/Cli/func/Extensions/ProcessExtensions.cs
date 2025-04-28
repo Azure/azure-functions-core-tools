@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.NativeMethods;
 
 namespace Azure.Functions.Cli.Extensions
@@ -44,7 +42,7 @@ namespace Azure.Functions.Cli.Extensions
                 return null;
             }
 
-            var pbi = new ProcessNativeMethods.ProcessInformation();
+            var pbi = default(ProcessNativeMethods.ProcessInformation);
             try
             {
                 int returnLength;
@@ -76,10 +74,13 @@ namespace Azure.Functions.Cli.Extensions
                     {
                         result.AddRange(GetChildren(id, tree, recursive));
                     }
+
                     result.Add(id);
                 }
+
                 return result;
             }
+
             return Enumerable.Empty<int>();
         }
 

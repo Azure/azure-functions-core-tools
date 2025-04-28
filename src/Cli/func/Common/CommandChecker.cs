@@ -1,10 +1,10 @@
-﻿using Colors.Net;
-using System;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
+using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Common
@@ -39,7 +39,8 @@ namespace Azure.Functions.Cli.Common
         public static async Task<bool> PowerShellModuleExistsAsync(string powershellExecutable, string module)
         {
             // Attempt to get the specified module. If it cannot be found, throw.
-            var exe = new Executable(powershellExecutable,
+            var exe = new Executable(
+                powershellExecutable,
                 $"-NonInteractive -o Text -NoProfile -c if(!(Get-Module -ListAvailable {module})) {{ throw '{module} module not found' }}");
 
             var stdout = new StringBuilder();
@@ -62,7 +63,7 @@ namespace Azure.Functions.Cli.Common
             process?.WaitForExit();
             return process?.ExitCode == 0;
         }
-        
+
         public static string GetWindowsWherePath()
         {
             return $"{Environment.SystemDirectory}{Path.DirectorySeparatorChar}where.exe";

@@ -1,5 +1,6 @@
-﻿using System;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Text.RegularExpressions;
 
 namespace Azure.Functions.Cli.Arm
@@ -24,17 +25,19 @@ namespace Azure.Functions.Cli.Arm
 
     public class ArmUriTemplate
     {
-        public string TemplateUrl { get; private set; }
-        private readonly string apiVersion;
+        private readonly string _apiVersion;
+
         public ArmUriTemplate(string templateUrl, string apiVersion)
         {
-            this.TemplateUrl = templateUrl;
-            this.apiVersion = "api-version=" + apiVersion;
+            TemplateUrl = templateUrl;
+            _apiVersion = "api-version=" + apiVersion;
         }
+
+        public string TemplateUrl { get; private set; }
 
         public Uri Bind(string managementURL, object obj)
         {
-            var completeTemplateUrl = $"{managementURL}/{this.TemplateUrl}";
+            var completeTemplateUrl = $"{managementURL}/{TemplateUrl}";
             var dataBindings = Regex.Matches(completeTemplateUrl, "\\{(.*?)\\}").Cast<Match>().Where(m => m.Success).Select(m => m.Groups[1].Value).ToList();
             var type = obj.GetType();
             var uriBuilder = new UriBuilder(dataBindings.Aggregate(completeTemplateUrl, (a, b) =>
@@ -44,10 +47,11 @@ namespace Azure.Functions.Cli.Arm
                 {
                     a = a.Replace(string.Format("{{{0}}}", b), property.GetValue(obj).ToString());
                 }
+
                 return a;
             }));
             var query = uriBuilder.Query.Trim('?');
-            uriBuilder.Query = string.IsNullOrWhiteSpace(query) ? this.apiVersion : string.Format("{0}&{1}", this.apiVersion, query);
+            uriBuilder.Query = string.IsNullOrWhiteSpace(query) ? _apiVersion : string.Format("{0}&{1}", _apiVersion, query);
             return uriBuilder.Uri;
         }
     }

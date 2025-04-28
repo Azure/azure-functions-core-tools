@@ -1,16 +1,21 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
-
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "get-instances", Context = Context.Durable, HelpText = "Retrieve the status of all orchestration instances. Supports paging via 'top' parameter.")]
-    class DurableGetInstances : BaseDurableAction
+    internal class DurableGetInstances : BaseDurableAction
     {
         private readonly IDurableManager _durableManager;
+
+        public DurableGetInstances(IDurableManager durableManager)
+        {
+            _durableManager = durableManager;
+        }
 
         private DateTime CreatedTimeFrom { get; set; }
 
@@ -21,11 +26,6 @@ namespace Azure.Functions.Cli.Actions.DurableActions
         private int Top { get; set; }
 
         private string ContinuationToken { get; set; }
-
-        public DurableGetInstances(IDurableManager durableManager)
-        {
-            _durableManager = durableManager;
-        }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -60,8 +60,7 @@ namespace Azure.Functions.Cli.Actions.DurableActions
 
         public override async Task RunAsync()
         {
-            await _durableManager.GetInstances(ConnectionString, TaskHubName, CreatedTimeFrom, 
-                CreatedTimeTo, DurableManager.ParseStatuses(Statuses), Top, ContinuationToken);
+            await _durableManager.GetInstances(ConnectionString, TaskHubName, CreatedTimeFrom, CreatedTimeTo, DurableManager.ParseStatuses(Statuses), Top, ContinuationToken);
         }
     }
 }

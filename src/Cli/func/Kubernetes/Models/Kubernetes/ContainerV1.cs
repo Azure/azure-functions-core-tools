@@ -1,5 +1,6 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.Generic;
 using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
@@ -31,10 +32,10 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
         public IEnumerable<ContainerVolumeMountV1> VolumeMounts { get; internal set; }
 
         [JsonProperty("readinessProbe")]
-        public Probe ReadinessProbe { get; set;}
+        public Probe ReadinessProbe { get; set; }
 
         [JsonProperty("startupProbe")]
-        public Probe StartupProbe { get; set;}
+        public Probe StartupProbe { get; set; }
     }
 
     public class ContainerVolumeMountV1
@@ -60,7 +61,6 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
         [JsonProperty("requests")]
         public ContainerResourceRequestsV1 Requests { get; set; }
     }
-
 
     public class ContainerPortV1
     {
@@ -149,7 +149,7 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
         public string Path { get; set; }
 
         [JsonProperty("port")]
-        public int? port { get; set; }
+        public int? Port { get; set; }
 
         [JsonProperty("scheme")]
         public string Scheme { get; set; }

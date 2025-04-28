@@ -1,12 +1,11 @@
-﻿using Azure.Functions.Cli.Common;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Reflection;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp.Internals;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -81,7 +80,7 @@ namespace Azure.Functions.Cli.Helpers
                 LogEventIfAllowed(telemetry, telemetryEvent);
             }
             catch
-            { 
+            {
                 // oh well!
             }
         }
@@ -96,12 +95,12 @@ namespace Azure.Functions.Cli.Helpers
             telemetryEvent.Parameters = telemetryEvent.Parameters ?? new List<string>();
             var properties = new Dictionary<string, string>
             {
-                { "commandName" , telemetryEvent.CommandName },
-                { "iActionName" , telemetryEvent.IActionName },
-                { "parameters" , string.Join(",", telemetryEvent.Parameters) },
-                { "prefixOrScriptRoot" , telemetryEvent.PrefixOrScriptRoot.ToString() },
-                { "parseError" , telemetryEvent.ParseError.ToString() },
-                { "isSuccessful" , telemetryEvent.IsSuccessful.ToString() }
+                { "commandName", telemetryEvent.CommandName },
+                { "iActionName", telemetryEvent.IActionName },
+                { "parameters", string.Join(",", telemetryEvent.Parameters) },
+                { "prefixOrScriptRoot", telemetryEvent.PrefixOrScriptRoot.ToString() },
+                { "parseError", telemetryEvent.ParseError.ToString() },
+                { "isSuccessful", telemetryEvent.IsSuccessful.ToString() }
             };
 
             if (telemetryEvent.CommandEvents != null)
@@ -122,7 +121,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var measurements = new Dictionary<string, double>
             {
-                { "timeTaken" , telemetryEvent.TimeTaken }
+                { "timeTaken", telemetryEvent.TimeTaken }
             };
 
             telemetry.TrackEvent(telemetryEvent.CommandName, properties, measurements);

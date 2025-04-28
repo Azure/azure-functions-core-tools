@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Reflection;
 
 namespace Azure.Functions.Cli.Extensions
@@ -12,22 +12,29 @@ namespace Azure.Functions.Cli.Extensions
             where TSource : class
             where TSelected : class
         {
-            object _source = null;
+            object selectedSource = null;
+
             if (source != null && selector != null)
             {
-                _source = selector(source);
+                selectedSource = selector(source);
             }
-            
-            if (_source == null)
-                return target;
 
-            foreach (var sourceProperty in _source.GetType().GetProperties())
+            if (selectedSource is null)
+            {
+                return target;
+            }
+
+            foreach (var sourceProperty in selectedSource.GetType().GetProperties())
             {
                 var targetProperty = target.GetType().GetProperties().FirstOrDefault(p => p.Name.Equals(sourceProperty.Name, StringComparison.OrdinalIgnoreCase));
                 var targetPropertyEnum = target.GetType().GetProperties().FirstOrDefault(p => p.Name.Equals(sourceProperty.Name + "Enum", StringComparison.OrdinalIgnoreCase));
                 new List<PropertyInfo>() { targetProperty, targetPropertyEnum }.ForEach(property =>
                 {
-                    if (property == null) return;
+                    if (property == null)
+                    {
+                        return;
+                    }
+
                     var st = sourceProperty.PropertyType;
                     var tt = property.PropertyType;
 
@@ -37,17 +44,17 @@ namespace Azure.Functions.Cli.Extensions
                     Func<bool> nullableEnumMatch = () => Nullable.GetUnderlyingType(tt) != null && Nullable.GetUnderlyingType(tt).IsEnum && Enum.GetUnderlyingType(Nullable.GetUnderlyingType(tt)) == st;
                     Func<bool> nullableMatch = () => Nullable.GetUnderlyingType(tt) == st;
 
-
                     if (validReadableProperties() && (typesMatch() || nullableMatch() || enumMatch()))
                     {
-                        property.SetValue(target, sourceProperty.GetValue(_source));
+                        property.SetValue(target, sourceProperty.GetValue(selectedSource));
                     }
                     else if (validReadableProperties() && nullableEnumMatch())
                     {
-                        property.SetValue(target, Enum.ToObject(Nullable.GetUnderlyingType(tt), sourceProperty.GetValue(_source)));
+                        property.SetValue(target, Enum.ToObject(Nullable.GetUnderlyingType(tt), sourceProperty.GetValue(selectedSource)));
                     }
                 });
             }
+
             return target;
         }
     }

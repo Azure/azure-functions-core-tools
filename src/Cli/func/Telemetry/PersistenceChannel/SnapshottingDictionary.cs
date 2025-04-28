@@ -1,7 +1,5 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 {
@@ -26,7 +24,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 lock (Collection)
                 {
                     Collection[key] = value;
-                    snapshot = null;
+                    Snapshot = null;
                 }
             }
         }
@@ -36,7 +34,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             lock (Collection)
             {
                 Collection.Add(key, value);
-                snapshot = null;
+                Snapshot = null;
             }
         }
 
@@ -52,7 +50,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 bool removed = Collection.Remove(key);
                 if (removed)
                 {
-                    snapshot = null;
+                    Snapshot = null;
                 }
 
                 return removed;
