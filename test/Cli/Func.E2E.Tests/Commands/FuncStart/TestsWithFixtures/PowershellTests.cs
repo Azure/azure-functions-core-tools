@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2E.Tests.Fixtures;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
@@ -12,6 +13,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("Powershell")]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Powershell)]
     public class PowershellTests : IClassFixture<PowershellFunctionAppFixture>
     {
         private readonly PowershellFunctionAppFixture _fixture;

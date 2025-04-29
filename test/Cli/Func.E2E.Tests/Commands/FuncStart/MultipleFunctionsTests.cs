@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
@@ -14,6 +15,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
     public class MultipleFunctionsTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task Start_FunctionsStartArgument_OnlySelectedFunctionsRun()
         {
             var port = ProcessHelper.GetAvailablePort();

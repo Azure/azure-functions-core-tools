@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("DotnetInProc6")]
-    [Trait(TestTraits.Group, TestTraits.InProc)]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
     public class DotnetInProc6Tests : IClassFixture<Dotnet6InProcFunctionAppFixture>
     {
         private readonly Dotnet6InProcFunctionAppFixture _fixture;
@@ -42,7 +42,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
+                        .Execute(["--verbose", "--runtime", "inproc6", "--port", port.ToString()]);
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = funcStartCommand
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
+                        .Execute(["start", "--verbose", "--port", port.ToString()]);
 
             capturedContent.Should().Be("Hello, Test. This HTTP triggered function executed successfully.");
 
@@ -86,7 +86,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Dotnet6_WithoutSpecifyingRuntime_ExpectedToFail), _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "start", "--verbose", "--port", port.ToString() });
+                        .Execute(["start", "--verbose", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -102,7 +102,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_Dotnet6_WithSpecifyingRuntime_ExpectedToFail), _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "start", "--verbose", "--runtime", "inproc6", "--port", port.ToString() });
+                        .Execute(["start", "--verbose", "--runtime", "inproc6", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -118,7 +118,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Dotnet6InProcApp_With_InProc8AsRuntime_ShouldFail), _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "start", "--verbose", "--runtime", "inproc8", "--port", port.ToString() });
+                        .Execute(["start", "--verbose", "--runtime", "inproc8", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -134,7 +134,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(Start_Dotnet6InProcApp_With_DefaultAsRuntime_ShouldFail), _fixture.Log)
                         .WithWorkingDirectory(_fixture.WorkingDirectory)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "start", "--verbose", "--runtime", "default", "--port", port.ToString() });
+                        .Execute(["start", "--verbose", "--runtime", "default", "--port", port.ToString()]);
 
             // Validate failure message
             result.Should().ExitWith(1);
@@ -161,7 +161,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_InvalidHostJson_FailsWithExpectedError), _fixture.Log)
                         .WithWorkingDirectory(tempDir)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "--port", port.ToString() });
+                        .Execute(["--port", port.ToString()]);
 
             // Validate error message
             // We are expecting an exit to happen gracefully here;
@@ -188,7 +188,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
             var result = new FuncStartCommand(_fixture.FuncPath, nameof(Start_InProc_MissingHostJson_FailsWithExpectedError), _fixture.Log)
                         .WithWorkingDirectory(tempDir)
                         .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet")
-                        .Execute(new[] { "--port", port.ToString() });
+                        .Execute(["--port", port.ToString()]);
 
             // Validate error message
             // We are expecting an exit to happen gracefully here;
