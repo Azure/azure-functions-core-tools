@@ -99,8 +99,8 @@ namespace Azure.Functions.Cli.Common
         public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
         public const string PreviewVersionSuffixLabel = "preview";
 
-        private static readonly Lazy<string> _cliVersion = new(GetSemanticVersion);
-        public static string CliVersion => _cliVersion.Value;
+        private static readonly string _cliVersion = GetSemanticVersion();
+        public static string CliVersion => _cliVersion;
         public static string CliDetailedVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
         public static string CliUserAgent = $"functions-core-tools/{CliVersion}";
 
