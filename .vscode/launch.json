@@ -2,12 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (console)",
+            "name": "Run func cli (console)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/out/bin/Azure.Functions.Cli/debug_net8.0/func.dll",
+            "program": "${workspaceFolder}/out/bin/Azure.Functions.Cli/debug/func.dll",
             "env": {
                 "CLI_DEBUG": "1"
             },
@@ -27,6 +26,7 @@
             "id": "funcArgs",
             "type": "promptString",
             "description": "Args to pass to the 'func' command",
+            // use `--script-root` to set func app directory e.g. `--script-root ${workspaceFolder}/MyTestFuncApp`
             "default": "--version"
         }
     ]
