@@ -53,6 +53,19 @@ namespace Azure.Functions.Cli
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
         }
 
+        internal static void WarnIfPreviewVersion()
+        {
+            if (!Constants.CliVersion.Contains(Constants.PreviewVersionSuffixLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            ColoredConsole
+                .WriteLine("You are running a preview version of Azure Functions Core Tools.".DarkYellow())
+                .WriteLine("In this preview 'python' and 'powershell' worker support is not available for linux-arm64.".DarkYellow())
+                .WriteLine();
+        }
+
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)
         {
             if (str.Length == 1)

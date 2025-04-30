@@ -178,6 +178,7 @@ namespace Azure.Functions.Cli.Actions
                 .Distinct()
                 .OrderBy(c => c.ToLowerCaseString());
             Utilities.PrintVersion();
+            Utilities.WarnIfPreviewVersion();
             ColoredConsole
                 .WriteLine("Usage: func [context] [context] <action> [-/--options]")
                 .WriteLine();
