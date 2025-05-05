@@ -61,9 +61,18 @@ namespace Azure.Functions.Cli
             }
 
             ColoredConsole
-                .WriteLine("You are running a preview version of Azure Functions Core Tools.".DarkYellow())
-                .WriteLine("In this preview 'python' and 'powershell' worker support is not available for linux-arm64.".DarkYellow())
-                .WriteLine();
+                .WriteLine("You are running a preview version of Azure Functions Core Tools.".DarkYellow());
+
+            bool isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+            Architecture arch = RuntimeInformation.ProcessArchitecture;
+
+            if (isLinux && arch == Architecture.Arm64)
+            {
+                ColoredConsole
+                    .WriteLine("This version currently doesn't support linux-arm64 with Python or PowerShell workers.".DarkYellow());
+            }
+
+            ColoredConsole.WriteLine();
         }
 
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)

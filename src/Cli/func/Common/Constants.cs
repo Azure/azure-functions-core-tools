@@ -107,7 +107,7 @@ namespace Azure.Functions.Cli.Common
         // Helper method to extract version from CliDetailedVersion
         private static string GetSemanticVersion()
         {
-            var infoVersion = CliDetailedVersion;
+            var infoVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
 
             if (string.IsNullOrEmpty(infoVersion))
             {
