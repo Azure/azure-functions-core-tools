@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
@@ -13,6 +14,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
     public class AuthTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Theory]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
         [InlineData("function", false, "Welcome to Azure Functions!")]
         [InlineData("function", true, "")]
         [InlineData("anonymous", true, "Welcome to Azure Functions!")]

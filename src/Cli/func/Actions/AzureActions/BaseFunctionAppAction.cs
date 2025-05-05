@@ -1,11 +1,12 @@
-﻿using System.Linq;
-using Azure.Functions.Cli.Arm;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    abstract class BaseFunctionAppAction : BaseAzureAction
+    internal abstract class BaseFunctionAppAction : BaseAzureAction
     {
         public string FunctionAppName { get; set; }
 
@@ -25,7 +26,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
             else
             {
-                throw new CliArgumentsException("Must specify functionApp name.", base.ParseArgs(args),
+                throw new CliArgumentsException(
+                    "Must specify functionApp name.",
+                    base.ParseArgs(args),
                     new CliArgument { Name = nameof(FunctionAppName), Description = "Function App name" });
             }
 

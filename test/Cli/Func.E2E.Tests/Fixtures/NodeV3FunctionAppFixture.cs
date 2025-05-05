@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
     public class NodeV3FunctionAppFixture : BaseFunctionAppFixture
     {
         public NodeV3FunctionAppFixture()
-            : base(WorkerRuntime.node, version: "v3")
+            : base(WorkerRuntime.Node, version: "v3")
         {
         }
     }

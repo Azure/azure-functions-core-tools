@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
     public class Dotnet8InProcFunctionAppFixture : BaseFunctionAppFixture
     {
         public Dotnet8InProcFunctionAppFixture()
-            : base(WorkerRuntime.dotnet, targetFramework: "net8.0")
+            : base(WorkerRuntime.Dotnet, targetFramework: "net8.0")
         {
         }
     }

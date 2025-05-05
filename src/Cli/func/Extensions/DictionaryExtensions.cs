@@ -1,6 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 namespace Azure.Functions.Cli.Extensions
 {
@@ -27,6 +26,7 @@ namespace Azure.Functions.Cli.Extensions
                     updated = true;
                 }
             }
+
             return updated;
         }
 
@@ -44,6 +44,7 @@ namespace Azure.Functions.Cli.Extensions
                     }
                 }
             }
+
             return removed;
         }
     }

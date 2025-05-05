@@ -1,8 +1,0 @@
-{
-    "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_INPROC_NET8_ENABLED": "1", // test comment
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
-  }
-}

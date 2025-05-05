@@ -1,8 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -19,53 +17,83 @@ using Newtonsoft.Json.Linq;
 namespace Azure.Functions.Cli.Actions.KubernetesActions
 {
     [Action(Name = "deploy", Context = Context.Kubernetes, HelpText = "")]
-    class KubernetesDeployAction : BaseAction
+    internal class KubernetesDeployAction : BaseAction
     {
         private readonly ISecretsManager _secretsManager;
-
-        public string Registry { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Namespace { get; set; }
-        public string PullSecret { get; set; } = string.Empty;
-        public bool NoDocker { get; set; }
-        public bool UseConfigMap { get; set; }
-        public bool DryRun { get; private set; }
-        public string ImageName { get; private set; }
-        public string ConfigMapName { get; private set; }
-        public string SecretsCollectionName { get; private set; }
-        public string KeysSecretCollectionName { get; private set; }
-        public bool MountFuncKeysAsContainerVolume { get; private set; }
-        public int? PollingInterval { get; private set; }
-        public int? CooldownPeriod { get; private set; }
-        public string ServiceType { get; set; } = "LoadBalancer";
-        public IEnumerable<string> ServiceTypes { get; set; } = new string[] { "ClusterIP", "NodePort", "LoadBalancer" };
-        public bool IgnoreErrors { get; private set; } = false;
-        public int? MaxReplicaCount { get; private set; }
-        public int? MinReplicaCount { get; private set; }
-        public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.v2;
-        public bool ShowServiceFqdn { get; set; } = false;
-        public bool WriteConfigs { get; set; } = false;
-        public string ConfigFile { get; set; } = "functions.yaml";
-        public bool UseGitHashAsImageVersion { get; set; } = false;
-        public string HashFilesPattern { get; set; } = "";
-        public bool BuildImage { get; set; } = true;
-
-        public IDictionary<string, string> KeySecretAnnotations { get; private set; }
 
         public KubernetesDeployAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
         }
 
+        public string Registry { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Namespace { get; set; }
+
+        public string PullSecret { get; set; } = string.Empty;
+
+        public bool NoDocker { get; set; }
+
+        public bool UseConfigMap { get; set; }
+
+        public bool DryRun { get; private set; }
+
+        public string ImageName { get; private set; }
+
+        public string ConfigMapName { get; private set; }
+
+        public string SecretsCollectionName { get; private set; }
+
+        public string KeysSecretCollectionName { get; private set; }
+
+        public bool MountFuncKeysAsContainerVolume { get; private set; }
+
+        public int? PollingInterval { get; private set; }
+
+        public int? CooldownPeriod { get; private set; }
+
+        public string ServiceType { get; set; } = "LoadBalancer";
+
+        public IEnumerable<string> ServiceTypes { get; set; } = new string[] { "ClusterIP", "NodePort", "LoadBalancer" };
+
+        public bool IgnoreErrors { get; private set; } = false;
+
+        public int? MaxReplicaCount { get; private set; }
+
+        public int? MinReplicaCount { get; private set; }
+
+        public KedaVersion? KedaVersion { get; private set; } = Kubernetes.KEDA.KedaVersion.V2;
+
+        public bool ShowServiceFqdn { get; set; } = false;
+
+        public bool WriteConfigs { get; set; } = false;
+
+        public string ConfigFile { get; set; } = "functions.yaml";
+
+        public bool UseGitHashAsImageVersion { get; set; } = false;
+
+        public string HashFilesPattern { get; set; } = string.Empty;
+
+        public bool BuildImage { get; set; } = true;
+
+        public IDictionary<string, string> KeySecretAnnotations { get; private set; }
+
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
-            SetFlag<string>("name", "The name used for the deployment and other artifacts in kubernetes", n =>
-            {
-                KubernetesHelper.ValidateKubernetesName(n);
-                Name = n;
-            }, isRequired: true);
+            SetFlag<string>(
+                "name",
+                "The name used for the deployment and other artifacts in kubernetes",
+                n =>
+                {
+                    KubernetesHelper.ValidateKubernetesName(n);
+                    Name = n;
+                },
+                isRequired: true);
+
             SetFlag<string>("image-name", "Image to use for the pod deployment and to read functions from", n => ImageName = n);
-            SetFlag<KedaVersion>("keda-version", $"Defines the version of KEDA to use. Default: {Kubernetes.KEDA.KedaVersion.v2}. Options are: {Kubernetes.KEDA.KedaVersion.v1} or {Kubernetes.KEDA.KedaVersion.v2}", n => KedaVersion = n);
+            SetFlag<KedaVersion>("keda-version", $"Defines the version of KEDA to use. Default: {Kubernetes.KEDA.KedaVersion.V2}. Options are: {Kubernetes.KEDA.KedaVersion.V1} or {Kubernetes.KEDA.KedaVersion.V2}", n => KedaVersion = n);
             SetFlag<string>("registry", "When set, a docker build is run and the image is pushed to that registry/name. This is mutually exclusive with --image-name. For docker hub, use username.", r => Registry = r);
             SetFlag<string>("namespace", "Kubernetes namespace to deploy to. Default: Current namespace in Kubernetes config.", ns => Namespace = ns);
             SetFlag<string>("pull-secret", "The secret holding a private registry credentials", s => PullSecret = s);
@@ -83,6 +111,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     throw new CliArgumentsException($"serviceType {ServiceType} is not supported. Valid options are: {string.Join(",", ServiceTypes)}");
                 }
+
                 ServiceType = s;
             });
             SetFlag<bool>("no-docker", "With --image-name, the core-tools will inspect the functions inside the image. This will require mounting the image filesystem. Passing --no-docker uses current directory for functions.", nd => NoDocker = nd);
@@ -123,6 +152,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     await DockerHelpers.DockerBuild(resolvedImageName, Environment.CurrentDirectory);
                 }
+
                 // This needs to be fixed to run after the build.
                 triggers = await DockerHelpers.GetTriggersFromDockerImage(resolvedImageName);
             }
@@ -149,8 +179,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 KeysSecretCollectionName,
                 MountFuncKeysAsContainerVolume,
                 KedaVersion,
-                KeySecretAnnotations
-                );
+                KeySecretAnnotations);
 
             if (DryRun)
             {
@@ -159,7 +188,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             else
             {
                 Task kubernetesTask = null;
-                Task imageTask = ((BuildImage && shouldBuild) ? DockerHelpers.DockerPush(resolvedImageName, false) : null);
+                Task imageTask = (BuildImage && shouldBuild) ? DockerHelpers.DockerPush(resolvedImageName, false) : null;
 
                 if (WriteConfigs)
                 {
@@ -170,14 +199,16 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
                 else
                 {
-                    Func<Task> resourceTaskFn = () => {
+                    Func<Task> resourceTaskFn = () =>
+                    {
                         var serialized = KubernetesHelper.SerializeResources(resources, OutputSerializationOptions.Yaml);
                         return KubectlHelper.KubectlApply(serialized, showOutput: true, ignoreError: IgnoreErrors, @namespace: Namespace);
                     };
 
                     if (!await KubernetesHelper.NamespaceExists(Namespace))
                     {
-                        kubernetesTask = KubernetesHelper.CreateNamespace(Namespace).ContinueWith((result) => {
+                        kubernetesTask = KubernetesHelper.CreateNamespace(Namespace).ContinueWith((result) =>
+                        {
                             return resourceTaskFn();
                         });
                     }
@@ -191,6 +222,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 {
                     await imageTask;
                 }
+
                 await kubernetesTask;
 
                 var httpService = resources
@@ -205,7 +237,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 if (httpDeployment != null)
                 {
                     await KubernetesHelper.WaitForDeploymentRollout(httpDeployment);
-                    //Print the function keys message to the console
+
+                    // Print the function keys message to the console
                     await KubernetesHelper.PrintFunctionsInfo(httpDeployment, httpService, funcKeys, triggers, ShowServiceFqdn);
                 }
             }
@@ -214,8 +247,8 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
         private async Task<TriggersPayload> GetTriggersLocalFiles()
         {
             var functionsPath = Environment.CurrentDirectory;
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnet ||
-                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Dotnet ||
+                GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 if (DotnetHelpers.CanDotnetBuild())
                 {
@@ -225,7 +258,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 }
             }
 
-            var functionsJsons = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.dotnetIsolated
+            var functionsJsons = GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.DotnetIsolated
                 ? ReadFunctionsMetadata(functionsPath)
                 : ReadFunctionJsons(functionsPath);
 
@@ -269,10 +302,11 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 .ToDictionary(k => Path.GetFileName(Path.GetDirectoryName(k.filePath)), v => v.jObject);
         }
 
-        private async Task<(string, bool)> ResolveImageName()
+        private async Task<(string Name, bool ShouldBuild)> ResolveImageName()
         {
             var version = "latest";
-            if (UseGitHashAsImageVersion) {
+            if (UseGitHashAsImageVersion)
+            {
                 if (HashFilesPattern.Length > 0)
                 {
                     var matcher = new Matcher();
@@ -283,12 +317,15 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
                 else
                 {
                     (var stdout, var err, var exit) = await GitHelpers.GitHash();
-                    if (exit != 0) {
+                    if (exit != 0)
+                    {
                         throw new CliException("Git describe failed: " + err);
                     }
+
                     version = stdout;
                 }
             }
+
             if (!string.IsNullOrEmpty(Registry))
             {
                 return ($"{Registry}/{Name}:{version}", true && !NoDocker);
@@ -297,6 +334,7 @@ namespace Azure.Functions.Cli.Actions.KubernetesActions
             {
                 return ($"{ImageName}", false);
             }
+
             throw new CliArgumentsException("either --image-name or --registry is required.");
         }
     }

@@ -33,5 +33,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Traits
         /// This is done since when the dotnet isolated tests are run with dotnet inproc, we run into templating conflict errors.
         /// </summary>
         public const string InProc = "InProc";
+
+        public const string WorkerRuntime = "WorkerRuntime";
+        public const string Dotnet = "Dotnet";
+        public const string DotnetIsolated = "DotnetIsolated";
+        public const string Node = "Node";
+        public const string Powershell = "Powershell";
     }
 }

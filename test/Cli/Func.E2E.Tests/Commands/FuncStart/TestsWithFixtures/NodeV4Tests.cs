@@ -4,6 +4,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Azure.Functions.Cli.E2E.Tests.Fixtures;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
@@ -14,6 +15,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("NodeV4")]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
     public class NodeV4Tests : IClassFixture<NodeV4FunctionAppFixture>
     {
         private readonly NodeV4FunctionAppFixture _fixture;

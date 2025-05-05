@@ -1,30 +1,23 @@
-// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using Azure.Functions.Cli.Common;
+using Colors.Net;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.DotNet.PlatformAbstractions;
-using Azure.Functions.Cli.Telemetry.PersistenceChannel;
-using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Common;
-using Colors.Net;
 
 namespace Azure.Functions.Cli.Telemetry
 {
     // Most of the Telemetry implementation is inspired / acquired from https://github.com/dotnet/cli/tree/master/src/dotnet/Telemetry
     public class Telemetry : ITelemetry
     {
-        internal static string CurrentSessionId = null;
+        private static string _currentSessionId = null;
         private readonly int _senderCount;
         private TelemetryClient _client = null;
         private Dictionary<string, string> _commonProperties = null;
         private Dictionary<string, double> _commonMeasurements = null;
         private Task _trackEventTask = null;
-
-        public bool Enabled { get; }
 
         public Telemetry(
             string sessionId,
@@ -40,7 +33,7 @@ namespace Azure.Functions.Cli.Telemetry
             Enabled = true;
 
             // Store the session ID in a static field so that it can be reused
-            CurrentSessionId = sessionId ?? Guid.NewGuid().ToString();
+            _currentSessionId = sessionId ?? Guid.NewGuid().ToString();
             _senderCount = senderCount;
             if (blockThreadInitialization)
             {
@@ -53,18 +46,18 @@ namespace Azure.Functions.Cli.Telemetry
             }
         }
 
-        public void TrackEvent(string eventName, IDictionary<string, string> properties,
-            IDictionary<string, double> measurements)
+        public bool Enabled { get; }
+
+        public void TrackEvent(string eventName, IDictionary<string, string> properties, IDictionary<string, double> measurements)
         {
             if (!Enabled)
             {
                 return;
             }
 
-            //continue the task in different threads
+            // continue the task in different threads
             _trackEventTask = _trackEventTask.ContinueWith(
-                x => TrackEventTask(eventName, properties, measurements)
-            );
+                x => TrackEventTask(eventName, properties, measurements));
         }
 
         public void Flush()
@@ -83,6 +76,7 @@ namespace Azure.Functions.Cli.Telemetry
             {
                 return;
             }
+
             TrackEventTask(eventName, properties, measurements);
         }
 
@@ -98,12 +92,12 @@ namespace Azure.Functions.Cli.Telemetry
                     ConnectionString = $"InstrumentationKey={Constants.TelemetryInstrumentationKey}"
                 };
                 _client = new TelemetryClient(telemetryConfiguration);
-                _client.Context.Session.Id = CurrentSessionId;
+                _client.Context.Session.Id = _currentSessionId;
                 _client.Context.Device.OperatingSystem = RuntimeEnvironment.OperatingSystem;
 
                 // We don't want to log this.
                 // Setting it to null doesn't work. So might as well log the session id.
-                _client.Context.Cloud.RoleInstance = $"private-{CurrentSessionId}";
+                _client.Context.Cloud.RoleInstance = $"private-{_currentSessionId}";
 
                 _commonProperties = new TelemetryCommonProperties().GetTelemetryCommonProperties();
                 _commonMeasurements = new Dictionary<string, double>();
@@ -111,6 +105,7 @@ namespace Azure.Functions.Cli.Telemetry
             catch (Exception e)
             {
                 _client = null;
+
                 // we dont want to fail the tool if telemetry fails.
                 if (StaticSettings.IsDebug)
                 {
@@ -162,6 +157,7 @@ namespace Azure.Functions.Cli.Telemetry
                     eventMeasurements[measurement.Key] = measurement.Value;
                 }
             }
+
             return eventMeasurements;
         }
 
@@ -174,6 +170,7 @@ namespace Azure.Functions.Cli.Telemetry
                 {
                     eventProperties[property.Key] = property.Value;
                 }
+
                 return eventProperties;
             }
             else

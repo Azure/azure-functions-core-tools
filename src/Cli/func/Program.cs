@@ -1,5 +1,6 @@
-﻿using System;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Autofac;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -10,14 +11,14 @@ namespace Azure.Functions.Cli
 {
     internal class Program
     {
-        static IContainer _container;
-        private readonly static string[] _versionArgs = new[] { "version", "v" };
+        private static readonly string[] _versionArgs = new[] { "version", "v" };
+        private static IContainer _container;
 
         internal static void Main(string[] args)
         {
             // Check for version arg up front and prioritize speed over all else
             // Tools like VS Code may call this often and we want their UI to be responsive
-            if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", "").Equals(va, StringComparison.OrdinalIgnoreCase)))
+            if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", string.Empty).Equals(va, StringComparison.OrdinalIgnoreCase)))
             {
                 ColoredConsole.WriteLine($"{Constants.CliVersion}");
                 Environment.Exit(ExitCodes.Success);
@@ -63,8 +64,8 @@ namespace Azure.Functions.Cli
             var settings = new PersistentSettings();
             if (settings.RunFirstTimeCliExperience)
             {
-                //ColoredConsole.WriteLine("Welcome to Azure Functions CLI");
-                //settings.RunFirstTimeCliExperience = false;
+                // ColoredConsole.WriteLine("Welcome to Azure Functions CLI");
+                // settings.RunFirstTimeCliExperience = false;
             }
         }
 

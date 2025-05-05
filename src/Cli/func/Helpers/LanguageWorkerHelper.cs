@@ -1,19 +1,20 @@
-using System.Collections.Generic;
-using System.Linq;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Runtime.InteropServices;
 
 namespace Azure.Functions.Cli.Helpers
 {
     public static class LanguageWorkerHelper
     {
-        private readonly static Dictionary<WorkerRuntime, string> _map = new Dictionary<WorkerRuntime, string>
+        private static readonly Dictionary<WorkerRuntime, string> _map = new Dictionary<WorkerRuntime, string>
         {
-            { WorkerRuntime.node, "languageWorkers:node:arguments" },
-            { WorkerRuntime.python, "languageWorkers:python:arguments" },
-            { WorkerRuntime.java, "languageWorkers:java:arguments" },
-            { WorkerRuntime.powershell, "languageWorkers:powershell:arguments" },
-            { WorkerRuntime.dotnet, string.Empty },
-            { WorkerRuntime.custom, string.Empty },
+            { WorkerRuntime.Node, "languageWorkers:node:arguments" },
+            { WorkerRuntime.Python, "languageWorkers:python:arguments" },
+            { WorkerRuntime.Java, "languageWorkers:java:arguments" },
+            { WorkerRuntime.Powershell, "languageWorkers:powershell:arguments" },
+            { WorkerRuntime.Dotnet, string.Empty },
+            { WorkerRuntime.Custom, string.Empty },
             { WorkerRuntime.None, string.Empty }
         }
         .Select(p => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)

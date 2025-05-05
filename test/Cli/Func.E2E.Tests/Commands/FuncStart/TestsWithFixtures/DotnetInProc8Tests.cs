@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
     [Collection("DotnetInProc8")]
-    [Trait(TestTraits.Group, TestTraits.InProc)]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
     public class DotnetInProc8Tests : IClassFixture<Dotnet8InProcFunctionAppFixture>
     {
         private readonly Dotnet8InProcFunctionAppFixture _fixture;
@@ -147,7 +147,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
             // Validate failure message
             result.Should().ExitWith(1);
-            result.Should().HaveStdErrContaining("The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnetIsolated'.");
+            result.Should().HaveStdErrContaining("The runtime argument value provided, 'default', is invalid. The provided value is only valid for the worker runtime 'dotnet-isolated'.");
         }
     }
 }

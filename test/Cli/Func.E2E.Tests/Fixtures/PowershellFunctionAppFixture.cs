@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
     public class PowershellFunctionAppFixture : BaseFunctionAppFixture
     {
         public PowershellFunctionAppFixture()
-            : base(WorkerRuntime.powershell)
+            : base(WorkerRuntime.Powershell)
         {
         }
     }

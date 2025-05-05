@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Fixtures
     public class DotnetIsolatedFunctionAppFixture : BaseFunctionAppFixture
     {
         public DotnetIsolatedFunctionAppFixture()
-            : base(WorkerRuntime.dotnetIsolated)
+            : base(WorkerRuntime.DotnetIsolated)
         {
         }
     }

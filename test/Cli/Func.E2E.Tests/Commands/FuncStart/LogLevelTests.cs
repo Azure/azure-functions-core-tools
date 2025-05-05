@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
@@ -14,18 +15,21 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
     public class LogLevelTests(ITestOutputHelper log) : BaseLogLevelTests(log)
     {
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
         public async Task Start_Dotnet_Isolated_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             await RunLogLevelOverridenViaHostJsonTest("dotnet-isolated", nameof(Start_Dotnet_Isolated_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue));
         }
 
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
         public async Task Start_Dotnet_Isolated_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue()
         {
             await RunLogLevelOverridenWithFilterTest("dotnet-isolated", nameof(Start_Dotnet_Isolated_LogLevelOverridenWithFilter_LogLevelSetToExpectedValue));
         }
 
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue()
         {
             var port = ProcessHelper.GetAvailablePort();
@@ -59,6 +63,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
         }
 
         [Fact]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue()
         {
             var port = ProcessHelper.GetAvailablePort();

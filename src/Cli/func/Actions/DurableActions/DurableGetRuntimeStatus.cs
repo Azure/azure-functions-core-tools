@@ -1,24 +1,24 @@
-﻿using System;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "get-runtime-status", Context = Context.Durable, HelpText = "Retrieve the status of the specified orchestration instance")]
-    class DurableGetRuntimeStatus : BaseDurableActionWithId
+    internal class DurableGetRuntimeStatus : BaseDurableActionWithId
     {
         private readonly IDurableManager _durableManager;
-
-        private bool ShowInput { get; set; }
-
-        private bool ShowOutput { get; set; }
 
         public DurableGetRuntimeStatus(IDurableManager durableManager)
         {
             _durableManager = durableManager;
         }
+
+        private bool ShowInput { get; set; }
+
+        private bool ShowOutput { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

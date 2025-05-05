@@ -12,6 +12,8 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
+    [Collection("DotnetIsolated")]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
     public class DotnetIsolatedTests : IClassFixture<DotnetIsolatedFunctionAppFixture>
     {
         private readonly DotnetIsolatedFunctionAppFixture _fixture;

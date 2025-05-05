@@ -1,7 +1,6 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -10,8 +9,8 @@ namespace Azure.Functions.Cli.Common
 {
     public class AppSettingsFile
     {
+        private const string Reason = "secrets.manager.1";
         private readonly string _filePath;
-        private const string reason = "secrets.manager.1";
 
         public AppSettingsFile(string filePath)
         {
@@ -34,7 +33,9 @@ namespace Azure.Functions.Cli.Common
         }
 
         public bool IsEncrypted { get; set; }
+
         public Dictionary<string, string> Values { get; set; } = new Dictionary<string, string>();
+
         public Dictionary<string, JToken> ConnectionStrings { get; set; } = new Dictionary<string, JToken>();
 
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
@@ -44,18 +45,18 @@ namespace Azure.Functions.Cli.Common
         {
             if (IsEncrypted)
             {
-                Values[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), reason));
+                Values[name] = Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), Reason));
             }
             else
             {
                 Values[name] = value;
-            };
+            }
         }
 
         public void SetConnectionString(string name, string value, string providerName)
         {
             value = IsEncrypted
-                ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), reason))
+                ? Convert.ToBase64String(ProtectedData.Protect(Encoding.Default.GetBytes(value), Reason))
                 : value;
 
             ConnectionStrings[name] = JToken.FromObject(new
@@ -92,7 +93,7 @@ namespace Azure.Functions.Cli.Common
             {
                 try
                 {
-                    return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), reason)));
+                    return Values.ToDictionary(k => k.Key, v => string.IsNullOrEmpty(v.Value) ? string.Empty : Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(v.Value), Reason)));
                 }
                 catch (Exception e)
                 {
@@ -110,7 +111,7 @@ namespace Azure.Functions.Cli.Common
             try
             {
                 string DecryptIfNeeded(string value) => IsEncrypted
-                    ? Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), reason))
+                    ? Encoding.Default.GetString(ProtectedData.Unprotect(Convert.FromBase64String(value), Reason))
                     : value;
 
                 return ConnectionStrings.Select(c =>

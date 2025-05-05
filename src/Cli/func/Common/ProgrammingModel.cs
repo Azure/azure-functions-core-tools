@@ -1,10 +1,19 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Helpers;
+
 namespace Azure.Functions.Cli.Common
 {
     public enum ProgrammingModel
     {
+        [DisplayString("v1")]
         V1,
+        [DisplayString("v2")]
         V2,
+        [DisplayString("v3")]
         V3,
+        [DisplayString("v4")]
         V4
     }
 }

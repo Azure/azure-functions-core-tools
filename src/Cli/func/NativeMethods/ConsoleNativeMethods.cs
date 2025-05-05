@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 
@@ -17,6 +19,11 @@ namespace Azure.Functions.Cli.NativeMethods
         public enum ConsoleMode
         {
             ENABLE_ECHO_INPUT = 4
+        }
+
+        private enum ShowWindowCommands
+        {
+            Show = 5
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -67,15 +74,10 @@ namespace Azure.Functions.Cli.NativeMethods
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
-        static extern bool ShowWindow(IntPtr hWnd, ShowWindowCommands nCmdShow);
-
-        enum ShowWindowCommands
-        {
-            Show = 5
-        }
+        private static extern bool ShowWindow(IntPtr hWnd, ShowWindowCommands nCmdShow);
 
         [DllImport("kernel32.dll")]
-        static extern IntPtr GetConsoleWindow();
+        private static extern IntPtr GetConsoleWindow();
 
         public static int GetFocusBack()
         {
