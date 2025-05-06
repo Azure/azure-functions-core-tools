@@ -177,8 +177,8 @@ namespace Azure.Functions.Cli.Actions
                 .Where(c => c != Context.None)
                 .Distinct()
                 .OrderBy(c => c.ToLowerCaseString());
-            Utilities.PrintVersion();
             Utilities.WarnIfPreviewVersion();
+            Utilities.PrintVersion();
             ColoredConsole
                 .WriteLine("Usage: func [context] [context] <action> [-/--options]")
                 .WriteLine();
