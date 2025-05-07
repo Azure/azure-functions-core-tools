@@ -29,15 +29,16 @@ namespace Azure.Functions.Cli.ArtifactAssembler
         /// </summary>
         private readonly string[] _cliArtifacts =
         [
-            "Azure.Functions.Cli.min.win-arm64",
             "Azure.Functions.Cli.min.win-x86",
             "Azure.Functions.Cli.min.win-x64",
-            "Azure.Functions.Cli.linux-x64",
-            "Azure.Functions.Cli.osx-x64",
-            "Azure.Functions.Cli.osx-arm64",
+            "Azure.Functions.Cli.min.win-arm64",
             "Azure.Functions.Cli.win-x86",
             "Azure.Functions.Cli.win-x64",
-            "Azure.Functions.Cli.win-arm64"
+            "Azure.Functions.Cli.win-arm64",
+            "Azure.Functions.Cli.linux-x64",
+            "Azure.Functions.Cli.linux-arm64",
+            "Azure.Functions.Cli.osx-x64",
+            "Azure.Functions.Cli.osx-arm64"
         ];
 
         private readonly string _inProcArtifactDirectoryName;
@@ -338,8 +339,8 @@ namespace Azure.Functions.Cli.ArtifactAssembler
                 FileUtilities.CopyDirectory(outOfProcArtifactDirPath, consolidatedArtifactDirPath);
                 Directory.Delete(outOfProcArtifactDirPath, true);
 
-                // If we are currently on the minified version of the artifacts, we do not want the inproc6/inproc8 subfolders
-                if (artifactName.Contains("min.win"))
+                // If we are currently on the minified version of the artifacts (or if its linux arm64), we do not want the inproc6/inproc8 subfolders
+                if (artifactName.Contains("min.win") || artifactName.Contains("linux-arm64"))
                 {
                     Console.WriteLine($"Finished assembling {consolidatedArtifactDirPath}\n");
                     continue;
