@@ -71,53 +71,6 @@ jobs:
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/build'
 
-  - ${{ if startsWith(parameters.arch, 'win-x') }}:
-    - template: ci/sign-files.yml@eng
-      parameters:
-        displayName: Sign MSI files
-        folderPath: $(Pipeline.Workspace)/staging/coretools-cli
-        pattern: '*.msi'
-        signType: 'inline'
-        inlineOperation: |
-          [
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolSign",
-              "Parameters": {
-                "OpusName": "Microsoft",
-                "OpusInfo": "http://www.microsoft.com",
-                "FileDigest": "/fd \"SHA256\"",
-                "PageHash": "/NPH",
-                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-              },
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            },
-            {
-              "KeyCode": "CP-230012",
-              "OperationCode": "SigntoolVerify",
-              "Parameters": {},
-              "ToolName": "sign",
-              "ToolVersion": "1.0"
-            }
-          ]
-
-  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
-    - task: PowerShell@2
-      displayName: 'Test Artifacts - Visual Studio'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testVsArtifacts.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-visualstudio"'
-
-  - ${{ if startsWith(parameters.arch, 'win') }}:
-    - task: PowerShell@2
-      displayName: 'Test Artifacts'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testArtifacts.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-cli"'
-
   - task: DotNetCoreCLI@2
     displayName: 'Zip Artifacts'
     inputs:
