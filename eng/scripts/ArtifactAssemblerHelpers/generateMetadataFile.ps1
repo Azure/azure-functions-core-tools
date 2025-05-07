@@ -8,10 +8,18 @@ $stagingCoreToolsCli = Join-Path $StagingDirectory "coretools-cli"
 $stagingCoreToolsVisualStudio = Join-Path $StagingDirectory "coretools-visualstudio"
 
 # Get OOP Artifact Version
-$oopVersion = (Get-ChildItem $stagingCoreToolsCli | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)$", '$1'
+$oopVersion = (
+    Get-ChildItem $stagingCoreToolsCli |
+    Where-Object { $_.Name -match "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)(-.+)?$" } |
+    Select-Object -First 1
+).Name -replace "^Azure\.Functions\.Cli\..*\.(\d+\.\d+\.\d+)(-.+)?$", '$1$2'
 
 # Get inProc Artifact Version
-$inProcVersion = (Get-ChildItem $stagingCoreToolsVisualStudio | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$", '$1'
+$inProcVersion = (
+    Get-ChildItem $stagingCoreToolsVisualStudio |
+    Where-Object { $_.Name -match "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)(-.+)?$" } |
+    Select-Object -First 1
+).Name -replace "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)(-.+)?$", '$1$2'
 
 # Get the current release number from ADO
 $releaseNumberFull = $env:RELEASE_RELEASENAME
