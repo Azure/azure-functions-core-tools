@@ -14,8 +14,7 @@ $oopVersion = (Get-ChildItem $stagingCoreToolsCli | Where-Object { $_.Name -matc
 $inProcVersion = (Get-ChildItem $stagingCoreToolsVisualStudio | Where-Object { $_.Name -match "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$" } | Select-Object -First 1).Name -replace "^Azure\.Functions\.Cli\.min\.win.*\.(\d+\.\d+\.\d+)$", '$1'
 
 # Get the current release number from ADO
-$releaseNumberFull = $env:RELEASE_RELEASENAME
-$releaseNumber = ($releaseNumberFull -replace '\D', '')
+$releaseNumber = $(Build.BuildId)
 
 # Get commit id
 $commitId = $env:BUILD_SOURCEVERSION
