@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
@@ -94,17 +95,28 @@ namespace Azure.Functions.Cli.Common
         public const string Dotnet = "dotnet";
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
-        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
+        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>"; // forwardedHttpUrl sample format: https://n12abc3t-<port>.asse.devtunnels.ms/
         public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
+        public const string PreviewVersionSuffixLabel = "preview";
 
-        // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
-
-
-        public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
-
+        private static readonly string _cliVersion = GetSemanticVersion();
+        public static string CliVersion => _cliVersion;
         public static string CliDetailedVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+        public static string CliUserAgent = $"functions-core-tools/{CliVersion}";
 
-        public static string CliUserAgent = $"functions-core-tools/{Constants.CliVersion}";
+        // Helper method to extract version from CliDetailedVersion
+        private static string GetSemanticVersion()
+        {
+            var infoVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
+            if (string.IsNullOrEmpty(infoVersion))
+            {
+                return Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+            }
+
+            var match = Regex.Match(infoVersion, @"^(\S+)");
+            return match.Success ? match.Groups[1].Value : infoVersion;
+        }
 
         public static readonly Dictionary<WorkerRuntime, IEnumerable<string>> WorkerRuntimeImages = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {

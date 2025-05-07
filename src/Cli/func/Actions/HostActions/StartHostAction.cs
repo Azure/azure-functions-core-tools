@@ -400,12 +400,14 @@ namespace Azure.Functions.Cli.Actions.HostActions
         {
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
-            
+
             // Return if running is delegated to another version of Core Tools
             if (await TryHandleInProcDotNetLaunchAsync())
             {
                 return;
             }
+
+            Utilities.WarnIfPreviewVersion();
 
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
