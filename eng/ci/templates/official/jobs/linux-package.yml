@@ -39,7 +39,6 @@ jobs:
         
         # Set as pipeline variables for later steps
         Write-Host "##vso[task.setvariable variable=ConsolidatedBuildId]$($metadata.consolidatedBuildId)"
-        Write-Host "##vso[task.setvariable variable=DefaultArtifactVersion]$($metadata.defaultArtifactVersion)"
 
   - task: Bash@3
     displayName: 'Build DEB package'
@@ -58,10 +57,11 @@ jobs:
 
         sudo apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
-        python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
-        python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
-        export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
-        echo "${DEB_PACKAGE}"
+        echo "$consolidatedBuildId"
+        #python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
+        #python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
+        #export DEB_PACKAGE="$(readlink -f artifact/*$RELEASE_VERSION*)"
+        #echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
     env:
       linuxBuildNumber: $(LinuxPackageBuildTag)
