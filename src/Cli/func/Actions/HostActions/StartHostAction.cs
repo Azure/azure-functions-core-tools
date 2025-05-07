@@ -409,6 +409,8 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 return;
             }
 
+            Utilities.WarnIfPreviewVersion();
+
             if (isVerbose || EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.DisplayLogo))
             {
                 Utilities.PrintLogo();

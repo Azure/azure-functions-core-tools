@@ -20,14 +20,18 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
+    <!-- Base version components -->
     <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
-    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
+    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
+    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
+
+    <!-- Final version properties -->
+    <Version>$(MajorMinorProductVersion).$(BuildNumber)-preview1</Version>
     <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
     <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
-    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
+
+    <InformationalVersion>$(Version) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
     <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
-    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
