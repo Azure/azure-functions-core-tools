@@ -95,10 +95,10 @@ namespace Azure.Functions.Cli.Common
         public const string Dotnet = "dotnet";
         public const string InProcDotNet8EnabledSetting = "FUNCTIONS_INPROC_NET8_ENABLED";
         public const string AzureDevSessionsRemoteHostName = "AzureDevSessionsRemoteHostName";
-        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
+        public const string AzureDevSessionsPortSuffixPlaceholder = "<port>"; // forwardedHttpUrl sample format: https://n12abc3t-<port>.asse.devtunnels.ms/
         public const string GitHubReleaseApiUrl = "https://api.github.com/repos/Azure/azure-functions-core-tools/releases/latest";
+        public const string PreviewVersionSuffixLabel = "preview";
 
-        // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
         public static readonly Dictionary<WorkerRuntime, IEnumerable<string>> WorkerRuntimeImages = new Dictionary<WorkerRuntime, IEnumerable<string>>
         {
             { WorkerRuntime.Dotnet, new[] { "mcr.microsoft.com/azure-functions/dotnet", "microsoft/azure-functions-dotnet-core2.0", "mcr.microsoft.com/azure-functions/base", "microsoft/azure-functions-base" } },
@@ -126,6 +126,20 @@ namespace Azure.Functions.Cli.Common
         public static string CliUserAgent => $"functions-core-tools/{CliVersion}";
 
         public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator" };
+
+        // Helper method to extract version from CliDetailedVersion
+        private static string GetSemanticVersion()
+        {
+            var infoVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
+            if (string.IsNullOrEmpty(infoVersion))
+            {
+                return Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+            }
+
+            var match = Regex.Match(infoVersion, @"^(\S+)");
+            return match.Success ? match.Groups[1].Value : infoVersion;
+        }
 
         public static class Errors
         {
