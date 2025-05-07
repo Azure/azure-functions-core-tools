@@ -51,6 +51,28 @@ namespace Azure.Functions.Cli
                 .WriteLine($"Function Runtime Version: {ScriptHost.Version}\n".DarkGray());
         }
 
+        internal static void WarnIfPreviewVersion()
+        {
+            if (!Constants.CliVersion.Contains(Constants.PreviewVersionSuffixLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            ColoredConsole
+                .WriteLine("You are running a preview version of Azure Functions Core Tools.".DarkYellow());
+
+            bool isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+            Architecture arch = RuntimeInformation.ProcessArchitecture;
+
+            if (isLinux && arch == Architecture.Arm64)
+            {
+                ColoredConsole
+                    .WriteLine("This version of the Azure Functions Core Tools currently doesn't support linux-arm64 with Python workers, with PowerShell workers, or with .NET applications using the in-process model.".DarkYellow());
+            }
+
+            ColoredConsole.WriteLine();
+        }
+
         private static RichString AlternateLogoColor(string str, int firstColorCount = -1)
         {
             if (str.Length == 1)
