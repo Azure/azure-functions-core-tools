@@ -182,6 +182,7 @@ namespace Azure.Functions.Cli.Actions
                 .Where(c => c != Context.None)
                 .Distinct()
                 .OrderBy(c => c.ToLowerCaseString());
+            Utilities.WarnIfPreviewVersion();
             Utilities.PrintVersion();
             ColoredConsole
                 .WriteLine("Usage: func [context] <action> [-/--options]")
