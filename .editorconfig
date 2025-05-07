@@ -285,7 +285,8 @@ dotnet_diagnostic.CA2326.severity = none # Do not use TypeNameHandling values ot
 dotnet_diagnostic.CA2327.severity = none # Do not use insecure JsonSerializerSettings
 
 # IDE
-dotnet_diagnostic.IDE0005.severity = warning # Using directive is unnecessary
+# IDE0005 requires documentation generation to be enabled via `EnableGenerateDocumentationFile` - disabling until we fix all documentation issues
+# dotnet_diagnostic.IDE0005.severity = warning # Using directive is unnecessary
 dotnet_diagnostic.IDE1006.severity = warning # Predefined type alias should not be used
 
 #############################
