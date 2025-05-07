@@ -43,9 +43,6 @@ jobs:
   - task: Bash@3
     displayName: 'Build DEB package'
     inputs:
-  - task: Bash@3
-    displayName: 'Build DEB package'
-    inputs:
       targetType: 'inline'
       script: |
         cd publish-scripts
