@@ -13,10 +13,10 @@ jobs:
 
   templateContext:
     inputs:
-      - input: pipelineArtifact
-        pipeline: core-tools-consolidated-artifacts
-        artifactName: drop-metadata-json
-        targetPath: $(Pipeline.Workspace)/core-tools-consolidated-artifacts/drop-metadata-json
+    - input: pipelineArtifact
+      pipeline: core-tools-consolidated-artifacts
+      artifactName: drop-metadata-json
+      targetPath: $(Pipeline.Workspace)/core-tools-consolidated-artifacts/drop-metadata-json
     outputParentDirectory: $(drop_path)
     outputs:
     - output: pipelineArtifact
