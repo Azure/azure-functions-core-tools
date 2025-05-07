@@ -82,9 +82,26 @@ jobs:
 
   - pwsh: |
       echo $env:LinuxPackageAccountName
-      $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      $buildTag = $env:LinuxPackageBuildTag
+      $majorVersion = [math]::Floor([double]$buildTag.Split(".")[0])
+
+      # Convert to Debian version format
+      if ($buildTag -like "*-*") {
+        $parts = $buildTag -split "-"
+        $debianVersion = "$($parts[0])~$($parts[1])-1"
+      } else {
+        $debianVersion = "$buildTag-1"
+      }
+
+      foreach ($arch in @("x64", "arm64")) {
+        $fileName = "azure-functions-core-tools_${debianVersion}_${arch}.deb"
+        $filePath = "/mnt/vss/_work/1/s/publish-scripts/artifact/$fileName"
+        az storage blob upload -f $filePath -c signed -n $fileName --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+
+        $fileNameMajor = "azure-functions-core-tools-$($majorVersion)_${debianVersion}_${arch}.deb"
+        $filePathMajor = "/mnt/vss/_work/1/s/publish-scripts/artifact/$fileNameMajor"
+        az storage blob upload -f $filePathMajor -c signed -n $fileNameMajor --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      }
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
