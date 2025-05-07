@@ -29,16 +29,26 @@ def returnDebVersion(version):
 @helper.restoreDirectory
 def preparePackage():
     """
-    Prepares and builds a Debian package.
-    This includes setting up directories, copying necessary files,
-    generating SHA256 hashes, and building the final .deb package.
+    Prepares and builds a Debian package for each supported architecture.
     """
     os.chdir(constants.DRIVERROOTDIR)
 
     debianVersion = returnDebVersion(constants.VERSION)
-    packageFolder = f"{constants.PACKAGENAME}_{debianVersion}"
-    buildFolder = os.path.join(os.getcwd(), constants.BUILDFOLDER, packageFolder)
-    helper.linuxOutput(buildFolder)
+    print(f"debianVersion: {debianVersion}")
+
+    for arch in ["x64", "arm64"]:
+        print(f"\nBuilding package for linux-{arch}...\n")
+        preparePackageForArch(arch, debianVersion)
+
+def preparePackageForArch(arch, debianVersion):
+    """
+    Prepares and builds a Debian package.
+    This includes setting up directories, copying necessary files,
+    generating SHA256 hashes, and building the final .deb package.
+    """
+    packageFolderName = f"{constants.PACKAGENAME}_{debianVersion}_{arch}"
+    buildFolder = os.path.join(os.getcwd(), constants.BUILDFOLDER, packageFolderName)
+    helper.linuxOutput(buildFolder, arch)
 
     os.chdir(buildFolder)
     document = os.path.join("usr", "share", "doc", constants.PACKAGENAME)
@@ -107,5 +117,5 @@ def preparePackage():
     # Build the Debian package using dpkg-deb
     os.chdir(constants.DRIVERROOTDIR)
     output = helper.printReturnOutput(["fakeroot", "dpkg-deb", "--build", "-Zxz",
-                   os.path.join(constants.BUILDFOLDER, packageFolder), os.path.join(constants.ARTIFACTFOLDER, packageFolder+".deb")])
+                   os.path.join(constants.BUILDFOLDER, packageFolderName), os.path.join(constants.ARTIFACTFOLDER, packageFolderName+".deb")])
     assert(f"building package '{constants.PACKAGENAME}'" in output)
