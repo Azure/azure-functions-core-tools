@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli
             if (isLinux && arch == Architecture.Arm64)
             {
                 ColoredConsole
-                    .WriteLine("This version currently doesn't support linux-arm64 with Python or PowerShell workers.".DarkYellow());
+                    .WriteLine("This version currently doesn't support linux-arm64 with Python or PowerShell workers, or with in-process dotnet applications.".DarkYellow());
             }
 
             ColoredConsole.WriteLine();
