@@ -34,6 +34,7 @@ def preparePackage():
     os.chdir(constants.DRIVERROOTDIR)
 
     debianVersion = returnDebVersion(constants.VERSION)
+    print(f"debianVersion: {debianVersion}")
 
     for arch in ["x64", "arm64"]:
         print(f"\nBuilding package for linux-{arch}...\n")
