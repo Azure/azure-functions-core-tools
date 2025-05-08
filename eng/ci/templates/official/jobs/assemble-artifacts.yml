@@ -9,7 +9,7 @@ parameters:
 
 jobs:
 - job: AssembleArtifact${{ parameters.displayName }}
-  displayName: "Assemble ${{ parameters.arch }} ${{ parameters.isNightlyBuild && '(Nightly)' || '' }}"
+  displayName: "Assemble ${{ parameters.arch }}"
   templateContext:
     inputs:
       - input: pipelineArtifact
@@ -54,7 +54,7 @@ jobs:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
       - output: pipelineArtifact
-        displayName: Publish assembled artifact ${{ parameters.arch }} ${{ parameters.isNightlyBuild && '(Nightly)' || '' }}
+        displayName: Publish assembled artifact ${{ parameters.arch }}
         targetPath: $(Build.ArtifactStagingDirectory)/core-tools
         artifact: drop-${{ parameters.arch }}}
       - output: pipelineArtifact
