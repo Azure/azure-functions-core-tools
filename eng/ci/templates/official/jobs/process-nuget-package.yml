@@ -24,7 +24,7 @@ jobs:
           targetPath: $(Pipeline.Workspace)/core-tools-default/drop
     outputs:
       - output: pipelineArtifact
-        displayName: Publish nuget package ${{ parameters.isNightlyBuild && '(Nightly)' || '' }}
+        displayName: Publish nuget package
         targetPath: $(Pipeline.Workspace)/nugetPackage
         artifact: drop-nuget-package
   steps:
