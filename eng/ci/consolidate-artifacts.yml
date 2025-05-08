@@ -29,7 +29,6 @@ resources:
     - pipeline: core-tools-inproc
       source: azure/azure-functions-core-tools/core-tools.official
       branch: in-proc  # in-proc branch of core-tools.official
-      displayName: core-tools-inproc
       tags:
       - nightly-build
       trigger:
@@ -40,7 +39,6 @@ resources:
     - pipeline: core-tools-default
       source: azure/azure-functions-core-tools/core-tools.official
       branch: main  # main branch of core-tools.official
-      displayName: core-tools-default
       tags:
       - nightly-build
       trigger:
