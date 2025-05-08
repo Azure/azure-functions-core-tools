@@ -100,4 +100,4 @@ extends:
           parameters:
             arch: ${{ arch }}
             displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
-            isNightlyBuild: $(isNightlyBuild)
+            isNightlyBuild:  variables['isNightlyBuild']
