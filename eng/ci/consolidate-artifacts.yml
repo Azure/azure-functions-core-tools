@@ -26,28 +26,26 @@ resources:
     - pipeline: core-tools-host
       source: azure/azure-functions-core-tools/core-tools-host.official
 
-    # For regular builds (non-nightly)
+    # The latest build (can be nightly but if it is being trigerred after CI)
     - pipeline: core-tools-inproc
       source: azure/azure-functions-core-tools/core-tools.official
       branch: in-proc
-      tags:
-        exclude:
-          - nightly-build
       trigger:
         branches:
           include:
             - in-proc
+        tags:
+          exclude: [nightly-build]
 
     - pipeline: core-tools-default
       source: azure/azure-functions-core-tools/core-tools.official
       branch: main
-      tags:
-        exclude:
-          - nightly-build
       trigger:
         branches:
           include:
             - main
+        tags:
+          exclude: [nightly-build]
 
     # For nightly builds only
     - pipeline: core-tools-inproc-nightly
