@@ -1,6 +1,5 @@
 jobs:
 - job: LinuxPackage
-  condition: and(ne(variables['LinuxPackageBuildTag'], ''), ne(variables['ConsolidatedBuildId'], ''))
   timeoutInMinutes: "120"
 
   pool:
@@ -13,6 +12,11 @@ jobs:
     pkg_drop_path: $(drop_path)/drop_debian
 
   templateContext:
+    inputs:
+    - input: pipelineArtifact
+      pipeline: core-tools-consolidated-artifacts
+      artifactName: drop-metadata-json
+      targetPath: $(Pipeline.Workspace)/core-tools-consolidated-artifacts/drop-metadata-json
     outputParentDirectory: $(drop_path)
     outputs:
     - output: pipelineArtifact
@@ -21,6 +25,21 @@ jobs:
       artifact: drop_debian
 
   steps:
+  - task: PowerShell@2
+    displayName: 'Read metadata from consolidated build'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $metadataPath = "$(Pipeline.Workspace)/core-tools-consolidated-artifacts/drop-metadata-json/metadata.json"
+        Write-Host "Reading metadata from $metadataPath"
+        $metadata = Get-Content -Path $metadataPath | ConvertFrom-Json
+        Write-Host "Consolidated Build ID: $($metadata.consolidatedBuildId)"
+        Write-Host "Default Artifact Version: $($metadata.defaultArtifactVersion)"
+        
+        # Set as pipeline variables for later steps
+        Write-Host "##vso[task.setvariable variable=ConsolidatedBuildId]$($metadata.consolidatedBuildId)"
+        Write-Host "##vso[task.setvariable variable=DefaultArtifactVersion]$($metadata.defaultArtifactVersion)"
+
   - task: Bash@3
     displayName: 'Build DEB package'
     inputs:
@@ -41,7 +60,7 @@ jobs:
         echo "${DEB_PACKAGE}"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable
     env:
-      linuxBuildNumber: $(LinuxPackageBuildTag)
+      linuxBuildNumber: $(DefaultArtifactVersion)
       consolidatedBuildId: $(ConsolidatedBuildId)
 
   - template: ci/sign-files.yml@eng
