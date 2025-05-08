@@ -53,9 +53,6 @@ resources:
         branches:
           include:
             - in-proc
-        tags:
-          include:
-            - nightly-build
             
     - pipeline: core-tools-default-nightly
       source: azure/azure-functions-core-tools/core-tools.official
@@ -66,9 +63,6 @@ resources:
         branches:
           include:
             - main
-        tags:
-          include:
-            - nightly-build
 
 variables:
 - template: /ci/variables/cfs.yml@eng
