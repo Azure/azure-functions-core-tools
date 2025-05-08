@@ -26,13 +26,12 @@ resources:
     - pipeline: core-tools-host
       source: azure/azure-functions-core-tools/core-tools-host.official
 
-    # The latest build (can be nightly but if it is being trigerred after CI)
+    # The latest non-nightly build that was trigerred by a PR run
     - pipeline: core-tools-inproc
       source: azure/azure-functions-core-tools/core-tools.official
       branch: in-proc
       tags:
-        exclude:
-          - nightly-build
+        - pr-trigger
       trigger:
         branches:
           include:
@@ -42,8 +41,7 @@ resources:
       source: azure/azure-functions-core-tools/core-tools.official
       branch: main
       tags:
-        exclude:
-          - nightly-build
+        - pr-trigger
       trigger:
         branches:
           include:
