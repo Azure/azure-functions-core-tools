@@ -10,7 +10,7 @@ name: $(Build.SourceBranchName)_$(Build.Reason)
 
 trigger: none
 
-# This pipeline is triggered by the completion of scheduled builds
+# This pipeline is triggered by the completion of builds
 # in the core-tools-inproc and core-tools-default pipelines
 resources:
   repositories:
@@ -26,30 +26,62 @@ resources:
     - pipeline: core-tools-host
       source: azure/azure-functions-core-tools/core-tools-host.official
 
+    # For regular builds (non-nightly)
     - pipeline: core-tools-inproc
       source: azure/azure-functions-core-tools/core-tools.official
-      branch: in-proc  # in-proc branch of core-tools.official
-      tags:
-      - nightly-build
+      branch: in-proc
       trigger:
         branches:
           include:
             - in-proc
+        tags:
+          exclude:
+            - nightly-build  # Exclude nightly builds, handle them separately
 
     - pipeline: core-tools-default
       source: azure/azure-functions-core-tools/core-tools.official
-      branch: main  # main branch of core-tools.official
-      tags:
-      - nightly-build
+      branch: main
       trigger:
         branches:
           include:
             - main
+        tags:
+          exclude:
+            - nightly-build  # Exclude nightly builds, handle them separately
+
+    # For nightly builds only
+    - pipeline: core-tools-inproc-nightly
+      source: azure/azure-functions-core-tools/core-tools.official
+      branch: in-proc
+      tags:
+        - nightly-build  # Only select runs with this tag
+      trigger:
+        branches:
+          include:
+            - in-proc
+        tags:
+          include:
+            - nightly-build  # Only trigger on nightly builds
+            
+    - pipeline: core-tools-default-nightly
+      source: azure/azure-functions-core-tools/core-tools.official
+      branch: main
+      tags:
+        - nightly-build  # Only select runs with this tag
+      trigger:
+        branches:
+          include:
+            - main
+        tags:
+          include:
+            - nightly-build  # Only trigger on nightly builds
 
 variables:
 - template: /ci/variables/cfs.yml@eng
 - name: archs
   value: 'win-x64,win-x86,min.win-x64,osx-x64,linux-x64,osx-arm64,win-arm64,min.win-arm64,min.win-x86'
+- name: isNightlyBuild
+  value: $[eq(variables['Build.Reason'], 'Schedule')]
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -72,9 +104,12 @@ extends:
       displayName: "Assemble Artifacts"
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
+        parameters:
+          jobDisplayName: $[ variables['isNightlyBuild'] && 'Nightly Package Processing' || 'Package Processing' ]
 
       - ${{ each arch in split(variables.archs,',') }}:
         - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
           parameters:
             arch: ${{ arch }}
             displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
+            isNightlyBuild: $(isNightlyBuild)

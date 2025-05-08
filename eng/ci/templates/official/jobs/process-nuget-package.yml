@@ -1,15 +1,30 @@
+parameters:
+  - name: jobDisplayName
+    type: string
+    default: 'Process NuGet Package'
+  - name: isNightlyBuild
+    type: boolean
+    default: false
+
 jobs:
 - job: ProcessNuGetPackage
-  displayName: "Process NuGet Package"
+  displayName: "${{ parameters.jobDisplayName }}"
   templateContext:
     inputs:
-      - input: pipelineArtifact
-        pipeline: core-tools-default
-        artifactName: drop
-        targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+      # Dynamically select the appropriate pipeline for default artifacts based on whether it's a nightly build
+      - ${{ if parameters.isNightlyBuild }}:
+        - input: pipelineArtifact
+          pipeline: core-tools-default-nightly
+          artifactName: drop
+          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+      - ${{ else }}:
+        - input: pipelineArtifact
+          pipeline: core-tools-default
+          artifactName: drop
+          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
     outputs:
       - output: pipelineArtifact
-        displayName: Publish nuget package
+        displayName: Publish nuget package ${{ parameters.isNightlyBuild && '(Nightly)' || '' }}
         targetPath: $(Pipeline.Workspace)/nugetPackage
         artifact: drop-nuget-package
   steps:

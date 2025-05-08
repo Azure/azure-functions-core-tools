@@ -3,10 +3,13 @@ parameters:
     type: string
   - name: displayName
     type: string
+  - name: isNightlyBuild
+    type: boolean
+    default: false
 
 jobs:
 - job: AssembleArtifact${{ parameters.displayName }}
-  displayName: "Assemble ${{ parameters.arch }}"
+  displayName: "Assemble ${{ parameters.arch }} ${{ parameters.isNightlyBuild && '(Nightly)' || '' }}"
   templateContext:
     inputs:
       - input: pipelineArtifact
@@ -17,25 +20,43 @@ jobs:
         pipeline: core-tools-host
         artifactName: drop-coretools-host-windows
         targetPath: $(Pipeline.Workspace)/core-tools-host/drop-coretools-host-windows
-      - input: pipelineArtifact
-        pipeline: core-tools-inproc
-        artifactName: drop-inproc6
-        targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc6
-      - input: pipelineArtifact
-        pipeline: core-tools-inproc
-        artifactName: drop-inproc8
-        targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc8
-      - input: pipelineArtifact
-        pipeline: core-tools-default
-        artifactName: drop
-        targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+      # Dynamically select the appropriate pipeline for inproc artifacts based on whether it's a nightly build
+      - ${{ if parameters.isNightlyBuild }}:
+        - input: pipelineArtifact
+          pipeline: core-tools-inproc-nightly
+          artifactName: drop-inproc6
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc6
+        - input: pipelineArtifact
+          pipeline: core-tools-inproc-nightly
+          artifactName: drop-inproc8
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc8
+      - ${{ else }}:
+        - input: pipelineArtifact
+          pipeline: core-tools-inproc
+          artifactName: drop-inproc6
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc6
+        - input: pipelineArtifact
+          pipeline: core-tools-inproc
+          artifactName: drop-inproc8
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc8
+      # Dynamically select the appropriate pipeline for default artifacts based on whether it's a nightly build
+      - ${{ if parameters.isNightlyBuild }}:
+        - input: pipelineArtifact
+          pipeline: core-tools-default-nightly
+          artifactName: drop
+          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+      - ${{ else }}:
+        - input: pipelineArtifact
+          pipeline: core-tools-default
+          artifactName: drop
+          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
 
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
       - output: pipelineArtifact
-        displayName: Publish assembled artifact ${{ parameters.arch }}
+        displayName: Publish assembled artifact ${{ parameters.arch }} ${{ parameters.isNightlyBuild && '(Nightly)' || '' }}
         targetPath: $(Build.ArtifactStagingDirectory)/core-tools
-        artifact: drop-${{ parameters.arch }}
+        artifact: drop-${{ parameters.arch }}}
       - output: pipelineArtifact
         displayName: Publish metadata.json
         targetPath: $(Build.ArtifactStagingDirectory)/metadata.json
