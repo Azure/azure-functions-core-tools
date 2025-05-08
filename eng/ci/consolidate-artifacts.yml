@@ -34,9 +34,6 @@ resources:
         branches:
           include:
             - in-proc
-        tags:
-          exclude:
-            - nightly-build  # Exclude nightly builds, handle them separately
 
     - pipeline: core-tools-default
       source: azure/azure-functions-core-tools/core-tools.official
@@ -45,9 +42,6 @@ resources:
         branches:
           include:
             - main
-        tags:
-          exclude:
-            - nightly-build  # Exclude nightly builds, handle them separately
 
     # For nightly builds only
     - pipeline: core-tools-inproc-nightly
