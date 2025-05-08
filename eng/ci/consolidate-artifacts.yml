@@ -53,6 +53,9 @@ resources:
         branches:
           include:
             - in-proc
+        tags:
+          include:
+            - nightly-build
             
     - pipeline: core-tools-default-nightly
       source: azure/azure-functions-core-tools/core-tools.official
@@ -63,13 +66,14 @@ resources:
         branches:
           include:
             - main
+        tags:
+          include:
+            - nightly-build
 
 variables:
 - template: /ci/variables/cfs.yml@eng
 - name: archs
   value: 'win-x64,win-x86,min.win-x64,osx-x64,linux-x64,osx-arm64,win-arm64,min.win-arm64,min.win-x86'
-- name: isNightlyBuild
-  value: $[eq(variables['Build.Reason'], 'Schedule')]
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -91,13 +95,30 @@ extends:
     - stage: ConsolidateArticacts
       displayName: "Assemble Artifacts"
       jobs:
-      - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
-        parameters:
-          jobDisplayName: $[ variables['isNightlyBuild'] && 'Nightly Package Processing' || 'Package Processing' ]
-
-      - ${{ each arch in split(variables.archs,',') }}:
-        - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
+      # For scheduled builds (nightly)
+      - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+        - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
           parameters:
-            arch: ${{ arch }}
-            displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
-            isNightlyBuild:  variables['isNightlyBuild']
+            jobDisplayName: 'Nightly Package Processing'
+            isNightlyBuild: true
+
+        - ${{ each arch in split(variables.archs,',') }}:
+          - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
+            parameters:
+              arch: ${{ arch }}
+              displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
+              isNightlyBuild: true
+
+      # For non-scheduled builds
+      - ${{ if ne(variables['Build.Reason'], 'Schedule') }}:
+        - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
+          parameters:
+            jobDisplayName: 'Package Processing'
+            isNightlyBuild: false
+
+        - ${{ each arch in split(variables.archs,',') }}:
+          - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
+            parameters:
+              arch: ${{ arch }}
+              displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
+              isNightlyBuild: false
