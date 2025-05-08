@@ -33,9 +33,10 @@ resources:
       trigger:
         branches:
           include:
-            - in-proc
+          - in-proc
         tags:
-          exclude: [nightly-build]
+          exclude:
+          - nightly-build
 
     - pipeline: core-tools-default
       source: azure/azure-functions-core-tools/core-tools.official
@@ -43,9 +44,10 @@ resources:
       trigger:
         branches:
           include:
-            - main
+          - main
         tags:
-          exclude: [nightly-build]
+          exclude:
+          - nightly-build
 
     # For nightly builds only
     - pipeline: core-tools-inproc-nightly
