@@ -1,25 +1,30 @@
-# Run: ./download-templates.ps1 --output "/desired/output/path"
+# Run: ./download-templates.ps1 || From root of the repo: ./eng/scripts/download-templates.ps1
+# Optional parameters: -OutputPath "./desired/output/path" -TemplatesVersion "4.0.5086" -TemplateJsonVersion "3.1.1648"
+
+# You can check NuGet for the latest template versions:
+# https://www.nuget.org/packages/Microsoft.Azure.Functions.Worker.ItemTemplates/
+# https://www.nuget.org/packages/Microsoft.Azure.Functions.Worker.ProjectTemplates/
+# https://www.nuget.org/packages/Microsoft.Azure.WebJobs.ItemTemplates/
+
+# For the json templates version, you can check the latest entry of the tooling feed i.e.
+# https://github.com/Azure/azure-functions-tooling-feed/blob/eeb299f0f24e4f778a6e2ec3c92e3f76a7fd03e8/cli-feed-v4.json#L36596
 
 # Parse CLI arguments
 param (
-    [string]$output
+    [string]$OutputPath           = "./templates-download",
+    [string]$TemplatesVersion     = "4.0.5086",
+    [string]$TemplateJsonVersion  = "3.1.1648"
 )
 
-# Default output directory
-$OUTPUT_DIR = "./tmp"
-
-if ($output) {
-    $OUTPUT_DIR = $output
-}
+# Default values
+$OUTPUT_DIR             = $OutputPath
+$TEMPLATES_VERSION      = $TemplatesVersion
+$TEMPLATE_JSON_VERSION  = $TemplateJsonVersion
 
 # Set up variables for paths
 $templatesPath = Join-Path $OUTPUT_DIR "templates"
 $templatesV2Path = Join-Path $OUTPUT_DIR "templates-v2"
 $isolatedTemplatesPath = Join-Path $templatesPath "net-isolated"
-
-# Versions
-$TEMPLATES_VERSION = "4.0.5086"
-$TEMPLATE_JSON_VERSION = "3.1.1648"
 
 # URLs
 $DOTNET_ISOLATED_ITEM_TEMPLATES_URL = "https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/$TEMPLATES_VERSION"

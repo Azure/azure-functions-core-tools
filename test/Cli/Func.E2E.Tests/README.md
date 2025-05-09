@@ -219,7 +219,7 @@ public async Task Start_DotnetIsolated_Test_EnableAuthFeature(
 
 2. Download the templates packages if they don't exist already.
    - First check `out/bin/Azure.Functions.Cli.E2E.Tests/debug` for the `templates` folder. If it's not there:
-   - Download templates by running: `./eng/scripts/download-templates.ps1 --output ./out/bin/Azure.Functions.Cli.E2E.Tests/debug`
+   - Download templates by running: `./eng/scripts/download-templates.ps1 -OutputPath ./out/bin/Azure.Functions.Cli.E2E.Tests/debug`
 
 3. To test in-proc artifacts:
    - Checkout and build the `inproc` branch locally
