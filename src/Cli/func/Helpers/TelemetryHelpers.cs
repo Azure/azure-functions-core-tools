@@ -51,6 +51,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+#pragma warning disable CS0162 // Unreachable code: TelemetryInstrumentationKey is set during build/CI
         public static bool CheckIfTelemetryEnabled()
         {
             // If Ikey is not set, can't get anything
@@ -60,7 +61,6 @@ namespace Azure.Functions.Cli.Helpers
                 return false;
             }
 
-            #pragma warning disable 0162
             // If opt out is not set, we check if the default sentinel is present
             var optOutVar = Environment.GetEnvironmentVariable(Constants.TelemetryOptOutVariable);
             if (string.IsNullOrEmpty(optOutVar))
@@ -72,6 +72,7 @@ namespace Azure.Functions.Cli.Helpers
             // If opt out is present and set to falsy, only then we enable telemetry
             return optOutVar == "0" || optOutVar.Equals("false", StringComparison.OrdinalIgnoreCase);
         }
+#pragma warning restore CS0162 // Unreachable code
 
         public static void LogEventIfAllowedSafe(ITelemetry telemetry, TelemetryEvent telemetryEvent)
         {
