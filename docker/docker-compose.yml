@@ -1,0 +1,13 @@
+# Run: docker-compose up --build -d && docker exec -it func-cli bash
+services:
+  func-cli:
+    build:
+      context: ..  # Go up one level to repo root
+      dockerfile: docker/Dockerfile
+      args:
+        TARGET_RUNTIME: linux-arm64
+    # platform: linux/amd64 # Uncomment if you are on a Mac with Apple silicon for non-ARM RID builds
+    container_name: func-cli
+    image: func-cli
+    ports:
+      - "7071:7071"

@@ -21,48 +21,29 @@ where PATH_TO_FUNCTIONS_CLI is the absolute or relative path to the root of this
 ### Running the Test Suite
 
 - Build the solution `dotnet build Azure.Functions.Cli.sln`
-  - As part of this build, the cli is copied into the test project's output directory (`out/bin/Azure.Functions.Cli.Tests/debug_net8.0`) - this is what will be used by the tests
+  - As part of this build, the cli is copied into the test project's output directory (`out/bin/Azure.Functions.Cli.Tests/debug`) - this is what will be used by the tests
   - If you wish to override this, you can set the `FUNC_PATH` environment variable to the path of the `func`/`func.exe` you wish to test against
 - Run the test suite in Visual Studio Test Explorer or by running `dotnet test` from the `test` project root.
   - i.e. `cd test/Azure.Functions.Cli.Tests; dotnet test`
 
 #### Storage Emulator
 
-Some tests, namely E2E, require an Azure storage emulator to be running. You can download the storage emulator [here](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite?tabs=visual-studio%2Cblob-storage).
+Some tests, namely E2E, require an Azure storage emulator to be running. You can download the storage emulator [here](https://learn.microsoft.com/azure/storage/common/storage-use-azurite?tabs=visual-studio%2Cblob-storage).
 
 Run the emulator before your run the tests.
 
 > There is a script you can use for this as well, see `tools/start-emulators.ps1`
 
-#### Templates missing
+#### Templates Missing
 
-If you see an error saying the templates folder is missing, you can follow either of the following steps:
+If you see an error saying the templates folder is missing, you can download the templates using the `download-templates.ps1` script.
 
-##### (a)
+From the root of the repo, run:
 
-- Find your offical func instation directory
-  - i.e. `/opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.6610`
-  - or `%LOCALAPPDATA%\AzureFunctionsTools\Releases\4.69.0\cli_x64\`
-- Copy the templates folder to the test project's output directory (`out/bin/Azure.Functions.Cli.Tests/debug_net8.0`)
+- `./eng/scripts/download-templates.ps1 -OutputPath "./out/bin/<test_project_name>/debug`
+  - e.g. "./out/bin/Azure.Functions.Cli.E2E.Tests/debug"
 
-##### or (b)
-
-- Update `build/Program.cs` to just add the template nugets and json:
-
-    ```csharp
-    Orchestrator
-        .CreateForTarget(args)
-        .Then(AddTemplatesNupkgs)
-        .Then(AddTemplatesJson)
-        .Run();
-    ```
-- Set environment variables required to run the build script
-  - Windows: `$env:IsReleaseBuild = "false"`
-  - MacOS: `export IsReleaseBuild=false`
-    - If using M1/M2, you may need to set the dotnet root as well `export DOTNET_ROOT=/usr/local/share/dotnet/x64`
-- Run the build script `build.ps1`
-- In the `artifacts` folder, you should find a `templates` folder within any the subfolders here
-- Copy the `templates` folder to the test project's output directory (`out/bin/Azure.Functions.Cli.Tests/debug_net8.0`)
+The script will download the template packages to a `templates` folder in the specified output directory.
 
 ## Contributing to this Repository
 
@@ -83,3 +64,5 @@ Before we can accept your pull-request you'll need to sign a [Contribution Licen
 When your pull-request is created, we classify it. If the change is trivial, i.e. you just fixed a typo, then the PR is labelled with `cla-not-required`. Otherwise it's classified as `cla-required`. In that case, the system will also also tell you how you can sign the CLA. Once you signed a CLA, the current and all future pull-requests will be labelled as `cla-signed`. Signing the CLA might sound scary but it's actually super simple and can be done in less than a minute.
 
 Before submitting a feature or substantial code contribution please discuss it with the team and ensure it follows the product roadmap. Note that all code submissions will be rigorously reviewed and tested by the Azure Functions Core Tools team, and only those that meet the bar for both quality and design/roadmap appropriateness will be merged into the source.
+
+Path: /opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.7030/templates
