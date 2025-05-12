@@ -116,6 +116,28 @@ jobs:
         nethost.dll
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-arm64
 
+  - pwsh: |
+      # Generate a unique version number based on date
+      $versionDate = Get-Date -Format "yyyy.MMdd"
+      # Base version is 4.0 followed by date in YYYY.MMDD format
+      $uniqueVersion = "4.0.$versionDate"
+      Write-Host "Generated unique version for nightly build: $uniqueVersion"
+      
+      # Set as pipeline variable for use in the Universal Packages task
+      Write-Host "##vso[task.setvariable variable=NightlyBuildVersion]$uniqueVersion"
+    displayName: 'Generate unique nightly build version'
+
+  - task: UniversalPackages@0
+    displayName: Publish
+    inputs:
+      command: publish
+      publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
+      vstsFeedPublish: 'internal/core-tools-nightly-build'
+      vstsFeedPackagePublish: 'drop-coretools-host-windows'
+      versionOption: custom
+      versionPublish: '$(NightlyBuildVersion)'
+      packagePublishDescription: 'Core tools host build (windows)'
+
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
@@ -220,6 +242,28 @@ jobs:
         func
         libnethost.so
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
+
+  - pwsh: |
+      # Generate a unique version number based on date
+      $versionDate = Get-Date -Format "yyyy.MMdd"
+      # Base version is 4.0 followed by date in YYYY.MMDD format
+      $uniqueVersion = "4.0.$versionDate"
+      Write-Host "Generated unique version for nightly build: $uniqueVersion"
+      
+      # Set as pipeline variable for use in the Universal Packages task
+      Write-Host "##vso[task.setvariable variable=NightlyBuildVersion]$uniqueVersion"
+    displayName: 'Generate unique nightly build version'
+
+  - task: UniversalPackages@0
+    displayName: Publish
+    inputs:
+      command: publish
+      publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
+      vstsFeedPublish: 'internal/core-tools-nightly-build'
+      vstsFeedPackagePublish: 'drop-coretools-host-linux-signed'
+      versionOption: custom
+      versionPublish: '$(NightlyBuildVersion)'
+      packagePublishDescription: 'Core tools host build (linux)'
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)

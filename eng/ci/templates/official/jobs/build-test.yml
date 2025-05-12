@@ -292,12 +292,12 @@ jobs:
     displayName: Publish
     inputs:
       command: publish
-      publishDirectory: '$(Build.ArtifactStagingDirectory)'             ## Location of the files you wish to publish
-      vstsFeedPublish: 'internal/core-tools-nightly-build'                     ## The project and feed name to publish to. If you're working with an organization-scoped feed, specify only the feed name
-      vstsFeedPackagePublish: 'drop'                          ## The package name. Must be lower case. Use only letters, numbers, and dashes
-      versionOption: custom                                             ## Select a versioning strategy. Options: `major`, `minor`, `patch`, `custom`
-      versionPublish: '$(NightlyBuildVersion)'                              ## The custom package version
-      packagePublishDescription: 'Core tools default nightly build'                ## Description of the package content
+      publishDirectory: '$(Build.ArtifactStagingDirectory)'
+      vstsFeedPublish: 'internal/core-tools-nightly-build'
+      vstsFeedPackagePublish: 'drop'
+      versionOption: custom
+      versionPublish: '$(NightlyBuildVersion)'
+      packagePublishDescription: 'Core tools default nightly build'
 
   - pwsh: |
       eng/scripts/uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
