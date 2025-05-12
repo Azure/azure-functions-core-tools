@@ -44,18 +44,7 @@ jobs:
 
   steps:
   - checkout: self
-
-  - task: UniversalPackages@0
-    displayName: Publish
-    inputs:
-      command: publish
-      publishDirectory: '$(Build.ArtifactStagingDirectory)'             ## Location of the files you wish to publish
-      vstsFeedPublish: 'internal/core-tools-nightly-build'                     ## The project and feed name to publish to. If you're working with an organization-scoped feed, specify only the feed name
-      vstsFeedPackagePublish: 'test'                          ## The package name. Must be lower case. Use only letters, numbers, and dashes
-      versionOption: custom                                             ## Select a versioning strategy. Options: `major`, `minor`, `patch`, `custom`
-      versionPublish: '1.0.0'                               ## The custom package version
-      packagePublishDescription: 'test'                ## Description of the package content
-
+  
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
     inputs:
