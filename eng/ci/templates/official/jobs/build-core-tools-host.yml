@@ -239,10 +239,10 @@ jobs:
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
 
   - task: PowerShell@2
-      displayName: 'Generate nightly build package version for feed'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+    displayName: 'Generate nightly build package version for feed'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
   - task: UniversalPackages@0
     displayName: Publish
