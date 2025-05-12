@@ -48,5 +48,4 @@ extends:
       - stage: BuildAndTest
         jobs:
         - template: /eng/ci/templates/official/jobs/build-test.yml@self
-        - template: /eng/ci/templates/official/jobs/linux-package.yml@self
 
