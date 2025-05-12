@@ -51,6 +51,8 @@ variables:
 - template: /ci/variables/cfs.yml@eng
 - name: archs
   value: 'win-x64,win-x86,min.win-x64,osx-x64,linux-x64,osx-arm64,win-arm64,min.win-arm64,min.win-x86'
+- name: isNightlyBuild
+  value: ${{ eq(variables['Build.Reason'], 'Schedule') }}
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -73,9 +75,12 @@ extends:
       displayName: "Assemble Artifacts"
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
+        parameters:
+          isNightlyBuild: true
 
       - ${{ each arch in split(variables.archs,',') }}:
         - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
           parameters:
             arch: ${{ arch }}
             displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
+            isNightlyBuild: true

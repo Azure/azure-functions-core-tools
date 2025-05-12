@@ -117,15 +117,23 @@ jobs:
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-arm64
 
   - pwsh: |
-      # Generate a unique version number based on date
-      $versionDate = Get-Date -Format "yyyy.MMdd"
-      # Base version is 4.0 followed by date in YYYY.MMDD format
-      $uniqueVersion = "4.0.$versionDate"
+      # Generate a SemVer 2.0 compliant version number
+      # Format: 4.0.YYYYMMDD (where YYYYMMDD has no leading zeros)
+      $year = (Get-Date).Year
+      $month = (Get-Date).Month
+      $day = (Get-Date).Day
+      
+      # Construct date as an integer (no leading zeros)
+      $dateInt = ($year * 10000) + ($month * 100) + $day
+      
+      # Create version in format 4.0.YYYYMMDD
+      $uniqueVersion = "4.0.$dateInt"
       Write-Host "Generated unique version for nightly build: $uniqueVersion"
       
       # Set as pipeline variable for use in the Universal Packages task
       Write-Host "##vso[task.setvariable variable=NightlyBuildVersion]$uniqueVersion"
-    displayName: 'Generate unique nightly build version'
+    displayName: 'Generate SemVer-compliant nightly build version'
+
 
   - task: UniversalPackages@0
     displayName: Publish
@@ -244,15 +252,23 @@ jobs:
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
 
   - pwsh: |
-      # Generate a unique version number based on date
-      $versionDate = Get-Date -Format "yyyy.MMdd"
-      # Base version is 4.0 followed by date in YYYY.MMDD format
-      $uniqueVersion = "4.0.$versionDate"
+      # Generate a SemVer 2.0 compliant version number
+      # Format: 4.0.YYYYMMDD (where YYYYMMDD has no leading zeros)
+      $year = (Get-Date).Year
+      $month = (Get-Date).Month
+      $day = (Get-Date).Day
+      
+      # Construct date as an integer (no leading zeros)
+      $dateInt = ($year * 10000) + ($month * 100) + $day
+      
+      # Create version in format 4.0.YYYYMMDD
+      $uniqueVersion = "4.0.$dateInt"
       Write-Host "Generated unique version for nightly build: $uniqueVersion"
       
       # Set as pipeline variable for use in the Universal Packages task
       Write-Host "##vso[task.setvariable variable=NightlyBuildVersion]$uniqueVersion"
-    displayName: 'Generate unique nightly build version'
+    displayName: 'Generate SemVer-compliant nightly build version'
+
 
   - task: UniversalPackages@0
     displayName: Publish

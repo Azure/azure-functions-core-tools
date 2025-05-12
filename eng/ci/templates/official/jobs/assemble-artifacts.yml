@@ -3,32 +3,36 @@ parameters:
     type: string
   - name: displayName
     type: string
+  - name: isNightlyBuild
+    type: boolean
+    default: false
 
 jobs:
 - job: AssembleArtifact${{ parameters.displayName }}
   displayName: "Assemble ${{ parameters.arch }}"
   templateContext:
-    inputs:
-      - input: pipelineArtifact
-        pipeline: core-tools-host
-        artifactName: drop-coretools-host-linux-signed
-        targetPath: $(Pipeline.Workspace)/core-tools-host/drop-coretools-host-linux-signed
-      - input: pipelineArtifact
-        pipeline: core-tools-host
-        artifactName: drop-coretools-host-windows
-        targetPath: $(Pipeline.Workspace)/core-tools-host/drop-coretools-host-windows
-      - input: pipelineArtifact
-        pipeline: core-tools-inproc
-        artifactName: drop-inproc6
-        targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc6
-      - input: pipelineArtifact
-        pipeline: core-tools-inproc
-        artifactName: drop-inproc8
-        targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc8
-      - input: pipelineArtifact
-        pipeline: core-tools-default
-        artifactName: drop
-        targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+    ${{ if eq(parameters.isNightlyBuild, false) }}:
+      inputs:
+        - input: pipelineArtifact
+          pipeline: core-tools-host
+          artifactName: drop-coretools-host-linux-signed
+          targetPath: $(Pipeline.Workspace)/core-tools-host/drop-coretools-host-linux-signed
+        - input: pipelineArtifact
+          pipeline: core-tools-host
+          artifactName: drop-coretools-host-windows
+          targetPath: $(Pipeline.Workspace)/core-tools-host/drop-coretools-host-windows
+        - input: pipelineArtifact
+          pipeline: core-tools-inproc
+          artifactName: drop-inproc6
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc6
+        - input: pipelineArtifact
+          pipeline: core-tools-inproc
+          artifactName: drop-inproc8
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc8
+        - input: pipelineArtifact
+          pipeline: core-tools-default
+          artifactName: drop
+          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
 
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
@@ -44,7 +48,55 @@ jobs:
 
   steps:
   - checkout: self
-  
+
+  # Conditional download of artifacts based on isNightlyBuild parameter
+  - ${{ if eq(parameters.isNightlyBuild, true) }}:
+    # Download from ADO feed for nightly builds
+    - task: UniversalPackages@0
+      displayName: 'Download core-tools-host (Linux signed) from feed'
+      inputs:
+        command: download
+        vstsFeed: 'internal/core-tools-nightly-build'
+        vstsFeedPackage: 'drop-coretools-host-linux-signed'
+        vstsPackageVersion: '4.0.*'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/drop-coretools-host-linux-signed'
+
+    - task: UniversalPackages@0
+      displayName: 'Download core-tools-host (Windows) from feed'
+      inputs:
+        command: download
+        vstsFeed: 'internal/core-tools-nightly-build'
+        vstsFeedPackage: 'drop-core-tools-host-windows'
+        vstsPackageVersion: '4.0.*'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/drop-coretools-host-windows'
+
+    - task: UniversalPackages@0
+      displayName: 'Download core-tools-inproc6 from feed'
+      inputs:
+        command: download
+        vstsFeed: 'internal/core-tools-nightly-build'
+        vstsFeedPackage: 'drop-inproc6'
+        vstsPackageVersion: '4.0.*'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/drop-inproc6'
+
+    - task: UniversalPackages@0
+      displayName: 'Download core-tools-inproc8 from feed'
+      inputs:
+        command: download
+        vstsFeed: 'internal/core-tools-nightly-build'
+        vstsFeedPackage: 'drop-inproc8'
+        vstsPackageVersion: '4.0.*'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/drop-inproc8'
+
+    - task: UniversalPackages@0
+      displayName: 'Download core-tools-default from feed'
+      inputs:
+        command: download
+        vstsFeed: 'internal/core-tools-nightly-build'
+        vstsFeedPackage: 'drop'
+        vstsPackageVersion: '4.0.*'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/drop'
+
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
     inputs:
