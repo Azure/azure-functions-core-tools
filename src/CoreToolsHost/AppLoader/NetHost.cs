@@ -7,8 +7,8 @@ namespace CoreToolsHost
 {
     internal class NetHost
     {
-        [DllImport("nethost", EntryPoint = "get_hostfxr_path", CharSet = CharSet.Auto)]
-        private static extern unsafe int get_hostfxr_path(
+        [DllImport("nethost", EntryPoint = "GetHostFXRPath", CharSet = CharSet.Auto)]
+        private static extern unsafe int GetHostFXRPath(
         [Out] char[] buffer,
         [In] ref int buffer_size,
         HostFxrParameters* parameters);
@@ -18,7 +18,7 @@ namespace CoreToolsHost
             char[] buffer = new char[200];
             int bufferSize = buffer.Length;
 
-            int rc = get_hostfxr_path(buffer, ref bufferSize, parameters);
+            int rc = GetHostFXRPath(buffer, ref bufferSize, parameters);
 
             if (rc != 0)
             {
