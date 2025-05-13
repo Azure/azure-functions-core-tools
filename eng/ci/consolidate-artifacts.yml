@@ -10,7 +10,7 @@ name: $(Build.SourceBranchName)_$(Build.Reason)
 
 trigger: none
 
-# This pipeline is triggered by the completion of scheduled builds
+# This pipeline is triggered by the completion of builds
 # in the core-tools-inproc and core-tools-default pipelines
 resources:
   repositories:
@@ -30,8 +30,6 @@ resources:
     - pipeline: core-tools-inproc
       source: azure/azure-functions-core-tools/core-tools.official
       branch: in-proc  # in-proc branch of core-tools.official
-      tags:
-      - nightly-build
       trigger:
         branches:
           include:
@@ -40,8 +38,6 @@ resources:
     - pipeline: core-tools-default
       source: azure/azure-functions-core-tools/core-tools.official
       branch: main  # main branch of core-tools.official
-      tags:
-      - nightly-build
       trigger:
         branches:
           include:
@@ -76,11 +72,11 @@ extends:
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
         parameters:
-          isNightlyBuild: true
+          isNightlyBuild: $[variables.isNightlyBuild]
 
       - ${{ each arch in split(variables.archs,',') }}:
         - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
           parameters:
             arch: ${{ arch }}
             displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
-            isNightlyBuild: true
+            isNightlyBuild: $[variables.isNightlyBuild]
