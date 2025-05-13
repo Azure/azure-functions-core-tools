@@ -7,13 +7,11 @@ namespace CoreToolsHost
 {
     internal class NetHost
     {
-        [DllImport("nethost", CharSet = CharSet.Auto)]
-#pragma warning disable SA1300 // Element should begin with upper-case letter
+        [DllImport("nethost", EntryPoint = "get_hostfxr_path", CharSet = CharSet.Auto)]
         private static extern unsafe int get_hostfxr_path(
         [Out] char[] buffer,
         [In] ref int buffer_size,
         HostFxrParameters* parameters);
-#pragma warning restore SA1300 // Element should begin with upper-case letter
 
         internal static unsafe string GetHostFxrPath(HostFxrParameters* parameters)
         {
