@@ -7,18 +7,20 @@ namespace CoreToolsHost
 {
     internal class NetHost
     {
-        [DllImport("nethost", EntryPoint = "get_hostfxr_path", CharSet = CharSet.Auto)]
-        private static extern unsafe int GetHostFXRPath(
+        [DllImport("nethost", CharSet = CharSet.Auto)]
+#pragma warning disable SA1300 // Element should begin with upper-case letter
+        private static extern unsafe int get_hostfxr_path(
         [Out] char[] buffer,
         [In] ref int buffer_size,
         HostFxrParameters* parameters);
+#pragma warning restore SA1300 // Element should begin with upper-case letter
 
         internal static unsafe string GetHostFxrPath(HostFxrParameters* parameters)
         {
             char[] buffer = new char[200];
             int bufferSize = buffer.Length;
 
-            int rc = GetHostFXRPath(buffer, ref bufferSize, parameters);
+            int rc = get_hostfxr_path(buffer, ref bufferSize, parameters);
 
             if (rc != 0)
             {
