@@ -251,22 +251,24 @@ jobs:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
 
-  - task: PowerShell@2
-    displayName: 'Generate nightly build package version for feed'
-    inputs:
-      targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/generateNightlyBuildPackageVersion.ps1'
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: PowerShell@2
+      displayName: 'Generate nightly build package version for feed'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/generateNightlyBuildPackageVersion.ps1'
 
-  - task: UniversalPackages@0
-    displayName: Publish
-    inputs:
-      command: publish
-      publishDirectory: '$(Build.ArtifactStagingDirectory)'
-      vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: 'drop-${{ parameters.artifactTargetFramework }}'
-      versionOption: custom
-      versionPublish: '$(NightlyBuildVersion)'
-      packagePublishDescription: 'Core tools ${{ parameters.artifactTargetFramework }} nightly build'
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: UniversalPackages@0
+      displayName: Publish
+      inputs:
+        command: publish
+        publishDirectory: '$(Build.ArtifactStagingDirectory)'
+        vstsFeedPublish: 'internal/core-tools-nightly-build'
+        vstsFeedPackagePublish: 'drop-${{ parameters.artifactTargetFramework }}'
+        versionOption: custom
+        versionPublish: '$(NightlyBuildVersion)'
+        packagePublishDescription: 'Core tools ${{ parameters.artifactTargetFramework }} nightly build'
   - task: 1ES.PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
