@@ -128,14 +128,10 @@ namespace Build
                 }
                 catch (Exception ex)
                 {
-                    if (runtime == "win-arm64" && ex.Message.Contains("Runtime 'win-arm64' is not supported by the Python worker"))
-                    {
-                        Console.WriteLine($"Warning: Skipping Python worker for unsupported runtime: {runtime}");
-                    }
-                    else
-                    {
-                        throw;
-                    }
+
+                    Console.WriteLine($"ERROR: {ex.Message}");
+                    Console.WriteLine($"Warning: Skipping Python worker for unsupported runtime: {runtime}");
+                    continue;
                 }
             }
 
