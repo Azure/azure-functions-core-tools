@@ -7,7 +7,7 @@ namespace CoreToolsHost
     {
 #if OS_LINUX
         [System.Runtime.InteropServices.DllImport("libc")]
-        private static extern int setenv(string name, string value, int overwrite);
+        private static extern int SetEnv(string name, string value, int overwrite);
 #endif
 
         /// <summary>
@@ -28,7 +28,7 @@ namespace CoreToolsHost
              *  So using the native method directly here.
              * */
 #if OS_LINUX
-            setenv(name, value, 1);
+            SetEnv(name, value, 1);
 #else
             Environment.SetEnvironmentVariable(name, value);
 #endif
