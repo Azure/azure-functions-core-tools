@@ -115,6 +115,13 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
+                // Check if the runtime is unsupported by the Python worker
+                if (runtime == "win-arm64")
+                {
+                    Console.WriteLine($"Excluding Python worker for unsupported runtime: {runtime}");
+                    RemoveSpecificLanguageWorker(outputPath, "python");
+                }
+
                 ExecuteDotnetPublish(outputPath, rid, "net8.0");
                 if (isMinVersion)
                 {
@@ -126,6 +133,16 @@ namespace Build
             if (!string.IsNullOrEmpty(Settings.IntegrationBuildNumber) && (_integrationManifest != null))
             {
                 _integrationManifest.CommitId = Settings.CommitId;
+            }
+        }
+
+        private static void RemoveSpecificLanguageWorker(string outputPath, string languageWorker)
+        {
+            var path = Path.Combine(outputPath, "workers", languageWorker);
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+                Console.WriteLine($"Removed {languageWorker} worker from {path}");
             }
         }
 
