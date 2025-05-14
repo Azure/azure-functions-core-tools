@@ -64,7 +64,7 @@ jobs:
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
     inputs:
-      azureSubscription: $(E2ETestServiceConnectionName)
+      azureSubscription: CoreTools-E2E-Linux-internal
       scriptType: ps
       scriptLocation: inlineScript
       signType: inline
