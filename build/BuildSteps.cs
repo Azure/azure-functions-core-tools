@@ -115,11 +115,12 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                // Check if the runtime is unsupported by the Python worker
+                // Adjust the list of language workers for unsupported runtimes
+                var excludedWorkers = new List<string>();
                 if (runtime == "win-arm64")
                 {
                     Console.WriteLine($"Excluding Python worker for unsupported runtime: {runtime}");
-                    RemoveSpecificLanguageWorker(outputPath, "python");
+                    excludedWorkers.Add("python");
                 }
 
                 ExecuteDotnetPublish(outputPath, rid, "net8.0");
@@ -136,24 +137,20 @@ namespace Build
             }
         }
 
-        private static void RemoveSpecificLanguageWorker(string outputPath, string languageWorker)
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, List<string> excludedWorkers = null)
         {
-            var path = Path.Combine(outputPath, "workers", languageWorker);
-            if (Directory.Exists(path))
-            {
-                Directory.Delete(path, recursive: true);
-                Console.WriteLine($"Removed {languageWorker} worker from {path}");
-            }
-        }
+            // Prepare the NoWorkers property if workers need to be excluded
+            var noWorkers = excludedWorkers != null && excludedWorkers.Any()
+                ? $"/p:NoWorkers=\"{string.Join(";", excludedWorkers)}\" "
+                : string.Empty;
 
-        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework)
-        {
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 $"/p:ContinuousIntegrationBuild=\"true\" " +
+                                noWorkers +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +
+                                $"-o {outputPath} -c Release -f {targetFramework} " +
                                 (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
