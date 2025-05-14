@@ -115,19 +115,27 @@ namespace Build
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
 
-                // Adjust the list of language workers for unsupported runtimes
-                var excludedWorkers = new List<string>();
-                if (runtime == "win-arm64")
+                try
                 {
-                    Console.WriteLine($"Excluding Python worker for unsupported runtime: {runtime}");
-                    excludedWorkers.Add("python");
-                }
+                    // Attempt to publish for the current runtime
+                    ExecuteDotnetPublish(outputPath, rid, "net8.0");
 
-                ExecuteDotnetPublish(outputPath, rid, "net8.0");
-                if (isMinVersion)
+                    if (isMinVersion)
+                    {
+                        RemoveLanguageWorkers(outputPath);
+                        CreateMinConfigurationFile(outputPath);
+                    }
+                }
+                catch (Exception ex)
                 {
-                    RemoveLanguageWorkers(outputPath);
-                    CreateMinConfigurationFile(outputPath);
+                    if (runtime == "win-arm64" && ex.Message.Contains("Runtime 'win-arm64' is not supported by the Python worker"))
+                    {
+                        Console.WriteLine($"Warning: Skipping Python worker for unsupported runtime: {runtime}");
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
             }
 
@@ -137,20 +145,14 @@ namespace Build
             }
         }
 
-        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework, List<string> excludedWorkers = null)
+        private static void ExecuteDotnetPublish(string outputPath, string rid, string targetFramework)
         {
-            // Prepare the NoWorkers property if workers need to be excluded
-            var noWorkers = excludedWorkers != null && excludedWorkers.Any()
-                ? $"/p:NoWorkers=\"{string.Join(";", excludedWorkers)}\" "
-                : string.Empty;
-
             Shell.Run("dotnet", $"publish {Settings.ProjectFile} " +
                                 $"/p:BuildNumber=\"{Settings.BuildNumber}\" " +
                                 $"/p:CommitHash=\"{Settings.CommitId}\" " +
                                 $"/p:ContinuousIntegrationBuild=\"true\" " +
-                                noWorkers +
                                 (string.IsNullOrEmpty(Settings.IntegrationBuildNumber) ? string.Empty : $"/p:IntegrationBuildNumber=\"{Settings.IntegrationBuildNumber}\" ") +
-                                $"-o {outputPath} -c Release -f {targetFramework} " +
+                                $"-o {outputPath} -c Release -f {targetFramework}  --self-contained" +
                                 (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
