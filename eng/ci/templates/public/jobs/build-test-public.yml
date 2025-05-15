@@ -44,7 +44,7 @@ jobs:
     displayName: Install Nuget tool
 
   - pwsh: |
-    eng/scripts/validateWorkerVersions.ps1
+      eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
 
