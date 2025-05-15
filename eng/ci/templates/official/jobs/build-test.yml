@@ -86,11 +86,6 @@ jobs:
       eng/scripts/check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
 
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - pwsh: |
-        # Check if this is a scheduled build
-        Write-Host "##vso[build.addbuildtag]nightly-build"
-
   - pwsh: |
       eng/scripts/build.ps1
     env:
@@ -276,6 +271,25 @@ jobs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: 'drop'
       artifactType: 'pipeline'
+
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: PowerShell@2
+      displayName: 'Generate nightly build package version for feed'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: UniversalPackages@0
+      displayName: Publish
+      inputs:
+        command: publish
+        publishDirectory: '$(Build.ArtifactStagingDirectory)'
+        vstsFeedPublish: 'internal/core-tools-nightly-build'
+        vstsFeedPackagePublish: 'drop'
+        versionOption: custom
+        versionPublish: '$(NightlyBuildVersion)'
+        packagePublishDescription: 'Core tools default nightly build'
 
   - pwsh: |
       eng/scripts/uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
