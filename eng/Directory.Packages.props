@@ -39,7 +39,7 @@
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" Version="4.0.3148" />
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" Version="4.0.4025" />
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4206" />
-    <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.34.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.35.0" />
   </ItemGroup>
 
   <!-- host -->
