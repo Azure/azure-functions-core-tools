@@ -123,7 +123,6 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
     - task: UniversalPackages@0
       displayName: Publish
       inputs:
@@ -247,7 +246,6 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
     - task: UniversalPackages@0
       displayName: Publish
       inputs:
