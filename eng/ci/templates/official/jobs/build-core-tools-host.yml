@@ -240,22 +240,24 @@ jobs:
         libnethost.so
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
 
-  - task: PowerShell@2
-    displayName: 'Generate nightly build package version for feed'
-    inputs:
-      targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: PowerShell@2
+      displayName: 'Generate nightly build package version for feed'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
-  - task: UniversalPackages@0
-    displayName: Publish
-    inputs:
-      command: publish
-      publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
-      vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: 'drop-coretools-host-linux-signed'
-      versionOption: custom
-      versionPublish: '$(NightlyBuildVersion)'
-      packagePublishDescription: 'Core tools host build (linux)'
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: UniversalPackages@0
+      displayName: Publish
+      inputs:
+        command: publish
+        publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
+        vstsFeedPublish: 'internal/core-tools-nightly-build'
+        vstsFeedPackagePublish: 'drop-coretools-host-linux-signed'
+        versionOption: custom
+        versionPublish: '$(NightlyBuildVersion)'
+        packagePublishDescription: 'Core tools host build (linux)'
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
