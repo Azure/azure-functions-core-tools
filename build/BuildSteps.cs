@@ -122,7 +122,7 @@ namespace Build
                 }
                 catch (Exception ex)
                 {
-                    if (runtime.StartsWith("min.win-arm64"))
+                    if (runtime.Contains("arm64"))
                     {
                         Console.WriteLine($"Error publishing for runtime {runtime}. Exception: {ex.Message}");
                         continue;
