@@ -15,7 +15,6 @@ jobs:
     devops_buildNumber: $[counter(format('1'), 6100)]
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
-    SimulateReleaseBuild: true
   steps:
   - pwsh: . "tools/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
@@ -259,7 +258,6 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/generateNightlyBuildPackageVersion.ps1'
 
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
     - task: UniversalPackages@0
       displayName: Publish
       inputs:
@@ -270,11 +268,13 @@ jobs:
         versionOption: custom
         versionPublish: '$(NightlyBuildVersion)'
         packagePublishDescription: 'Core tools ${{ parameters.artifactTargetFramework }} nightly build'
+
   - task: 1ES.PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: 'drop-${{ parameters.artifactTargetFramework }}'
       artifactType: 'pipeline'
+      
   - pwsh: |
       .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
     env:
