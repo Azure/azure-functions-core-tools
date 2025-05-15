@@ -130,7 +130,7 @@ namespace Build
                 {
 
                     Console.WriteLine($"ERROR message: {ex.Message}");
-                    Console.WriteLine($"ERROR inner exception: {ex.InnerException}");
+                    Console.WriteLine($"ERROR stack trace: {ex.StackTrace}");
                     Console.WriteLine($"Current runtime: {runtime}");
                     continue;
                 }
