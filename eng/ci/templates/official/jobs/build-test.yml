@@ -15,7 +15,7 @@ jobs:
     devops_buildNumber: $[counter(format('1'), 6100)]
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
-    E2ETestServiceConnectionName: CoreTools-E2E-Linux-internal
+    SimulateReleaseBuild: true
   steps:
   - pwsh: . "tools/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
@@ -64,7 +64,7 @@ jobs:
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
     inputs:
-      azureSubscription: CoreTools-E2E-Linux-internal
+      azureSubscription: $(E2ETestServiceConnectionName)
       scriptType: ps
       scriptLocation: inlineScript
       signType: inline
