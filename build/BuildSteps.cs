@@ -129,8 +129,9 @@ namespace Build
                 catch (Exception ex)
                 {
 
-                    Console.WriteLine($"ERROR: {ex.Message}");
-                    Console.WriteLine($"Warning: Skipping Python worker for unsupported runtime: {runtime}");
+                    Console.WriteLine($"ERROR message: {ex.Message}");
+                    Console.WriteLine($"ERROR inner exception: {ex.InnerException}");
+                    Console.WriteLine($"Current runtime: {runtime}");
                     continue;
                 }
             }
