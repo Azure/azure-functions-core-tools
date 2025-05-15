@@ -122,13 +122,15 @@ namespace Build
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Runtime: {runtime}");
-                    Console.WriteLine($"Message: {ex.Message}");
-                    Console.WriteLine($"StackTrace: {ex.StackTrace}");
-                    Console.WriteLine($"Source: {ex.Source}");
-                    Console.WriteLine($"TargetSite: {ex.TargetSite}");
-                    Console.WriteLine($"HResult: {ex.HResult}");
-                    continue;
+                    if (runtime.StartsWith("min.win-arm64"))
+                    {
+                        Console.WriteLine($"Error publishing for runtime {runtime}. Exception: {ex.Message}");
+                        continue;
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
                 if (isMinVersion)
                 {
