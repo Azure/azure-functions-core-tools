@@ -119,22 +119,21 @@ namespace Build
                 {
                     // Attempt to publish for the current runtime
                     ExecuteDotnetPublish(outputPath, rid, "net8.0");
-
-                    if (isMinVersion)
-                    {
-                        RemoveLanguageWorkers(outputPath);
-                        CreateMinConfigurationFile(outputPath);
-                    }
                 }
                 catch (Exception ex)
                 {
-
+                    Console.WriteLine($"Runtime: {runtime}");
                     Console.WriteLine($"Message: {ex.Message}");
                     Console.WriteLine($"StackTrace: {ex.StackTrace}");
                     Console.WriteLine($"Source: {ex.Source}");
                     Console.WriteLine($"TargetSite: {ex.TargetSite}");
                     Console.WriteLine($"HResult: {ex.HResult}");
                     continue;
+                }
+                if (isMinVersion)
+                {
+                    RemoveLanguageWorkers(outputPath);
+                    CreateMinConfigurationFile(outputPath);
                 }
             }
 
