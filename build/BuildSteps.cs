@@ -129,10 +129,11 @@ namespace Build
                 catch (Exception ex)
                 {
 
-                    Console.WriteLine($"ERROR message: {ex.Message}");
-                    Console.WriteLine($"ERROR inner exception: {ex.InnerException?.Message}");
-                    Console.WriteLine($"ERROR stack trace: {ex.StackTrace}");
-                    Console.WriteLine($"Current runtime: {runtime}");
+                    Console.WriteLine($"Message: {ex.Message}");
+                    Console.WriteLine($"StackTrace: {ex.StackTrace}");
+                    Console.WriteLine($"Source: {ex.Source}");
+                    Console.WriteLine($"TargetSite: {ex.TargetSite}");
+                    Console.WriteLine($"HResult: {ex.HResult}");
                     continue;
                 }
             }
