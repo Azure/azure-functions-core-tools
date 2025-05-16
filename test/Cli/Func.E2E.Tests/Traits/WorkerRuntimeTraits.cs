@@ -34,5 +34,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Traits
         /// Indicates tests that target the PowerShell runtime.
         /// </summary>
         public const string Powershell = "Powershell";
+
+        /// <summary>
+        /// Indicates tests that target the Python runtime.
+        /// </summary>
+        public const string Python = "Python";
     }
 }
