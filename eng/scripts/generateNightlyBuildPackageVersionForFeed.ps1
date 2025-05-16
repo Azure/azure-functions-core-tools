@@ -8,7 +8,8 @@ $day = (Get-Date).Day
 $dateInt = ($year * 10000) + ($month * 100) + $day
 
 # Create version in format 4.0.YYYYMMDD
-$uniqueVersion = "4.0.$dateInt"
+#$uniqueVersion = "4.0.$dateInt"
+$uniqueVersion = $env:BUILD_BUILDID
 Write-Host "Generated unique version for nightly build: $uniqueVersion"
 
 # Set as pipeline variable for use in the Universal Packages task
