@@ -68,15 +68,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
             }
             else
             {
-                // ArmAuthenticationOptions was removed with host v4.1038.300 - we need to double check the impact of this.
                 services.AddAuthentication()
                     .AddScriptJwtBearer()
                     .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { });
-            }
 
-            // Only set up authorization handler which bypasses all local auth if enableAuth param is not set
-            if (!_enableAuth)
-            {
+                // Bypass all local auth
                 services.AddSingleton<IAuthorizationHandler, CoreToolsAuthorizationHandler>();
             }
 
