@@ -73,9 +73,12 @@ extends:
       displayName: "Assemble Artifacts"
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
+        parameters:
+          isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
 
       - ${{ each arch in split(variables.archs,',') }}:
         - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
           parameters:
             arch: ${{ arch }}
             displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
+            isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}

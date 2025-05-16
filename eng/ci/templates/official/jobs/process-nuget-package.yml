@@ -1,12 +1,18 @@
+parameters:
+  - name: isNightlyBuild
+    type: boolean
+    default: false
+
 jobs:
 - job: ProcessNuGetPackage
   displayName: "Process NuGet Package"
   templateContext:
-    inputs:
-      - input: pipelineArtifact
-        pipeline: core-tools-default
-        artifactName: drop
-        targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+    ${{ if eq(parameters.isNightlyBuild, false) }}:
+      inputs:
+        - input: pipelineArtifact
+          pipeline: core-tools-default
+          artifactName: drop
+          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
@@ -14,6 +20,18 @@ jobs:
         artifact: drop-nuget-package
   steps:
   - checkout: self
+
+  # Conditional download of artifacts based on isNightlyBuild parameter
+  - ${{ if eq(parameters.isNightlyBuild, true) }}:
+    # Download from ADO feed for nightly builds
+    - task: UniversalPackages@0
+      displayName: 'Download core-tools-default from feed'
+      inputs:
+        command: download
+        vstsFeed: 'internal/core-tools-nightly-build'
+        vstsFeedPackage: 'drop'
+        vstsPackageVersion: '4.0.*'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/drop'
 
   - task: PowerShell@2
     displayName: 'Process and move nuget package to staging directory'
