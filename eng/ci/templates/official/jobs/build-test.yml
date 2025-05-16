@@ -107,7 +107,7 @@ jobs:
     condition: succeededOrFailed()
     inputs:
       targetPath: '$(Build.SourcesDirectory)/TestLogs'
-      artifactName: 'TestLogs'
+      artifactName: 'TestLogs_$(System.JobAttempt)'
       artifactType: 'pipeline'
 
   - template: ci/sign-files.yml@eng
