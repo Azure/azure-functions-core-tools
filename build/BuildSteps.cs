@@ -114,24 +114,8 @@ namespace Build
                 var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
-
-                try
-                {
-                    // Attempt to publish for the current runtime
-                    ExecuteDotnetPublish(outputPath, rid, "net8.0");
-                }
-                catch (Exception ex)
-                {
-                    if (runtime.Contains("arm64"))
-                    {
-                        Console.WriteLine($"Error publishing for runtime {runtime}. Exception: {ex.Message}");
-                        continue;
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+  
+                ExecuteDotnetPublish(outputPath, rid, "net8.0");
                 if (isMinVersion)
                 {
                     RemoveLanguageWorkers(outputPath);
