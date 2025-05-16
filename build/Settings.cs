@@ -43,7 +43,8 @@ namespace Build
 
         public static readonly string RuntimeSettings = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", ".runsettings", "start_tests", "ci_pipeline", "dotnet_inproc.runsettings");
 
-        public static readonly string[] TargetRuntimes = new[] {
+        public static readonly string[] TargetRuntimes = new[]
+        {
             "min.win-arm64",
             "min.win-x86",
             "min.win-x64",
@@ -56,7 +57,11 @@ namespace Build
             "win-arm64"
         };
 
-        public static readonly string[] UnsupportedPythonRuntimes = new[] { "win-arm64" };
+        public static readonly string[] UnsupportedPythonRuntimes = new[]
+        {
+            "win-arm64",
+            "linux-arm64"
+        };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
