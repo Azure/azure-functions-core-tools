@@ -10,7 +10,7 @@ $defaultArtifactName = $env:DEFAULT_ARTIFACT_NAME
 $artifactPath = Join-Path -Path $CurrentDirectory -ChildPath "$defaultArtifactAlias\$defaultArtifactName"
 
 # Define the regex pattern to match the nupkg file (digit.digit.4digits)
-$regexPattern = "^Microsoft\.Azure\.Functions\.CoreTools\.\d+\.\d+\.\d{4}\.nupkg$"
+$regexPattern = "^Microsoft\.Azure\.Functions\.CoreTools\.\d+\.\d+\.\d{4}(?:-[\w\d\-]+)?\.nupkg$"
 
 # Look for the first nupkg file that matches the pattern in the constructed path
 $fileToMove = Get-ChildItem -Path $artifactPath -Filter "*.nupkg" | Where-Object { $_.Name -match $regexPattern } | Select-Object -First 1
