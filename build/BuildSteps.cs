@@ -114,7 +114,7 @@ namespace Build
                 var isMinVersion = runtime.StartsWith(Settings.MinifiedVersionPrefix);
                 var outputPath = Path.Combine(Settings.OutputDir, runtime);
                 var rid = GetRuntimeId(runtime);
-  
+
                 ExecuteDotnetPublish(outputPath, rid, "net8.0");
                 if (isMinVersion)
                 {
