@@ -52,7 +52,10 @@ namespace Build
             "osx-arm64",
             "win-x86",
             "win-x64",
-            "win-arm64" };
+            "win-arm64"
+        };
+
+        public static readonly string[] UnsupportedPythonRuntimes = new[] { "win-arm64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
@@ -180,15 +183,15 @@ namespace Build
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
         public static readonly string SBOMManifestTelemetryDir = Path.Combine(OutputDir, "SBOMManifestTelemetry");
-        
+
         public static string TargetFramework = "net6.0";
 
         public static readonly string NupkgPublishDir = Path.GetFullPath($"../src/Azure.Functions.Cli/bin/Release/{TargetFramework}/publish");
-        
+
         public static readonly string PreSignTestDir = "PreSignTest";
 
         public static readonly string SignTestDir = "SignTest";
-       
+
         public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
 
         public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
@@ -275,7 +278,7 @@ namespace Build
                 "Grpc.AspNetCore.Server.dll",
                 "Grpc.Core.dll",
                 "Grpc.Core.Api.dll",
-                "Grpc.Net.Client.dll", 
+                "Grpc.Net.Client.dll",
                 "Grpc.Net.ClientFactory.dll",
                 "Grpc.Net.Common.dll",
                 "grpc_csharp_ext.x64.dll",

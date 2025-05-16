@@ -193,7 +193,9 @@ namespace Build
         public static void FilterPythonRuntimes()
         {
             var minifiedRuntimes = Settings.TargetRuntimes.Where(r => r.StartsWith(Settings.MinifiedVersionPrefix));
-            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
+            var unsupportedPythonRuntimes = Settings.UnsupportedPythonRuntimes;
+
+            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes).Except(unsupportedPythonRuntimes))
             {
                 var pythonWorkerPath = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
                 var allPythonVersions = Directory.GetDirectories(pythonWorkerPath);
