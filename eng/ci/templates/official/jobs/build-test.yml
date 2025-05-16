@@ -272,23 +272,23 @@ jobs:
       artifactName: 'drop'
       artifactType: 'pipeline'
 
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - task: PowerShell@2
-      displayName: 'Generate nightly build package version for feed'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+  #- ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+  - task: PowerShell@2
+    displayName: 'Generate nightly build package version for feed'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
-    - task: UniversalPackages@0
-      displayName: Publish
-      inputs:
-        command: publish
-        publishDirectory: '$(Build.ArtifactStagingDirectory)'
-        vstsFeedPublish: 'internal/core-tools-nightly-build'
-        vstsFeedPackagePublish: 'drop'
-        versionOption: custom
-        versionPublish: '$(NightlyBuildVersion)'
-        packagePublishDescription: 'Core tools default nightly build'
+  - task: UniversalPackages@0
+    displayName: Publish
+    inputs:
+      command: publish
+      publishDirectory: '$(Build.ArtifactStagingDirectory)'
+      vstsFeedPublish: 'internal/core-tools-nightly-build'
+      vstsFeedPackagePublish: 'drop'
+      versionOption: custom
+      versionPublish: '$(NightlyBuildVersion)'
+      packagePublishDescription: 'Core tools default nightly build'
 
   - pwsh: |
       eng/scripts/uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
