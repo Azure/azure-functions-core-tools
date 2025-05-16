@@ -17,7 +17,7 @@ The default func runtime being built by the `Dockerfile` is linux x64.
 - When you want to kill the container, run: `docker-compose down`
 
 > [!IMPORTANT]
-> If you are using a Mac with Apple silicon (M1, M2, etc.), you will need to use the `--platform linux/amd64`
+> If you are using a Mac with Apple silicon (M1, M2, etc.), you will need to use the `--platform linux/arm64`
 > flag when building the image for non-ARM RIDs. You can also set this in the docker-compose file.
 
 ### Testing Different Runtimes
