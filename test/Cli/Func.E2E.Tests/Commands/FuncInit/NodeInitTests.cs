@@ -16,16 +16,24 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("")]
         [InlineData("v3")]
         [InlineData("v4")]
-        public void Init_Node_App_With_SupportedModel(string programmingModel)
+        public void Init_WithSupportedModel_SuccessfulExecution(string programmingModel)
         {
             var workingDir = WorkingDirectory;
             var programmingModelFlag = string.IsNullOrEmpty(programmingModel) ? string.Empty : $"--model {programmingModel}";
-            var testName = nameof(Init_Node_App_With_SupportedModel);
+            var testName = nameof(Init_WithSupportedModel_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
-            var expectedcontent = new[] { "FUNCTIONS_WORKER_RUNTIME", "node" };
-            var packageJsonPath = Path.Combine(workingDir, "package.json");
+            var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
+            var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "node" };
+            var packageJsonPath = Path.Combine(workingDir, Common.Constants.PackageJsonFileName);
             var expectedJsoncontent = new[] { $"\"@azure/functions\": \"^4" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (localSettingsPath, expectedcontent)
+            };
+            if (programmingModel == "v4" || string.IsNullOrEmpty(programmingModel))
+            {
+                filesToValidate.Add((packageJsonPath, expectedJsoncontent));
+            }
 
             // Initialize node function app
             var funcInitResult = funcInitCommand
@@ -33,23 +41,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                .Execute(["--worker-runtime", "node", programmingModelFlag]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().NotHaveStdOutContaining($"Initialized empty Git repository");
-            funcInitResult.Should().FileExistsWithContent(localSettingsPath, expectedcontent);
-
-            if (programmingModel == "v4" || programmingModel == string.Empty)
-            {
-                funcInitResult.Should().FileExistsWithContent(packageJsonPath, expectedJsoncontent);
-            }
+            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Theory]
         [InlineData("v1")]
         [InlineData("v2")]
-        public void Init_Node_App_With_UnsupportedModel(string programmingModel)
+        public void Init_WithUnsupportedModel_FailsWithError(string programmingModel)
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Node_App_With_UnsupportedModel);
+            var testName = nameof(Init_WithUnsupportedModel_FailsWithError);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize node function app
@@ -63,13 +65,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_Node_App_Contains_Logging_Config()
+        public void Init_VerifyHostJsonFileExpectsLoggingConfig_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Node_App_Contains_Logging_Config);
+            var testName = nameof(Init_VerifyHostJsonFileExpectsLoggingConfig_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var hostJsonFilePath = Path.Combine(workingDir, "host.json");
+            var hostJsonFilePath = Path.Combine(workingDir, Common.Constants.HostJsonFileName);
             var expectedHostJsonContent = new[] { "logging", "applicationInsights", "excludedTypes", "Request" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (hostJsonFilePath, expectedHostJsonContent)
+            };
 
             // Initialize node function app
             var funcInitResult = funcInitCommand
@@ -79,17 +85,21 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
             funcInitResult.Should().HaveStdOutContaining($"Writing host.json");
-            funcInitResult.Should().FileExistsWithContent(hostJsonFilePath, expectedHostJsonContent);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_Node_App_With_Dockerfile()
+        public void Init_WithDockerFlag_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Node_App_With_Dockerfile);
+            var testName = nameof(Init_WithDockerFlag_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { "FROM mcr.microsoft.com/azure-functions/node:4" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize node function app
             var funcInitResult = funcInitCommand
@@ -98,20 +108,25 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_Node_App_Typescript_With_Dockerfile()
+        public void Init_WithTypescriptAndDockerFlag_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Node_App_Typescript_With_Dockerfile);
+            var testName = nameof(Init_WithTypescriptAndDockerFlag_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
-            var expectedcontent = new[] { "FUNCTIONS_WORKER_RUNTIME", "node" };
+            var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
+            var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "node" };
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { "FROM mcr.microsoft.com/azure-functions/node:4", "npm run build" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (localSettingsPath, expectedcontent),
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize node function app
             var funcInitResult = funcInitCommand
@@ -120,19 +135,22 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(localSettingsPath, expectedcontent);
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public async void Init_Docker_Only_For_Existing_Project_Node()
+        public async void Init_DockerOnlyOnExistingProject_GeneratesDockerfile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Docker_Only_For_Existing_Project_Node);
+            var testName = nameof(Init_DockerOnlyOnExistingProject_GeneratesDockerfile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/node:4" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize node function app using retry helper
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node"]);
@@ -143,15 +161,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_Node_App_With_skip_npm_install()
+        public void Init_WithSkipNpmInstallFlag_SuccessfullySkipsNpmInstall()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Node_App_With_skip_npm_install);
+            var testName = nameof(Init_WithSkipNpmInstallFlag_SuccessfullySkipsNpmInstall);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize node function app
@@ -166,10 +184,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_Node_App_Typescript_With_ModelV4_skip_npm_install()
+        public void Init_WithTypescriptModelV4AndSkipNpmInstall_SuccessfullySkipsNpmInstall()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Node_App_Typescript_With_ModelV4_skip_npm_install);
+            var testName = nameof(Init_WithTypescriptModelV4AndSkipNpmInstall_SuccessfullySkipsNpmInstall);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize node function app

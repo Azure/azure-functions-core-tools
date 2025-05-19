@@ -14,15 +14,20 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
     public class PowershellInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_App_With_Powershell_Runtime()
+        public void Init_PowershellApp__SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_App_With_Powershell_Runtime);
+            var testName = nameof(Init_PowershellApp__SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
-            var expectedcontent = new[] { "FUNCTIONS_WORKER_RUNTIME", "powershell" };
+            var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
+            var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "powershell" };
             var profileFilePath = Path.Combine(workingDir, "profile.ps1");
             var expectedProfileContent = new[] { $"# Azure Functions profile.ps1" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (localSettingsPath, expectedcontent),
+                (profileFilePath, expectedProfileContent)
+            };
 
             // Initialize powershell function app
             var funcInitResult = funcInitCommand
@@ -30,21 +35,22 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                 .Execute(["--worker-runtime", "powershell"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing {WorkingDirectory}\\.vscode\\extensions.json");
-            funcInitResult.Should().NotHaveStdOutContaining($"Initialized empty Git repository");
-            funcInitResult.Should().FileExistsWithContent(localSettingsPath, expectedcontent);
-            funcInitResult.Should().FileExistsWithContent(profileFilePath, expectedProfileContent);
+            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_Powershell_App_With_DockerFile()
+        public void Init_WithDockerFlag_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Powershell_App_With_DockerFile);
+            var testName = nameof(Init_WithDockerFlag_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerFileContent = new[] { "FROM mcr.microsoft.com/azure-functions/powershell:4" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerFileContent)
+            };
 
             // Initialize powershell function app
             var funcInitResult = funcInitCommand
@@ -53,18 +59,22 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerFileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public async Task Init_Powershell_App_With_Docker_Only_For_Existing_Project()
+        public async Task Init_DockerOnlyOnExistingProject_GeneratesDockerFile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Powershell_App_With_Docker_Only_For_Existing_Project);
+            var testName = nameof(Init_DockerOnlyOnExistingProject_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/powershell:4" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize dotnet function app with retry helper
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "powershell"]);
@@ -75,15 +85,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_Powershell_App_With_Enable_Managed_Dependencies()
+        public void Init_WithManagedDependenciesGeneratesAllConfigFiles_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Powershell_App_With_Enable_Managed_Dependencies);
+            var testName = nameof(Init_WithManagedDependenciesGeneratesAllConfigFiles_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var hostJsonfilePath = Path.Combine(workingDir, "host.json");
             var expectedHostJsonContent = new[]
@@ -109,14 +119,22 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                             "Disable-AzContextAutosave -Scope Process | Out-Null",
                             "Connect-AzAccount -Identity"
                         };
-            var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
+            var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedLocalSettingsContent = new[]
                         {
-                            "FUNCTIONS_WORKER_RUNTIME",
+                            Common.Constants.FunctionsWorkerRuntime,
                             "powershell",
                             "FUNCTIONS_WORKER_RUNTIME_VERSION",
                             "7.4"
                         };
+
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (localSettingsPath, expectedLocalSettingsContent),
+                (profileFilePath, expectedProfileContent),
+                (hostJsonfilePath, expectedHostJsonContent),
+                (requirementsFilePath, expectedRequirementsFileContent)
+            };
 
             // Initialize powershell function app
             var funcInitResult = funcInitCommand
@@ -125,10 +143,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().FileExistsWithContent(hostJsonfilePath, expectedHostJsonContent);
-            funcInitResult.Should().FileExistsWithContent(requirementsFilePath, expectedRequirementsFileContent);
-            funcInitResult.Should().FileExistsWithContent(profileFilePath, expectedProfileContent);
-            funcInitResult.Should().FileExistsWithContent(localSettingsPath, expectedLocalSettingsContent);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
     }
 }

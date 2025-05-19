@@ -14,54 +14,67 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
     public class DotnetIsolatedInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_App_With_DotnetIsolated_Runtime()
+        public void Init_NetIsolatedApp_SuccessfulExecution()
         {
-            var testName = nameof(Init_App_With_DotnetIsolated_Runtime);
+            var workinDir = WorkingDirectory;
+            var testName = nameof(Init_NetIsolatedApp_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var localSettingsPath = Path.Combine(WorkingDirectory, "local.settings.json");
-            var expectedcontent = new[] { "FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated" };
+            var localSettingsPath = Path.Combine(WorkingDirectory, Common.Constants.LocalSettingsJsonFileName);
+            var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (localSettingsPath, expectedcontent)
+            };
 
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
-               .WithWorkingDirectory(WorkingDirectory)
+               .WithWorkingDirectory(workinDir)
                .Execute(["--worker-runtime", "dotnet-isolated"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing {WorkingDirectory}\\.vscode\\extensions.json");
-            funcInitResult.Should().FileExistsWithContent(localSettingsPath, expectedcontent);
+            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workinDir);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_DotnetIsolated_With_Net9TargetFramework()
+        public void Init_WithNet9TargetFramework_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_DotnetIsolated_With_Net9TargetFramework);
+            var testName = nameof(Init_WithNet9TargetFramework_SuccessfulExecution);
+            var projectName = "Test-funcs";
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var localSettingsPath = Path.Combine(workingDir, "Test-funcs", "local.settings.json");
-            var csprojfilepath = Path.Combine(workingDir, "Test-funcs", "Test-funcs.csproj");
-            var expectedLocalSettingsContent = new[] { "FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated" };
+            var localSettingsPath = Path.Combine(workingDir, projectName, Common.Constants.LocalSettingsJsonFileName);
+            var csprojfilepath = Path.Combine(workingDir, projectName, "Test-funcs.csproj");
+            var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated" };
             var expectedCsprojContent = new[] { "Microsoft.NET.Sdk", "v4", "net9.0" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (localSettingsPath, expectedLocalSettingsContent),
+                (csprojfilepath, expectedCsprojContent)
+            };
 
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["Test-funcs", "--worker-runtime", "dotnet-isolated", "--target-framework", "net9.0"]);
+                .Execute([projectName, "--worker-runtime", "dotnet-isolated", "--target-framework", "net9.0"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().FileExistsWithContent(localSettingsPath, expectedLocalSettingsContent);
-            funcInitResult.Should().FileExistsWithContent(csprojfilepath, expectedCsprojContent);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_DotnetIsolated_With_Dockerfile()
+        public void Init_WithDotnetIsolatedAndDockerFlag_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_DotnetIsolated_With_Dockerfile);
+            var testName = nameof(Init_WithDotnetIsolatedAndDockerFlag_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated8.0" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
@@ -70,8 +83,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Theory]
@@ -79,14 +92,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("net7.0")]
         [InlineData("net8.0")]
         [InlineData("net9.0")]
-        public void Init_DotnetIsolated_With_TargetFramework_Dockerfile(string targetFramework)
+        public void Init_WithTargetFrameworkAndDockerFlag_SuccessfulExecution(string targetFramework)
         {
             var targetFrameworkstr = targetFramework.Replace("net", string.Empty);
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_DotnetIsolated_With_TargetFramework_Dockerfile);
+            var testName = nameof(Init_WithTargetFrameworkAndDockerFlag_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated{targetFrameworkstr}" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
@@ -95,8 +112,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Theory]
@@ -104,14 +121,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("net7.0")]
         [InlineData("net8.0")]
         [InlineData("net9.0")]
-        public async void Init_Docker_Only_For_Existing_Project_With_TargetFramework(string targetFramework)
+        public async void Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile(string targetFramework)
         {
             var targetFrameworkstr = targetFramework.Replace("net", string.Empty);
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Docker_Only_For_Existing_Project_With_TargetFramework);
+            var testName = nameof(Init_DockerOnlyOnExistingProjectWithTargetFramework_GeneratesDockerfile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated{targetFrameworkstr}" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize dotnet-isolated function app using retry helper
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework]);
@@ -122,8 +143,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
     }
 }

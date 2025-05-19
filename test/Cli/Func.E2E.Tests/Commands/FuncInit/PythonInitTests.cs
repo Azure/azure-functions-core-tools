@@ -16,16 +16,22 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("")]
         [InlineData("v1")]
         [InlineData("v2")]
-        public void Init_Python_App_With_Supported_Model(string programmingModel)
+        public void Init_With_SupportedModel_SuccessfulExecution(string programmingModel)
         {
             var workingDir = WorkingDirectory;
             var programmingModelFlag = string.IsNullOrEmpty(programmingModel) ? string.Empty : $"--model {programmingModel}";
-            var testName = nameof(Init_Python_App_With_Supported_Model);
+            var testName = nameof(Init_With_SupportedModel_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var localSettingsPath = Path.Combine(workingDir, "local.settings.json");
-            var expectedcontent = new[] { "FUNCTIONS_WORKER_RUNTIME", "python" };
+            var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
+            var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "python" };
             var requirementsPath = Path.Combine(workingDir, "requirements.txt");
             var expectedRequirementsContent = new[] { "# Do not include azure-functions-worker", "azure-functions" };
+
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (localSettingsPath, expectedcontent),
+                (requirementsPath, expectedRequirementsContent)
+            };
 
             // Initialize python function app
             var funcInitResult = funcInitCommand
@@ -33,7 +39,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                 .Execute(["--worker-runtime", "python", programmingModelFlag]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
+            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
             if (programmingModel == string.Empty || programmingModel == "v2")
             {
                 funcInitResult.Should().HaveStdOutContaining($"Writing function_app.py");
@@ -43,18 +50,14 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             {
                 funcInitResult.Should().HaveStdOutContaining($"Writing getting_started.md");
             }
-
-            funcInitResult.Should().NotHaveStdOutContaining($"Initialized empty Git repository");
-            funcInitResult.Should().FileExistsWithContent(localSettingsPath, expectedcontent);
-            funcInitResult.Should().FileExistsWithContent(requirementsPath, expectedRequirementsContent);
         }
 
         [Theory]
         [InlineData("v3")]
-        public void Init_Python_App_With_UnsupportedModel(string programmingModel)
+        public void Init_With_UnsupportedModel_FailsWithError(string programmingModel)
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Python_App_With_UnsupportedModel);
+            var testName = nameof(Init_With_UnsupportedModel_FailsWithError);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize node function app
@@ -68,13 +71,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_Python_App_With_Dockerfile()
+        public void Init_WithDockerFlag_GeneratesDockerfile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Python_App_With_Dockerfile);
+            var testName = nameof(Init_WithDockerFlag_GeneratesDockerfile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { "FROM mcr.microsoft.com/azure-functions/python:4" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize node function app
             var funcInitResult = funcInitCommand
@@ -83,18 +90,22 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public async Task Init_Python_App_With_Docker_Only_For_Existing_Project()
+        public async Task Init_DockerOnlyOnExistingProject_GeneratesDockerfile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Python_App_With_Docker_Only_For_Existing_Project);
+            var testName = nameof(Init_DockerOnlyOnExistingProject_GeneratesDockerfile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/python:4" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (dockerFilePath, expectedDockerfileContent)
+            };
 
             // Initialize dotnet function app with retry helper
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "python"]);
@@ -105,15 +116,15 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing Dockerfile");
-            funcInitResult.Should().FileExistsWithContent(dockerFilePath, expectedDockerfileContent);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public async void Init_Python_App_Twice()
+        public async void Init_WithExistingProject_SkipsExistingFilesCreation()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Python_App_Twice);
+            var testName = nameof(Init_WithExistingProject_SkipsExistingFilesCreation);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize dotnet function app with retry helper
@@ -132,13 +143,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_Python_App_ModelV1_Generates_getting_started_md()
+        public void Init_PythonApp_ModelV1_GeneratesGettingStartedDoc()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Python_App_ModelV1_Generates_getting_started_md);
+            var testName = nameof(Init_PythonApp_ModelV1_GeneratesGettingStartedDoc);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var gettingStartedPath = Path.Combine(workingDir, "getting_started.md");
             var expectedcontent = new[] { "## Getting Started with Azure Function" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (gettingStartedPath, expectedcontent)
+            };
 
             // Initialize python function app
             var funcInitResult = funcInitCommand
@@ -148,7 +163,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
             funcInitResult.Should().HaveStdOutContaining($"Writing getting_started.md");
-            funcInitResult.Should().FileExistsWithContent(gettingStartedPath, expectedcontent);
+            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
     }
 }

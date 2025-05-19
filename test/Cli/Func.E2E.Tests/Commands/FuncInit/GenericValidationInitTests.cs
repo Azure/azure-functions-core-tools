@@ -12,11 +12,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
     public class GenericValidationInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_Function_App_With_unknown_worker_runtime()
+        public void Init_WithUnknownWorkerRuntime_DisplayNotValidOptionError()
         {
             const string unknownWorkerRuntime = "foo";
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Function_App_With_unknown_worker_runtime);
+            var testName = nameof(Init_WithUnknownWorkerRuntime_DisplayNotValidOptionError);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize function app with unsupported worker runtime
@@ -30,10 +30,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_Docker_Only_Without_Project()
+        public void Init_WithDockerOnlyWithoutProject_ExpectedToFailWithError()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Docker_Only_Without_Project);
+            var testName = nameof(Init_WithDockerOnlyWithoutProject_ExpectedToFailWithError);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize function app with unsupported worker runtime
@@ -47,10 +47,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_Function_App_With_Managed_Dependencies_Unsupported_WorkerRuntime()
+        public void Init_WithManagedDependenciesOnUnsupportedWorkerRuntime_FailsWithError()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Function_App_With_Managed_Dependencies_Unsupported_WorkerRuntime);
+            var testName = nameof(Init_WithManagedDependenciesOnUnsupportedWorkerRuntime_FailsWithError);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize function app
@@ -64,10 +64,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_Function_App_With_WorkerRuntime_Typescript_SuccessfulExecution()
+        public void Init_WithWorkerRuntimeTypescript_SuccessfulExecution()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_Function_App_With_WorkerRuntime_Typescript_SuccessfulExecution);
+            var testName = nameof(Init_WithWorkerRuntimeTypescript_SuccessfulExecution);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize dotnet function app
@@ -76,9 +76,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                .Execute(["--worker-runtime", "typescript"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
+            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
             funcInitResult.Should().HaveStdOutContaining($"Writing tsconfig.json");
-            funcInitResult.Should().HaveStdOutContaining($"Writing {WorkingDirectory}\\.vscode\\extensions.json");
         }
     }
 }
