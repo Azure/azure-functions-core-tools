@@ -11,13 +11,13 @@ jobs:
       inputs:
         - input: pipelineArtifact
           pipeline: core-tools-default
-          artifactName: drop
-          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+          artifactName: coretools-cli
+          targetPath: $(Pipeline.Workspace)/core-tools-default/coretools-cli
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
         targetPath: $(Pipeline.Workspace)/nugetPackage
-        artifact: drop-nuget-package
+        artifact: coretools-nuget-package
   steps:
   - checkout: self
 
@@ -29,9 +29,9 @@ jobs:
       inputs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'drop'
-        vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/drop'
+        vstsFeedPackage: 'coretools-cli'
+        vstsPackageVersion: '4.0.*+*'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/coretools-cli'
 
   - task: PowerShell@2
     displayName: 'Process and move nuget package to staging directory'

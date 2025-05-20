@@ -14,35 +14,35 @@ jobs:
       inputs:
         - input: pipelineArtifact
           pipeline: core-tools-host
-          artifactName: drop-coretools-host-linux-signed
-          targetPath: $(Pipeline.Workspace)/core-tools-host/drop-coretools-host-linux-signed
+          artifactName: coretools-host-linux-signed
+          targetPath: $(Pipeline.Workspace)/core-tools-host/coretools-host-linux-signed
         - input: pipelineArtifact
           pipeline: core-tools-host
-          artifactName: drop-coretools-host-windows
-          targetPath: $(Pipeline.Workspace)/core-tools-host/drop-coretools-host-windows
+          artifactName: coretools-host-windows
+          targetPath: $(Pipeline.Workspace)/core-tools-host/coretools-host-windows
         - input: pipelineArtifact
           pipeline: core-tools-inproc
-          artifactName: drop-inproc6
-          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc6
+          artifactName: coretools-cli-inproc6
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc6
         - input: pipelineArtifact
           pipeline: core-tools-inproc
-          artifactName: drop-inproc8
-          targetPath: $(Pipeline.Workspace)/core-tools-inproc/drop-inproc8
+          artifactName: coretools-cli-inproc8
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc8
         - input: pipelineArtifact
           pipeline: core-tools-default
-          artifactName: drop
-          targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+          artifactName: coretools-cli
+          targetPath: $(Pipeline.Workspace)/core-tools-default/coretools-cli
 
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
       - output: pipelineArtifact
         displayName: Publish assembled artifact ${{ parameters.arch }}
         targetPath: $(Build.ArtifactStagingDirectory)/core-tools
-        artifact: drop-${{ parameters.arch }}
+        artifact: coretools-cli-${{ parameters.arch }}
       - output: pipelineArtifact
         displayName: Publish metadata.json
         targetPath: $(Build.ArtifactStagingDirectory)/metadata.json
-        artifact: drop-metadata-json
+        artifact: coretools-cli-metadata-json
         condition: and(succeeded(), eq('${{ parameters.arch }}', 'min.win-x64'))
 
   steps:
@@ -56,45 +56,45 @@ jobs:
       inputs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'drop-coretools-host-linux-signed'
+        vstsFeedPackage: 'coretools-host-linux-signed'
         vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/drop-coretools-host-linux-signed'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/coretools-host-linux-signed'
 
     - task: UniversalPackages@0
       displayName: 'Download core-tools-host (Windows) from feed'
       inputs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'drop-coretools-host-windows'
+        vstsFeedPackage: 'coretools-host-windows'
         vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/drop-coretools-host-windows'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/coretools-host-windows'
 
     - task: UniversalPackages@0
       displayName: 'Download core-tools-inproc6 from feed'
       inputs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'drop-inproc6'
+        vstsFeedPackage: 'coretools-cli-inproc6'
         vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/drop-inproc6'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc6'
 
     - task: UniversalPackages@0
       displayName: 'Download core-tools-inproc8 from feed'
       inputs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'drop-inproc8'
+        vstsFeedPackage: 'coretools-cli-inproc8'
         vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/drop-inproc8'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc8'
 
     - task: UniversalPackages@0
       displayName: 'Download core-tools-default from feed'
       inputs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'drop'
+        vstsFeedPackage: 'coretools-cli'
         vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/drop'
+        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/coretools-cli'
 
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
