@@ -264,7 +264,7 @@ jobs:
         command: publish
         publishDirectory: '$(Build.ArtifactStagingDirectory)'
         vstsFeedPublish: 'internal/core-tools-nightly-build'
-        vstsFeedPackagePublish: 'drop-${{ parameters.artifactTargetFramework }}'
+        vstsFeedPackagePublish: '${{ parameters.artifactTargetFramework }}'
         versionOption: custom
         versionPublish: '$(NightlyBuildVersion)'
         packagePublishDescription: 'Core tools ${{ parameters.artifactTargetFramework }} nightly build'
