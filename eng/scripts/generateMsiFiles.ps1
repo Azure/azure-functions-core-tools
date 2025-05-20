@@ -22,6 +22,7 @@ $artifactsPath = "$rootDir\artifacts"
 $buildDir = "$rootDir\build"
 $cli = Get-ChildItem -Path $artifactsPath -Include func.dll -Recurse | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
+Write-Host "##vso[task.setvariable variable=cliVersion;]$cliVersion"
 
 # Generate MSI installers for Windows
 # TODO: add 'arm64' to the below array once a production-ready version of the WiX toolset supporting
