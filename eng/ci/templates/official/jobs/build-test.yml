@@ -269,7 +269,7 @@ jobs:
     condition: succeeded()
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifactName: 'drop'
+      artifactName: 'coretools-cli'
       artifactType: 'pipeline'
 
   #- ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
@@ -285,7 +285,7 @@ jobs:
       command: publish
       publishDirectory: '$(Build.ArtifactStagingDirectory)'
       vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: 'drop'
+      vstsFeedPackagePublish: 'coretools-cli'
       versionOption: custom
       versionPublish: '$(NightlyBuildVersion)'
       packagePublishDescription: 'Core tools default nightly build'
