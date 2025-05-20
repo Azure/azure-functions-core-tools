@@ -64,9 +64,10 @@ jobs:
 
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeededOrFailed()
+    continueOnError: true
     inputs:
       targetPath: '$(Build.SourcesDirectory)/TestLogs'
-      artifactName: 'TestLogs'
+      artifactName: 'TestLogs_$(System.JobAttempt)'
       artifactType: 'pipeline'
 
   - task: PublishTestResults@2
