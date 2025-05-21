@@ -69,7 +69,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
             var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
 
             var result = funcNewCommand
-                .WithWorkingDirectory(WorkingDirectory)  // Use WorkingDirectory directly
+                .WithWorkingDirectory(WorkingDirectory)
                 .Execute(new[] { ".", "--template", "InvalidTrigger", "--name", "InvalidFunction" });
 
             // Validate result
@@ -80,7 +80,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         [Fact]
         public async Task FuncNew_WithoutName_ShowsError()
         {
-
             var methodName = nameof(FuncNew_WithoutName_ShowsError);
             var uniqueTestName = methodName;
 

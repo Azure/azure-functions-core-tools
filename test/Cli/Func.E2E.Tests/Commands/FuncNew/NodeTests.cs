@@ -136,34 +136,27 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         [Fact]
         public async Task FuncNew_TypeScript_HttpTrigger_CreatesFunctionWithExpectedMetadata()
         {
-            try
-            {
-                var uniqueTestName = nameof(FuncNew_TypeScript_HttpTrigger_CreatesFunctionWithExpectedMetadata);
+            var uniqueTestName = nameof(FuncNew_TypeScript_HttpTrigger_CreatesFunctionWithExpectedMetadata);
 
-                // Initialize the project with TypeScript and model v3
-                await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "node", "--language", "typescript", "-m", "v3" });
+            // Initialize the project with TypeScript and model v3
+            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "node", "--language", "typescript", "-m", "v3" });
 
-                // Create new Http Trigger function
-                var newCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
-                var result = newCommand
-                    .WithWorkingDirectory(WorkingDirectory)
-                    .Execute(new[] { ".", "--template", "httptrigger", "--name", "testfunc" });
+            // Create new Http Trigger function
+            var newCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
+            var result = newCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--template", "httptrigger", "--name", "testfunc" });
 
-                // Validate expected output
-                result.Should().ExitWith(0);
-                result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
+            // Validate expected output
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
 
-                var functionJsonPath = Path.Combine(WorkingDirectory, "testfunc", "function.json");
-                var content = await File.ReadAllTextAsync(functionJsonPath);
-                content.Should().Contain("../dist/testfunc/index.js");
-                content.Should().Contain("authLevel");
-                content.Should().Contain("methods");
-                content.Should().Contain("httpTrigger");
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            var functionJsonPath = Path.Combine(WorkingDirectory, "testfunc", "function.json");
+            var content = await File.ReadAllTextAsync(functionJsonPath);
+            content.Should().Contain("../dist/testfunc/index.js");
+            content.Should().Contain("authLevel");
+            content.Should().Contain("methods");
+            content.Should().Contain("httpTrigger");
         }
 
         [Fact]
