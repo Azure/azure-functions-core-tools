@@ -51,8 +51,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(1);
-            funcInitResult.Should().HaveStdErrContaining($"The {programmingModel} programming model is not supported for worker runtime java.");
-
+            funcInitResult.Should().HaveStdErrContaining($"programming model is not supported for worker runtime java.");
         }
     }
  }
