@@ -257,6 +257,7 @@ jobs:
     inputs:
       targetType: filePath
       filePath: '$(Build.SourcesDirectory)/generateNightlyBuildPackageVersion.ps1'
+      arguments: '-ArtifactDirectory "$(Build.ArtifactStagingDirectory)"'
 
   - task: UniversalPackages@0
     displayName: Publish

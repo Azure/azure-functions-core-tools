@@ -1,4 +1,19 @@
-$cli = Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" -Include func.dll -Recurse | Select-Object -First 1
+param (
+    [Parameter(Mandatory=$true)]
+    [string]$ArtifactDirectory
+)
+
+# Find func.dll file
+Write-Host "Searching for func.dll in directory: $ArtifactDirectory"
+$cli = Get-ChildItem -Path $ArtifactDirectory -Include "func.dll" -Recurse | Select-Object -First 1
+
+# Check if func.dll was found
+if ($null -eq $cli) {
+    throw "Error: func.dll not found in $ArtifactDirectory"
+}
+
+Write-Host "Found func.dll at: $($cli.FullName)"
+
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 
 
