@@ -1,4 +1,6 @@
-$cliVersion = $env:cliVersion
+$cli = Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" -Include func.dll -Recurse | Select-Object -First 1
+$cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
+
 
 # Throw an error if cliVersion is not found
 if ([string]::IsNullOrEmpty($cliVersion)) {
