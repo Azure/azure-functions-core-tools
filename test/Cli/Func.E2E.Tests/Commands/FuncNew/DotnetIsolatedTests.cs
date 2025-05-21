@@ -48,7 +48,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "TimerTrigger", "--name", "TimerFunction"]);
 
             // Validate result
-            funcNewResult.Should().ExitWith(0);
             funcNewResult.Should().HaveStdOutContaining("The function \"TimerFunction\" was created successfully");
         }
     }

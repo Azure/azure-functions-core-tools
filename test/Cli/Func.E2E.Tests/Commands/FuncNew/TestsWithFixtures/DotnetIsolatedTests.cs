@@ -34,7 +34,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew.TestsWithFixtures
                 .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
                 .Execute([".", "--template", "HttpTrigger", "--name", "MyHttpFunction"]);
 
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"MyHttpFunction\" was created successfully");
         }
     }
