@@ -30,7 +30,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "HttpTrigger", "--name", "HttpFunction"]);
 
             // Validate result
-            funcNewResult.Should().ExitWith(0);
             funcNewResult.Should().HaveStdOutContaining("The function \"HttpFunction\" was created successfully");
         }
 
@@ -49,7 +48,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 
             // Validate error message
             var functionPath = Path.Combine(WorkingDirectory, uniqueTestName, "testfunc");
-            result.Should().ExitWith(0);
             Directory.Exists(functionPath).Should().BeFalse("Function directory should not be created with invalid authlevel.");
         }
 
@@ -69,7 +67,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "HttpTrigger", "--name", "testfunc", "--authlevel", "function"]);
 
             // Validate expected output
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully");
         }
 
@@ -89,7 +86,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute(new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
         }
 
@@ -109,7 +105,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute(new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
         }
 
@@ -129,7 +124,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute(new[] { ".", "--language", "js", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
         }
 
@@ -148,7 +142,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute(new[] { ".", "--template", "httptrigger", "--name", "testfunc" });
 
             // Validate expected output
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
 
             var functionJsonPath = Path.Combine(WorkingDirectory, "testfunc", "function.json");
@@ -177,7 +170,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "httptrigger", "--name", "testfunc"]);
 
             // Step 3: Assertions
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
         }
     }

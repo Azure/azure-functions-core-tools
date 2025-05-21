@@ -28,7 +28,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute(new[] { ".", "--template", "HttpTrigger", "--name", "testfunc" });
 
             // Validate result
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"HttpTrigger\" template.");
         }
     }

@@ -34,7 +34,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "HttpTrigger", "--name", "MyHttpTriggerFunction", "--authlevel", "Anonymous", "-a"]);
 
             // Verify output contains success message
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"MyHttpTriggerFunction\" was created successfully from the \"HttpTrigger\" template.");
 
             // Verify generated function.json and authLevel

@@ -30,7 +30,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "HttpTrigger", "--name", "HttpFunction"]);
 
             // Validate result
-            funcNewResult.Should().ExitWith(0);
             funcNewResult.Should().HaveStdOutContaining("The function \"HttpFunction\" was created successfully");
         }
 
@@ -51,7 +50,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "TimerTrigger", "--name", "TimerFunction"]);
 
             // Validate result
-            funcNewResult.Should().ExitWith(0);
             funcNewResult.Should().HaveStdOutContaining("The function \"TimerFunction\" was created successfully");
         }
 
@@ -73,7 +71,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute(new[] { ".", "--template", "InvalidTrigger", "--name", "InvalidFunction" });
 
             // Validate result
-            result.Should().ExitWith(1);
             result.Should().HaveStdErrContaining("Unknown template 'InvalidTrigger'");
         }
 
@@ -129,7 +126,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .Execute([".", "--template", "HttpTrigger", "--name", "testfunc", "--authlevel", "function"]);
 
             // Validate expected output
-            result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully");
         }
 

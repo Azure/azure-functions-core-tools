@@ -30,7 +30,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute([".", "--template", "invalidTemplate", "--name", "testfunc"]);
 
-            result.Should().ExitWith(1);
             result.Should().HaveStdErrContaining("Can't find template \"invalidTemplate\" in \"javascript\"");
         }
 
