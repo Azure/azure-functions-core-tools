@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Theory]
-        [InlineData("v3")]
+        [InlineData("v2")]
         public void Init_With_UnsupportedModel_DisplaysError(string programmingModel)
         {
             var workingDir = WorkingDirectory;
