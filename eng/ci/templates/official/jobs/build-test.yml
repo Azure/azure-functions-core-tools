@@ -264,7 +264,7 @@ jobs:
       command: publish
       publishDirectory: '$(Build.ArtifactStagingDirectory)'
       vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: '${{ parameters.artifactTargetFramework }}'
+      vstsFeedPackagePublish: 'coretools-cli-${{ parameters.artifactTargetFramework }}'
       versionOption: custom
       versionPublish: '$(NightlyBuildVersion)'
       packagePublishDescription: 'Core tools ${{ parameters.artifactTargetFramework }} nightly build'
@@ -272,7 +272,7 @@ jobs:
   - task: 1ES.PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifactName: 'drop-${{ parameters.artifactTargetFramework }}'
+      artifactName: 'coretools-cli-${{ parameters.artifactTargetFramework }}'
       artifactType: 'pipeline'
       
   - pwsh: |
