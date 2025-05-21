@@ -64,10 +64,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithWorkerRuntimeTypescript_SuccessfulExecution()
+        public void Init_WithWorkerRuntimeTypescript_GeneratesExpectedFunctionProjectFiles()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithWorkerRuntimeTypescript_SuccessfulExecution);
+            var testName = nameof(Init_WithWorkerRuntimeTypescript_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize dotnet function app

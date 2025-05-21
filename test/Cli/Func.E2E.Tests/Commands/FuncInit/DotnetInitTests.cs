@@ -13,10 +13,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
     public class DotnetInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_DotnetApp_SuccessfulExecution()
+        public void Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_DotnetApp_SuccessfulExecution);
+            var testName = nameof(Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet" };
@@ -38,10 +38,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [Theory]
         [InlineData("net6.0")]
         [InlineData("net8.0")]
-        public void Init_WithSupportedTargetFramework_SuccessfulExecution(string targetFramework)
+        public void Init_WithSupportedTargetFramework_GeneratesProjectFile_ContainsExpectedVersion(string targetFramework)
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithSupportedTargetFramework_SuccessfulExecution);
+            var testName = nameof(Init_WithSupportedTargetFramework_GeneratesProjectFile_ContainsExpectedVersion);
             var projectName = "dotnet-funcs";
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, "dotnet-funcs", Common.Constants.LocalSettingsJsonFileName);
@@ -85,10 +85,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [Theory]
         [InlineData("")]
         [InlineData("--csx")]
-        public void Init_WithDockerFlagAndCsx_SuccessfulExecution(string csxParam)
+        public void Init_WithDockerFlagAndCsx_GeneratesDockerFile(string csxParam)
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithDockerFlagAndCsx_SuccessfulExecution);
+            var testName = nameof(Init_WithDockerFlagAndCsx_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet:4" };
@@ -109,10 +109,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithCsxFlag_SuccessfulExecution()
+        public void Init_WithCsxFlag_GeneratesExpectedFunctionProjectFiles()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithCsxFlag_SuccessfulExecution);
+            var testName = nameof(Init_WithCsxFlag_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet" };

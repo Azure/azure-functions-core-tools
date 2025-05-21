@@ -16,11 +16,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("")]
         [InlineData("v1")]
         [InlineData("v2")]
-        public void Init_With_SupportedModel_SuccessfulExecution(string programmingModel)
+        public void Init_With_SupportedModel_GeneratesExpectedFunctionProjectFiles(string programmingModel)
         {
             var workingDir = WorkingDirectory;
             var programmingModelFlag = string.IsNullOrEmpty(programmingModel) ? string.Empty : $"--model {programmingModel}";
-            var testName = nameof(Init_With_SupportedModel_SuccessfulExecution);
+            var testName = nameof(Init_With_SupportedModel_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "python" };

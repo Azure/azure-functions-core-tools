@@ -16,11 +16,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("")]
         [InlineData("v3")]
         [InlineData("v4")]
-        public void Init_WithSupportedModel_SuccessfulExecution(string programmingModel)
+        public void Init_WithSupportedModel_GeneratesExpectedFunctionProjectFiles(string programmingModel)
         {
             var workingDir = WorkingDirectory;
             var programmingModelFlag = string.IsNullOrEmpty(programmingModel) ? string.Empty : $"--model {programmingModel}";
-            var testName = nameof(Init_WithSupportedModel_SuccessfulExecution);
+            var testName = nameof(Init_WithSupportedModel_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "node" };
@@ -65,10 +65,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_VerifyHostJsonFileExpectsLoggingConfig_SuccessfulExecution()
+        public void Init_GeneratesHostJson_ContainsExpectedLoggingConfig()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_VerifyHostJsonFileExpectsLoggingConfig_SuccessfulExecution);
+            var testName = nameof(Init_GeneratesHostJson_ContainsExpectedLoggingConfig);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var hostJsonFilePath = Path.Combine(workingDir, Common.Constants.HostJsonFileName);
             var expectedHostJsonContent = new[] { "logging", "applicationInsights", "excludedTypes", "Request" };
@@ -89,10 +89,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithDockerFlag_SuccessfulExecution()
+        public void Init_WithDockerFlag_GeneratesDockerFile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithDockerFlag_SuccessfulExecution);
+            var testName = nameof(Init_WithDockerFlag_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { "FROM mcr.microsoft.com/azure-functions/node:4" };
@@ -113,10 +113,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithTypescriptAndDockerFlag_SuccessfulExecution()
+        public void Init_WithTypescriptAndDockerFlag_GeneratesDockerfile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithTypescriptAndDockerFlag_SuccessfulExecution);
+            var testName = nameof(Init_WithTypescriptAndDockerFlag_GeneratesDockerfile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "node" };
@@ -184,10 +184,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithTypescriptModelV4AndSkipNpmInstall_SuccessfullySkipsNpmInstall()
+        public void Init_Typescript_ModelV4_SkipNpmInstall_SuccessfullySkipsNpmInstall()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithTypescriptModelV4AndSkipNpmInstall_SuccessfullySkipsNpmInstall);
+            var testName = nameof(Init_Typescript_ModelV4_SkipNpmInstall_SuccessfullySkipsNpmInstall);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize node function app

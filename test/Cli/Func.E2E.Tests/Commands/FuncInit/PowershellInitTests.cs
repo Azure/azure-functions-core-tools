@@ -14,10 +14,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
     public class PowershellInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_PowershellApp__SuccessfulExecution()
+        public void Init_PowershellApp_GeneratesExpectedFunctionProjectFiles()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_PowershellApp__SuccessfulExecution);
+            var testName = nameof(Init_PowershellApp_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "powershell" };
@@ -40,10 +40,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithDockerFlag_SuccessfulExecution()
+        public void Init_WithDockerFlag_GeneratesDockerFile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithDockerFlag_SuccessfulExecution);
+            var testName = nameof(Init_WithDockerFlag_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerFileContent = new[] { "FROM mcr.microsoft.com/azure-functions/powershell:4" };
@@ -90,10 +90,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithManagedDependenciesGeneratesAllConfigFiles_SuccessfulExecution()
+        public void Init_WithManagedDependencies_GeneratesAllExpectedConfigFiles()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithManagedDependenciesGeneratesAllConfigFiles_SuccessfulExecution);
+            var testName = nameof(Init_WithManagedDependencies_GeneratesAllExpectedConfigFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var hostJsonfilePath = Path.Combine(workingDir, "host.json");
             var expectedHostJsonContent = new[]

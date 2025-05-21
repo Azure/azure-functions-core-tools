@@ -14,10 +14,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
     public class DotnetIsolatedInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_NetIsolatedApp_SuccessfulExecution()
+        public void Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles()
         {
             var workinDir = WorkingDirectory;
-            var testName = nameof(Init_NetIsolatedApp_SuccessfulExecution);
+            var testName = nameof(Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(WorkingDirectory, Common.Constants.LocalSettingsJsonFileName);
             var expectedcontent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated" };
@@ -37,10 +37,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithNet9TargetFramework_SuccessfulExecution()
+        public void Init_WithNet9TargetFramework_GeneratesProjectFile_ContainsExpectedVersion()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithNet9TargetFramework_SuccessfulExecution);
+            var testName = nameof(Init_WithNet9TargetFramework_GeneratesProjectFile_ContainsExpectedVersion);
             var projectName = "Test-funcs";
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, projectName, Common.Constants.LocalSettingsJsonFileName);
@@ -64,10 +64,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         }
 
         [Fact]
-        public void Init_WithDotnetIsolatedAndDockerFlag_SuccessfulExecution()
+        public void Init_WithDotnetIsolatedAndDockerFlag_GeneratesDockerFile()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithDotnetIsolatedAndDockerFlag_SuccessfulExecution);
+            var testName = nameof(Init_WithDotnetIsolatedAndDockerFlag_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated8.0" };
@@ -92,11 +92,11 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("net7.0")]
         [InlineData("net8.0")]
         [InlineData("net9.0")]
-        public void Init_WithTargetFrameworkAndDockerFlag_SuccessfulExecution(string targetFramework)
+        public void Init_WithTargetFrameworkAndDockerFlag_GeneratesDockerFile(string targetFramework)
         {
             var targetFrameworkstr = targetFramework.Replace("net", string.Empty);
             var workingDir = WorkingDirectory;
-            var testName = nameof(Init_WithTargetFrameworkAndDockerFlag_SuccessfulExecution);
+            var testName = nameof(Init_WithTargetFrameworkAndDockerFlag_GeneratesDockerFile);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var dockerFilePath = Path.Combine(workingDir, "Dockerfile");
             var expectedDockerfileContent = new[] { $"FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated{targetFrameworkstr}" };
