@@ -169,6 +169,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             {
                 (dockerFilePath, expectedDockerfileContent)
             };
+
             // Initialize dotnet function app with retry helper
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet", "--csx"]);
 

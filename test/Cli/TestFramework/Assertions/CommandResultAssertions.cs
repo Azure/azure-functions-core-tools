@@ -82,24 +82,6 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
             return new AndConstraint<CommandResultAssertions>(this);
         }
 
-        public AndConstraint<CommandResultAssertions> FileExistsWithContent(string filePath, params string[] expectedContents)
-        {
-            Execute.Assertion.ForCondition(File.Exists(filePath))
-                .FailWith($"File '{filePath}' to exist, but it does not.");
-
-            var actualContent = File.ReadAllText(filePath);
-            Execute.Assertion.ForCondition(!string.IsNullOrEmpty(actualContent))
-                .FailWith($"File '{filePath}' to have content, but it was empty.");
-
-            foreach (var expectedContent in expectedContents)
-            {
-                Execute.Assertion.ForCondition(actualContent.Contains(expectedContent))
-                    .FailWith($"File '{filePath}' should contain '{expectedContent}', but it did not.");
-            }
-
-            return new AndConstraint<CommandResultAssertions>(this);
-        }
-
         public AndConstraint<CommandResultAssertions> WriteDockerfile()
         {
             const string pattern = $"Writing Dockerfile";
