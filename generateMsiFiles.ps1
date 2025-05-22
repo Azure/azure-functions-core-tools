@@ -22,6 +22,9 @@ $buildDir = "$baseDir\build"
 $cli = Get-ChildItem -Path $artifactsPath -Include func.dll -Recurse | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 
+# Set the output variable for use in other tasks
+Write-Host "##vso[task.setvariable variable=cliVersion;isOutput=true]$cliVersion"
+
 # Generate MSI installers for Windows
 # TODO: add 'arm64' to the below array once a production-ready version of the WiX toolset supporting
 # it is released. See https://github.com/Azure/azure-functions-core-tools/issues/3122
