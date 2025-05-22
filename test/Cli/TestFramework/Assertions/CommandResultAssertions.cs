@@ -81,5 +81,51 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
                 .FailWith($"The command output did not contain expected result for .NET 8 host.{Environment.NewLine}");
             return new AndConstraint<CommandResultAssertions>(this);
         }
+
+        public AndConstraint<CommandResultAssertions> WriteDockerfile()
+        {
+            const string pattern = $"Writing Dockerfile";
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains(pattern))
+                .FailWith($"The command output did not contain expected result: {pattern}{Environment.NewLine}");
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
+
+        public AndConstraint<CommandResultAssertions> WriteVsCodeExtensionsJsonAndExitWithZero(string workingDirectory)
+        {
+            var pattern = $"Writing {workingDirectory}\\.vscode\\extensions.json";
+            var gitInitPattern = "Initialized empty Git repository";
+
+            Execute.Assertion.ForCondition(_commandResult.ExitCode == 0)
+                .FailWith($"Expected command to exit with 0 but it did not. Error message: {_commandResult.StdErr}");
+
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && _commandResult.StdOut.Contains(pattern))
+                .FailWith($"The command output did not contain expected result: {pattern}{Environment.NewLine}");
+
+            Execute.Assertion.ForCondition(_commandResult.StdOut is not null && !_commandResult.StdOut.Contains(gitInitPattern))
+                .FailWith($"The command output did contain unexpected result: {gitInitPattern}{Environment.NewLine}");
+
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
+
+        public AndConstraint<CommandResultAssertions> FilesExistsWithExpectContent(List<(string FilePath, string[] ExpectedContents)> filesWithExpectedContents)
+        {
+            foreach (var file in filesWithExpectedContents)
+            {
+                Execute.Assertion.ForCondition(File.Exists(file.FilePath))
+                    .FailWith($"File '{file.FilePath}' to exist, but it does not.");
+
+                var actualContent = File.ReadAllText(file.FilePath);
+                Execute.Assertion.ForCondition(!string.IsNullOrEmpty(actualContent))
+                    .FailWith($"File '{file.FilePath}' to have content, but it was empty.");
+
+                foreach (var expectedContent in file.ExpectedContents)
+                {
+                    Execute.Assertion.ForCondition(actualContent.Contains(expectedContent))
+                        .FailWith($"File '{file.FilePath}' should contain '{expectedContent}', but it did not.");
+                }
+            }
+
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
     }
 }
