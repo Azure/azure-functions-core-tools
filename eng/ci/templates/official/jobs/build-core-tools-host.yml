@@ -123,13 +123,6 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
-    - task: PowerShell@2
-      displayName: 'Print NightlyBuildVersion'
-      inputs:
-        targetType: 'inline'
-        script: |
-          Write-Host "NightlyBuildVersion value: $(NightlyBuildVersion)"
-
     - task: UniversalPackages@0
       displayName: Publish
       inputs:
