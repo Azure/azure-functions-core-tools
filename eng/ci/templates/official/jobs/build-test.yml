@@ -257,7 +257,6 @@ jobs:
     inputs:
       targetType: filePath
       filePath: '$(Build.SourcesDirectory)/generateNightlyBuildPackageVersion.ps1'
-      arguments: '-ArtifactDirectory "$(Build.ArtifactStagingDirectory)"'
 
   - task: UniversalPackages@0
     displayName: Publish
@@ -265,7 +264,7 @@ jobs:
       command: publish
       publishDirectory: '$(Build.ArtifactStagingDirectory)'
       vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: 'coretools-cli-${{ parameters.artifactTargetFramework }}'
+      vstsFeedPackagePublish: 'func-cli-${{ parameters.artifactTargetFramework }}'
       versionOption: custom
       versionPublish: '$(NightlyBuildVersion)'
       packagePublishDescription: 'Core tools ${{ parameters.artifactTargetFramework }} nightly build'
@@ -273,7 +272,7 @@ jobs:
   - task: 1ES.PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifactName: 'coretools-cli-${{ parameters.artifactTargetFramework }}'
+      artifactName: 'func-cli-${{ parameters.artifactTargetFramework }}'
       artifactType: 'pipeline'
       
   - pwsh: |
