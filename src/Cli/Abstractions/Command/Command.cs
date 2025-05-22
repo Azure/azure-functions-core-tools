@@ -52,25 +52,55 @@ namespace Azure.Functions.Cli.Abstractions
             }
 
             Task? processTask = null;
+            CancellationTokenSource? processTaskCts = null;
 
             using (var reaper = new ProcessReaper(_process))
             {
                 _process.Start();
                 if (processStarted != null)
                 {
+                    // Create a cancellation token source with a timeout of 2 minutes
+                    processTaskCts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+                    var token = processTaskCts.Token;
+
                     processTask = Task.Run(async () =>
                     {
                         try
                         {
-                            await processStarted(_process);
+                            // Use WhenAny to either complete the processStarted task or timeout
+                            var processStartedTask = processStarted(_process);
+                            var completedTask = await Task.WhenAny(processStartedTask, Task.Delay(Timeout.Infinite, token));
+                            
+                            if (completedTask == processStartedTask)
+                            {
+                                // Await the task to propagate any exceptions
+                                await processStartedTask;
+                            }
+                            else
+                            {
+                                // If we get here, it means the task was canceled due to timeout
+                                Reporter.Verbose.WriteLine("Process started handler timed out. Killing the process.");
+                                if (!_process.HasExited)
+                                {
+                                    _process.Kill(true);
+                                }
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Reporter.Verbose.WriteLine("Process started handler was canceled due to timeout. Killing the process.");
+                            if (!_process.HasExited)
+                            {
+                                _process.Kill(true);
+                            }
                         }
                         catch (Exception ex)
                         {
                             Reporter.Verbose.WriteLine(string.Format(
-                                "Error in process started handler: ",
+                                "Error in process started handler: {0}",
                                 ex.Message));
                         }
-                    });
+                    }, token);
                 }
 
                 reaper.NotifyProcessStarted();
@@ -87,6 +117,7 @@ namespace Azure.Functions.Cli.Abstractions
                 taskErr?.Wait();
 
                 processTask?.Wait();
+                processTaskCts?.Dispose();
             }
 
             var exitCode = _process.ExitCode;
