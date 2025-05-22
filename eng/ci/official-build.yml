@@ -45,5 +45,5 @@ extends:
     stages:
       - stage: BuildAndTest
         jobs:
-        - template: /eng/ci/templates/official/jobs/build-test.yml@self
+        - template: /eng/ci/templates/official/jobs/core-cli-build-test.yml@self
 
