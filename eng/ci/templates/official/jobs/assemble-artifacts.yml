@@ -57,7 +57,7 @@ jobs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
         vstsFeedPackage: 'func-host-linux-signed'
-        vstsPackageVersion: '4.0.*'
+        vstsPackageVersion: '*'
         downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/func-host-linux-signed'
 
     - task: UniversalPackages@0
@@ -66,7 +66,7 @@ jobs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
         vstsFeedPackage: 'func-host-windows'
-        vstsPackageVersion: '4.0.*'
+        vstsPackageVersion: '*'
         downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/func-host-windows'
 
     - task: UniversalPackages@0
@@ -75,7 +75,7 @@ jobs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
         vstsFeedPackage: 'func-cli-inproc6'
-        vstsPackageVersion: '4.0.*'
+        vstsPackageVersion: '*'
         downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc6'
 
     - task: UniversalPackages@0
@@ -84,7 +84,7 @@ jobs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
         vstsFeedPackage: 'func-cli-inproc8'
-        vstsPackageVersion: '4.0.*'
+        vstsPackageVersion: '*'
         downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc8'
 
     - task: UniversalPackages@0
@@ -93,7 +93,7 @@ jobs:
         command: download
         vstsFeed: 'internal/core-tools-nightly-build'
         vstsFeedPackage: 'func-cli'
-        vstsPackageVersion: '4.0.*'
+        vstsPackageVersion: '*'
         downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/func-cli'
 
   - task: DotNetCoreCLI@2
