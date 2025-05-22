@@ -14,6 +14,9 @@ namespace Azure.Functions.Cli
     {
         private static readonly string[] _versionArgs = new[] { "version", "v" };
         private static IContainer _container;
+        
+        // Added for testing purposes
+        internal static System.Text.Encoding GetConsoleOutputEncoding() => Console.OutputEncoding;
 
         internal static void Main(string[] args)
         {
