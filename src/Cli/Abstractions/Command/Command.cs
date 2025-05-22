@@ -69,7 +69,14 @@ namespace Azure.Functions.Cli.Abstractions
                         {
                             // Use WhenAny to either complete the processStarted task or timeout
                             var processStartedTask = processStarted(_process);
-                            if (await Task.WhenAny(processStartedTask, Task.Delay(Timeout.Infinite, token)) != processStartedTask)
+                            var completedTask = await Task.WhenAny(processStartedTask, Task.Delay(Timeout.Infinite, token));
+                            
+                            if (completedTask == processStartedTask)
+                            {
+                                // Await the task to propagate any exceptions
+                                await processStartedTask;
+                            }
+                            else
                             {
                                 // If we get here, it means the task was canceled due to timeout
                                 Reporter.Verbose.WriteLine("Process started handler timed out. Killing the process.");
