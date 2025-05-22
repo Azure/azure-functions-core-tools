@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
+using System.Text;
 
 namespace Azure.Functions.Cli
 {
@@ -16,6 +17,9 @@ namespace Azure.Functions.Cli
 
         internal static void Main(string[] args)
         {
+            // Set console encoding to UTF-8 to properly display international characters
+            Console.OutputEncoding = Encoding.UTF8;
+            
             // Check for version arg up front and prioritize speed over all else
             // Tools like VS Code may call this often and we want their UI to be responsive
             if (args.Length == 1 && _versionArgs.Any(va => args[0].Replace("-", string.Empty).Equals(va, StringComparison.OrdinalIgnoreCase)))
