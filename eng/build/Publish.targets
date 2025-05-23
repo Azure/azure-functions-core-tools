@@ -1,0 +1,117 @@
+<Project>
+
+  <!-- Default: not minified -->
+  <PropertyGroup>
+    <IsMinified>false</IsMinified>
+  </PropertyGroup>
+
+  <!-- Set script locations -->
+  <PropertyGroup>
+    <PowershellFilterScript>$(EngRoot)scripts\build\filter-pwsh-runtimes.ps1</PowershellFilterScript>
+    <PythonFilterScript>$(EngRoot)scripts\build\filter-python-runtimes.ps1</PythonFilterScript>
+    <DistLibScript>$(EngRoot)scripts\build\add-distlib.ps1</DistLibScript>
+    <TemplatesScriptPath>$(EngRoot)scripts\download-templates.ps1</TemplatesScriptPath>
+    <GoZipScriptPath>$(EngRoot)scripts\build\build-gozip.ps1</GoZipScriptPath>
+  </PropertyGroup>
+
+  <!-- This will be automatically set during publish -->
+  <PropertyGroup>
+    <PublishDir Condition="'$(PublishDir)' == ''">$(OutDir)</PublishDir>
+  </PropertyGroup>
+
+  <Target Name="DebugWorkerPaths" AfterTargets="Publish" Condition="'$(IsMinified)' == 'true'">
+    <Message Text="Workers to be removed:" Importance="high" />
+    <Message Text="@(LanguageWorker)" Importance="high" />
+  </Target>
+
+  <!-- Workers to delete in minified builds -->
+  <ItemGroup Condition="'$(IsMinified)' == 'true'">
+    <LanguageWorker Include="$(PublishDir)\workers\python" />
+    <LanguageWorker Include="$(PublishDir)\workers\java" />
+    <LanguageWorker Include="$(PublishDir)\workers\powershell" />
+    <LanguageWorker Include="$(PublishDir)\workers\node" />
+  </ItemGroup>
+
+  <!-- Remove worker directories from minified builds -->
+  <Target Name="RemoveLanguageWorkers" AfterTargets="Publish" Condition="'$(IsMinified)' == 'true'">
+    <Message Text="Removing language workers for minified build..." Importance="high" />
+    <RemoveDir Directories="@(LanguageWorker)" />
+  </Target>
+
+  <!-- Write artifactsconfig.json for minified builds -->
+  <Target Name="WriteArtifactsConfig" AfterTargets="Publish" Condition="'$(IsMinified)' == 'true'">
+    <Message Text="Creating artifactsconfig.json for minified build..." Importance="high" />
+    <WriteLinesToFile
+      File="$(PublishDir)artifactsconfig.json"
+      Lines='{"minifiedVersion": true}'
+      Overwrite="true"
+      Encoding="UTF-8" />
+  </Target>
+
+  <!-- Filter powershell runtimes for non-min versions -->
+  <Target Name="FilterPowershellRuntimes" AfterTargets="Publish" Condition="'$(IsMinified)' == 'false'">
+    <Message Text="Filtering powershell runtimes..." Importance="high" />
+    <Exec Command="pwsh -File $(PowershellFilterScript) -RuntimeArtifactDir $(PublishDir)" />
+  </Target>
+
+  <!-- This step I think is unnecessary, I am seeing the right runtimes without any extras and without needing to filter
+       For instance, the osx-arm64 build only has the OSX/Arm64 runtimes for python e.g. python/3.9/OSX/Arm64 -->
+  <!-- Target to filter python runtimes for non-min versions -->
+  <!-- <Target Name="FilterPythonRuntimes" AfterTargets="Publish" Condition="'$(IsMinified)' == 'false'">
+    <Message Text="Filtering python runtimes..." Importance="high" />
+    <Exec Command="pwsh -File $(PythonFilterScript) -RuntimeArtifactDir $(PublishDir)" />
+  </Target> -->
+
+  <!-- Add dist libs -->
+  <Target Name="AddDistLib" AfterTargets="Publish" Condition="'$(IsMinified)' == 'false'">
+    <Message Text="Adding distlib to Python worker..." Importance="high" />
+    <Exec Command="pwsh -File $(DistLibScript) -RuntimeArtifactDir $(PublishDir)" />
+  </Target>
+
+  <!-- Add templates -->
+  <Target Name="EnsureTemplates" AfterTargets="Publish">
+    <Message Text="Setting up templates folder..." Importance="high" />
+
+    <PropertyGroup>
+      <!-- Location where CI might have already downloaded templates -->
+      <TemplatesSourceDir>$(RepoRoot)artifacts</TemplatesSourceDir>
+    </PropertyGroup>
+
+    <!-- If templates exist in TemplatesSourceDir, copy them -->
+    <ItemGroup Condition="Exists('$(TemplatesSourceDir)\templates\templates.json')">
+      <TemplatesToCopy Include="
+          $(TemplatesSourceDir)\templates\**\*;
+          $(TemplatesSourceDir)\templates\net-isolated\**\*" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(TemplatesToCopy)"
+      DestinationFiles="@(TemplatesToCopy->'$(PublishDir)\templates\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true" />
+
+    <!-- If templates don't exist, download directly into publish dir -->
+    <Exec
+      Condition="!Exists('$(TemplatesSourceDir)\templates\templates.json')"
+      Command='pwsh -ExecutionPolicy Bypass -File "$(TemplatesScriptPath)" -OutputPath "$(PublishDir)"'
+      WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- GoZip -->
+  <Target Name="EnsureGoZip" AfterTargets="Publish">
+    <PropertyGroup>
+      <GoZipOutput>$(PublishDir)/gozip$(ExeSuffix)</GoZipOutput>
+      <GoZipSource>$(EngRoot)/tools/go/gozip/main.go</GoZipSource>
+      <ExeSuffix Condition="'$(OS)' == 'Windows_NT'">.exe</ExeSuffix>
+    </PropertyGroup>
+
+    <Message 
+      Text="Building gozip..."
+      Importance="high"
+      Condition="!Exists('$(GoZipOutput)')" />
+
+    <Exec 
+      Condition="!Exists('$(GoZipOutput)')"
+      Command="pwsh -ExecutionPolicy Bypass -File '$(GoZipScriptPath)'  -OutputPath '$(GoZipOutput)' -GoFile '$(GoZipSource)' -Runtime '$(RuntimeIdentifier)'" />
+  </Target>
+
+</Project>
