@@ -186,7 +186,7 @@ jobs:
     inputs:
       targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
       script: |
-        cd publish-scripts
+        cd eng/tools/publish-tools
         python3 -m venv publish-env
         source publish-env/bin/activate
         sudo pip install -r requirements.txt

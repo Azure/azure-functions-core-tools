@@ -35,7 +35,7 @@ jobs:
         $metadata = Get-Content -Path $metadataPath | ConvertFrom-Json
         Write-Host "Consolidated Build ID: $($metadata.consolidatedBuildId)"
         Write-Host "Default Artifact Version: $($metadata.defaultArtifactVersion)"
-        
+
         # Set as pipeline variables for later steps
         Write-Host "##vso[task.setvariable variable=ConsolidatedBuildId]$($metadata.consolidatedBuildId)"
         Write-Host "##vso[task.setvariable variable=DefaultArtifactVersion]$($metadata.defaultArtifactVersion)"
@@ -45,7 +45,7 @@ jobs:
     inputs:
       targetType: 'inline'
       script: |
-        cd publish-scripts
+        cd eng/tools/publish-tools
         python3 -m venv publish-env
         source publish-env/bin/activate
 
@@ -66,7 +66,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
-      folderPath: '/mnt/vss/_work/1/s/publish-scripts/artifact'
+      folderPath: '/mnt/vss/_work/1/s/eng/tools/publish-tools/artifact'
       pattern: '*.deb'
       signType: inline
       inlineOperation: |
@@ -83,8 +83,8 @@ jobs:
   - pwsh: |
       echo $env:LinuxPackageAccountName
       $majorVersion = [math]::Floor([double]$env:LinuxPackageBuildTag.Split(".")[0])
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
-      az storage blob upload -f /mnt/vss/_work/1/s/publish-scripts/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact/azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+      az storage blob upload -f /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact/azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb -c signed -n azure-functions-core-tools-$($majorVersion)_$env:LinuxPackageBuildTag-1.deb --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
@@ -98,6 +98,6 @@ jobs:
       targetType: 'inline'
       script: |
         mkdir -p $drop
-        cp -r /mnt/vss/_work/1/s/publish-scripts/artifact/* $drop
+        cp -r /mnt/vss/_work/1/s/eng/tools/publish-tools/artifact/* $drop
     env:
       drop: $(pkg_drop_path)

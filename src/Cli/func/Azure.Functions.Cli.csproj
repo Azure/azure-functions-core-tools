@@ -259,7 +259,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="$(RepoRoot)tools\python\packapp\__main__.py">
+    <Content Include="$(EngRoot)tools\python\packapp\__main__.py">
       <Link>tools\python\packapp\__main__.py</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
