@@ -1,0 +1,14 @@
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+
+- pwsh: |
+    Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
+    Install-Dotnet
+  displayName: 'Install .NET 6.0 and 3.1'
+
+- task: NuGetToolInstaller@1
+  inputs:
+    versionSpec:
+  displayName: Install Nuget tool

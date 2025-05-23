@@ -33,13 +33,13 @@ $DOTNET_ITEM_TEMPLATES_URL = "https://www.nuget.org/api/v2/package/Microsoft.Azu
 $DOTNET_PROJECT_TEMPLATES_URL = "https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/$TEMPLATES_VERSION"
 $TEMPLATES_JSON_ZIP_URL = "https://cdn.functions.azure.com/public/TemplatesApi/$TEMPLATE_JSON_VERSION.zip"
 
-Write-Output "Setting up directories for templates and isolated templates"
+Write-Verbose "Setting up directories for templates and isolated templates"
 
 # Create directories if they don't exist
 New-Item -ItemType Directory -Path $templatesPath -Force | Out-Null
 New-Item -ItemType Directory -Path $isolatedTemplatesPath -Force | Out-Null
 
-Write-Output "Downloading templates to $templatesPath and $isolatedTemplatesPath"
+Write-Host "Downloading templates to $templatesPath and $isolatedTemplatesPath"
 
 # Download files
 Invoke-WebRequest -Uri $DOTNET_ISOLATED_ITEM_TEMPLATES_URL -OutFile (Join-Path $isolatedTemplatesPath "itemTemplates.$TEMPLATES_VERSION.nupkg")

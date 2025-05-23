@@ -20,11 +20,10 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
-    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
-    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
-    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
+    <MajorMinorProductVersion>4.0.10000</MajorMinorProductVersion>
+    <Version>$(MajorMinorProductVersion)</Version>
+    <AssemblyVersion>$(MajorMinorProductVersion)</AssemblyVersion>
+    <FileVersion>$(MajorMinorProductVersion)</FileVersion>
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
     <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
     <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>

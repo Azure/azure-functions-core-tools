@@ -1,0 +1,91 @@
+jobs:
+- job: Build_CLI
+  timeoutInMinutes: "180"
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  variables:
+    DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
+    DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+
+  steps:
+  - template: /eng/ci/templates/newbuildci/steps/install-tools.yaml@self
+
+  - pwsh: |
+      eng/scripts/validateWorkerVersions.ps1
+    displayName: 'Validate worker versions'
+    condition: ne(variables['skipWorkerVersionValidation'], 'true')
+
+  - pwsh: |
+      eng/scripts/check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
+
+  - pwsh: |
+      eng/scripts/build/replace-telemetry-key.ps1
+    displayName: 'Replace telemetry key'
+
+  - template: /eng/ci/templates/newbuildci/steps/build-cli.yaml@self
+
+  templateContext:
+    outputs:
+    - output: pipelineArtifact
+      path: 'out/bin/Azure.Functions.Cli.Tests/debug/ZippedOnWindows.zip'
+      artifact: ZippedOnWindows
+    - output: pipelineArtifact
+      path: '$(Build.ArtifactStagingDirectory)/artifacts'
+      artifact: CliBuild
+
+# Run tests
+- job: Test_CLI
+  timeoutInMinutes: "180"
+  dependsOn: Build_CLI
+
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  steps:
+  - download: current
+    displayName: 'Download test zip'
+    artifact: ZippedOnWindows
+
+  - download: current
+    displayName: 'Download cli'
+    artifact: CliBuild
+
+  - pwsh: . "eng/scripts/start-emulators.ps1" -NoWait
+    displayName: "Start emulators (NoWait)"
+
+  - template: /eng/ci/templates/newbuildci/steps/install-tools.yaml@self
+
+  - template: /eng/ci/templates/newbuildci/steps/test-cli.yaml@self
+
+# Test linux zip
+- job: Test_Linux_Zip
+  timeoutInMinutes: "180"
+  dependsOn: Build_CLI
+
+  pool:
+    name: 1es-pool-azfunc-public
+    image: '1es-ubuntu-22.04'
+    os: 'linux'
+
+  steps:
+  - download: current
+    displayName: 'Download test zip'
+    artifact: ZippedOnWindows
+
+  - script: |
+      sudo apt-get update
+      sudo apt-get -y install fuse-zip
+    displayName: 'Install fuse-zip'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: '**/Azure.Functions.Cli.Tests.csproj'
+      arguments: '--filter CreateZip_Succeeds'
+    displayName: 'Run zip test'

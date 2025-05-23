@@ -1,0 +1,37 @@
+parameters:
+  runtimes:
+    - min.win-arm64
+    - min.win-x86
+    - min.win-x64
+    - linux-x64
+    - osx-x64
+    - osx-arm64
+    - win-x86
+    - win-x64
+    - win-arm64
+
+steps:
+  - pwsh: |
+      eng/scripts/download-templates.ps1 -OutputPath ./artifacts/templates
+    displayName: 'Download Templates'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore dependencies'
+    inputs:
+      command: 'restore'
+      projects: '**/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj'
+      feedsToUse: 'select'
+      vstsFeed: 'Azure Functions CLI'
+      noRestore: true
+      restoreSolution: '**/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj'
+
+  - task: PowerShell@2
+    displayName: 'Run publish script'
+    inputs:
+      filePath: 'eng/scripts/build/publish-cli.ps1'
+      arguments: |
+        -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj'
+        -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
+        -commitHash '$(Build.SourceVersion)'
+        -integrationBuildNumber '$(Build.BuildNumber)'
+      pwsh: true

@@ -1,0 +1,41 @@
+steps:
+
+- task: PowerShell@2
+  displayName: 'Set environment variables for E2E tests'
+  inputs:
+    targetType: 'inline'
+    script: |
+      if ($IsWindows) {
+          $funcPath = "$(Build.ArtifactStagingDirectory)\artifacts\win-x86\func.exe"
+      }
+      else {
+          $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/linux-x64/func"
+      }
+      Write-Host "##vso[task.setvariable variable=FUNC_PATH]$funcPath"
+
+      if (-not $env:DURABLE_STORAGE_CONNECTION) {
+          Write-Host "##vso[task.setvariable variable=DURABLE_STORAGE_CONNECTION]UseDevelopmentStorage=true"
+      }
+      Write-Host "##vso[task.setvariable variable=DURABLE_FUNCTION_PATH]$(Build.SourcesDirectory)/test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder"
+
+- task: DotNetCoreCLI@2
+  displayName: 'Run E2E Tests'
+  inputs:
+    command: 'test'
+    projects: '**/Azure.Functions.Cli.E2E.Tests.csproj'
+    arguments: '--framework net8.0 --blame-hang-timeout 10m --logger "console;verbosity=detailed"'
+
+- task: 1ES.PublishPipelineArtifact@1
+  condition: succeededOrFailed()
+  continueOnError: true
+  inputs:
+    targetPath: '$(Build.SourcesDirectory)/TestLogs'
+    artifactName: 'TestLogs_$(System.JobAttempt)'
+    artifactType: 'pipeline'
+
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '**/*.trx'
+    failTaskOnFailedTests: true
+  condition: succeededOrFailed()
