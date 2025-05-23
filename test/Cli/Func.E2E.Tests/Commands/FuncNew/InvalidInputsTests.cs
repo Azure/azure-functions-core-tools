@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Xunit;
@@ -13,6 +14,7 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 {
+    [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
     public class InvalidInputsTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]

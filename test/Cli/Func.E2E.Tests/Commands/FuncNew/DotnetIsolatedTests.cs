@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 {
-    [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
+    [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
     public class DotnetIsolatedTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]

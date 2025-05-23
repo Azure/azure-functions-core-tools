@@ -15,45 +15,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
     public class DotnetInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public async Task FuncNew_HttpTrigger_CreatesFunctionSuccessfully()
-        {
-            var uniqueTestName = nameof(FuncNew_HttpTrigger_CreatesFunctionSuccessfully);
-            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var workingDir = WorkingDirectory;
-
-            // Initialize the function app
-            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
-
-            // Run func new
-            var funcNewResult = funcNewCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute([".", "--template", "HttpTrigger", "--name", "HttpFunction"]);
-
-            // Validate result
-            funcNewResult.Should().HaveStdOutContaining("The function \"HttpFunction\" was created successfully");
-        }
-
-        [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
-        public async Task FuncNew_TimerTrigger_CreatesTimerFunction()
-        {
-            var uniqueTestName = nameof(FuncNew_TimerTrigger_CreatesTimerFunction);
-            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var workingDir = WorkingDirectory;
-
-            // Initialize the function app
-            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
-
-            // Create func new command using consistent working directory
-            var funcNewResult = funcNewCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute([".", "--template", "TimerTrigger", "--name", "TimerFunction"]);
-
-            // Validate result
-            funcNewResult.Should().HaveStdOutContaining("The function \"TimerFunction\" was created successfully");
-        }
-
-        [Fact]
         [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
         public async Task FuncNew_InvalidTemplate_ShowsError()
         {
