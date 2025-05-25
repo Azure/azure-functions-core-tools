@@ -193,7 +193,9 @@ namespace Build
         public static void FilterPythonRuntimes()
         {
             var minifiedRuntimes = Settings.TargetRuntimes.Where(r => r.StartsWith(Settings.MinifiedVersionPrefix));
-            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes))
+            var unsupportedPythonRuntimes = Settings.UnsupportedPythonRuntimes;
+
+            foreach (var runtime in Settings.TargetRuntimes.Except(minifiedRuntimes).Except(unsupportedPythonRuntimes))
             {
                 var pythonWorkerPath = Path.Combine(Settings.OutputDir, runtime, "workers", "python");
                 var allPythonVersions = Directory.GetDirectories(pythonWorkerPath);
@@ -330,6 +332,42 @@ namespace Build
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
             Shell.Run("dotnet", $"test {Settings.TestProjectFile} -f net8.0 --logger trx");
+        }
+
+        public static void TestNewE2EProject()
+        {
+            var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
+                : Path.Combine(Settings.OutputDir, "linux-x64", "func");
+            Environment.SetEnvironmentVariable("FUNC_PATH", funcPath);
+
+            string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))
+            {
+                Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
+            }
+
+            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
+
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 --blame-hang-timeout 10m --logger \"console;verbosity=detailed\"");
+        }
+
+        public static void TestNewE2EProjectDotnetInProc()
+        {
+            var funcPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
+                : Path.Combine(Settings.OutputDir, "linux-x64", "func");
+            Environment.SetEnvironmentVariable("FUNC_PATH", funcPath);
+
+            string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))
+            {
+                Environment.SetEnvironmentVariable(durableStorageConnectionVar, "UseDevelopmentStorage=true");
+            }
+
+            Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
+
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 --logger trx --settings {Settings.RuntimeSettings} --blame-hang-timeout 10m");
         }
 
         public static void CopyBinariesToSign()

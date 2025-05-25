@@ -1,4 +1,7 @@
-﻿using Azure.Functions.Cli.Interfaces;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Interfaces;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using Fclp;
@@ -11,12 +14,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         private readonly ITemplatesManager _templatesManager;
 
-        public string Language { get; set; }
-
         public ListTemplatesAction(ITemplatesManager templatesManager)
         {
             _templatesManager = templatesManager;
         }
+
+        public string Language { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

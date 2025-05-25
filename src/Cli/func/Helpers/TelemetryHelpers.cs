@@ -1,12 +1,11 @@
-﻿using Azure.Functions.Cli.Common;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Reflection;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using Fclp.Internals;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -52,6 +51,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
+#pragma warning disable CS0162 // Unreachable code: TelemetryInstrumentationKey is set during build/CI
         public static bool CheckIfTelemetryEnabled()
         {
             // If Ikey is not set, can't get anything
@@ -61,7 +61,6 @@ namespace Azure.Functions.Cli.Helpers
                 return false;
             }
 
-            #pragma warning disable 0162
             // If opt out is not set, we check if the default sentinel is present
             var optOutVar = Environment.GetEnvironmentVariable(Constants.TelemetryOptOutVariable);
             if (string.IsNullOrEmpty(optOutVar))
@@ -73,6 +72,7 @@ namespace Azure.Functions.Cli.Helpers
             // If opt out is present and set to falsy, only then we enable telemetry
             return optOutVar == "0" || optOutVar.Equals("false", StringComparison.OrdinalIgnoreCase);
         }
+#pragma warning restore CS0162 // Unreachable code
 
         public static void LogEventIfAllowedSafe(ITelemetry telemetry, TelemetryEvent telemetryEvent)
         {
@@ -81,7 +81,7 @@ namespace Azure.Functions.Cli.Helpers
                 LogEventIfAllowed(telemetry, telemetryEvent);
             }
             catch
-            { 
+            {
                 // oh well!
             }
         }
@@ -96,12 +96,12 @@ namespace Azure.Functions.Cli.Helpers
             telemetryEvent.Parameters = telemetryEvent.Parameters ?? new List<string>();
             var properties = new Dictionary<string, string>
             {
-                { "commandName" , telemetryEvent.CommandName },
-                { "iActionName" , telemetryEvent.IActionName },
-                { "parameters" , string.Join(",", telemetryEvent.Parameters) },
-                { "prefixOrScriptRoot" , telemetryEvent.PrefixOrScriptRoot.ToString() },
-                { "parseError" , telemetryEvent.ParseError.ToString() },
-                { "isSuccessful" , telemetryEvent.IsSuccessful.ToString() }
+                { "commandName", telemetryEvent.CommandName },
+                { "iActionName", telemetryEvent.IActionName },
+                { "parameters", string.Join(",", telemetryEvent.Parameters) },
+                { "prefixOrScriptRoot", telemetryEvent.PrefixOrScriptRoot.ToString() },
+                { "parseError", telemetryEvent.ParseError.ToString() },
+                { "isSuccessful", telemetryEvent.IsSuccessful.ToString() }
             };
 
             if (telemetryEvent.CommandEvents != null)
@@ -122,7 +122,7 @@ namespace Azure.Functions.Cli.Helpers
 
             var measurements = new Dictionary<string, double>
             {
-                { "timeTaken" , telemetryEvent.TimeTaken }
+                { "timeTaken", telemetryEvent.TimeTaken }
             };
 
             telemetry.TrackEvent(telemetryEvent.CommandName, properties, measurements);

@@ -59,7 +59,16 @@ jobs:
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
+      DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    continueOnError: true
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
+      artifactName: 'TestLogs_$(System.JobAttempt)'
+      artifactType: 'pipeline'
 
   - task: PublishTestResults@2
     inputs:

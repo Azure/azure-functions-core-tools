@@ -8,8 +8,9 @@ Write-Host "$rootDir"
 ls $rootDir
 
 # Set the path to test project (.csproj) and runtime settings
-$testProjectPath = ".\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
-$runtimeSettings = ".\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact_consolidation.runsettings"
+$testProjectPath = ".\test\Cli\Func.E2E.Tests\Azure.Functions.Cli.E2E.Tests.csproj"
+$defaultRuntimeSettings = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\default.runsettings"
+$inProcRuntimeSettings = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\dotnet_inproc.runsettings"
 
 dotnet build $testProjectPath
 
@@ -29,8 +30,11 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
             [System.Environment]::SetEnvironmentVariable("FUNC_PATH", $funcExePath.FullName, "Process")
         
             # Run dotnet test with the environment variable set
-            Write-Host "Running 'dotnet test' on test project: $testProjectPath"
-            dotnet test $testProjectPath --no-build --settings $runtimeSettings --logger "console;verbosity=detailed"
+            Write-Host "Running 'dotnet test' on test project: $testProjectPath with default artifacts"
+            dotnet test $testProjectPath --no-build --settings $defaultRuntimeSettings --logger "console;verbosity=detailed"
+
+            Write-Host "Running 'dotnet test' on test project: $testProjectPath with inproc artifacts"
+            dotnet test $testProjectPath --no-build --settings $inProcRuntimeSettings --logger "console;verbosity=detailed"
 
             if ($LASTEXITCODE -ne 0) {
                 # If the exit code is non-zero, throw an error

@@ -1,13 +1,12 @@
-using System.Linq;
-using System.IO;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
-using Colors.Net;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
 using Azure.Functions.Cli.Kubernetes;
 using Azure.Functions.Cli.Kubernetes.Models.Knative;
+using Colors.Net;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 {
@@ -44,6 +43,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             {
                 ColoredConsole.WriteLine("Couldn't identify Function URL: Couldn't find Istio Cluster Ingress endpoint");
             }
+
             ColoredConsole.WriteLine($"Function Host: {host}");
             ColoredConsole.WriteLine();
             ColoredConsole.WriteLine("Plese note: it may take a few minutes for the knative service to be reachable");
@@ -64,32 +64,31 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         private KnativeService GetKnativeService(string name, string image, string nameSpace, int min, int max, bool isHTTP)
         {
             var knativeService = new KnativeService();
-            knativeService.kind = "Service";
-            knativeService.apiVersion = "serving.knative.dev/v1alpha1";
-            knativeService.metadata = new Metadata();
-            knativeService.metadata.name = name;
-            knativeService.metadata.@namespace = nameSpace;
+            knativeService.Kind = "Service";
+            knativeService.ApiVersion = "serving.knative.dev/v1alpha1";
+            knativeService.Metadata = new Metadata();
+            knativeService.Metadata.Name = name;
+            knativeService.Metadata.@Namespace = nameSpace;
 
-            knativeService.spec = new KnativeSpec();
-            knativeService.spec.runLatest = new RunLatest();
-            knativeService.spec.runLatest.configuration = new Configuration();
-            knativeService.spec.runLatest.configuration.revisionTemplate = new RevisionTemplate();
-            knativeService.spec.runLatest.configuration.revisionTemplate.spec = new RevisionTemplateSpec();
-            knativeService.spec.runLatest.configuration.revisionTemplate.spec.container = new KnativeContainer();
-            knativeService.spec.runLatest.configuration.revisionTemplate.spec.container.image = image;
-
-            knativeService.spec.runLatest.configuration.revisionTemplate.metadata = new RevisionTemplateMetadata();
-            knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations = new Dictionary<string, string>();
+            knativeService.Spec = new KnativeSpec();
+            knativeService.Spec.RunLatest = new RunLatest();
+            knativeService.Spec.RunLatest.Configuration = new Configuration();
+            knativeService.Spec.RunLatest.Configuration.RevisionTemplate = new RevisionTemplate();
+            knativeService.Spec.RunLatest.Configuration.RevisionTemplate.Spec = new RevisionTemplateSpec();
+            knativeService.Spec.RunLatest.Configuration.RevisionTemplate.Spec.Container = new KnativeContainer();
+            knativeService.Spec.RunLatest.Configuration.RevisionTemplate.Spec.Container.Image = image;
+            knativeService.Spec.RunLatest.Configuration.RevisionTemplate.Metadata = new RevisionTemplateMetadata();
+            knativeService.Spec.RunLatest.Configuration.RevisionTemplate.Metadata.Annotations = new Dictionary<string, string>();
 
             // opt out of knative scale-to-zero for non-http triggers
             if (!isHTTP)
             {
-                knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations.Add("autoscaling.knative.dev/minScale", min.ToString());
+                knativeService.Spec.RunLatest.Configuration.RevisionTemplate.Metadata.Annotations.Add("autoscaling.knative.dev/minScale", min.ToString());
             }
 
             if (max > 0)
             {
-                knativeService.spec.runLatest.configuration.revisionTemplate.metadata.annotations.Add("autoscaling.knative.dev/maxScale", max.ToString());
+                knativeService.Spec.RunLatest.Configuration.RevisionTemplate.Metadata.Annotations.Add("autoscaling.knative.dev/maxScale", max.ToString());
             }
 
             return knativeService;
@@ -121,4 +120,3 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         }
     }
 }
-

@@ -1,5 +1,5 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
 
@@ -47,7 +47,6 @@ namespace Azure.Functions.Cli.ArtifactAssembler
 
             ZipFile.CreateFromDirectory(sourceDirectory, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
         }
-
 
         /// <summary>
         /// Extracts the specified zip file to the specified destination directory and returns the path to the extracted directory.

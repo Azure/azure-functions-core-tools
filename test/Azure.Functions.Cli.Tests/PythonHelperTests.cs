@@ -35,7 +35,7 @@ namespace Azure.Functions.Cli.Tests
         public async void WorkerInfoRuntimeShouldBePython()
         {
             WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
-            if (worker.Runtime != WorkerRuntime.python)
+            if (worker.Runtime != WorkerRuntime.Python)
             {
                 throw new Exception("Worker runtime should always be python");
             }
@@ -77,7 +77,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("3.12.0", false)]
         public void AssertPythonVersion(string pythonVersion, bool expectException)
         {
-            WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.python, pythonVersion, "python");
+            WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonVersion, "python");
             if (!expectException)
             {
                 PythonHelpers.AssertPythonVersion(worker);

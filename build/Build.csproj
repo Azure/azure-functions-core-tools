@@ -10,8 +10,10 @@
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
-  <!-- setting directly to false as this project will be deprecated soon -->
+  <!-- suppress all warnings as this project will be deprecated soon -->
   <PropertyGroup>
+    <NoWarn>$(NoWarn);NETSDK1138;NU1903;IDE1006;* </NoWarn>
+    <WarningLevel>0</WarningLevel>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 </Project>

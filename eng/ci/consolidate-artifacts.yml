@@ -25,6 +25,7 @@ resources:
   pipelines:
     - pipeline: core-tools-host
       source: azure/azure-functions-core-tools/core-tools-host.official
+      branch: main
 
     - pipeline: core-tools-inproc
       source: azure/azure-functions-core-tools/core-tools.official

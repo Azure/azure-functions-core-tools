@@ -1,5 +1,5 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.RegularExpressions;
 
@@ -273,7 +273,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
         }
 
         // This method creates a new directory for the core tools host and copies the inproc8 files
-        private (string artifactDirName, string consolidatedArtifactDirPath) CreateInProc8CoreToolsHostHelper(
+        private (string ArtifactDirName, string ConsolidatedArtifactDirPath) CreateInProc8CoreToolsHostHelper(
             string artifactName, string customHostTargetArtifactDir, bool createDirectory)
         {
             var inProcArtifactDirPath = Directory
@@ -381,7 +381,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
             Console.WriteLine("Finished assembling CLI Core Tools artifacts\n");
         }
 
-        private static (string artifactDirectory, string version) GetArtifactDirectoryAndVersionNumber(string extractedRootDirectory, string artifactName)
+        private static (string ArtifactDirectory, string Version) GetArtifactDirectoryAndVersionNumber(string extractedRootDirectory, string artifactName)
         {
             var artifactDirPath = Directory.EnumerateDirectories(extractedRootDirectory)
                                            .FirstOrDefault(dir => dir.Contains(artifactName));

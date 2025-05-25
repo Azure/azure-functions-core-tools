@@ -6,7 +6,7 @@ trigger:
     - main
   paths:
     include:
-      - /host/src/**
+      - /src/CoreToolsHost/**
 
 resources:
   repositories:

@@ -1,24 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.ComponentModel;
-using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
-using Colors.Net;
-using Fclp;
-using Microsoft.Azure.WebJobs.Script;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Interfaces;
-using static Azure.Functions.Cli.Common.OutputTheme;
 using System.Text;
-using Fclp.Internals;
-using Colors.Net.StringColorExtensions;
-using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Actions.LocalActions;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Interfaces;
+using Colors.Net;
+using Colors.Net.StringColorExtensions;
+using Fclp;
+using Fclp.Internals;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions
 {
-    class HelpAction : BaseAction
+    internal class HelpAction : BaseAction
     {
         private readonly string _context;
         private readonly string _subContext;
@@ -56,7 +54,7 @@ namespace Azure.Functions.Cli.Actions
             _parseResult = parseResult;
         }
 
-        public async override Task RunAsync()
+        public override async Task RunAsync()
         {
             var latestVersionMessageTask = VersionHelper.IsRunningAnOlderVersion();
             ScriptHostHelpers.SetIsHelpRunning();
@@ -86,6 +84,7 @@ namespace Azure.Functions.Cli.Actions
                     DisplayContextHelp(context, Context.None);
                     return;
                 }
+
                 DisplayContextHelp(context, subContext);
             }
             else if (_action != null && _parseResult != null)
@@ -196,6 +195,7 @@ namespace Azure.Functions.Cli.Actions
                 {
                     ColoredConsole.WriteLine(string.Format($"{{0, {-longestName}}}  {{1}}", context.ToLowerCaseString().DarkYellow(), GetDescriptionOfContext(context)));
                 }
+
                 ColoredConsole.WriteLine();
             }
         }
@@ -212,6 +212,7 @@ namespace Azure.Functions.Cli.Actions
                     ColoredConsole.WriteLine(GetActionHelp(action, longestName));
                     DisplaySwitches(action);
                 }
+
                 ColoredConsole.WriteLine();
             }
         }
@@ -239,6 +240,7 @@ namespace Azure.Functions.Cli.Actions
                 {
                     DisplayOptions(e.ParseResults.UnMatchedOptions);
                 }
+
                 ColoredConsole.WriteLine();
             }
             catch (Exception e)
@@ -302,6 +304,7 @@ namespace Azure.Functions.Cli.Actions
                 {
                     stringBuilder.Append($" [-{option.ShortName}]");
                 }
+
                 var helpSwitch = string.Format($"    {{0, {-longestName}}} ", stringBuilder.ToString().DarkGray());
                 var helpSwitchLength = helpSwitch.Length - 2; // helpSwitch contains 2 formatting characters.
                 var helpText = option.Description;
@@ -326,9 +329,11 @@ namespace Azure.Functions.Cli.Actions
                         {
                             segment = segment.PadLeft(helpSwitchLength + segment.Length);
                         }
+
                         ColoredConsole.WriteLine(segment);
                         lineNumber++;
                     }
+
                     if (helpText.Length > 0)
                     {
                         ColoredConsole.WriteLine(helpText.PadLeft(helpSwitchLength + helpText.Length, ' '));
@@ -344,7 +349,7 @@ namespace Azure.Functions.Cli.Actions
                 ? action.Names.Distinct().Aggregate((a, b) => string.Join(", ", a, b))
                 : string.Empty;
             var description = action.Type.GetCustomAttributes<ActionAttribute>()?.FirstOrDefault()?.HelpText;
-            return string.Format($"{{0, {-formattingSpace}}}  {{1}} {(aliases.Any() ? "Aliases:" : "")} {{2}}", name.DarkYellow(), description, aliases);
+            return string.Format($"{{0, {-formattingSpace}}}  {{1}} {(aliases.Any() ? "Aliases:" : string.Empty)} {{2}}", name.DarkYellow(), description, aliases);
         }
 
         // http://stackoverflow.com/a/1799401

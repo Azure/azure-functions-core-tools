@@ -1,4 +1,7 @@
-﻿using System.Text.RegularExpressions;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Exceptions;
 using Azure.Functions.Cli.ExtensionBundle;
@@ -21,24 +24,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     [Action(Name = "create", Context = Context.Function, HelpText = "Create a new function from a template.")]
     internal class CreateFunctionAction : BaseAction
     {
-        private ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
         private readonly IContextHelpManager _contextHelpManager;
         private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
-        Lazy<IEnumerable<UserPrompt>> _userPrompts;
-        public WorkerRuntime workerRuntime;
-
-        public string Language { get; set; }
-        public string TemplateName { get; set; }
-        public string FunctionName { get; set; }
-        public bool Csx { get; set; }
-        private string TriggerNameForHelp { get; set; }
-        private string FileName { get; set; }
-        public AuthorizationLevel? AuthorizationLevel { get; set; }
-
-        Lazy<IEnumerable<Template>> _templates;
-        Lazy<IEnumerable<NewTemplate>> _newTemplates;
+        private readonly ITemplatesManager _templatesManager;
+        private readonly Lazy<IEnumerable<Template>> _templates;
+        private readonly Lazy<IEnumerable<NewTemplate>> _newTemplates;
+        private readonly Lazy<IEnumerable<UserPrompt>> _userPrompts;
+        private WorkerRuntime _workerRuntime;
 
         public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
         {
@@ -51,6 +45,22 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
             _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
         }
+
+        public string Language { get; set; }
+
+        public string TemplateName { get; set; }
+
+        public string FunctionName { get; set; }
+
+        public bool Csx { get; set; }
+
+        private string TriggerNameForHelp { get; set; }
+
+        private string FileName { get; set; }
+
+        public AuthorizationLevel? AuthorizationLevel { get; set; }
+
+        public WorkerRuntime WorkerRuntime => _workerRuntime;
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -90,7 +100,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return base.ParseArgs(args);
         }
 
-        public async override Task RunAsync()
+        public override async Task RunAsync()
         {
             // Check if the command only ran for help.
             if (!string.IsNullOrEmpty(TriggerNameForHelp))
@@ -106,12 +116,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             await UpdateLanguageAndRuntime();
 
-            if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && !Csx)
+            if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) && !Csx)
             {
                 if (string.IsNullOrWhiteSpace(TemplateName))
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
-                    TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(workerRuntime));
+                    TemplateName ??= SelectionMenuHelper.DisplaySelectionWizard(DotnetHelpers.GetTemplates(_workerRuntime));
                 }
                 else
                 {
@@ -124,7 +134,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 var namespaceStr = Path.GetFileName(Environment.CurrentDirectory);
                 try
                 {
-                    await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", ""), workerRuntime, AuthorizationLevel);
+                    await DotnetHelpers.DeployDotnetFunction(TemplateName.Replace(" ", string.Empty), Utilities.SanitizeClassName(FunctionName), Utilities.SanitizeNameSpace(namespaceStr), Language.Replace("-isolated", string.Empty), _workerRuntime, AuthorizationLevel);
                 }
                 catch (CsTemplateNotFoundException)
                 {
@@ -214,7 +224,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 catch (Exception)
                 {
                     // Ideally this should never happen.
-                    templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(workerRuntime);
+                    templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(_workerRuntime);
                 }
 
                 TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
@@ -238,7 +248,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         throw new CliException($"The {template.Metadata.Name} template has extensions. {Constants.Errors.ExtensionsNeedDotnet}");
                     }
 
-                    if (!IsNewNodeJsProgrammingModel(workerRuntime) && AuthorizationLevel.HasValue)
+                    if (!IsNewNodeJsProgrammingModel(_workerRuntime) && AuthorizationLevel.HasValue)
                     {
                         ConfigureAuthorizationLevel(template);
                     }
@@ -250,14 +260,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     PerformPostDeployTasks(FunctionName, Language);
                 }
             }
+
             ColoredConsole.WriteLine($"The function \"{FunctionName}\" was created successfully from the \"{TemplateName}\" template.");
             if (string.Equals(Language, Languages.Python, StringComparison.CurrentCultureIgnoreCase) && !IsNewPythonProgrammingModel())
             {
                 PythonHelpers.PrintPySteinAwarenessMessage();
             }
 
-            var isNewNodeJsModel = IsNewNodeJsProgrammingModel(workerRuntime);
-            if (workerRuntime == WorkerRuntime.node && !isNewNodeJsModel)
+            var isNewNodeJsModel = IsNewNodeJsProgrammingModel(_workerRuntime);
+            if (_workerRuntime == WorkerRuntime.Node && !isNewNodeJsModel)
             {
                 NodeJSHelpers.PrintV4AwarenessMessage();
             }
@@ -283,37 +294,36 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async Task UpdateLanguageAndRuntime()
         {
-            workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            _workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             if (!CurrentPathHasLocalSettings())
             {
                 // we're assuming "func init" has not been run
                 await _initAction.RunAsync();
-                workerRuntime = _initAction.ResolvedWorkerRuntime;
+                _workerRuntime = _initAction.ResolvedWorkerRuntime;
                 Language = _initAction.ResolvedLanguage;
             }
 
-
-            if (workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
+            if (_workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
             {
                 // validate
                 var workerRuntimeSelected = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(Language);
-                if (workerRuntime != workerRuntimeSelected)
+                if (_workerRuntime != workerRuntimeSelected)
                 {
                     throw new CliException("Selected language doesn't match worker set in local.settings.json." +
-                        $"Selected worker is: {workerRuntime} and selected language is: {workerRuntimeSelected}");
+                        $"Selected worker is: {_workerRuntime} and selected language is: {workerRuntimeSelected}");
                 }
             }
             else if (string.IsNullOrWhiteSpace(Language))
             {
-                if (workerRuntime == WorkerRuntime.None)
+                if (_workerRuntime == WorkerRuntime.None)
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
                     Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
-                    workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
+                    _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
-                else if (!WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) || Csx)
+                else if (!WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) || Csx)
                 {
-                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(workerRuntime);
+                    var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
                     var displayList = _templates.Value
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
@@ -323,22 +333,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     {
                         Language = displayList.First();
                     }
-                    else if (!InferAndUpdateLanguage(workerRuntime))
+                    else if (!InferAndUpdateLanguage(_workerRuntime))
                     {
                         SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
                         Language = SelectionMenuHelper.DisplaySelectionWizard(displayList);
                     }
                 }
-                else if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime))
+                else if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime))
                 {
-                    InferAndUpdateLanguage(workerRuntime);
+                    InferAndUpdateLanguage(_workerRuntime);
                 }
             }
             else if (!string.IsNullOrWhiteSpace(Language))
             {
-                workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
+                _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
         }
+
         private IEnumerable<string> GetTriggerNames(string templateLanguage, bool forNewModelHelp = false)
         {
             return GetLanguageTemplates(templateLanguage, forNewModelHelp).Select(t => t.Metadata.Name).Distinct();
@@ -346,12 +357,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private IEnumerable<Template> GetLanguageTemplates(string templateLanguage, bool forNewModelHelp = false)
         {
-            if (IsNewNodeJsProgrammingModel(workerRuntime) ||
+            if (IsNewNodeJsProgrammingModel(_workerRuntime) ||
                 (forNewModelHelp && (Languages.TypeScript.EqualsIgnoreCase(templateLanguage) || Languages.JavaScript.EqualsIgnoreCase(templateLanguage))))
             {
                 return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
-            else if (workerRuntime == WorkerRuntime.node)
+            else if (_workerRuntime == WorkerRuntime.Node)
             {
                 // Ensuring that we only show v3 templates for node when the user has not opted into the new model
                 return _templates.Value.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
@@ -378,9 +389,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private void ConfigureAuthorizationLevel(Template template)
         {
             var bindings = template.Function["bindings"];
-            bool IsHttpTriggerTemplate = bindings.Any(b => b["type"].ToString() == "httpTrigger");
+            bool isHttpTriggerTemplate = bindings.Any(b => b["type"].ToString() == "httpTrigger");
 
-            if (!IsHttpTriggerTemplate)
+            if (!isHttpTriggerTemplate)
             {
                 throw new CliException(AuthLevelErrorMessage);
             }
@@ -395,23 +406,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             switch (workerRuntime)
             {
-                case WorkerRuntime.dotnet:
+                case WorkerRuntime.Dotnet:
                     // use fsproj as an indication that we have a F# project
                     Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharp : Constants.Languages.CSharp;
                     return true;
-                case WorkerRuntime.dotnetIsolated:
+                case WorkerRuntime.DotnetIsolated:
                     // use fsproj as an indication that we have a F# project
                     Language = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj").Any() ? Constants.Languages.FSharpIsolated : Constants.Languages.CSharpIsolated;
                     return true;
-                case WorkerRuntime.node:
+                case WorkerRuntime.Node:
                     // use tsconfig.json as an indicator that we have a TypeScript project
                     Language = FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "tsconfig.json")) ? Constants.Languages.TypeScript : Constants.Languages.JavaScript;
                     return true;
                 case WorkerRuntime.None:
-                case WorkerRuntime.python:
-                case WorkerRuntime.java:
-                case WorkerRuntime.powershell:
-                case WorkerRuntime.custom:
+                case WorkerRuntime.Python:
+                case WorkerRuntime.Java:
+                case WorkerRuntime.Powershell:
+                case WorkerRuntime.Custom:
                 default:
                     return false;
             }
@@ -419,10 +430,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private void PerformPostDeployTasks(string functionName, string language)
         {
-            if (language == Constants.Languages.TypeScript && !IsNewNodeJsProgrammingModel(workerRuntime))
+            if (language == Languages.TypeScript && !IsNewNodeJsProgrammingModel(_workerRuntime))
             {
                 // Update typescript function.json
-                var funcJsonFile = Path.Combine(Environment.CurrentDirectory, functionName, Constants.FunctionJsonFileName);
+                var funcJsonFile = Path.Combine(Environment.CurrentDirectory, functionName, FunctionJsonFileName);
                 var jsonStr = FileSystemHelpers.ReadAllTextFromFile(funcJsonFile);
                 var funcObj = JsonConvert.DeserializeObject<JObject>(jsonStr);
                 funcObj.Add("scriptFile", $"../dist/{functionName}/index.js");
@@ -488,6 +499,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 triggerName = _contextHelpManager.GetTriggerTypeFromTriggerNameForHelp(triggerName);
             }
+
             if (promptQuestions && !_contextHelpManager.IsValidTriggerTypeForHelp(triggerName))
             {
                 ColoredConsole.WriteLine(ErrorColor($"The trigger name '{TriggerNameForHelp}' is not valid for {Language} language. "));
@@ -514,7 +526,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             try
             {
-                if (workerRuntime == WorkerRuntime.node)
+                if (workerRuntime == WorkerRuntime.Node)
                 {
                     if (FileSystemHelpers.FileExists(Constants.PackageJsonFileName))
                     {

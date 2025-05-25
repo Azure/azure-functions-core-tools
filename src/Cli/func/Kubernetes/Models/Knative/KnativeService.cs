@@ -1,65 +1,88 @@
-using System.Collections.Generic;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.Kubernetes.Models.Knative
 {
+    public class KnativeService
+    {
+        [JsonProperty("apiVersion")]
+        public string ApiVersion { get; set; }
+
+        [JsonProperty("kind")]
+        public string Kind { get; set; }
+
+        [JsonProperty("spec")]
+        public KnativeSpec Spec { get; set; }
+
+        [JsonProperty("metadata")]
+        public Metadata Metadata { get; set; }
+    }
 
     public class Env
     {
-        public string name { get; set; }
-        public string value { get; set; }
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("value")]
+        public string Value { get; set; }
     }
 
     public class KnativeContainer
     {
-        public string image { get; set; }
-        public List<Env> env { get; set; }
+        [JsonProperty("image")]
+        public string Image { get; set; }
+
+        [JsonProperty("env")]
+        public List<Env> Env { get; set; }
     }
 
     public class RevisionTemplateSpec
     {
-        public KnativeContainer container { get; set; }
+        [JsonProperty("container")]
+        public KnativeContainer Container { get; set; }
     }
 
     public class RevisionTemplateMetadata
     {
-        public Dictionary<string,string> annotations { get; set; }
+        [JsonProperty("annotations")]
+        public Dictionary<string, string> Annotations { get; set; }
     }
 
     public class RevisionTemplate
     {
-        public RevisionTemplateSpec spec { get; set; }
-        public RevisionTemplateMetadata metadata { get; set; }
+        [JsonProperty("spec")]
+        public RevisionTemplateSpec Spec { get; set; }
 
+        [JsonProperty("metadata")]
+        public RevisionTemplateMetadata Metadata { get; set; }
     }
 
     public class Configuration
     {
-        public RevisionTemplate revisionTemplate { get; set; }
+        [JsonProperty("revisionTemplate")]
+        public RevisionTemplate RevisionTemplate { get; set; }
     }
 
     public class RunLatest
     {
-        public Configuration configuration { get; set; }
+        [JsonProperty("configuration")]
+        public Configuration Configuration { get; set; }
     }
 
     public class KnativeSpec
     {
-        public RunLatest runLatest { get; set; }
-    }
-
-    public class KnativeService
-    {
-        public string apiVersion { get; set; }
-        public string kind { get; set; }
-        public KnativeSpec spec { get; set; }
-
-        public Metadata metadata { get; set; }
+        [JsonProperty("runLatest")]
+        public RunLatest RunLatest { get; set; }
     }
 
     public class Metadata
     {
-        public string name { get; set; }
-        public string @namespace { get; set; }
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("@namespace")]
+        public string @Namespace { get; set; }
     }
 }

@@ -242,6 +242,7 @@ dotnet_diagnostic.SA1127.severity = none # Generic type constraints should be on
 dotnet_diagnostic.SA1204.severity = none # Static elements should appear before instance elements
 dotnet_diagnostic.SA1309.severity = none # Field names should not begin with underscore
 dotnet_diagnostic.SA1413.severity = none # Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1405.severity = none # Debug.Assert should provide message text
 dotnet_diagnostic.SA1600.severity = none # Elements should be documented
 dotnet_diagnostic.SA1601.severity = none # Partial elements should be documented
 dotnet_diagnostic.SA1602.severity = none # Enumeration items should be documented
@@ -284,7 +285,8 @@ dotnet_diagnostic.CA2326.severity = none # Do not use TypeNameHandling values ot
 dotnet_diagnostic.CA2327.severity = none # Do not use insecure JsonSerializerSettings
 
 # IDE
-dotnet_diagnostic.IDE0005.severity = warning # Using directive is unnecessary
+# IDE0005 requires documentation generation to be enabled via `EnableGenerateDocumentationFile` - disabling until we fix all documentation issues
+# dotnet_diagnostic.IDE0005.severity = warning # Using directive is unnecessary
 dotnet_diagnostic.IDE1006.severity = warning # Predefined type alias should not be used
 
 #############################
@@ -295,11 +297,17 @@ dotnet_diagnostic.IDE1006.severity = warning # Predefined type alias should not 
 # We allow usage of "var" inside tests as it reduces churn as we remove/rename types
 csharp_style_var_for_built_in_types = true:none
 csharp_style_var_elsewhere = true:none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA2208.severity = none
+dotnet_diagnostic.xUnit1000.severity = none
 
 [**/test/**/*.cs]
 # We allow usage of "var" inside tests as it reduces churn as we remove/rename types
 csharp_style_var_for_built_in_types = true:none
 csharp_style_var_elsewhere = true:none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA2208.severity = none
+dotnet_diagnostic.xUnit1000.severity = none
 
 [**/generated/**/*.cs]
 dotnet_analyzer_diagnostic.severity = none

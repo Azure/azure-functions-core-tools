@@ -1,3 +1,6 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -24,16 +27,16 @@ namespace Azure.Functions.Cli.Helpers
 
         /// <summary>
         /// Function that determines TargetFramework of a project even when it's defined outside of the .csproj file,
-        /// e.g. in Directory.Build.props
+        /// e.g. in Directory.Build.props.
         /// </summary>
-        /// <param name="projectDirectory">Directory containing the .csproj file</param>
-        /// <param name="projectFilename">Name of the .csproj file</param>
-        /// <returns>Target framework, e.g. net8.0</returns>
-        /// <exception cref="CliException"></exception>
+        /// <param name="projectDirectory">Directory containing the .csproj file.</param>
+        /// <param name="projectFilename">Name of the .csproj file.</param>
+        /// <returns>Target framework, e.g. net8.0.</returns>
+        /// <exception cref="CliException">Unable to determine target framework.</exception>
         public static async Task<string> DetermineTargetFramework(string projectDirectory, string projectFilename = null)
         {
             EnsureDotnet();
-            if (projectFilename == null) 
+            if (projectFilename == null)
             {
                 var projectFilePath = ProjectHelpers.FindProjectFile(projectDirectory);
                 if (projectFilePath != null)
@@ -41,6 +44,7 @@ namespace Azure.Functions.Cli.Helpers
                     projectFilename = Path.GetFileName(projectFilePath);
                 }
             }
+
             var exe = new Executable(
                 "dotnet",
                 $"build {projectFilename} -getproperty:TargetFramework",
@@ -62,62 +66,67 @@ namespace Azure.Functions.Cli.Helpers
             return output.ToString();
         }
 
-        public static async Task DeployDotnetProject(string Name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
+        public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
-            await TemplateOperation(async () =>
-            {
-                var frameworkString = string.IsNullOrEmpty(targetFramework)
-                    ? string.Empty
-                    : $"--Framework \"{targetFramework}\"";
-                var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
-                    : string.Empty;
-                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
-                var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-                if (exitCode != 0)
+            await TemplateOperation(
+                async () =>
                 {
-                    throw new CliException("Error creating project template");
-                }
-            }, workerRuntime);
+                    var frameworkString = string.IsNullOrEmpty(targetFramework)
+                        ? string.Empty
+                        : $"--Framework \"{targetFramework}\"";
+                    var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                        ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
+                        : string.Empty;
+                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}");
+                    var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+                    if (exitCode != 0)
+                    {
+                        throw new CliException("Error creating project template");
+                    }
+                },
+                workerRuntime);
         }
 
         public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             ColoredConsole.WriteLine($"{Environment.NewLine}Creating dotnet function...");
-            await TemplateOperation(async () =>
-            {
-                // In .NET 6.0, the 'dotnet new' command requires the short name.
-                string templateShortName = GetTemplateShortName(templateName);
-                string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr} --language {language}";
-                if (httpAuthorizationLevel != null)
+            await TemplateOperation(
+                async () =>
                 {
-                    if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
+                    // In .NET 6.0, the 'dotnet new' command requires the short name.
+                    string templateShortName = GetTemplateShortName(templateName);
+                    string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr} --language {language}";
+                    if (httpAuthorizationLevel != null)
                     {
-                        exeCommandArguments += $" --AccessRights {httpAuthorizationLevel}";
+                        if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            exeCommandArguments += $" --AccessRights {httpAuthorizationLevel}";
+                        }
+                        else
+                        {
+                            throw new CliException(Constants.AuthLevelErrorMessage);
+                        }
                     }
-                    else
-                    {
-                        throw new CliException(Constants.AuthLevelErrorMessage);
-                    }
-                }
 
-                var exe = new Executable("dotnet", exeCommandArguments);
-                string dotnetNewErrorMessage = string.Empty;
-                var exitCode = await exe.RunAsync(o => { }, e => {
-                    dotnetNewErrorMessage = string.Concat(dotnetNewErrorMessage, Environment.NewLine, e);
-                });
-
-                if (exitCode != 0)
-                {
-                    // Only print the error message from dotnet new command when command was not successful to avoid confusing people. 
-                    if (!string.IsNullOrWhiteSpace(dotnetNewErrorMessage))
+                    var exe = new Executable("dotnet", exeCommandArguments);
+                    string dotnetNewErrorMessage = string.Empty;
+                    var exitCode = await exe.RunAsync(o => { }, e =>
                     {
-                        ColoredConsole.Error.WriteLine(ErrorColor(dotnetNewErrorMessage));
+                        dotnetNewErrorMessage = string.Concat(dotnetNewErrorMessage, Environment.NewLine, e);
+                    });
+
+                    if (exitCode != 0)
+                    {
+                        // Only print the error message from dotnet new command when command was not successful to avoid confusing people.
+                        if (!string.IsNullOrWhiteSpace(dotnetNewErrorMessage))
+                        {
+                            ColoredConsole.Error.WriteLine(ErrorColor(dotnetNewErrorMessage));
+                        }
+
+                        throw new CliException("Error creating function.");
                     }
-                        
-                    throw new CliException("Error creating function.");
-                }
-            }, workerRuntime);
+                },
+                workerRuntime);
         }
 
         private static string GetTemplateShortName(string templateName) => templateName.ToLowerInvariant() switch
@@ -146,7 +155,7 @@ namespace Azure.Functions.Cli.Helpers
 
         internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
         {
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 return new[]
                 {
@@ -192,19 +201,23 @@ namespace Azure.Functions.Cli.Helpers
         public static bool CanDotnetBuild()
         {
             EnsureDotnet();
+
             // dotnet build will only search for .csproj files within the current directory (when no .csproj file is passed), so we limit our search to that directory only
             var csProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.csproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
             var fsProjFiles = FileSystemHelpers.GetFiles(Environment.CurrentDirectory, searchPattern: "*.fsproj", searchOption: SearchOption.TopDirectoryOnly).ToList();
+
             // If the project name is extensions only then is extensions.csproj a valid csproj file
             if (!Path.GetFileName(Environment.CurrentDirectory).Equals("extensions"))
             {
                 csProjFiles.Remove("extensions.csproj");
                 fsProjFiles.Remove("extensions.fsproj");
             }
+
             if (csProjFiles.Count + fsProjFiles.Count > 1)
             {
                 throw new CliException($"Can't determine Project to build. Expected 1 .csproj or .fsproj but found {csProjFiles.Count + fsProjFiles.Count}");
             }
+
             return csProjFiles.Count + fsProjFiles.Count == 1;
         }
 
@@ -227,6 +240,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 FileSystemHelpers.DeleteDirectorySafe(outputPath);
             }
+
             var exe = new Executable("dotnet", $"build --output {outputPath} {dotnetCliParams}");
             var exitCode = showOutput
                 ? await exe.RunAsync(o => ColoredConsole.WriteLine(o), e => ColoredConsole.Error.WriteLine(e))
@@ -236,6 +250,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new CliException("Error building project");
             }
+
             return true;
         }
 
@@ -265,7 +280,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             EnsureDotnet();
 
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 return IsolatedTemplateOperation(action);
             }

@@ -1,7 +1,6 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
@@ -17,16 +16,20 @@ namespace Azure.Functions.Cli.Actions.LocalActions
     {
         private readonly ISecretsManager _secretsManager;
 
-        public string FolderName { get; set; } = string.Empty;
-        public string OutputPath { get; set; }
-        public bool BuildNativeDeps { get; set; }
-        public string AdditionalPackages { get; set; } = string.Empty;
-        public bool Squashfs { get; private set; }
-
         public PackAction(ISecretsManager secretsManager)
         {
             _secretsManager = secretsManager;
         }
+
+        public string FolderName { get; set; } = string.Empty;
+
+        public string OutputPath { get; set; }
+
+        public bool BuildNativeDeps { get; set; }
+
+        public string AdditionalPackages { get; set; } = string.Empty;
+
+        public bool Squashfs { get; private set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

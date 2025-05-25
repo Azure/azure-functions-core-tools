@@ -1,15 +1,30 @@
-﻿using Newtonsoft.Json;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.ContainerApps.Models
 {
     public class ContainerAppsFunctionPayload
     {
+        private ContainerAppsFunctionPayload(string name, string location, string managedEnvironmentId, string linuxFxVersion, List<ContainerAppsFunctionAppSettings> appSettings, List<ContainerAppsFunctionConnectionStrings> connectionStrings)
+        {
+            Name = name;
+            Location = location;
+            Properties = new ContainerAppsFunctionProperties
+            {
+                Name = name,
+                ManagedEnvironmentId = managedEnvironmentId,
+                SiteConfig = new ContainerAppsFunctionSiteConfig
+                {
+                    LinuxFxVersion = linuxFxVersion,
+                    AppSettings = appSettings,
+                    ConnectionStrings = connectionStrings
+                }
+            };
+        }
+
         [JsonProperty(PropertyName = "name")]
         public string Name { get; set; }
 
@@ -24,6 +39,29 @@ namespace Azure.Functions.Cli.ContainerApps.Models
 
         [JsonProperty(PropertyName = "properties")]
         public ContainerAppsFunctionProperties Properties { get; set; }
+
+        public static ContainerAppsFunctionPayload CreateInstance(string name, string location, string managedEnvironmentId, string linuxFxVersion, string storageConnection, string runtime, string registry, string registryUsername, string registryPassword, Dictionary<string, string> appSettings = null, List<ContainerAppsFunctionConnectionStrings> connectionStrings = null)
+        {
+            appSettings ??= new Dictionary<string, string>();
+            connectionStrings ??= new List<ContainerAppsFunctionConnectionStrings>();
+
+            appSettings["AzureWebJobsStorage"] = storageConnection;
+            appSettings["FUNCTIONS_WORKER_RUNTIME"] = runtime;
+
+            if (!string.IsNullOrEmpty(registry))
+            {
+                appSettings["DOCKER_REGISTRY_SERVER_URL"] = registry;
+            }
+
+            if (!string.IsNullOrEmpty(registryUsername))
+            {
+                appSettings["DOCKER_REGISTRY_SERVER_USERNAME"] = registryUsername;
+                appSettings["DOCKER_REGISTRY_SERVER_PASSWORD"] = registryPassword;
+            }
+
+            var allAppSettings = appSettings.Select(kvp => new ContainerAppsFunctionAppSettings { Name = kvp.Key, Value = kvp.Value }).ToList();
+            return new ContainerAppsFunctionPayload(name, location, managedEnvironmentId, linuxFxVersion, allAppSettings, connectionStrings);
+        }
 
         public class ContainerAppsFunctionProperties
         {
@@ -68,46 +106,6 @@ namespace Azure.Functions.Cli.ContainerApps.Models
 
             [JsonProperty(PropertyName = "type")]
             public string Type { get; set; }
-        }
-
-        private ContainerAppsFunctionPayload(string name, string location, string managedEnvironmentId, string linuxFxVersion, List<ContainerAppsFunctionAppSettings> appSettings, List<ContainerAppsFunctionConnectionStrings> connectionStrings)
-        {
-            Name = name;
-            Location = location;
-            Properties = new ContainerAppsFunctionProperties
-            {
-                Name = name,
-                ManagedEnvironmentId = managedEnvironmentId,
-                SiteConfig = new ContainerAppsFunctionSiteConfig
-                {
-                    LinuxFxVersion = linuxFxVersion,
-                    AppSettings = appSettings,
-                    ConnectionStrings = connectionStrings
-                }
-            };
-        }
-
-        public static ContainerAppsFunctionPayload CreateInstance(string name, string location, string managedEnvironmentId, string linuxFxVersion, string storageConnection, string runtime, string registry, string registryUsername, string registryPassword, Dictionary<string, string> appSettings = null, List<ContainerAppsFunctionConnectionStrings> connectionStrings = null)
-        {
-            appSettings ??= new Dictionary<string, string>();
-            connectionStrings ??= new List<ContainerAppsFunctionConnectionStrings>();
-
-            appSettings["AzureWebJobsStorage"] = storageConnection;
-            appSettings["FUNCTIONS_WORKER_RUNTIME"] = runtime;
-
-            if (!string.IsNullOrEmpty(registry))
-            {
-                appSettings["DOCKER_REGISTRY_SERVER_URL"] = registry;
-            }
-
-            if (!string.IsNullOrEmpty(registryUsername))
-            {
-                appSettings["DOCKER_REGISTRY_SERVER_USERNAME"] = registryUsername;
-                appSettings["DOCKER_REGISTRY_SERVER_PASSWORD"] = registryPassword;
-            }
-
-            var allAppSettings = appSettings.Select(kvp => new ContainerAppsFunctionAppSettings { Name = kvp.Key, Value = kvp.Value }).ToList();
-            return new ContainerAppsFunctionPayload(name, location, managedEnvironmentId, linuxFxVersion, allAppSettings, connectionStrings);
         }
     }
 }

@@ -1,0 +1,37 @@
+{
+  "name": "azure-functions-core-tools",
+  "version": "3.0.2106",
+  "description": "Azure Functions Core Tools",
+  "consolidatedBuildId": "123",
+  "scripts": {
+    "postinstall": "node lib/install.js",
+    "prepublishOnly": "node lib/copy-metadata.js"
+  },
+  "author": "Microsoft",
+  "license": "MIT",
+  "preferGlobal": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Azure/azure-functions-core-tools.git"
+  },
+  "bin": {
+    "func": "lib/main.js",
+    "azfun": "lib/main.js",
+    "azurefunctions": "lib/main.js"
+  },
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ],
+  "engines": {
+    "node": ">=6.9.1"
+  },
+  "dependencies": {
+    "chalk": "3.0.0",
+    "https-proxy-agent": "5.0.1",
+    "extract-zip": "^2.0.1",
+    "progress": "2.0.3",
+    "rimraf": "4.4.1"
+  }
+}

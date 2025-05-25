@@ -1,14 +1,19 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.IO;
 using System.Security;
-using Microsoft.Win32;
 using Microsoft.DotNet.PlatformAbstractions;
-using System;
+using Microsoft.Win32;
 
 namespace Azure.Functions.Cli.Telemetry
 {
+    internal enum DockerContainer
+    {
+        True,
+        False,
+        Unknown
+    }
+
     internal class DockerContainerDetectorForTelemetry : IDockerContainerDetector
     {
         public DockerContainer IsDockerContainer()
@@ -19,19 +24,20 @@ namespace Azure.Functions.Cli.Telemetry
                     try
                     {
 #pragma warning disable CA1416 // Validate platform compatibility - This is a windows only code path.
-                        
+
                         using var subkey = Registry.LocalMachine.OpenSubKey("System\\CurrentControlSet\\Control");
-                        
+
                         return subkey?.GetValue("ContainerType") != null
                             ? DockerContainer.True
                             : DockerContainer.False;
-                        
+
 #pragma warning restore CA1416 // Validate platform compatibility
                     }
                     catch (SecurityException)
                     {
                         return DockerContainer.Unknown;
                     }
+
                 case Platform.Linux:
                     try
                     {
@@ -46,6 +52,7 @@ namespace Azure.Functions.Cli.Telemetry
                         // inner exception is set to IOException. In this case, it is unknown.
                         return DockerContainer.Unknown;
                     }
+
                 case Platform.Unknown:
                     return DockerContainer.Unknown;
                 case Platform.Darwin:
@@ -60,12 +67,5 @@ namespace Azure.Functions.Cli.Telemetry
                 .ReadAllText("/proc/1/cgroup")
                 .Contains("/docker/");
         }
-    }
-
-    internal enum DockerContainer
-    {
-        True,
-        False,
-        Unknown
     }
 }

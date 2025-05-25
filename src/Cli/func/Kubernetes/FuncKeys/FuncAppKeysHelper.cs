@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security;
 
@@ -16,11 +17,12 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
         private const string HostSystemKey = "host.systemKey.default";
         private const string FunctionKeyPrefix = "functions.";
         private const string FunctionDefaultKeyName = "default";
+
         /// <summary>
-        /// Implementation of this method creates the Host and Function Keys
+        /// Implementation of this method creates the Host and Function Keys.
         /// </summary>
-        /// <param name="functionNames">The <see cref="IEnumerable{string}"></see> of function names </param>
-        /// <returns>The <see cref="IDictionary{string, string}"/> of function app's host and function keys</returns>
+        /// <param name="functionNames">The <see cref="IEnumerable{String}"></see> of function names.</param>
+        /// <returns>The <see cref="IDictionary{String, String}"/> of function app's host and function keys.</returns>
         public static IDictionary<string, string> CreateKeys(IEnumerable<string> functionNames)
         {
             var funcAppKeys = new Dictionary<string, string>
@@ -48,7 +50,7 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
                 { AzureWebJobsSecretStorageTypeEnvVariableName, "kubernetes" }
             };
 
-            //if keys needs are not to be mounted as container volume then add "AzureWebJobsKubernetesSecretName" enviornment varibale to the container 
+            // if keys needs are not to be mounted as container volume then add "AzureWebJobsKubernetesSecretName" enviornment varibale to the container
             if (!mountKeysAsContainerVolume)
             {
                 funcKeysKubernetesEnvironVariables.Add(AzureWebJobsKubernetesSecretNameEnvVariableName, $"secrets/{keysSecretCollectionName}");
@@ -74,7 +76,7 @@ namespace Azure.Functions.Cli.Kubernetes.FuncKeys
                 volume.VolumeSecret = new VolumeSecretV1 { SecretName = funcAppKeysSecretsCollectionName };
             }
 
-            //Mount the app keys as volume mount to the container at the path "/run/secrets/functions-keys"
+            // Mount the app keys as volume mount to the container at the path "/run/secrets/functions-keys"
             foreach (var deployment in deployments)
             {
                 deployment.Spec.Template.Spec.Volumes = new VolumeV1[] { volume };
