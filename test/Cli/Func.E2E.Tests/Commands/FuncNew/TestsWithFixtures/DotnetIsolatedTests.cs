@@ -14,27 +14,7 @@ using Xunit;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew.TestsWithFixtures
 {
-    //public class DotnetIsolatedTests : IClassFixture<DotnetIsolatedFunctionAppFixture>
-    //{
-    //    private readonly DotnetIsolatedFunctionAppFixture _fixture;
-
-    //    public DotnetIsolatedTests(DotnetIsolatedFunctionAppFixture fixture)
-    //    {
-    //        _fixture = fixture;
-    //    }
-
-    //    [Fact]
-    //    public void FuncNew_HttpTrigger_CreatesFunction()
-    //    {
-    //        var testName = nameof(FuncNew_HttpTrigger_CreatesFunction);
-    //        var newCommand = new FuncNewCommand(_fixture.FuncPath, testName, _fixture.Log);
-
-    //        var result = newCommand
-    //            .WithWorkingDirectory(_fixture.WorkingDirectory)
-    //            .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated")
-    //            .Execute([".", "--template", "HttpTrigger", "--name", "MyHttpFunction"]);
-
-    //        result.Should().HaveStdOutContaining("The function \"MyHttpFunction\" was created successfully");
-    //    }
-    //}
+    public class DotnetIsolatedTests
+    {
+    }
 }
