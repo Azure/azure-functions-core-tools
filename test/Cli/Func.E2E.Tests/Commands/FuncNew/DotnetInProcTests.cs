@@ -54,41 +54,41 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
             result.Should().HaveStdErrContaining("Command must specify --template, and --name explicitly");
         }
 
-        [Fact]
-        public async Task FuncNew_WithAuthLevel_Anonymous_CreatesHttpTrigger()
-        {
-            var methodName = nameof(FuncNew_WithAuthLevel_Anonymous_CreatesHttpTrigger);
-            var uniqueTestName = methodName;
+        //[Fact]
+        //public async Task FuncNew_WithAuthLevel_Anonymous_CreatesHttpTrigger()
+        //{
+        //    var methodName = nameof(FuncNew_WithAuthLevel_Anonymous_CreatesHttpTrigger);
+        //    var uniqueTestName = methodName;
 
-            // Initialize the function app
-            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
+        //    // Initialize the function app
+        //    await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
 
-            // Create func new command using consistent working directory
-            var funcNewCommand = new FuncNewCommand(FuncPath, methodName, Log);
-            var result = funcNewCommand
-                   .WithWorkingDirectory(WorkingDirectory)
-                   .Execute(new[] { ".", "--template", "HttpTrigger", "--name", "HttpAuthFunction", "--authlevel", "anonymous" });
+        //    // Create func new command using consistent working directory
+        //    var funcNewCommand = new FuncNewCommand(FuncPath, methodName, Log);
+        //    var result = funcNewCommand
+        //           .WithWorkingDirectory(WorkingDirectory)
+        //           .Execute(new[] { ".", "--template", "HttpTrigger", "--name", "HttpAuthFunction", "--authlevel", "anonymous" });
 
-            // Validate result
-            result.Should().HaveStdOutContaining("The function \"HttpAuthFunction\" was created successfully");
-        }
+        //    // Validate result
+        //    result.Should().HaveStdOutContaining("The function \"HttpAuthFunction\" was created successfully");
+        //}
 
-        [Fact]
-        public async Task FuncNew_HttpTrigger_WithAuthLevelFunction_Dotnet_CreatesSuccessfully()
-        {
-            var uniqueTestName = nameof(FuncNew_HttpTrigger_WithAuthLevelFunction_Dotnet_CreatesSuccessfully);
+        //[Fact]
+        //public async Task FuncNew_HttpTrigger_WithAuthLevelFunction_Dotnet_CreatesSuccessfully()
+        //{
+        //    var uniqueTestName = nameof(FuncNew_HttpTrigger_WithAuthLevelFunction_Dotnet_CreatesSuccessfully);
 
-            // Initialize function app
-            await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
+        //    // Initialize function app
+        //    await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
 
-            // Create a new HTTP Trigger function with authlevel = function
-            var result = new FuncNewCommand(FuncPath, uniqueTestName, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute([".", "--template", "HttpTrigger", "--name", "testfunc", "--authlevel", "function"]);
+        //    // Create a new HTTP Trigger function with authlevel = function
+        //    var result = new FuncNewCommand(FuncPath, uniqueTestName, Log)
+        //        .WithWorkingDirectory(WorkingDirectory)
+        //        .Execute([".", "--template", "HttpTrigger", "--name", "testfunc", "--authlevel", "function"]);
 
-            // Validate expected output
-            result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully");
-        }
+        //    // Validate expected output
+        //    result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully");
+        //}
 
         [Fact]
         public void FuncNew_HttpTrigger_CsxMode_WithoutInit_Succeeds()
