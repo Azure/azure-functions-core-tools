@@ -101,12 +101,7 @@ def linuxOutput(buildFolder, arch):
     sharedObjects = glob.glob("**/*.so", recursive=True)
     sharedObjects = [obj for obj in sharedObjects if "workers" not in obj]
 
-    for so_file in sharedObjects:
-        try:
-            print(f"Stripping: {so_file}")
-            printReturnOutput([stripBinary, "--strip-unneeded", so_file])
-        except Exception as e:
-            print(f"⚠️ Failed to strip {so_file}: {e}")
+    printReturnOutput([stripBinary, "--strip-unneeded"] + sharedObjects)
 
     print(f"change bin/func permission to 755")
     chmodFolderAndFiles(os.path.join(buildFolder, "usr"))
