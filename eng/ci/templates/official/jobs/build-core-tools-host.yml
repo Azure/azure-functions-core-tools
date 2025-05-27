@@ -116,30 +116,30 @@ jobs:
         nethost.dll
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-arm64
 
-  #- ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-  - task: PowerShell@2
-    displayName: 'Generate nightly build package version for feed'
-    inputs:
-      targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: PowerShell@2
+      displayName: 'Generate nightly build package version for feed'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
-  - task: UniversalPackages@0
-    displayName: Publish
-    inputs:
-      command: publish
-      publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
-      vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: 'coretools-host-windows-signed'
-      versionOption: custom
-      versionPublish: '$(NightlyBuildVersion)'
-      packagePublishDescription: 'Core tools host build (windows)'
+    - task: UniversalPackages@0
+      displayName: Publish
+      inputs:
+        command: publish
+        publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
+        vstsFeedPublish: 'internal/core-tools-nightly-build'
+        vstsFeedPackagePublish: 'func-host-windows-signed'
+        versionOption: custom
+        versionPublish: '$(NightlyBuildVersion)'
+        packagePublishDescription: 'Core tools host build (windows)'
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: coretools-host-windows-signed
+      artifact: func-host-windows-signed
 
 - job: BuildCoreToolsHostLinux
   displayName: '[Linux] Build CoreToolsHost'
@@ -179,7 +179,7 @@ jobs:
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: coretools-host-linux
+      artifact: func-host-linux
 
 - job: SignCoreToolsHostLinux
   displayName: '[Linux] Sign CoreToolsHost'
@@ -197,8 +197,8 @@ jobs:
 
   - task: DownloadPipelineArtifact@2
     inputs:
-      artifact: coretools-host-linux
-      path: $(Build.SourcesDirectory)/coretools-host-linux
+      artifact: func-host-linux
+      path: $(Build.SourcesDirectory)/func-host-linux
 
   - task: Bash@3
     inputs:
@@ -215,7 +215,7 @@ jobs:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign'
-      folderPath: '/mnt/vss/_work/1/s/coretools-host-linux'
+      folderPath: '/mnt/vss/_work/1/s/func-host-linux'
       pattern: 'func, libnethost.so'
       signType: inline
       inlineOperation: |
@@ -232,34 +232,41 @@ jobs:
   - task: CopyFiles@2
     displayName: Copy files (linux-x64)
     inputs:
-      SourceFolder: $(Build.SourcesDirectory)/coretools-host-linux/linux-x64
+      SourceFolder: $(Build.SourcesDirectory)/func-host-linux/linux-x64
       # Publish output will include many other files. We only need func & libnethost.so
       Contents: |
         func
         libnethost.so
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
 
-  #- ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-  - task: PowerShell@2
-    displayName: 'Generate nightly build package version for feed'
-    inputs:
-      targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: PowerShell@2
+      displayName: 'Generate nightly build package version for feed'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
 
-  - task: UniversalPackages@0
-    displayName: Publish
-    inputs:
-      command: publish
-      publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
-      vstsFeedPublish: 'internal/core-tools-nightly-build'
-      vstsFeedPackagePublish: 'coretools-host-linux-signed'
-      versionOption: custom
-      versionPublish: '$(NightlyBuildVersion)'
-      packagePublishDescription: 'Core tools host build (linux)'
+    - task: PowerShell@2
+      displayName: 'Print NightlyBuildVersion'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "NightlyBuildVersion value: $(NightlyBuildVersion)"
+
+    - task: UniversalPackages@0
+      displayName: Publish
+      inputs:
+        command: publish
+        publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
+        vstsFeedPublish: 'internal/core-tools-nightly-build'
+        vstsFeedPackagePublish: 'func-host-linux-signed'
+        versionOption: custom
+        versionPublish: '$(NightlyBuildVersion)'
+        packagePublishDescription: 'Core tools host build (linux)'
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
       path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: coretools-host-linux-signed
+      artifact: func-host-linux-signed

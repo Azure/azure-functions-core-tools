@@ -11,27 +11,27 @@ jobs:
       inputs:
         - input: pipelineArtifact
           pipeline: core-tools-default
-          artifactName: coretools-cli
-          targetPath: $(Pipeline.Workspace)/core-tools-default/coretools-cli
+          artifactName: func-cli
+          targetPath: $(Pipeline.Workspace)/core-tools-default/func-cli
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
         targetPath: $(Pipeline.Workspace)/nugetPackage
-        artifact: coretools-nuget-package
+        artifact: func-nuget-package
   steps:
   - checkout: self
 
   # Conditional download of artifacts based on isNightlyBuild parameter
   - ${{ if eq(parameters.isNightlyBuild, true) }}:
     # Download from ADO feed for nightly builds
-    - task: UniversalPackages@0
+    - task: DownloadPackage@1
       displayName: 'Download core-tools-default from feed'
       inputs:
-        command: download
-        vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'coretools-cli'
-        vstsPackageVersion: '4.0.*+*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/coretools-cli'
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/core-tools-default/func-cli'
 
   - task: PowerShell@2
     displayName: 'Process and move nuget package to staging directory'

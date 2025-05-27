@@ -48,7 +48,6 @@ $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVer
 $buildNumberForZipFile = ($cliVersion -split "\.")[2]
 Write-Host "Build number: $buildNumberForZipFile"
 Write-Host "##vso[task.setvariable variable=BuildNumberForZipFile;]$buildNumberForZipFile"
-Write-Host "##vso[task.setvariable variable=cliVersion;]$cliVersion"
 
 # Define the platforms to search for
 $platforms = @('x64', 'x86')

@@ -14,35 +14,35 @@ jobs:
       inputs:
         - input: pipelineArtifact
           pipeline: core-tools-host
-          artifactName: coretools-host-linux-signed
-          targetPath: $(Pipeline.Workspace)/core-tools-host/coretools-host-linux-signed
+          artifactName: func-host-linux-signed
+          targetPath: $(Pipeline.Workspace)/core-tools-host/func-host-linux-signed
         - input: pipelineArtifact
           pipeline: core-tools-host
-          artifactName: coretools-host-windows
-          targetPath: $(Pipeline.Workspace)/core-tools-host/coretools-host-windows
+          artifactName: func-host-windows-signed
+          targetPath: $(Pipeline.Workspace)/core-tools-host/func-host-windows-signed
         - input: pipelineArtifact
           pipeline: core-tools-inproc
-          artifactName: coretools-cli-inproc6
-          targetPath: $(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc6
+          artifactName: func-cli-inproc6
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc6
         - input: pipelineArtifact
           pipeline: core-tools-inproc
-          artifactName: coretools-cli-inproc8
-          targetPath: $(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc8
+          artifactName: func-cli-inproc8
+          targetPath: $(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc8
         - input: pipelineArtifact
           pipeline: core-tools-default
-          artifactName: coretools-cli
-          targetPath: $(Pipeline.Workspace)/core-tools-default/coretools-cli
+          artifactName: func-cli
+          targetPath: $(Pipeline.Workspace)/core-tools-default/func-cli
 
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
       - output: pipelineArtifact
         displayName: Publish assembled artifact ${{ parameters.arch }}
         targetPath: $(Build.ArtifactStagingDirectory)/core-tools
-        artifact: coretools-cli-${{ parameters.arch }}
+        artifact: func-cli-${{ parameters.arch }}
       - output: pipelineArtifact
         displayName: Publish metadata.json
         targetPath: $(Build.ArtifactStagingDirectory)/metadata.json
-        artifact: coretools-cli-metadata-json
+        artifact: func-cli-metadata-json
         condition: and(succeeded(), eq('${{ parameters.arch }}', 'min.win-x64'))
 
   steps:
@@ -51,50 +51,51 @@ jobs:
   # Conditional download of artifacts based on isNightlyBuild parameter
   - ${{ if eq(parameters.isNightlyBuild, true) }}:
     # Download from ADO feed for nightly builds
-    - task: UniversalPackages@0
+    - task: DownloadPackage@1
       displayName: 'Download core-tools-host (Linux signed) from feed'
       inputs:
-        command: download
-        vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'coretools-host-linux-signed'
-        vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/coretools-host-linux-signed'
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-host-linux-signed'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/core-tools-host/func-host-linux-signed'
 
-    - task: UniversalPackages@0
+    - task: DownloadPackage@1
       displayName: 'Download core-tools-host (Windows) from feed'
       inputs:
-        command: download
-        vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'coretools-host-windows'
-        vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-host/coretools-host-windows'
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-host-windows-signed'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/core-tools-host/func-host-windows-signed'
 
-    - task: UniversalPackages@0
+    - task: DownloadPackage@1
       displayName: 'Download core-tools-inproc6 from feed'
       inputs:
-        command: download
-        vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'coretools-cli-inproc6'
-        vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc6'
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli-inproc6'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc6'
 
-    - task: UniversalPackages@0
+    - task: DownloadPackage@1
       displayName: 'Download core-tools-inproc8 from feed'
       inputs:
-        command: download
-        vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'coretools-cli-inproc8'
-        vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-inproc/coretools-cli-inproc8'
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli-inproc8'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc8'
 
-    - task: UniversalPackages@0
+    - task: DownloadPackage@1
       displayName: 'Download core-tools-default from feed'
       inputs:
-        command: download
-        vstsFeed: 'internal/core-tools-nightly-build'
-        vstsFeedPackage: 'coretools-cli'
-        vstsPackageVersion: '4.0.*'
-        downloadDirectory: '$(Pipeline.Workspace)/core-tools-default/coretools-cli'
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/core-tools-default/func-cli'
+
 
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
