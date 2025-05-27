@@ -25,6 +25,12 @@ jobs:
       artifact: drop_debian
 
   steps:
+  - script: |
+      sudo apt-get update
+      sudo apt-get install -y binutils-aarch64-linux-gnu
+      sudo apt-get install -y fakeroot
+    displayName: 'Install required tools'
+
   - task: PowerShell@2
     displayName: 'Read metadata from consolidated build'
     inputs:
@@ -35,7 +41,7 @@ jobs:
         $metadata = Get-Content -Path $metadataPath | ConvertFrom-Json
         Write-Host "Consolidated Build ID: $($metadata.consolidatedBuildId)"
         Write-Host "Default Artifact Version: $($metadata.defaultArtifactVersion)"
-        
+
         # Set as pipeline variables for later steps
         Write-Host "##vso[task.setvariable variable=ConsolidatedBuildId]$($metadata.consolidatedBuildId)"
         Write-Host "##vso[task.setvariable variable=DefaultArtifactVersion]$($metadata.defaultArtifactVersion)"
@@ -52,7 +58,6 @@ jobs:
         pip install -r requirements.txt
         pip install wget
 
-        sudo apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
         python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
         python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
@@ -82,30 +87,29 @@ jobs:
 
   - pwsh: |
       echo $env:LinuxPackageAccountName
-      $buildTag = $env:LinuxPackageBuildTag
-      $majorVersion = [math]::Floor([double]$buildTag.Split(".")[0])
+      $majorVersion = [math]::Floor([double]$linuxPackageBuildTag.Split(".")[0])
 
       # Convert to Debian version format
-      if ($buildTag -like "*-*") {
-        $parts = $buildTag -split "-"
+      if ($linuxPackageBuildTag -like "*-*") {
+        $parts = $linuxPackageBuildTag -split "-"
         $debianVersion = "$($parts[0])~$($parts[1])-1"
       } else {
-        $debianVersion = "$buildTag-1"
+        $debianVersion = "$linuxPackageBuildTag-1"
       }
 
       foreach ($arch in @("x64", "arm64")) {
         $fileName = "azure-functions-core-tools_${debianVersion}_${arch}.deb"
         $filePath = "/mnt/vss/_work/1/s/publish-scripts/artifact/$fileName"
-        az storage blob upload -f $filePath -c signed -n $fileName --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+        az storage blob upload -f $filePath -c signed -n $fileName --account-name $linuxPackageAccountName --account-key $linuxPackageAccountKey
 
         $fileNameMajor = "azure-functions-core-tools-$($majorVersion)_${debianVersion}_${arch}.deb"
         $filePathMajor = "/mnt/vss/_work/1/s/publish-scripts/artifact/$fileNameMajor"
-        az storage blob upload -f $filePathMajor -c signed -n $fileNameMajor --account-name $env:LinuxPackageAccountName --account-key $env:LinuxPackageAccountKey
+        az storage blob upload -f $filePathMajor -c signed -n $fileNameMajor --account-name $linuxPackageAccountName --account-key $linuxPackageAccountKey
       }
     env:
-      LinuxPackageAccountName: $(LinuxPackageAccountName)
-      LinuxPackageAccountKey: $(LinuxPackageAccountKey)
-      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+      linuxPackageAccountName: $(LinuxPackageAccountName)
+      linuxPackageAccountKey: $(LinuxPackageAccountKey)
+      linuxPackageBuildTag: $(DefaultArtifactVersion)
     displayName: 'Upload Core Tools Signed Linux Package to the storage'
     condition: eq(variables['UploadSignedPackages'], 'true') # This is a UI variable that defaults to false
 
