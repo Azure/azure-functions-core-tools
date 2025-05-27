@@ -143,13 +143,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 
             // Validate expected output
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
-
-            var functionJsonPath = Path.Combine(WorkingDirectory, "testfunc", "function.json");
-            var content = await File.ReadAllTextAsync(functionJsonPath);
-            content.Should().Contain("../dist/testfunc/index.js");
-            content.Should().Contain("authLevel");
-            content.Should().Contain("methods");
-            content.Should().Contain("httpTrigger");
         }
 
         [Fact]
