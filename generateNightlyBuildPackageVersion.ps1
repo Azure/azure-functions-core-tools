@@ -1,15 +1,19 @@
-# Generate a SemVer 2.0 compliant version number
-# Format: 4.0.YYYYMMDD (where YYYYMMDD has no leading zeros)
-$year = (Get-Date).Year
-$month = (Get-Date).Month
-$day = (Get-Date).Day
+# Get build ID from environment variable or use timestamp if not available
+$buildId = $env:BUILD_BUILDID
 
-# Construct date as an integer (no leading zeros)
-$dateInt = ($year * 10000) + ($month * 100) + $day
+# Throw an error if buildId is not found
+if ([string]::IsNullOrEmpty($buildId)) {
+    throw "Error: BUILD_BUILDID environment variable not found."
+}
 
-# Create version in format 4.0.YYYYMMDD
-$uniqueVersion = "4.0.$dateInt"
-Write-Host "Generated unique version for nightly build: $uniqueVersion"
+# Get current date components
+$year = Get-Date -Format "yyyy"
+$month = (Get-Date).Month  # No leading zero for single digit months
+$day = Get-Date -Format "dd"  # Always double digit for days
 
-# Set as pipeline variable for use in the Universal Packages task
-Write-Host "##vso[task.setvariable variable=NightlyBuildVersion]$uniqueVersion"
+# Create version: YYYY.MMDD.buildId
+$semVerVersion = "$year.$month$day.$buildId"
+Write-Host "Generated SemVer version: $semVerVersion"
+
+# Set as pipeline variables for use in subsequent tasks
+Write-Host "##vso[task.setvariable variable=NightlyBuildVersion]$semVerVersion"
