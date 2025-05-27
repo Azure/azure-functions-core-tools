@@ -1,13 +1,13 @@
+# This is a wrapper script that calls the consolidated generateSha script
 param (
     [string]$CurrentDirectory
 )
 
-$rootPath = Join-Path $CurrentDirectory "staging"
-$zipFiles = Get-ChildItem -Path $rootPath -Filter *.zip  -Recurse
-foreach ($file in $zipfiles) 
-{
-	$sha = (Get-FileHash $file.FullName).Hash.ToLower()
-	$shaFilePath = $file.FullName + ".sha2"
-	Out-File -InputObject $sha -Encoding ascii -FilePath $shaFilePath -NoNewline
-	Write-Host "Generated sha for $filePath at $shaFilePath"
-}
+# Resolve the path to the consolidated script
+$consolidatedScriptPath = Join-Path $PSScriptRoot "..\generateSha.ps1"
+
+Write-Host "Calling consolidated generateSha script: $consolidatedScriptPath"
+Write-Host "CurrentDirectory: $CurrentDirectory"
+
+# Call the consolidated script with the CurrentDirectory parameter
+& $consolidatedScriptPath -CurrentDirectory $CurrentDirectory

@@ -1,43 +1,22 @@
 # Note that this file should be used with YAML steps directly when the consolidated pipeline is migrated over to YAML
+# This is a wrapper script that calls the consolidated testArtifacts script in ArtifactAssemblerHelpers
 param (
     [string]$StagingDirectory
 )
 
-# Set the path to test project (.csproj) and runtime settings
-$testProjectPath = "..\..\test\Azure.Functions.Cli.Tests\Azure.Functions.Cli.Tests.csproj"
-$runtimeSettings = "..\..\test\Azure.Functions.Cli.Tests\E2E\StartTests_artifact_consolidation.runsettings"
+# Resolve the path to the consolidated script
+$consolidatedScriptPath = Join-Path $PSScriptRoot "ArtifactAssemblerHelpers\testArtifacts.ps1"
 
-dotnet build $testProjectPath
-
-# Loop through each subdirectory within the parent directory
-Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
-    # Check if the subdirectory name includes 'win-x64 or win-x86'
-    $subDir = $_.FullName
-    if ($subDir -like "*Cli.win-x*") {
-        Write-Host "Current directory: $subDir"
-        # Find func.exe in the subdirectory
-        $funcExePath = Get-ChildItem -Path $subDir -Filter "func.exe" -ErrorAction SilentlyContinue
-
-        if ($funcExePath) {
-             Write-Host "Setting FUNC_PATH to: $funcExePath"
-        
-            # Set the environment variable FUNC_PATH to the func.exe or func path
-            [System.Environment]::SetEnvironmentVariable("FUNC_PATH", $funcExePath.FullName, "Process")
-        
-            # Run dotnet test with the environment variable set
-            Write-Host "Running 'dotnet test' on test project: $testProjectPath"
-            dotnet test $testProjectPath --no-build --settings $runtimeSettings --logger "console;verbosity=detailed"
-
-            if ($LASTEXITCODE -ne 0) {
-                # If the exit code is non-zero, throw an error
-                Write-Host "Tests failed with exit code $LASTEXITCODE"
-                throw "dotnet test failed within $subDir. Exiting with error."
-            } else {
-                # If the exit code is zero, tests passed
-                Write-Host "All tests passed successfully within $subDir"
-            }
-        } else {
-            Write-Host "No func.exe or func found in: $subDir"
-        }
-    }
+# For backward compatibility with the legacy pipeline, convert the staging directory to match expected format
+# The legacy version expects artifacts folder structure, while the new version expects staging folder structure
+if (-not $StagingDirectory) {
+    # Default to artifacts directory for legacy behavior
+    $rootDir = Join-Path $PSScriptRoot ".." | Join-Path -ChildPath ".." | Resolve-Path
+    $StagingDirectory = Join-Path $rootDir "artifacts"
 }
+
+Write-Host "Calling consolidated testArtifacts script: $consolidatedScriptPath"
+Write-Host "StagingDirectory: $StagingDirectory"
+
+# Call the consolidated script
+& $consolidatedScriptPath -StagingDirectory $StagingDirectory
