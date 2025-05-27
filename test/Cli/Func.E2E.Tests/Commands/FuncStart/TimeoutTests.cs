@@ -12,8 +12,12 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
 {
-    public class TimeoutTests(ITestOutputHelper log) : BaseE2ETests(log)
+    public class TimeoutTests : BaseE2ETests
     {
+        public TimeoutTests(ITestOutputHelper log) : base(log)
+        {
+        }
+
         [Fact]
         [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task ProcessStartedHandler_ExceedsTimeout_ProcessIsKilled()
@@ -22,10 +26,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(ProcessStartedHandler_ExceedsTimeout_ProcessIsKilled);
 
             // Initialize JavaScript function app
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "javascript"]);
+            await FuncInitWithRetryAsync(testName, new string[] { ".", "--worker-runtime", "javascript" });
 
             // Add HTTP trigger function
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "httpTrigger"]);
+            await FuncNewWithRetryAsync(testName, new string[] { ".", "--template", "HttpTrigger", "--name", "httpTrigger" });
 
             // Start the function app with a process handler that intentionally stalls
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);
@@ -82,7 +86,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             // Execute the command
             var result = funcStartCommand
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--port", port.ToString()]);
+                .Execute(new string[] { "--port", port.ToString() });
 
             // Verify that the process was killed and didn't run for the full 3 minutes
             // We expect it to be killed after 2 minutes (120 seconds) with some buffer

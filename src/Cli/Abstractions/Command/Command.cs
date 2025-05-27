@@ -82,7 +82,14 @@ namespace Azure.Functions.Cli.Abstractions
                                 Reporter.Verbose.WriteLine("Process started handler timed out. Killing the process.");
                                 if (!_process.HasExited)
                                 {
-                                    _process.Kill(true);
+                                    try
+                                    {
+                                        _process.Kill();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Reporter.Verbose.WriteLine($"Error killing process: {ex.Message}");
+                                    }
                                 }
                             }
                         }
@@ -91,7 +98,14 @@ namespace Azure.Functions.Cli.Abstractions
                             Reporter.Verbose.WriteLine("Process started handler was canceled due to timeout. Killing the process.");
                             if (!_process.HasExited)
                             {
-                                _process.Kill(true);
+                                try
+                                {
+                                    _process.Kill();
+                                }
+                                catch (Exception ex)
+                                {
+                                    Reporter.Verbose.WriteLine($"Error killing process: {ex.Message}");
+                                }
                             }
                         }
                         catch (Exception ex)
