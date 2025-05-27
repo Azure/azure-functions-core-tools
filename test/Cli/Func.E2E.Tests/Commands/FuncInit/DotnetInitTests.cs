@@ -44,7 +44,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             var testName = nameof(Init_WithSupportedTargetFramework_GeneratesProjectFile_ContainsExpectedVersion);
             var projectName = "dotnet-funcs";
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
-            var localSettingsPath = Path.Combine(workingDir, "dotnet-funcs", Common.Constants.LocalSettingsJsonFileName);
+            var localSettingsPath = Path.Combine(workingDir, projectName, Common.Constants.LocalSettingsJsonFileName);
             var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet" };
             var csprojfilepath = Path.Combine(workingDir, projectName, "dotnet-funcs.csproj");
             var expectedCsprojContent = new[] { "Microsoft.NET.Sdk", "v4", targetFramework };

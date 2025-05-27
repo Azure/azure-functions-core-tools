@@ -39,5 +39,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Traits
         /// Indicates tests that target the Python runtime.
         /// </summary>
         public const string Python = "Python";
+
+        /// <summary>
+        /// Indicates tests that target the Java runtime.
+        /// </summary>
+        public const string Java = "Java";
     }
 }
