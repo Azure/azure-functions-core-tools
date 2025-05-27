@@ -92,26 +92,26 @@
     <!-- If templates don't exist, download directly into publish dir -->
     <Exec
       Condition="!Exists('$(TemplatesSourceDir)\templates\templates.json')"
-      Command='pwsh -ExecutionPolicy Bypass -File "$(TemplatesScriptPath)" -OutputPath "$(PublishDir)"'
+      Command='pwsh -File $(TemplatesScriptPath) -OutputPath $(PublishDir)'
       WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
   <!-- GoZip -->
   <Target Name="EnsureGoZip" AfterTargets="Publish">
     <PropertyGroup>
-      <GoZipOutput>$(PublishDir)/gozip$(ExeSuffix)</GoZipOutput>
-      <GoZipSource>$(EngRoot)/tools/go/gozip/main.go</GoZipSource>
+      <GoZipOutput>$(PublishDir)gozip$(ExeSuffix)</GoZipOutput>
+      <GoZipSource>$(EngRoot)tools\go\gozip\main.go</GoZipSource>
       <ExeSuffix Condition="'$(OS)' == 'Windows_NT'">.exe</ExeSuffix>
     </PropertyGroup>
 
-    <Message 
+    <Message
       Text="Building gozip..."
       Importance="high"
       Condition="!Exists('$(GoZipOutput)')" />
 
-    <Exec 
+    <Exec
       Condition="!Exists('$(GoZipOutput)')"
-      Command="pwsh -ExecutionPolicy Bypass -File '$(GoZipScriptPath)'  -OutputPath '$(GoZipOutput)' -GoFile '$(GoZipSource)' -Runtime '$(RuntimeIdentifier)'" />
+      Command="pwsh -File $(GoZipScriptPath) -OutputPath $(GoZipOutput) -GoFile $(GoZipSource) -Runtime $(RuntimeIdentifier)" />
   </Target>
 
 </Project>
