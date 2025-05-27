@@ -88,18 +88,28 @@ def linuxOutput(buildFolder, arch):
     exeFullPath = os.path.abspath("func")
 
     os.chdir(buildFolder)
+
     # strip sharedobjects
     import glob
 
-    sharedObjects = glob.glob("**/*.so", recursive=True)
+    stripBinary = "strip"
+    if arch == "arm64":
+        stripBinary = "aarch64-linux-gnu-strip"
 
     # obj files inside the workers should not be removed as workers like "python"
     # come with objects necessary for the worker to work.
+    sharedObjects = glob.glob("**/*.so", recursive=True)
     sharedObjects = [obj for obj in sharedObjects if "workers" not in obj]
-    printReturnOutput(["strip", "--strip-unneeded"] + sharedObjects)
 
-    chmodFolderAndFiles(os.path.join(buildFolder, "usr"))
+    for so_file in sharedObjects:
+        try:
+            print(f"Stripping: {so_file}")
+            printReturnOutput([stripBinary, "--strip-unneeded", so_file])
+        except Exception as e:
+            print(f"⚠️ Failed to strip {so_file}: {e}")
+
     print(f"change bin/func permission to 755")
+    chmodFolderAndFiles(os.path.join(buildFolder, "usr"))
     # octal
     os.chmod(exeFullPath, 0o755)
 
