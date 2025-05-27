@@ -25,6 +25,12 @@ jobs:
       artifact: drop_debian
 
   steps:
+  - script: |
+      sudo apt-get update
+      sudo apt-get install -y binutils-aarch64-linux-gnu
+      sudo apt-get install -y fakeroot
+    displayName: 'Install required tools'
+
   - task: PowerShell@2
     displayName: 'Read metadata from consolidated build'
     inputs:
@@ -35,7 +41,7 @@ jobs:
         $metadata = Get-Content -Path $metadataPath | ConvertFrom-Json
         Write-Host "Consolidated Build ID: $($metadata.consolidatedBuildId)"
         Write-Host "Default Artifact Version: $($metadata.defaultArtifactVersion)"
-        
+
         # Set as pipeline variables for later steps
         Write-Host "##vso[task.setvariable variable=ConsolidatedBuildId]$($metadata.consolidatedBuildId)"
         Write-Host "##vso[task.setvariable variable=DefaultArtifactVersion]$($metadata.defaultArtifactVersion)"
@@ -52,7 +58,6 @@ jobs:
         pip install -r requirements.txt
         pip install wget
 
-        sudo apt-get install fakeroot
         major_version=$(echo "$linuxBuildNumber" | cut -d'.' -f1)
         python driver.py "$linuxBuildNumber" "$consolidatedBuildId" "$major_version"
         python driver.py "$linuxBuildNumber" "$consolidatedBuildId"
@@ -105,7 +110,7 @@ jobs:
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
-      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+      LinuxPackageBuildTag: $(DefaultArtifactVersion)
     displayName: 'Upload Core Tools Signed Linux Package to the storage'
     condition: eq(variables['UploadSignedPackages'], 'true') # This is a UI variable that defaults to false
 
