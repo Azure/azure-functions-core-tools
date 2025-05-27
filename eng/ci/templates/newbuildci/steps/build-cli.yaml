@@ -12,18 +12,14 @@ parameters:
 
 steps:
   - pwsh: |
-      eng/scripts/download-templates.ps1 -OutputPath ./artifacts/templates
-    displayName: 'Download Templates'
+      eng/scripts/download-templates.ps1 -OutputPath ./artifacts
+    displayName: 'Download templates'
 
   - task: DotNetCoreCLI@2
-    displayName: 'Restore dependencies'
+    displayName: 'Dotnet restore'
     inputs:
       command: 'restore'
-      projects: '**/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj'
-      feedsToUse: 'select'
-      vstsFeed: 'Azure Functions CLI'
-      noRestore: true
-      restoreSolution: '**/src/Azure.Functions.Cli/Azure.Functions.Cli.csproj'
+      projects: 'Azure.Functions.Cli.sln'
 
   - task: PowerShell@2
     displayName: 'Run publish script'
