@@ -6,8 +6,6 @@ schedules:
     include:
       - main
 
-name: $(Build.SourceBranchName)_$(Build.Reason)
-
 trigger: none
 
 # This pipeline is triggered by the completion of scheduled builds

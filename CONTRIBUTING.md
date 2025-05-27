@@ -8,13 +8,13 @@ To install the required dotnet packages navigate into the repository root and ru
 
 ## Compiling the CLI Tools
 
-To build the project run `cd src/Azure.Functions.Cli; dotnet build` (note navigating into the src directory is required due to the test suite currently failing to compile on non-windows environments - see below)
+To build the project run `dotnet build` from the root of the repository. This will build the project and all of its dependencies.
 
 ### Running against a function app
 
 To test this project against a local function app you can run from that function app's directory
 
-`dotnet run --project PATH_TO_FUNCTIONS_CLI/src/Azure.Functions.Cli start`
+`dotnet run --project PATH_TO_FUNCTIONS_CLI/src/Cli/func start`
 
 where PATH_TO_FUNCTIONS_CLI is the absolute or relative path to the root of this repository.
 
