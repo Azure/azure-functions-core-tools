@@ -23,13 +23,10 @@ steps:
       feedsToUse: 'config'
       nugetConfigPath: '$(Build.SourcesDirectory)/NuGet.config'
 
-  - task: PowerShell@2
-    displayName: 'Run publish script'
-    inputs:
-      filePath: 'eng/scripts/build/publish-cli.ps1'
-      arguments: |
-        -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj'
-        -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
-        -commitHash '$(Build.SourceVersion)'
+  - pwsh: |
+      ./eng/scripts/build/publish-cli.ps1 `
+        -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
+        -outputDirRoot '$(Build.ArtifactStagingDirectory)' `
+        -commitHash '$(Build.SourceVersion)' `
         -integrationBuildNumber '$(Build.BuildNumber)'
-      pwsh: true
+    displayName: 'Publish CLI'

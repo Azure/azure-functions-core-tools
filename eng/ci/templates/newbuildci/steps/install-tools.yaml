@@ -6,7 +6,7 @@ steps:
 - pwsh: |
     Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
     Install-Dotnet
-  displayName: 'Install .NET 6.0 and 3.1'
+  displayName: 'Install .NET'
 
 - task: NuGetToolInstaller@1
   inputs:

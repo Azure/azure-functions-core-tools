@@ -1,9 +1,13 @@
 param (
     [string]$projectFile = "src\Cli\func\Azure.Functions.Cli.csproj",
     [string]$outputDirRoot = "artifacts",
-    [string]$commitHash = "N/A",
+    [string]$commitHash = "",
     [string]$integrationBuildNumber = ""
 )
+
+Write-Host "Using commit hash: $commitHash"
+Write-Host "Using build number: $integrationBuildNumber"
+Write-Host "-------------------------------------------"
 
 # List of runtimes
 $runtimes = @(
@@ -38,7 +42,6 @@ foreach ($runtime in $runtimes) {
         "--self-contained"
         "-o", $outputPath
         "/p:CommitHash=$commitHash"
-        "/p:ContinuousIntegrationBuild=true"
     )
 
     # Add IntegrationBuildNumber if defined
