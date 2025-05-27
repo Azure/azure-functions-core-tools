@@ -88,7 +88,7 @@ jobs:
     env:
       LinuxPackageAccountName: $(LinuxPackageAccountName)
       LinuxPackageAccountKey: $(LinuxPackageAccountKey)
-      LinuxPackageBuildTag: $(LinuxPackageBuildTag)
+      LinuxPackageBuildTag: $(DefaultArtifactVersion)
     displayName: 'Upload Core Tools Signed Linux Package to the storage'
     condition: eq(variables['UploadSignedPackages'], 'true') # This is a UI variable that defaults to false
 
