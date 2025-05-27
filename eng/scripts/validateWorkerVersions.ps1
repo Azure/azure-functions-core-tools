@@ -13,7 +13,7 @@
 param (
     [Switch]$Update,
 
-    # An explicit host version, otherwise the host version from Engineering.props will be used
+    # An explicit host version, otherwise the host version from Packages.props will be used
     [string]$hostVersion
 )
 
@@ -27,7 +27,7 @@ function removeBomIfExists([string]$data)
 }
 
 $rootDir = Join-Path $PSScriptRoot "../.." | Resolve-Path
-$packagesPropsPath = "$rootDir/eng/build/Engineering.props"
+$packagesPropsPath = "$rootDir/eng/build/Packages.props"
 $packagesPropsContent = removeBomIfExists(Get-Content $packagesPropsPath)
 $packagesPropsXml = [xml]$packagesPropsContent
 
@@ -43,7 +43,7 @@ function getPackageVersion([string]$packageName, [xml]$propsXml, [bool]$isPackag
     if ($node) {
         return $node.Version
     } else {
-        throw "Failed to find version for package $packageName in Engineering.props"
+        throw "Failed to find version for package $packageName in Packages.props"
     }
 }
 
@@ -51,7 +51,7 @@ function setPackageVersionInProps([string]$packageName, [string]$newVersion)
 {
     $node = Select-Xml -Xml $packagesPropsXml -XPath "/Project/ItemGroup/PackageVersion[@Include='$packageName']" | Select-Object -ExpandProperty Node
     if (-Not $node) {
-        throw "Failed to find reference for package $packageName in Engineering.props"
+        throw "Failed to find reference for package $packageName in Packages.props"
     }
     $oldVersion = $node.Version
     $node.Version = $newVersion
