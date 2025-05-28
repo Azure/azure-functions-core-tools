@@ -59,62 +59,32 @@ namespace Azure.Functions.Cli.Abstractions
                 _process.Start();
                 if (processStarted != null)
                 {
-                    // Create a cancellation token source with a timeout of 2 minutes
-                    processTaskCts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-                    var token = processTaskCts.Token;
-
                     processTask = Task.Run(async () =>
                     {
-                        try
+                        var processStartedTask = processStarted(_process);
+                        var timeoutTask = Task.Delay(TimeSpan.FromMinutes(2));
+
+                        var completedTask = await Task.WhenAny(processStartedTask, timeoutTask);
+
+                        if (completedTask == timeoutTask)
                         {
-                            // Use WhenAny to either complete the processStarted task or timeout
-                            var processStartedTask = processStarted(_process);
-                            var completedTask = await Task.WhenAny(processStartedTask, Task.Delay(Timeout.Infinite, token));
-                            
-                            if (completedTask == processStartedTask)
-                            {
-                                // Await the task to propagate any exceptions
-                                await processStartedTask;
-                            }
-                            else
-                            {
-                                // If we get here, it means the task was canceled due to timeout
-                                Reporter.Verbose.WriteLine("Process started handler timed out. Killing the process.");
-                                if (!_process.HasExited)
-                                {
-                                    try
-                                    {
-                                        _process.Kill();
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Reporter.Verbose.WriteLine($"Error killing process: {ex.Message}");
-                                    }
-                                }
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            Reporter.Verbose.WriteLine("Process started handler was canceled due to timeout. Killing the process.");
+                            // Timeout occurred
+                            string timeoutMessage = $"Process started handler timed out after 2 minutes for process {_process.Id}.";
+                            Reporter.Verbose.WriteLine(timeoutMessage);
+                            fileWriter?.WriteLine($"[STDERR] {timeoutMessage}");
+
                             if (!_process.HasExited)
                             {
-                                try
-                                {
-                                    _process.Kill();
-                                }
-                                catch (Exception ex)
-                                {
-                                    Reporter.Verbose.WriteLine($"Error killing process: {ex.Message}");
-                                }
+                                _process.Kill(true);
                             }
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            Reporter.Verbose.WriteLine(string.Format(
-                                "Error in process started handler: {0}",
-                                ex.Message));
+                            string processSucceeded = $"Process succeeded within timeout.";
+                            Reporter.Verbose.WriteLine(processSucceeded);
+                            fileWriter?.WriteLine($"[STDOUT] {processSucceeded}");
                         }
-                    }, token);
+                    });
                 }
 
                 reaper.NotifyProcessStarted();
