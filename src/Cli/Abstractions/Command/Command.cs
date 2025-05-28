@@ -65,23 +65,18 @@ namespace Azure.Functions.Cli.Abstractions
 
                         var completedTask = await Task.WhenAny(processStartedTask, timeoutTask);
 
-                        if (completedTask == timeoutTask)
+                        if (completedTask.Id == timeoutTask.Id)
                         {
                             // Timeout occurred
                             string timeoutMessage = $"Process started handler timed out after 2 minutes for process {_process.Id}.";
                             Reporter.Verbose.WriteLine(timeoutMessage);
                             fileWriter?.WriteLine($"[STDERR] {timeoutMessage}");
-
-                            if (!_process.HasExited)
-                            {
-                                _process.Kill(true);
-                            }
                         }
-                        else
+
+                        // Kill the process if it is still running since it has been more than 2 minutes
+                        if (!_process.HasExited)
                         {
-                            string processSucceeded = $"Process succeeded within timeout.";
-                            Reporter.Verbose.WriteLine(processSucceeded);
-                            fileWriter?.WriteLine($"[STDOUT] {processSucceeded}");
+                            _process.Kill(true);
                         }
                     });
                 }
