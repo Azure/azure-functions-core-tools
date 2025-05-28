@@ -60,23 +60,34 @@ namespace Azure.Functions.Cli.Abstractions
                 {
                     processTask = Task.Run(async () =>
                     {
-                        var processStartedTask = processStarted(_process);
-                        var timeoutTask = Task.Delay(TimeSpan.FromMinutes(2));
-
-                        var completedTask = await Task.WhenAny(processStartedTask, timeoutTask);
-
-                        if (completedTask.Id == timeoutTask.Id)
+                        try
                         {
-                            // Timeout occurred
-                            string timeoutMessage = $"Process started handler timed out after 2 minutes for process {_process.Id}.";
-                            Reporter.Verbose.WriteLine(timeoutMessage);
-                            fileWriter?.WriteLine($"[STDERR] {timeoutMessage}");
+                            var processStartedTask = processStarted(_process);
+                            var timeoutTask = Task.Delay(TimeSpan.FromMinutes(2));
+
+                            var completedTask = await Task.WhenAny(processStartedTask, timeoutTask);
+
+                            if (completedTask.Id == timeoutTask.Id)
+                            {
+                                // Timeout occurred
+                                string timeoutMessage = $"Process started handler timed out after 2 minutes for process {_process.Id}.";
+                                Reporter.Verbose.WriteLine(timeoutMessage);
+                                fileWriter?.WriteLine($"[STDERR] {timeoutMessage}");
+                            }
                         }
-
-                        // Kill the process if it is still running since it has been more than 2 minutes
-                        if (!_process.HasExited)
+                        catch (Exception ex)
                         {
-                            _process.Kill(true);
+                            Reporter.Verbose.WriteLine(string.Format(
+                                "Error in process started handler: ",
+                                ex.Message));
+                        }
+                        finally
+                        {
+                            // Kill the process if it is still running
+                            if (!_process.HasExited)
+                            {
+                                _process.Kill(true);
+                            }
                         }
                     });
                 }
