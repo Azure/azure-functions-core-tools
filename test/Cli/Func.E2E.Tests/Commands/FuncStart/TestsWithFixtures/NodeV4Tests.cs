@@ -202,7 +202,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 
                     await Task.Delay(TimeSpan.FromMinutes(3)); // Stall for 3 minutes (longer than 2-minute timeout)
 
-
                     // If we make it here, the process was not killed as expected and had to be manually killed.
                     if (stopwatch.Elapsed.TotalMinutes > 2)
                     {
@@ -213,7 +212,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
                         processWasKilledManually = true;
                         process.Kill(true);
                     }
-
                 }
                 catch (Exception ex)
                 {
