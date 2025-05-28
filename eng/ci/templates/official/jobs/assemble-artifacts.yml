@@ -67,7 +67,7 @@ jobs:
       displayName: 'Generate MSI files'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/generateMsiFiles.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateMsiFiles.ps1'
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/build'
 
@@ -130,7 +130,7 @@ jobs:
     displayName: 'Generate SHA files'
     inputs:
       targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/generateSha.ps1'
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/generateSha.ps1'
       arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'
 
   - task: CopyFiles@2

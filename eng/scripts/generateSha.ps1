@@ -1,65 +1,41 @@
-# Consolidated generateSha.ps1 script that handles both legacy and new pipeline scenarios
 param (
-    [string]$CurrentDirectory,  # For ArtifactAssemblerHelpers compatibility
-    [string]$ArtifactsPath      # For legacy pipeline compatibility
+    [string]$CurrentDirectory
 )
 
-function GenerateSha([string]$filePath, [string]$outputDir, [string]$shaFileName = $null) {
-    $sha = (Get-FileHash $filePath).Hash.ToLower()
-    
-    if ($shaFileName) {
-        # Legacy mode: Generate .sha2 file with custom name in outputDir
-        $shaPath = Join-Path $outputDir "$shaFileName.sha2"
-    } else {
-        # New mode: Generate .sha2 file alongside the original file
-        $shaPath = $filePath + ".sha2"
-    }
-    
-    Out-File -InputObject $sha -Encoding ascii -FilePath $shaPath -NoNewline
-    Write-Host "Generated sha for $filePath at $shaPath"
+# Determine search path and output strategy
+if ($CurrentDirectory) {
+    # Consolidated pipeline - search in staging directory
+    $searchPath = Join-Path $CurrentDirectory "staging"
+    $useInlineOutput = $true
+    Write-Host "Using staging directory: $searchPath"
+} else {
+    # Otherwise search in artifacts directory
+    $rootDir = Join-Path $PSScriptRoot "../.."
+    $rootDir = Resolve-Path $rootDir
+    Set-Location "$rootDir/build"
+    $searchPath = "$rootDir/artifacts"
+    $useInlineOutput = $false
+    Write-Host "Using artifacts directory: $searchPath"
 }
 
-# Determine operation mode based on parameters
-if ($CurrentDirectory) {
-    # ArtifactAssemblerHelpers mode: Process staging directory structure
-    Write-Host "Running in ArtifactAssemblerHelpers mode with CurrentDirectory: $CurrentDirectory"
+# Find all zip files
+$zipFiles = Get-ChildItem -Path $searchPath -Filter "*.zip" -Recurse
+Write-Host "$($zipFiles.Count) zip files found."
+
+# Generate SHA for each zip file
+foreach ($zipFile in $zipFiles) {
+    $sha = (Get-FileHash $zipFile.FullName).Hash.ToLower()
     
-    $rootPath = Join-Path $CurrentDirectory "staging"
-    $zipFiles = Get-ChildItem -Path $rootPath -Filter *.zip -Recurse
-    
-    foreach ($file in $zipFiles) {
-        GenerateSha $file.FullName
+    if ($useInlineOutput) {
+        # New method: create .sha2 file alongside the zip file
+        $shaFilePath = $zipFile.FullName + ".sha2"
+    } else {
+        # Original method: create .sha2 file in artifacts directory with filename.sha2
+        $shaFilePath = Join-Path $searchPath "$($zipFile.Name).sha2"
     }
-} elseif ($ArtifactsPath) {
-    # Legacy mode with custom artifacts path
-    Write-Host "Running in legacy mode with custom ArtifactsPath: $ArtifactsPath"
     
-    $zipFilesSearchPath = Join-Path $ArtifactsPath "*.zip"
-    $zipFiles = Get-ChildItem -File $zipFilesSearchPath
-    
-    Write-Host "$($zipFiles.Count) zip files found."
-    
-    foreach ($zipFile in $zipFiles) {
-        $zipFullPath = $zipFile.FullName
-        $fileName = $zipFile.Name
-        GenerateSha $zipFullPath $ArtifactsPath $fileName
-    }
-} else {
-    # Default legacy mode: Process artifacts directory from repository root
-    Write-Host "Running in default legacy mode"
-    
-    $rootDir = Join-Path $PSScriptRoot ".." | Join-Path -ChildPath ".." | Resolve-Path
-    Set-Location "$rootDir/build"
-    
-    $artifactsPath = "$rootDir/artifacts/"
-    $zipFilesSearchPath = Join-Path $artifactsPath "*.zip"
-    $zipFiles = Get-ChildItem -File $zipFilesSearchPath
-    
-    Write-Host "$($zipFiles.Count) zip files found."
-    
-    foreach ($zipFile in $zipFiles) {
-        $zipFullPath = $zipFile.FullName
-        $fileName = $zipFile.Name
-        GenerateSha $zipFullPath $artifactsPath $fileName
-    }
+    Out-File -InputObject $sha -Encoding ascii -FilePath $shaFilePath -NoNewline
+    Write-Host "Generated SHA for $($zipFile.FullName) at $shaFilePath"
 }
+
+Write-Host "SHA generation completed."
