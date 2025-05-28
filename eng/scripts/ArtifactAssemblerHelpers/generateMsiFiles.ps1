@@ -1,13 +1,8 @@
-# This is a wrapper script that calls the consolidated generateMsiFiles script
+# This script calls the consolidated implementation in /eng/scripts/generateMsiFiles.ps1
+# Maintained for backward compatibility
 param (
     [string]$ArtifactsPath
 )
 
-# Resolve the path to the consolidated script
-$consolidatedScriptPath = Join-Path $PSScriptRoot "..\generateMsiFiles.ps1"
-
-Write-Host "Calling consolidated generateMsiFiles script: $consolidatedScriptPath"
-Write-Host "ArtifactsPath: $ArtifactsPath"
-
-# Call the consolidated script with the ArtifactsPath parameter
-& $consolidatedScriptPath -ArtifactsPath $ArtifactsPath
+# Forward all parameters to the main implementation
+& (Join-Path $PSScriptRoot "..\generateMsiFiles.ps1") @PSBoundParameters

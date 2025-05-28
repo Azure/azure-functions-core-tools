@@ -1,13 +1,8 @@
-# This is a wrapper script that calls the consolidated generateSha script
+# This script calls the consolidated implementation in /eng/scripts/generateSha.ps1
+# Maintained for backward compatibility
 param (
     [string]$CurrentDirectory
 )
 
-# Resolve the path to the consolidated script
-$consolidatedScriptPath = Join-Path $PSScriptRoot "..\generateSha.ps1"
-
-Write-Host "Calling consolidated generateSha script: $consolidatedScriptPath"
-Write-Host "CurrentDirectory: $CurrentDirectory"
-
-# Call the consolidated script with the CurrentDirectory parameter
-& $consolidatedScriptPath -CurrentDirectory $CurrentDirectory
+# Forward all parameters to the main implementation
+& (Join-Path $PSScriptRoot "..\generateSha.ps1") @PSBoundParameters
