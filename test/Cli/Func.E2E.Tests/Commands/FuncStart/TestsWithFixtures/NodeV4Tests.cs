@@ -12,7 +12,6 @@ using Azure.Functions.Cli.TestFramework.Helpers;
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
-using static Microsoft.Azure.AppService.Proxy.Runtime.Trace;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.TestsWithFixtures
 {
