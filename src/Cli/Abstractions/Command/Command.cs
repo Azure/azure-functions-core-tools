@@ -52,7 +52,6 @@ namespace Azure.Functions.Cli.Abstractions
             }
 
             Task? processTask = null;
-            CancellationTokenSource? processTaskCts = null;
 
             using (var reaper = new ProcessReaper(_process))
             {
@@ -101,7 +100,6 @@ namespace Azure.Functions.Cli.Abstractions
                 taskErr?.Wait();
 
                 processTask?.Wait();
-                processTaskCts?.Dispose();
             }
 
             var exitCode = _process.ExitCode;
