@@ -8,6 +8,7 @@
 // the dotnet cli utils package.
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Azure.Functions.Cli.Abstractions.Helpers;
 
 namespace Azure.Functions.Cli.Abstractions
 {
@@ -62,24 +63,28 @@ namespace Azure.Functions.Cli.Abstractions
                     {
                         try
                         {
-                            var processStartedTask = processStarted(_process);
-                            var timeoutTask = Task.Delay(TimeSpan.FromMinutes(2));
+                            // Try to run the process started handler with a timeout of 2 minutes
+                            await TimeoutHelper.RunWithTimeoutAsync(
+                                processStarted(_process),
+                                TimeSpan.FromMinutes(2));
 
-                            var completedTask = await Task.WhenAny(processStartedTask, timeoutTask);
-
-                            if (completedTask.Id == timeoutTask.Id)
-                            {
-                                // Timeout occurred
-                                string timeoutMessage = $"Process started handler timed out after 2 minutes for process {_process.Id}.";
-                                Reporter.Verbose.WriteLine(timeoutMessage);
-                                fileWriter?.WriteLine($"[STDERR] {timeoutMessage}");
-                            }
+                            // If we reach here, the process started successfully within timeout
+                            string successMessage = $"Process started handler completed successfully for process {_process.Id}.";
+                            Reporter.Verbose.WriteLine(successMessage);
+                            fileWriter?.WriteLine($"[STDOUT] {successMessage}");
+                        }
+                        catch (TimeoutException)
+                        {
+                            // Timeout occurred
+                            string timeoutMessage = $"Process started handler timed out after 2 minutes for process {_process.Id}.";
+                            Reporter.Verbose.WriteLine(timeoutMessage);
+                            fileWriter?.WriteLine($"[STDERR] {timeoutMessage}");
                         }
                         catch (Exception ex)
                         {
-                            Reporter.Verbose.WriteLine(string.Format(
-                                "Error in process started handler: ",
-                                ex.Message));
+                            string errorMessage = $"Error in process started handler: {ex.Message}";
+                            Reporter.Verbose.WriteLine(errorMessage);
+                            fileWriter?.WriteLine($"[STDERR] {errorMessage}");
                         }
                         finally
                         {
@@ -87,6 +92,7 @@ namespace Azure.Functions.Cli.Abstractions
                             if (!_process.HasExited)
                             {
                                 _process.Kill(true);
+                                Reporter.Verbose.WriteLine($"Process {_process.Id} was killed.");
                             }
                         }
                     });
