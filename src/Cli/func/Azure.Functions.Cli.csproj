@@ -20,10 +20,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <MajorMinorProductVersion>4.0.10000</MajorMinorProductVersion>
-    <Version>$(MajorMinorProductVersion)</Version>
-    <AssemblyVersion>$(MajorMinorProductVersion)</AssemblyVersion>
-    <FileVersion>$(MajorMinorProductVersion)</FileVersion>
+    <Version>4.0.10000</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
     <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
     <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
