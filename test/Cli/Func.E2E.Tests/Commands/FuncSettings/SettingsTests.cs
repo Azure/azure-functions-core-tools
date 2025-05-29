@@ -107,9 +107,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncSettings
         {
             var testName = nameof(ListSettings_DisplaysMaskValuesByDefault);
 
+            // Initialize the function app with retry helper
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated"]);
+
+            // Add a setting with retry helper
             await FuncSettingsWithRetryAsync(testName, ["add", "testkey", "valvalue"]);
 
+            // List settings
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
                                         .WithWorkingDirectory(WorkingDirectory)
                                         .Execute(["list"]);
@@ -127,9 +131,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncSettings
         {
             var testName = nameof(ListSettings_WithShowValue_ShowsActualValues);
 
+            // Initialize the function app with retry helper
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated"]);
+
+            // Add a setting with retry helper
             await FuncSettingsWithRetryAsync(testName, ["add", "testkey", "valvalue"]);
 
+            // List settings with --showValue option
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
                                         .WithWorkingDirectory(WorkingDirectory)
                                         .Execute(["list", "--showValue"]);
