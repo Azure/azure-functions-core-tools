@@ -4,5 +4,5 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
-  <Import Project="$(RepoEngRoot)Directory.Packages.props" />
+  <Import Project="$(EngBuildRoot)Packages.props" />
 </Project>
