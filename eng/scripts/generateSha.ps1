@@ -8,7 +8,7 @@ function GenerateSha([string]$filePath,[string]$artifactsPath, [string]$shaFileN
 $rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
 $rootDir = Resolve-Path $rootDir
 
-Set-Location "$rootDir/build"
+Set-Location "$rootDir"
 
 $artifactsPath = "$rootDir/artifacts/"
 $zipFilesSearchPath = Join-Path $artifactsPath "*.zip"

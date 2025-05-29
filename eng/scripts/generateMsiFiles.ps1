@@ -1,6 +1,8 @@
 $rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
 $rootDir = Resolve-Path $rootDir
 
+Set-Location "$rootDir"
+
 Write-Host "Generating MSI files"
 
 # Add WiX to PATH
@@ -19,7 +21,7 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 
 # Get runtime version
 $artifactsPath = "$rootDir\artifacts"
-$buildDir = "$rootDir\build"
+$resourceDir = "$rootDir\eng\res\msi"
 $cli = Get-ChildItem -Path $artifactsPath -Include func.dll -Recurse | Select-Object -First 1
 $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVersion
 
@@ -30,18 +32,18 @@ $cliVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cli).FileVer
     $platform = $_
     $targetDir = "$artifactsPath\win-$platform"
 
-    Copy-Item "$buildDir\icon.ico" -Destination $targetDir
-    Copy-Item "$buildDir\license.rtf" -Destination $targetDir
-    Copy-Item "$buildDir\installbanner.bmp" -Destination $targetDir
-    Copy-Item "$buildDir\installdialog.bmp" -Destination $targetDir
+    Copy-Item "$resourceDir\icon.ico" -Destination $targetDir
+    Copy-Item "$resourceDir\license.rtf" -Destination $targetDir
+    Copy-Item "$resourceDir\installbanner.bmp" -Destination $targetDir
+    Copy-Item "$resourceDir\installdialog.bmp" -Destination $targetDir
     Set-Location $targetDir
 
     $masterWxsName = "funcinstall"
     $fragmentName = "$platform-frag"
     $msiName = "func-cli-$cliVersion-$platform"
 
-    $masterWxsPath = "$buildDir\$masterWxsName.wxs"
-    $fragmentPath = "$buildDir\$fragmentName.wxs"
+    $masterWxsPath = "$resourceDir\$masterWxsName.wxs"
+    $fragmentPath = "$resourceDir\$fragmentName.wxs"
     $msiPath = "$artifactsPath\$msiName.msi"
 
     & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
