@@ -18,10 +18,11 @@ jobs:
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
+  # Do we need to publish the CLI for the public build? Should we just build the .sln and publish one RID instead?
   - template: /eng/ci/templates/steps/publish-cli.yml@self
 
   templateContext:
     outputs:
     - output: pipelineArtifact
       path: '$(Build.ArtifactStagingDirectory)/artifacts'
-      artifact: FuncCli
+      artifact: func-cli

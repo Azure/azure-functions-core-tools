@@ -11,15 +11,15 @@
 
 # Parse CLI arguments
 param (
-    [string]$OutputPath           = "./templates-download",
-    [string]$TemplatesVersion     = "4.0.5086",
-    [string]$TemplateJsonVersion  = "3.1.1648"
+  [string]$OutputPath = "./templates-download",
+  [string]$TemplatesVersion = "4.0.5086",
+  [string]$TemplateJsonVersion = "3.1.1648"
 )
 
 # Default values
-$OUTPUT_DIR             = $OutputPath
-$TEMPLATES_VERSION      = $TemplatesVersion
-$TEMPLATE_JSON_VERSION  = $TemplateJsonVersion
+$OUTPUT_DIR = $OutputPath
+$TEMPLATES_VERSION = $TemplatesVersion
+$TEMPLATE_JSON_VERSION = $TemplateJsonVersion
 
 # Set up variables for paths
 $templatesPath = Join-Path $OUTPUT_DIR "templates"
@@ -61,14 +61,14 @@ $templatesv2JsonPath = Join-Path $tempDirectoryPath "templates-v2/templates.json
 $userPromptsv2JsonPath = Join-Path $tempDirectoryPath "bindings-v2/userPrompts.json"
 
 if (Test-Path $templatesJsonPath) {
-    Copy-Item -Path $templatesJsonPath -Destination (Join-Path $templatesPath "templates.json") -Force
+  Copy-Item -Path $templatesJsonPath -Destination (Join-Path $templatesPath "templates.json") -Force
 }
 
 if ((Test-Path $templatesv2JsonPath) -and (Test-Path $userPromptsv2JsonPath)) {
-    $v2TargetPath = Join-Path $templatesV2Path "templates-v2"
-    New-Item -ItemType Directory -Path $v2TargetPath -Force | Out-Null
-    Copy-Item -Path $templatesv2JsonPath -Destination (Join-Path $v2TargetPath "templates.json") -Force
-    Copy-Item -Path $userPromptsv2JsonPath -Destination (Join-Path $v2TargetPath "userPrompts.json") -Force
+  $v2TargetPath = Join-Path $templatesV2Path "templates-v2"
+  New-Item -ItemType Directory -Path $v2TargetPath -Force | Out-Null
+  Copy-Item -Path $templatesv2JsonPath -Destination (Join-Path $v2TargetPath "templates.json") -Force
+  Copy-Item -Path $userPromptsv2JsonPath -Destination (Join-Path $v2TargetPath "userPrompts.json") -Force
 }
 
 # Clean up

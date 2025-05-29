@@ -1,6 +1,6 @@
 param (
-    [string]$RuntimeArtifactDir,  # e.g. artifacts/osx-arm64
-    [string]$DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.0.zip"
+  [string]$RuntimeArtifactDir,  # e.g. artifacts/osx-arm64
+  [string]$DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.0.zip"
 )
 
 # Set up paths
@@ -19,7 +19,7 @@ Expand-Archive -Path $DistLibZip -DestinationPath $DistLibExtractDir
 $ExtractedFolder = Get-ChildItem -Path $DistLibExtractDir | Where-Object { $_.PSIsContainer } | Select-Object -First 1
 
 if (-not $ExtractedFolder) {
-    throw "Could not find extracted distlib folder inside $DistLibExtractDir"
+  throw "Could not find extracted distlib folder inside $DistLibExtractDir"
 }
 
 # Destination path for the runtime-specific tools/python/packapp/distlib
@@ -32,7 +32,7 @@ New-Item -ItemType Directory -Force -Path $DestDistLib | Out-Null
 $SourceDistLib = Join-Path $ExtractedFolder.FullName "distlib"
 
 if (-not (Test-Path $SourceDistLib)) {
-    throw "Expected distlib folder not found in $($ExtractedFolder.FullName)"
+  throw "Expected distlib folder not found in $($ExtractedFolder.FullName)"
 }
 
 # Recursively copy distlib folder contents
