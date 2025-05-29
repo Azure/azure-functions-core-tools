@@ -1,0 +1,64 @@
+jobs:
+- job: OSX_E2E_Test
+  timeoutInMinutes: '180'
+  displayName: 'E2E Test:'
+
+  pool:
+    name: Azure Pipelines
+    image: macOS-latest
+    os: macOS
+
+  strategy:
+    matrix:
+      dotnet:
+        languageWorker: 'Dotnet'
+      dotnetIsolated:
+        languageWorker: 'DotnetIsolated'
+      node:
+        languageWorker: 'Node'
+      powershell:
+        languageWorker: 'Powershell'
+
+  steps:
+  - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
+    displayName: 'Start emulators (NoWait)'
+
+  - script: |
+      brew install go
+      go version
+    displayName: 'Install Go'
+
+  - script: |
+      sudo chown -R $(id -u):$(id -g) ~/.npm
+      npm install -g @azure/functions
+    displayName: 'Install @azure/functions'
+
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+
+  - pwsh: |
+      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r osx-x64 `
+      --self-contained `
+      -o $(Build.ArtifactStagingDirectory)/artifacts/osx-x64 `
+      /p:CommitHash=$(Build.SourceVersion) `
+      /p:IntegrationBuildNumber=$(Build.BuildNumber)
+    displayName: 'Publish Cli for osx-x64'
+
+  - bash: |
+      echo "Making CLI binaries executable..."
+
+      ls -l $(Build.ArtifactStagingDirectory)/artifacts/osx-x64
+
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/func
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/gozip
+      # chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/in-proc6/func
+      # chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/in-proc8/func
+    displayName: 'Make func-related binaries executable'
+
+  - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
+    parameters:
+      worker: $(languageWorker)

@@ -6,8 +6,6 @@ schedules:
       - main
   always: true
 
-name: $(Build.SourceBranchName)_$(Build.Reason)
-
 pr:
   branches:
     include:
@@ -47,7 +45,32 @@ extends:
       # PR's from forks do not have sufficient permissions to set tags.
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
     stages:
-      - stage: BuildAndTest
-        jobs:
-        - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
+      - stage: Build
 
+        jobs:
+        - template: /eng/ci/templates/public/jobs/build-cli.yml@self
+
+      - stage: UnitTest
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-unit-windows.yml@self
+        - template: /eng/ci/templates/jobs/test-unit-linux.yml@self
+
+      - stage: E2ETestWindows
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+
+      - stage: E2ETestLinux
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+
+      - stage: E2ETestOSX
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self

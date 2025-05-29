@@ -1,0 +1,24 @@
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+  displayName: 'Install Node 18.x'
+
+- task: NuGetToolInstaller@1
+  inputs:
+    versionSpec:
+  displayName: 'Install NuGet'
+
+- pwsh: |
+    Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
+    Install-Dotnet
+  displayName: 'Install .NET'
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.10'
+    addToPath: true
+  displayName: 'Install Python 3.10'
+
+- script: pwsh -Version
+  displayName: 'PowerShell version'
