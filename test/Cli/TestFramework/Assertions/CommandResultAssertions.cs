@@ -127,5 +127,30 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
 
             return new AndConstraint<CommandResultAssertions>(this);
         }
+
+        public AndConstraint<CommandResultAssertions> FileDoesNotContain(string filePath, params string[] unexpectedContents)
+        {
+            Execute.Assertion.ForCondition(File.Exists(filePath))
+                .FailWith($"File '{filePath}' does not exist.");
+
+            var actualContent = File.ReadAllText(filePath);
+
+            foreach (var input in unexpectedContents)
+            {
+                Execute.Assertion.ForCondition(!actualContent.Contains(input))
+                    .FailWith($"File '{filePath}' should not contain '{input}', but it does.");
+            }
+
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
+
+        public AndConstraint<CommandResultAssertions> HaveStdOutMatchesRegex(string pattern)
+        {
+            Execute.Assertion.ForCondition(
+                    _commandResult.StdOut is not null &&
+                    System.Text.RegularExpressions.Regex.IsMatch(_commandResult.StdOut, pattern))
+                .FailWith($"The command output did not match the regex pattern: {pattern}{Environment.NewLine}");
+            return new AndConstraint<CommandResultAssertions>(this);
+        }
     }
 }
