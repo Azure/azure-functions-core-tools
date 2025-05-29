@@ -2,14 +2,16 @@ param (
     [string]$ArtifactsPath
 )
 
+$buildDir = Get-Location
+
 # Determine artifacts path - use parameter if provided, otherwise calculate from script location
 if (-not $ArtifactsPath) {
     $rootDir = Join-Path $PSScriptRoot "../.."
     $rootDir = Resolve-Path $rootDir
     $ArtifactsPath = "$rootDir\artifacts"
+    $buildDir = "$rootDir\build"
 }
 
-$buildDir = Get-Location
 Write-Host "Generating MSI files"
 Write-Host "Build directory: $buildDir"
 Write-Host "Artifacts path: $ArtifactsPath"

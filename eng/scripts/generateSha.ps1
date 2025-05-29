@@ -27,7 +27,7 @@ foreach ($zipFile in $zipFiles) {
     $sha = (Get-FileHash $zipFile.FullName).Hash.ToLower()
     
     if ($useInlineOutput) {
-        # New method: create .sha2 file alongside the zip file
+        # Artifact assembler: create .sha2 file alongside the zip file
         $shaFilePath = $zipFile.FullName + ".sha2"
     } else {
         # Original method: create .sha2 file in artifacts directory with filename.sha2
