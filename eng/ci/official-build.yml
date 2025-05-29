@@ -6,7 +6,7 @@ schedules:
       - main
   always: true
 
-name: $(Build.SourceBranchName)_$(Build.Reason)
+name: $(Date:yyyyMMdd)$(Rev:.r)-$(Build.SourceBranchName)-$(Build.Reason)
 
 pr: none
 
