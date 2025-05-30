@@ -92,7 +92,8 @@ namespace Azure.Functions.Cli.TestFramework.Assertions
 
         public AndConstraint<CommandResultAssertions> WriteVsCodeExtensionsJsonAndExitWithZero(string workingDirectory)
         {
-            var pattern = $"Writing {workingDirectory}\\.vscode\\extensions.json";
+            var expectedVsCodePath = Path.Combine(workingDirectory, ".vscode", "extensions.json");
+            var pattern = $"Writing {expectedVsCodePath}";
             var gitInitPattern = "Initialized empty Git repository";
 
             Execute.Assertion.ForCondition(_commandResult.ExitCode == 0)
