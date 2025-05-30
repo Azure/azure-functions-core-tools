@@ -47,24 +47,37 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncDeploy
             string uniqueTestName = $"{methodName}_{DateTime.Now:HHmmss}";
             
             // TODO: Implement Azure resource management for the new test framework
-            // This should include:
-            // 1. Storage account creation
-            // 2. App Service Plan creation  
-            // 3. Function App creation
-            // 4. Waiting for resources to be ready
-            // For now, we assume a function app exists with a predictable name
-            string functionAppName = $"lcte2ecpython{DateTime.Now:HHmmss}";
+            // This should create Azure resources similar to the old test framework:
+            // 1. Create storage account: $"lcte2estorage{id}"  
+            // 2. Create App Service Plan: $"lcte2ecserverfarm{id}"
+            // 3. Create Function App: $"lcte2ecpython{id}"
+            // 4. Wait for resources to be available and ready
+            // 
+            // For reference, see the old implementation in:
+            // test/Azure.Functions.Cli.Tests/E2E/DeploymentTests.cs InitializeLinuxResources()
+            // test/Azure.Functions.Cli.Tests/E2E/AzureResourceManagers/
+            
+            // Generate a unique function app name for this test run
+            string id = DateTime.Now.ToString("HHmmss");
+            string functionAppName = $"lcte2ecpython{id}";
 
             Log.WriteLine($"Test will attempt to deploy to function app: {functionAppName}");
             Log.WriteLine("Note: Azure resource creation not yet implemented in new test framework");
+            Log.WriteLine("Required environment variables checked: TEST_SUBSCRIPTION_ID, TEST_RESOURCE_GROUP_NAME_LINUX, AZURE_SERVICE_PRINCIPAL_*");
 
             try
             {
-                // Initialize Python function app
+                // Initialize Python function app  
+                // This follows the same sequence as the original test:
+                // 1. func init . --worker-runtime python
+                // 2. func new -l python -t HttpTrigger -n httptrigger  
+                // 3. func azure functionapp publish {app} --build remote
                 await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "python" });
-                await FuncNewWithRetryAsync(uniqueTestName, new[] { ".", "--template", "HttpTrigger", "--name", "httptrigger" });
+                await FuncNewWithRetryAsync(uniqueTestName, new[] { ".", "-l", "python", "-t", "HttpTrigger", "-n", "httptrigger" });
 
                 // Create deploy command using the new framework pattern
+                // Note: Unlike func start, deployment doesn't need a ProcessStartedHandler
+                // since it's a one-shot command rather than a long-running process
                 var funcDeployCommand = new FuncDeployCommand(FuncPath, methodName, Log);
 
                 // Build command arguments for func azure functionapp publish with remote build
