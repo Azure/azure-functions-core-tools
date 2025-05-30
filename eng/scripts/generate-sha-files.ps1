@@ -25,7 +25,7 @@ Write-Host "$($zipFiles.Count) zip files found."
 # Generate SHA for each zip file
 foreach ($zipFile in $zipFiles) {
     $sha = (Get-FileHash $zipFile.FullName).Hash.ToLower()
-    
+
     if ($useInlineOutput) {
         # Artifact assembler: create .sha2 file alongside the zip file
         $shaFilePath = $zipFile.FullName + ".sha2"
@@ -33,7 +33,7 @@ foreach ($zipFile in $zipFiles) {
         # Original method: create .sha2 file in artifacts directory with filename.sha2
         $shaFilePath = Join-Path $searchPath "$($zipFile.Name).sha2"
     }
-    
+
     Out-File -InputObject $sha -Encoding ascii -FilePath $shaFilePath -NoNewline
     Write-Host "Generated SHA for $($zipFile.FullName) at $shaFilePath"
 }

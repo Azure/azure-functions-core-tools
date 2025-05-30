@@ -58,7 +58,7 @@ jobs:
       displayName: 'Generate metadata.json file'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/generateMetadataFile.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/generate-metadata-file.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
         workingDirectory: '$(Pipeline.Workspace)'
 
@@ -67,7 +67,7 @@ jobs:
       displayName: 'Generate MSI files'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateMsiFiles.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-msi-files.ps1'
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/build'
 
@@ -107,7 +107,7 @@ jobs:
       displayName: 'Test Artifacts - Visual Studio'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testVsArtifacts.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-visualstudio"'
 
   - ${{ if startsWith(parameters.arch, 'win') }}:
@@ -115,7 +115,7 @@ jobs:
       displayName: 'Test Artifacts'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testArtifacts.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-cli"'
 
   - task: DotNetCoreCLI@2
@@ -130,7 +130,7 @@ jobs:
     displayName: 'Generate SHA files'
     inputs:
       targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/generateSha.ps1'
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-sha-files.ps1'
       arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'
 
   - task: CopyFiles@2
