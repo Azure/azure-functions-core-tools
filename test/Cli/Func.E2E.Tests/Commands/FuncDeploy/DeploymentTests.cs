@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.TestFramework.Commands;
+using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.E2E.Tests.Traits;
 using FluentAssertions;
 using Xunit;
@@ -76,7 +77,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncDeploy
                     "remote" 
                 };
 
-                // Execute the deployment command
+                // Execute the deployment command  
+                // Note: Deployment commands typically take longer than other commands (5+ minutes)
+                // The old framework used CommandTimeout = TimeSpan.FromMinutes(5)
+                // TODO: Add timeout support to the new test framework if needed
                 var result = funcDeployCommand
                     .WithWorkingDirectory(WorkingDirectory)
                     .Execute(commandArgs.ToArray());
