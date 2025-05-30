@@ -117,6 +117,16 @@ jobs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/testArtifacts.ps1'
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-cli"'
+      env:
+        DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
+      
+    - task: 1ES.PublishPipelineArtifact@1
+      condition: succeededOrFailed()
+      continueOnError: true
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)/TestLogs'
+        artifactName: 'TestLogs_$(System.JobAttempt)'
+        artifactType: 'pipeline'
 
   - task: DotNetCoreCLI@2
     displayName: 'Zip Artifacts'
