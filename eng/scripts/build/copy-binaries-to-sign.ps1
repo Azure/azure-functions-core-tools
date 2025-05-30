@@ -3,10 +3,10 @@ param (
   [string]$CliVersion
 )
 
-$Runtimes = Get-Content -Path "$PSScriptRootdata/signing/runtimes-to-sign.txt"
-$AuthenticodePatterns = Get-Content -Path "$PSScriptRootdata/signing/authenticode-patterns.txt"
-$ThirdPartyPatterns = Get-Content -Path "$PSScriptRootdata/signing/thirdparty-patterns.txt"
-$MacPatterns = Get-Content -Path "$PSScriptRootdata/signing/mac-patterns.txt"
+$Runtimes = Get-Content -Path "$PSScriptRoot/data/signing/runtimes-to-sign.txt"
+$AuthenticodePatterns = Get-Content -Path "$PSScriptRoot/data/signing/authenticode-patterns.txt"
+$ThirdPartyPatterns = Get-Content -Path "$PSScriptRoot/data/signing/thirdparty-patterns.txt"
+$MacPatterns = Get-Content -Path "$PSScriptRoot/data/signing/mac-patterns.txt"
 
 $ToSignDir = Join-Path $OutputDir "ToSign"
 $AuthenticodeDir = Join-Path $ToSignDir "Authenticode"
