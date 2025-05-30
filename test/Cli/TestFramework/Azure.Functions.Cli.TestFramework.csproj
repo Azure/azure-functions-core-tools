@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoSrcRoot)Cli\Abstractions\Azure.Functions.Cli.Abstractions.csproj" />
+    <ProjectReference Include="$(SrcRoot)Cli\Abstractions\Azure.Functions.Cli.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

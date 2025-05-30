@@ -6,8 +6,6 @@ schedules:
       - main
   always: true
 
-name: $(Build.SourceBranchName)_$(Build.Reason)
-
 pr: none
 
 trigger:
@@ -47,5 +45,5 @@ extends:
     stages:
       - stage: BuildAndTest
         jobs:
-        - template: /eng/ci/templates/official/jobs/build-test.yml@self
+        - template: /eng/ci/templates/official/jobs/build-cli.yml@self
 

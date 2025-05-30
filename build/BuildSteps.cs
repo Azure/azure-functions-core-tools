@@ -752,7 +752,7 @@ namespace Build
                     Environment.SetEnvironmentVariable("GOARCH", goEnv.GOARCH);
                     var outputPath = Path.Combine(Settings.OutputDir, runtime, "gozip");
                     var output = runtimeId.Contains("win") ? $"{outputPath}.exe" : outputPath;
-                    var goFile = Path.GetFullPath("../tools/go/gozip/main.go");
+                    var goFile = Path.GetFullPath("../eng/tools/go/gozip/main.go");
                     Shell.Run("go", $"build -o {output} {goFile}");
                 }
                 else

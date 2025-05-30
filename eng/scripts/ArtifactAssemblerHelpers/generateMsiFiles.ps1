@@ -2,7 +2,10 @@ param (
     [string]$ArtifactsPath
 )
 
-$buildDir = Get-Location
+$rootDir = Join-Path $PSScriptRoot "../../../" # Path to the root of the repository
+$rootDir = Resolve-Path $rootDir
+
+$resourceDirectory = Join-Path $rootDir "eng/res/msi"
 
 Write-Host "Generating MSI files"
 
@@ -21,7 +24,7 @@ if (-not (@($env:Path -split ";") -contains $env:WIX))
 }
 
 # Get runtime version
-Write-Host "Build directory: $buildDir"
+Write-Host "Build directory: $resourceDirectory"
 
 Write-Host "Directly searching for func.dll in $ArtifactsPath..."
 $funcDlls = Get-ChildItem -Path $ArtifactsPath -Filter "func.dll" -Recurse -ErrorAction Continue
@@ -70,24 +73,24 @@ Get-ChildItem -Path $ArtifactsPath | ForEach-Object {
         $targetDir = $subDir
         Write-Host "Target directory: $targetDir"
 
-        Copy-Item "$buildDir\icon.ico" -Destination $targetDir
-        Copy-Item "$buildDir\license.rtf" -Destination $targetDir
-        Copy-Item "$buildDir\installbanner.bmp" -Destination $targetDir
-        Copy-Item "$buildDir\installdialog.bmp" -Destination $targetDir
+        Copy-Item "$resourceDirectory\icon.ico" -Destination $targetDir
+        Copy-Item "$resourceDirectory\license.rtf" -Destination $targetDir
+        Copy-Item "$resourceDirectory\installbanner.bmp" -Destination $targetDir
+        Copy-Item "$resourceDirectory\installdialog.bmp" -Destination $targetDir
         Set-Location $targetDir
 
         $masterWxsName = "funcinstall"
         $fragmentName = "$matchedPlatform-frag"
         $msiName = "func-cli-$cliVersion-$matchedPlatform"
 
-        $masterWxsPath = "$buildDir\$masterWxsName.wxs"
-        $fragmentPath = "$buildDir\$fragmentName.wxs"
+        $masterWxsPath = "$resourceDirectory\$masterWxsName.wxs"
+        $fragmentPath = "$resourceDirectory\$fragmentName.wxs"
         $msiPath = "$artifactsPath\$msiName.msi"
 
         & { heat dir '.' -cg FuncHost -dr INSTALLDIR -gg -ke -out $fragmentPath -srd -sreg -template fragment -var var.Source }
         & { candle -arch $matchedPlatform -dPlatform="$matchedPlatform" -dSource='.' -dProductVersion="$cliVersion" $masterWxsPath $fragmentPath }
         & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
-    
+
         # Check that the .msi files are actually present
         if (-not(Test-Path -Path $msiPath))
         {

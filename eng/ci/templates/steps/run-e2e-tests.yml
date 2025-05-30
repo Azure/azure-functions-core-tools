@@ -1,0 +1,72 @@
+parameters:
+  - name: worker
+    type: string
+
+steps:
+- pwsh: |
+    if ($IsWindows) {
+        $funcPath = "$(Build.ArtifactStagingDirectory)\artifacts\win-x64\func.exe"
+    }
+    elseif ($IsLinux) {
+        $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/linux-x64/func"
+    }
+    else {
+        $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/osx-x64/func"
+    }
+    Write-Host "##vso[task.setvariable variable=FUNC_PATH]$funcPath"
+
+    if (-not $env:DURABLE_STORAGE_CONNECTION) {
+        Write-Host "##vso[task.setvariable variable=DURABLE_STORAGE_CONNECTION]UseDevelopmentStorage=true"
+    }
+
+    Write-Host "##vso[task.setvariable variable=DURABLE_FUNCTION_PATH]$(Build.SourcesDirectory)/test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder"
+    Write-Host "##vso[task.setvariable variable=INPROC_RUN_SETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2E.Tests/.runsettings/start_tests/ci_pipeline/dotnet_inproc.runsettings"
+  displayName: 'Set environment variables for E2E tests'
+
+- pwsh: |
+    $(FUNC_PATH) --version
+  displayName: 'Verify CLI is executable'
+
+- pwsh: |
+    $worker = '${{ parameters.worker }}'
+    $proj = '$(Build.SourcesDirectory)/test/Cli/Func.E2E.Tests/Azure.Functions.Cli.E2E.Tests.csproj'
+    $baseArgs = @(
+      '--framework', 'net8.0'
+      '--blame-hang-timeout', '10m'
+      '--logger', 'console;verbosity=detailed'
+      '--logger', 'trx'
+    )
+
+    if ($worker -ne 'Dotnet') {
+      $args = $baseArgs + @('--filter', "WorkerRuntime=$worker")
+    }
+    else {
+      $args = $baseArgs + @('--settings', "$(INPROC_RUN_SETTINGS)")
+    }
+
+    Write-Host "Running tests for worker: $worker"
+    Write-Host "dotnet test $proj $($args -join ' ')"
+    dotnet test $proj @args
+  displayName: 'Run E2E tests'
+  env:
+    DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
+    FUNC_PATH: $(FUNC_PATH)
+    DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
+    DURABLE_FUNCTION_PATH: $(DURABLE_FUNCTION_PATH)
+
+- task: 1ES.PublishPipelineArtifact@1
+  condition: succeededOrFailed()
+  continueOnError: true
+  displayName: 'Publish Test Logs'
+  inputs:
+    targetPath: '$(Build.SourcesDirectory)/TestLogs'
+    artifactName: 'TestLogs_$(Agent.OS)_${{ parameters.worker }}_$(System.JobId)_$(System.JobAttempt)'
+    artifactType: 'pipeline'
+
+- task: PublishTestResults@2
+  condition: succeededOrFailed()
+  displayName: 'Publish E2E Test Results'
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '**/*.trx'
+    failTaskOnFailedTests: true

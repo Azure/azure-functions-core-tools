@@ -48,5 +48,5 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cli\func\Azure.Functions.Cli.csproj" />
   </ItemGroup>
-	
+
 </Project>

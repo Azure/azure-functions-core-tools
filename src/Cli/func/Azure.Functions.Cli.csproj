@@ -20,11 +20,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
-    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
-    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
-    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
+    <Version>4.0.10000</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
     <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
     <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
@@ -259,7 +257,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="$(RepoRoot)tools\python\packapp\__main__.py">
+    <Content Include="$(EngRoot)tools\python\packapp\__main__.py">
       <Link>tools\python\packapp\__main__.py</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

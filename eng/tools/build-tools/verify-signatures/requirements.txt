@@ -1,0 +1,2 @@
+pefile>=2023.2.7
+cryptography>=42.0.5
