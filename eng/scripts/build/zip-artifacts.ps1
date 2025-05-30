@@ -3,17 +3,7 @@ param(
   [string]$CliVersion
 )
 
-$TargetRuntimes = @(
-  "min.win-arm64",
-  "min.win-x86",
-  "min.win-x64",
-  "linux-x64",
-  "osx-x64",
-  "osx-arm64",
-  "win-x86",
-  "win-x64",
-  "win-arm64"
-)
+$TargetRuntimes = Get-Content -Path "$PSScriptRoot/data/supported-runtimes.txt"
 
 foreach ($runtime in $TargetRuntimes) {
   $artifactPath = Join-Path $OutputDir $runtime

@@ -1,6 +1,6 @@
 param (
   [string]$RuntimeArtifactDir,  # e.g. artifacts/osx-arm64
-  [string]$DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.0.zip"
+  [string]$DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.9.zip"
 )
 
 # Set up paths
@@ -28,7 +28,7 @@ $DestDistLib = Join-Path $RuntimeArtifactDir "tools/python/packapp/distlib"
 Write-Verbose "Copying distlib to $DestDistLib..."
 New-Item -ItemType Directory -Force -Path $DestDistLib | Out-Null
 
-# Source path inside distlib-0.3.0/distlib
+# Source path inside distlib-<version>/distlib
 $SourceDistLib = Join-Path $ExtractedFolder.FullName "distlib"
 
 if (-not (Test-Path $SourceDistLib)) {

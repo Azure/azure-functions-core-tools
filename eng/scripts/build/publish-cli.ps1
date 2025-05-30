@@ -10,17 +10,7 @@ Write-Host "Using build number: $integrationBuildNumber"
 Write-Host "-------------------------------------------"
 
 # List of runtimes
-$runtimes = @(
-  "min.win-arm64",
-  "min.win-x86",
-  "min.win-x64",
-  "linux-x64",
-  "osx-x64",
-  "osx-arm64"
-  "win-x86",
-  "win-x64",
-  "win-arm64"
-)
+$runtimes = Get-Content -Path "$PSScriptRoot/data/supported-runtimes.txt"
 
 foreach ($runtime in $runtimes) {
   Write-Host "Publishing runtime: $runtime"
