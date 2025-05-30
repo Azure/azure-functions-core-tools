@@ -21,13 +21,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
         [Fact]
         public async Task Start_InProc_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError()
         {
-            await RunMissingStorageConnString_FailsWithExpectedError("dotnet", nameof(Start_InProc_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError));
+            await RunMissingStorageConnString("dotnet", true, nameof(Start_InProc_WithUserSecrets_MissingStorageConnString_FailsWithExpectedError));
         }
 
         [Fact]
         public async Task Start_InProc_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError()
         {
-            await RunWithUserSecrets_MissingBindingSetting_FailsWithExpectedError("dotnet", nameof(Start_InProc_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError));
+            await RunWithUserSecrets_MissingBindingSettings("dotnet", nameof(Start_InProc_WithUserSecrets_MissingBindingSetting_FailsWithExpectedError));
         }
     }
 }

@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
 {
     public class BaseMissingConfigTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
-        public async Task RunInvalidHostJsonTest(string language, string testName)
+        public async Task RunInvalidHostJsonTest(string language, bool shouldFail, string testName)
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -26,16 +26,39 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var hostJsonContent = "{ \"version\": \"2.0\", \"extensionBundle\": { \"id\": \"Microsoft.Azure.Functions.ExtensionBundle\", \"version\": \"[2.*, 3.0.0)\" }}";
             File.WriteAllText(hostJsonPath, hostJsonContent);
 
-            // Call func start
-            var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--port", port.ToString()]);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
+            string? capturedContent = null;
 
-            // Validate error message
-            result.Should().HaveStdOutContaining("Extension bundle configuration should not be present");
+            if (!shouldFail)
+            {
+                // If not failing, set up process started handler to wait for host to start
+                funcStartCommand.ProcessStartedHandler = async (process) =>
+                {
+                    capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerCSharp");
+                };
+            }
+
+            // Call func start
+            var result = funcStartCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
+                .Execute(["--port", port.ToString(), "--verbose"]);
+
+            if (shouldFail)
+            {
+                // Validate error message
+                result.Should().HaveStdOutContaining("Extension bundle configuration should not be present");
+            }
+            else
+            {
+                // Validate successful start
+                capturedContent.Should().Be(
+                    "Welcome to Azure Functions!",
+                    because: "response from default function should be 'Welcome to Azure Functions!'");
+            }
         }
 
-        public async Task RunMissingHostJsonTest(string language, string testName)
+        public async Task RunMissingHostJsonTest(string language, bool shouldFail, string testName)
         {
             int port = ProcessHelper.GetAvailablePort();
 
@@ -49,13 +72,36 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
             File.Delete(hostJsonPath);
 
-            // Call func start
-            var result = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--port", port.ToString()]);
+            var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
+            string? capturedContent = null;
 
-            // Validate error message
-            result.Should().HaveStdOutContaining("Host.json file in missing");
+            if (!shouldFail)
+            {
+                // If should not fail, set up process started handler to wait for host to start
+                funcStartCommand.ProcessStartedHandler = async (process) =>
+                {
+                    capturedContent = await ProcessHelper.ProcessStartedHandlerHelper(port, process, funcStartCommand.FileWriter ?? throw new ArgumentNullException(nameof(funcStartCommand.FileWriter)), "HttpTriggerCSharp");
+                };
+            }
+
+            // Call func start
+            var result = funcStartCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
+                .Execute(["--port", port.ToString(), "--verbose"]);
+
+            if (shouldFail)
+            {
+                // Validate error message
+                result.Should().HaveStdOutContaining("Host.json file is missing");
+            }
+            else
+            {
+                // Validate successful start
+                capturedContent.Should().Be(
+                    "Welcome to Azure Functions!",
+                    because: "response from default function should be 'Welcome to Azure Functions!'");
+            }
         }
 
         public async Task RunMissingLocalSettingsJsonTest(string language, string runtimeParameter, string expectedOutput, bool invokeFunction, bool setRuntimeViaEnvironment, string testName)
