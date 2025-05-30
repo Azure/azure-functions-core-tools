@@ -1,7 +1,7 @@
 param (
   [string]$OutputPath,
   [string]$GoFile,
-  [string]$Runtime
+  [string]$Runtime = ""
 )
 
 $runtimeToGoEnv = @{
@@ -14,11 +14,12 @@ $runtimeToGoEnv = @{
 }
 
 if (-not $runtimeToGoEnv.ContainsKey($Runtime)) {
-  throw "Unsupported runtime: $Runtime"
+  Write-Warning "Unsupported runtime: $Runtime"
 }
+else {
+  $env:GOOS = $runtimeToGoEnv[$Runtime][0]
+  $env:GOARCH = $runtimeToGoEnv[$Runtime][1]
+  $env:CGO_ENABLED = "0"
 
-$env:GOOS = $runtimeToGoEnv[$Runtime][0]
-$env:GOARCH = $runtimeToGoEnv[$Runtime][1]
-$env:CGO_ENABLED = "0"
-
-go build -o $OutputPath $GoFile
+  go build -o $OutputPath $GoFile
+}

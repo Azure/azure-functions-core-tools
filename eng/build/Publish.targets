@@ -94,6 +94,7 @@
       <GoZipOutput>$(PublishDir)gozip$(ExeSuffix)</GoZipOutput>
       <GoZipSource>$(EngRoot)tools\go\gozip\main.go</GoZipSource>
       <ExeSuffix Condition="'$(OS)' == 'Windows_NT'">.exe</ExeSuffix>
+      <RuntimeIdentifier Condition="'$(RuntimeIdentifier)'==''">""</RuntimeIdentifier>
     </PropertyGroup>
 
     <Message
