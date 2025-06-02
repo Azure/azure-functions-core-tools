@@ -101,6 +101,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             {
                 args.Add(csxParam);
             }
+
             var funcInitResult = await FuncInitWithRetryAsync(testName, args);
 
             // Validate expected output content
