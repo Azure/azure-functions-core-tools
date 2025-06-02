@@ -1,15 +1,6 @@
 steps:
-- pwsh: ./eng/scripts/download-templates.ps1 -OutputPath ./artifacts
-  displayName: 'Download templates'
-
 - pwsh: |
-    ./eng/scripts/build/publish-cli.ps1 `
+    ./eng/scripts/publish-cli-all-rids.ps1 `
       -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
-      -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts' `
-      -commitHash '$(Build.SourceVersion)' `
-      -integrationBuildNumber '$(Build.BuildNumber)'
+      -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
   displayName: 'Build & publish CLI'
-
-- pwsh: |
-    Remove-Item -Recurse -Force ./artifacts/templates
-  displayName: 'Delete templates directory'

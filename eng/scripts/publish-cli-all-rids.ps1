@@ -1,13 +1,7 @@
 param (
   [string]$projectFile = "src\Cli\func\Azure.Functions.Cli.csproj",
-  [string]$outputDirRoot = "artifacts",
-  [string]$commitHash = "",
-  [string]$integrationBuildNumber = ""
+  [string]$outputDirRoot = "artifacts"
 )
-
-Write-Host "Using commit hash: $commitHash"
-Write-Host "Using build number: $integrationBuildNumber"
-Write-Host "-------------------------------------------"
 
 # List of runtimes
 $runtimes = Get-Content -Path "$PSScriptRoot/data/supported-runtimes.txt"
@@ -29,14 +23,10 @@ foreach ($runtime in $runtimes) {
     "-f", "net8.0"
     "-r", $rid
     "--self-contained"
-    "-o", $outputPath
-    "/p:CommitHash=$commitHash"
+    "-o", $outputPath,
+    "-v", "d",
+    "-p:ZipAfterPublish=true"
   )
-
-  # Add IntegrationBuildNumber if defined
-  if (-not [string]::IsNullOrEmpty($integrationBuildNumber)) {
-    $commandArgs += "/p:IntegrationBuildNumber=$integrationBuildNumber"
-  }
 
   # Add IsMinified property if runtime starts with min.
   if ($runtime.StartsWith("min.")) {
