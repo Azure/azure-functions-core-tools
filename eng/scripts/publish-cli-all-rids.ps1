@@ -23,9 +23,8 @@ foreach ($runtime in $runtimes) {
     "-f", "net8.0"
     "-r", $rid
     "--self-contained"
-    "-o", $outputPath,
-    "-v", "d",
-    "-p:ZipAfterPublish=true"
+    "-o", $outputPath
+    # "-p:ZipAfterPublish=true"
   )
 
   # Add IsMinified property if runtime starts with min.
