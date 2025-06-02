@@ -77,7 +77,7 @@ string uniqueTestName = $"{methodName}_{parameterValue1}_{parameterValue2}";
 Use `FuncInitWithRetryAsync` to create a new function app with the appropriate runtime:
 
 ```csharp
-await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
+_ = await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
 ```
 
 ### 4. Add a Trigger Function
@@ -85,7 +85,7 @@ await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "d
 Use `FuncNewWithRetryAsync` to add a trigger function with specific configuration:
 
 ```csharp
-await FuncNewWithRetryAsync(uniqueTestName, new[] { 
+_ = await FuncNewWithRetryAsync(uniqueTestName, new[] { 
     ".", 
     "--template", "HttpTrigger", 
     "--name", "HttpTrigger", 
@@ -180,8 +180,8 @@ public async Task Start_DotnetIsolated_Test_EnableAuthFeature(
     string uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
     
     // Setup the function app
-    await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
-    await FuncNewWithRetryAsync(uniqueTestName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
+    _ = await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet-isolated" });
+    _ = await FuncNewWithRetryAsync(uniqueTestName, new[] { ".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--authlevel", authLevel });
     
     // Create and configure the start command
     var funcStartCommand = new FuncStartCommand(FuncPath, methodName, Log);

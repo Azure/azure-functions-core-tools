@@ -16,10 +16,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Create invalid host.json
             var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -40,10 +40,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Delete host.json
             var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -65,14 +65,14 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
+            _ = await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
 
             var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
                                 .Concat(!language.Contains("dotnet") ? ["--language", language] : Array.Empty<string>())
                                 .ToArray();
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(logFileName, funcNewArgs);
+            _ = await FuncNewWithRetryAsync(logFileName, funcNewArgs);
 
             // Delete local.settings.json
             var localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");

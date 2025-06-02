@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
+using Azure.Functions.Cli.Abstractions;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -52,14 +53,14 @@ namespace Azure.Functions.Cli.E2E.Tests
             return Task.CompletedTask;
         }
 
-        public async Task FuncInitWithRetryAsync(string testName, IEnumerable<string> args)
+        public async Task<CommandResult?> FuncInitWithRetryAsync(string testName, IEnumerable<string> args, int exitWith = 0)
         {
-            await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
+            return await FunctionAppSetupHelper.FuncInitWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args, exitWith);
         }
 
-        public async Task FuncNewWithRetryAsync(string testName, IEnumerable<string> args, string? workerRuntime = null)
+        public async Task<CommandResult?> FuncNewWithRetryAsync(string testName, IEnumerable<string> args, string? workerRuntime = null)
         {
-            await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args, workerRuntime);
+            return await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args, workerRuntime);
         }
     }
 }

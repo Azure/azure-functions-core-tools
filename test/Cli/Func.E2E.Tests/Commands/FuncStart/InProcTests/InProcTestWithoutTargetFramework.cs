@@ -22,10 +22,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
             var testName = nameof(Start_InProc_SuccessfulFunctionExecution);
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger"]);
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));

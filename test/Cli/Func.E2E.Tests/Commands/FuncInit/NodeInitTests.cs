@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Threading.Tasks;
 using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
@@ -16,10 +17,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
         [InlineData("")]
         [InlineData("v3")]
         [InlineData("v4")]
-        public void Init_WithSupportedModel_GeneratesExpectedFunctionProjectFiles(string programmingModel)
+        public async Task Init_WithSupportedModel_GeneratesExpectedFunctionProjectFiles(string programmingModel)
         {
             var workingDir = WorkingDirectory;
-            var programmingModelFlag = string.IsNullOrEmpty(programmingModel) ? string.Empty : $"--model {programmingModel}";
             var testName = nameof(Init_WithSupportedModel_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var localSettingsPath = Path.Combine(workingDir, Common.Constants.LocalSettingsJsonFileName);
@@ -35,37 +35,42 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                 filesToValidate.Add((packageJsonPath, expectedJsoncontent));
             }
 
+            // Build arguments list based on programming model
+            var args = new List<string> { "--worker-runtime", "node" };
+            if (!string.IsNullOrEmpty(programmingModel))
+            {
+                args.AddRange(["--model", programmingModel]);
+            }
+
             // Initialize node function app
-            var funcInitResult = funcInitCommand
-               .WithWorkingDirectory(workingDir)
-               .Execute(["--worker-runtime", "node", programmingModelFlag]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, args);
 
             // Validate expected output content
-            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Theory]
         [InlineData("v1")]
         [InlineData("v2")]
-        public void Init_WithUnsupportedModel_FailsWithError(string programmingModel)
+        public async Task Init_WithUnsupportedModel_FailsWithError(string programmingModel)
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithUnsupportedModel_FailsWithError);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
-            // Initialize node function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "node", "--model", programmingModel]);
+            // Initialize node function app with unsupported model
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "node", "--model", programmingModel], exitWith: 1);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(1);
-            funcInitResult.Should().HaveStdErrContaining($"The {programmingModel} programming model is not supported for worker runtime node.");
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(1);
+            funcInitResult?.Should().HaveStdErrContaining($"The {programmingModel} programming model is not supported for worker runtime node.");
         }
 
         [Fact]
-        public void Init_GeneratesHostJson_ContainsExpectedLoggingConfig()
+        public async Task Init_GeneratesHostJson_ContainsExpectedLoggingConfig()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_GeneratesHostJson_ContainsExpectedLoggingConfig);
@@ -78,18 +83,17 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize node function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "node"]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "node"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"Writing host.json");
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().HaveStdOutContaining($"Writing host.json");
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_WithDockerFlag_GeneratesDockerFile()
+        public async Task Init_WithDockerFlag_GeneratesDockerFile()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithDockerFlag_GeneratesDockerFile);
@@ -101,19 +105,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                 (dockerFilePath, expectedDockerfileContent)
             };
 
-            // Initialize node function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "node", "--docker"]);
+            // Initialize node function app with docker flag
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "node", "--docker"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().WriteDockerfile();
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().WriteDockerfile();
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_WithTypescriptAndDockerFlag_GeneratesDockerfile()
+        public async Task Init_WithTypescriptAndDockerFlag_GeneratesDockerfile()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithTypescriptAndDockerFlag_GeneratesDockerfile);
@@ -128,19 +131,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
                 (dockerFilePath, expectedDockerfileContent)
             };
 
-            // Initialize node function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "node", "--language", "typescript", "--docker"]);
+            // Initialize node function app with typescript and docker
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "node", "--language", "typescript", "--docker"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().WriteDockerfile();
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().WriteDockerfile();
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public async void Init_DockerOnlyOnExistingProject_GeneratesDockerfile()
+        public async Task Init_DockerOnlyOnExistingProject_GeneratesDockerfile()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_DockerOnlyOnExistingProject_GeneratesDockerfile);
@@ -153,52 +155,50 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize node function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node"]);
+            var initialResult = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node"]);
+            Assert.NotNull(initialResult);
 
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only", "--worker-runtime", "node"]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--docker-only", "--worker-runtime", "node"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().WriteDockerfile();
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().WriteDockerfile();
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_WithSkipNpmInstallFlag_SuccessfullySkipsNpmInstall()
+        public async Task Init_WithSkipNpmInstallFlag_SuccessfullySkipsNpmInstall()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithSkipNpmInstallFlag_SuccessfullySkipsNpmInstall);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
-            // Initialize node function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "node", "--skip-npm-install"]);
+            // Initialize node function app with skip npm install flag
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "node", "--skip-npm-install"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"You skipped \"npm install\". You must run \"npm install\" manually");
-            funcInitResult.Should().NotHaveStdOutContaining($"Running 'npm install'...");
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().HaveStdOutContaining($"You skipped \"npm install\". You must run \"npm install\" manually");
+            funcInitResult?.Should().NotHaveStdOutContaining($"Running 'npm install'...");
         }
 
         [Fact]
-        public void Init_Typescript_ModelV4_SkipNpmInstall_SuccessfullySkipsNpmInstall()
+        public async Task Init_Typescript_ModelV4_SkipNpmInstall_SuccessfullySkipsNpmInstall()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_Typescript_ModelV4_SkipNpmInstall_SuccessfullySkipsNpmInstall);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
-            // Initialize node function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "node", "--language", "typescript", "--model", "V4", "--skip-npm-install"]);
+            // Initialize node function app with typescript, v4 model, and skip npm install
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "node", "--language", "typescript", "--model", "V4", "--skip-npm-install"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().HaveStdOutContaining($"You skipped \"npm install\". You must run \"npm install\" manually");
-            funcInitResult.Should().NotHaveStdOutContaining($"Running 'npm install'...");
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().HaveStdOutContaining($"You skipped \"npm install\". You must run \"npm install\" manually");
+            funcInitResult?.Should().NotHaveStdOutContaining($"Running 'npm install'...");
         }
     }
 }

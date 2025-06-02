@@ -16,10 +16,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Modify host.json to set log level to Debug
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");
@@ -46,10 +46,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTriggerCSharp"]);
 
             // Modify host.json to set log level with filter
             string hostJsonPath = Path.Combine(WorkingDirectory, "host.json");

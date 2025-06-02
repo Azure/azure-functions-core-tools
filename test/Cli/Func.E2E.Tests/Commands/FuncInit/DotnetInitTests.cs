@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Threading.Tasks;
 using Azure.Functions.Cli.E2E.Tests.Traits;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
@@ -13,7 +14,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
     public class DotnetInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public void Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles()
+        public async Task Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles);
@@ -26,19 +27,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize dotnet function app
-            var funcInitResult = funcInitCommand
-               .WithWorkingDirectory(workingDir)
-               .Execute(["--worker-runtime", "dotnet"]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "dotnet"]);
 
             // Validate expected output content
-            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Theory]
         [InlineData("net6.0")]
         [InlineData("net8.0")]
-        public void Init_WithSupportedTargetFramework_GeneratesProjectFile_ContainsExpectedVersion(string targetFramework)
+        public async Task Init_WithSupportedTargetFramework_GeneratesProjectFile_ContainsExpectedVersion(string targetFramework)
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithSupportedTargetFramework_GeneratesProjectFile_ContainsExpectedVersion);
@@ -55,17 +55,16 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize dotnet function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute([projectName, "--worker-runtime", "dotnet", "--target-framework", targetFramework]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, [projectName, "--worker-runtime", "dotnet", "--target-framework", targetFramework]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_WithUnsupportedTargetFramework_FailsWithError()
+        public async Task Init_WithUnsupportedTargetFramework_FailsWithError()
         {
             string unsupportedTargetFramework = "net7.0";
             var workingDir = WorkingDirectory;
@@ -73,19 +72,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
             // Initialize dotnet function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["dotnet-funcs", "--worker-runtime", "dotnet", "--target-framework", unsupportedTargetFramework]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["dotnet-funcs", "--worker-runtime", "dotnet", "--target-framework", unsupportedTargetFramework], exitWith: 1);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(1);
-            funcInitResult.Should().HaveStdErrContaining($"Unable to parse target framework {unsupportedTargetFramework} for worker runtime dotnet. Valid options are net8.0, net6.0");
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(1);
+            funcInitResult?.Should().HaveStdErrContaining($"Unable to parse target framework {unsupportedTargetFramework} for worker runtime dotnet. Valid options are net8.0, net6.0");
         }
 
         [Theory]
         [InlineData("")]
         [InlineData("--csx")]
-        public void Init_WithDockerFlagAndCsx_GeneratesDockerFile(string csxParam)
+        public async Task Init_WithDockerFlagAndCsx_GeneratesDockerFile(string csxParam)
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithDockerFlagAndCsx_GeneratesDockerFile);
@@ -98,18 +96,22 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize dotnet function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "dotnet", "--docker", csxParam]);
+            var args = new List<string> { "--worker-runtime", "dotnet", "--docker" };
+            if (!string.IsNullOrEmpty(csxParam))
+            {
+                args.Add(csxParam);
+            }
+            var funcInitResult = await FuncInitWithRetryAsync(testName, args);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().WriteDockerfile();
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().WriteDockerfile();
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
-        public void Init_WithCsxFlag_GeneratesExpectedFunctionProjectFiles()
+        public async Task Init_WithCsxFlag_GeneratesExpectedFunctionProjectFiles()
         {
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithCsxFlag_GeneratesExpectedFunctionProjectFiles);
@@ -122,13 +124,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize dotnet function app
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "dotnet", "--csx"]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--worker-runtime", "dotnet", "--csx"]);
 
             // Validate expected output content
-            funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
@@ -145,16 +146,16 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize dotnet function app with retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet"]);
+            var initialResult = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet"]);
+            Assert.NotNull(initialResult);
 
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only"]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--docker-only"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().WriteDockerfile();
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().WriteDockerfile();
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
         [Fact]
@@ -171,16 +172,16 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize dotnet function app with retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet", "--csx"]);
+            var initialResult = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet", "--csx"]);
+            Assert.NotNull(initialResult);
 
-            var funcInitResult = funcInitCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only", "--csx"]);
+            var funcInitResult = await FuncInitWithRetryAsync(testName, ["--docker-only", "--csx"]);
 
             // Validate expected output content
-            funcInitResult.Should().ExitWith(0);
-            funcInitResult.Should().WriteDockerfile();
-            funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            Assert.NotNull(funcInitResult);
+            funcInitResult?.Should().ExitWith(0);
+            funcInitResult?.Should().WriteDockerfile();
+            funcInitResult?.Should().FilesExistsWithExpectContent(filesToValidate);
         }
     }
 }

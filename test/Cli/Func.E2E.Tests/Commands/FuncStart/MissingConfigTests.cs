@@ -54,10 +54,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v3"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v3"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", functionName, "--language", "node"], workerRuntime: "node");
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", functionName, "--language", "node"], workerRuntime: "node");
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
@@ -90,10 +90,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_EmptyEnvVars_HandledAsExpected);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Add empty setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
