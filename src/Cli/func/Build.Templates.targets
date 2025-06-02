@@ -22,11 +22,12 @@
   </ItemGroup>
 
   <!-- Create a list of packages that need to be copied later from the nuget cache -->
+  <!-- Lower-case naming as linux is case sensitive and nuget installs everything in lowercaase anyway -->
   <ItemGroup>
-    <_TemplatePackages Include="Microsoft.Azure.Functions.Worker.ItemTemplates" Version="$(TemplatesVersion)" />
-    <_TemplatePackages Include="Microsoft.Azure.Functions.Worker.ProjectTemplates" Version="$(TemplatesVersion)" />
-    <_TemplatePackages Include="Microsoft.Azure.WebJobs.ItemTemplates" Version="$(TemplatesVersion)" />
-    <_TemplatePackages Include="Microsoft.Azure.WebJobs.ProjectTemplates" Version="$(TemplatesVersion)" />
+    <_TemplatePackages Include="microsoft.azure.functions.worker.itemtemplates" Version="$(TemplatesVersion)" />
+    <_TemplatePackages Include="microsoft.azure.functions.worker.projecttemplates" Version="$(TemplatesVersion)" />
+    <_TemplatePackages Include="microsoft.azure.webjobs.itemtemplates" Version="$(TemplatesVersion)" />
+    <_TemplatePackages Include="microsoft.azure.webjobs.projecttemplates" Version="$(TemplatesVersion)" />
   </ItemGroup>
 
   <!-- Target to download and extract templates.json zip -->
@@ -71,7 +72,7 @@
       SkipUnchangedFiles="true" />
 
     <ItemGroup>
-      <IsolatedPackages Include="$(TemplatesOutputDir)\Microsoft.Azure.Functions.Worker.*.nupkg" />
+      <IsolatedPackages Include="$(TemplatesOutputDir)\microsoft.azure.functions.worker.*.nupkg" />
     </ItemGroup>
 
     <Move SourceFiles="@(IsolatedPackages)"
@@ -82,21 +83,21 @@
     <Message Text="Renaming template packages..." Importance="high" />
 
     <ItemGroup>
-      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\Microsoft.Azure.Functions.Worker.ItemTemplates.*.nupkg" />
-      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\Microsoft.Azure.Functions.Worker.ProjectTemplates.*.nupkg" />
+      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\microsoft.azure.functions.worker.itemtemplates.*.nupkg" />
+      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\microsoft.azure.functions.worker.projecttemplates.*.nupkg" />
     </ItemGroup>
     <ItemGroup>
-      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\Microsoft.Azure.WebJobs.ItemTemplates.*.nupkg" />
-      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\Microsoft.Azure.WebJobs.ProjectTemplates.*.nupkg" />
+      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\microsoft.azure.webjobs.itemtemplates.*.nupkg" />
+      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\microsoft.azure.webjobs.projecttemplates.*.nupkg" />
     </ItemGroup>
 
     <Move
       SourceFiles="@(_FilesToRenameIsolated)"
-      DestinationFiles="@(_FilesToRenameIsolated->Replace('Microsoft.Azure.Functions.Worker.ItemTemplates','itemTemplates')->Replace('Microsoft.Azure.Functions.Worker.ProjectTemplates', 'projectTemplates'))" />
+      DestinationFiles="@(_FilesToRenameIsolated->Replace('microsoft.azure.functions.worker.itemtemplates','itemTemplates')->Replace('microsoft.azure.functions.worker.projecttemplates', 'projectTemplates'))" />
 
     <Move
       SourceFiles="@(_FilesToRenameWebJobs)"
-      DestinationFiles="@(_FilesToRenameWebJobs->Replace('Microsoft.Azure.WebJobs.ItemTemplates','itemTemplates')->Replace('Microsoft.Azure.WebJobs.ProjectTemplates', 'projectTemplates'))" />
+      DestinationFiles="@(_FilesToRenameWebJobs->Replace('microsoft.azure.webjobs.itemtemplates','itemTemplates')->Replace('microsoft.azure.webjobs.projecttemplates', 'projectTemplates'))" />
   </Target>
 
 </Project>

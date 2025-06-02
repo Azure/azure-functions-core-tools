@@ -19,7 +19,17 @@ jobs:
     displayName: 'Check for security vulnerabilities'
 
   # Do we need to publish the CLI for the public build? Should we just build the .sln and publish one RID instead?
-  - template: /eng/ci/templates/steps/publish-cli.yml@self
+  # - template: /eng/ci/templates/steps/publish-cli.yml@self
+
+  - pwsh: |
+      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r win-arm64 `
+      --self-contained `
+      -o $(Build.ArtifactStagingDirectory)/artifacts/win-arm64 `
+      -p:ZipAfterPublish=true
+    displayName: 'Publish CLI (win-arm64)'
 
   templateContext:
     outputs:

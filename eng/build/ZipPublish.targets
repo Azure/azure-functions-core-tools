@@ -9,7 +9,6 @@
   </ItemDefinitionGroup>
 
   <Target Name="PrepareZipArtifacts" AfterTargets="Publish">
-    <Message Importance="High" Text="Preparing publish artifacts for zipping..." />
     <PropertyGroup>
       <!-- By default, we zip to package output path (as this is the 'packed' publish artifact). -->
       <ZipArtifactsPath Condition="'$(ZipArtifactsPath)' == '' AND '$(ZipAfterPublish)' == 'true'">$(PackageOutputPath)</ZipArtifactsPath>
@@ -34,7 +33,9 @@
     AfterTargets="Publish"
     DependsOnTargets="PrepareZipArtifacts"
     Condition="'$(ZipArtifactsPath)' != '' AND '@(ZipArtifact)' != '' AND '$(IsCrossTargetingBuild)' != 'true' AND '$(IsPackable)' == 'true'">
+
     <Message Importance="High" Text="Zipping publish artifacts to '$(ZipArtifactsPath)'..." />
+
     <ItemGroup Condition="'$(ZipArtifactsPath)' != ''">
       <ZipArtifact Condition="'%(TargetPath)' == '' AND '%(TargetName)' != ''">
         <TargetPath>$([MSBuild]::EnsureTrailingSlash('$(ZipArtifactsPath)'))%(TargetName)</TargetPath>
