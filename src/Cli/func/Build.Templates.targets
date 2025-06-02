@@ -1,0 +1,102 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <TemplatesVersion>4.0.5086</TemplatesVersion>
+    <TemplatesJsonVersion>3.1.1648</TemplatesJsonVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <EffectiveOutputPath Condition="'$(PublishDir)' != ''">$(PublishDir)</EffectiveOutputPath>
+    <EffectiveOutputPath Condition="'$(PublishDir)' == ''">$(OutputPath)</EffectiveOutputPath>
+    <TemplatesOutputDir>$(EffectiveOutputPath)\templates</TemplatesOutputDir>
+    <TemplatesJsonZip>$(TemplatesOutputDir)\templates.zip</TemplatesJsonZip>
+    <TemplatesNetIsolatedDir>$(TemplatesOutputDir)\net-isolated</TemplatesNetIsolatedDir>
+  </PropertyGroup>
+
+  <!-- Download NuGet template packages -->
+  <ItemGroup>
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ItemTemplates" Version="[$(TemplatesVersion)]" />
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ProjectTemplates" Version="[$(TemplatesVersion)]" />
+    <PackageDownload Include="Microsoft.Azure.WebJobs.ItemTemplates" Version="[$(TemplatesVersion)]" />
+    <PackageDownload Include="Microsoft.Azure.WebJobs.ProjectTemplates" Version="[$(TemplatesVersion)]" />
+  </ItemGroup>
+
+  <!-- Create a list of packages that need to be copied later from the nuget cache -->
+  <ItemGroup>
+    <_TemplatePackages Include="Microsoft.Azure.Functions.Worker.ItemTemplates" Version="$(TemplatesVersion)" />
+    <_TemplatePackages Include="Microsoft.Azure.Functions.Worker.ProjectTemplates" Version="$(TemplatesVersion)" />
+    <_TemplatePackages Include="Microsoft.Azure.WebJobs.ItemTemplates" Version="$(TemplatesVersion)" />
+    <_TemplatePackages Include="Microsoft.Azure.WebJobs.ProjectTemplates" Version="$(TemplatesVersion)" />
+  </ItemGroup>
+
+  <!-- Target to download and extract templates.json zip -->
+  <Target Name="DownloadAndExtractTemplatesJson" AfterTargets="Build">
+    <Message Text="Downloading templates.json file to '$(TemplatesOutputDir)'..." Importance="high" />
+
+    <DownloadFile
+      SourceUrl="https://cdn.functions.azure.com/public/TemplatesApi/$(TemplatesJsonVersion).zip"
+      DestinationFolder="$(TemplatesOutputDir)"
+      DestinationFileName="templates.zip">
+    </DownloadFile>
+
+    <Unzip
+      SourceFiles="$(TemplatesJsonZip)"
+      DestinationFolder="$(TemplatesOutputDir)" />
+
+    <Move
+      SourceFiles="$(TemplatesOutputDir)\templates\templates.json"
+      DestinationFolder="$(TemplatesOutputDir)" />
+
+    <!-- Clean up -->
+    <Delete Files="$(TemplatesJsonZip)" />
+    <RemoveDir Directories="$(TemplatesOutputDir)\bindings" />
+    <RemoveDir Directories="$(TemplatesOutputDir)\resources" />
+    <RemoveDir Directories="$(TemplatesOutputDir)\templates" />
+  </Target>
+
+  <!-- Target to copy the contents of downloaded NuGet packages -->
+  <Target Name="CopyTemplatesFromPackages" AfterTargets="DownloadAndExtractTemplatesJson">
+    <Message Text="Copying template nupkgs from cache to '$(TemplatesOutputDir)'..." Importance="high" />
+
+    <ItemGroup>
+      <!-- Resolve the .nupkg file paths in the NuGet cache -->
+      <TemplatePackagesResolved Include="@(_TemplatePackages)">
+        <PackagePath>$(NuGetPackageRoot)%(Identity)/%(Version)/%(Identity).%(Version).nupkg</PackagePath>
+      </TemplatePackagesResolved>
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(TemplatePackagesResolved->'%(PackagePath)')"
+      DestinationFolder="$(TemplatesOutputDir)"
+      SkipUnchangedFiles="true" />
+
+    <ItemGroup>
+      <IsolatedPackages Include="$(TemplatesOutputDir)\Microsoft.Azure.Functions.Worker.*.nupkg" />
+    </ItemGroup>
+
+    <Move SourceFiles="@(IsolatedPackages)"
+      DestinationFiles="@(IsolatedPackages->'$(TemplatesNetIsolatedDir)\%(Filename)%(Extension)')" />
+  </Target>
+
+  <Target Name="RenameTemplates" AfterTargets="CopyTemplatesFromPackages">
+    <Message Text="Renaming template packages..." Importance="high" />
+
+    <ItemGroup>
+      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\Microsoft.Azure.Functions.Worker.ItemTemplates.*.nupkg" />
+      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\Microsoft.Azure.Functions.Worker.ProjectTemplates.*.nupkg" />
+    </ItemGroup>
+    <ItemGroup>
+      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\Microsoft.Azure.WebJobs.ItemTemplates.*.nupkg" />
+      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\Microsoft.Azure.WebJobs.ProjectTemplates.*.nupkg" />
+    </ItemGroup>
+
+    <Move
+      SourceFiles="@(_FilesToRenameIsolated)"
+      DestinationFiles="@(_FilesToRenameIsolated->Replace('Microsoft.Azure.Functions.Worker.ItemTemplates','itemTemplates')->Replace('Microsoft.Azure.Functions.Worker.ProjectTemplates', 'projectTemplates'))" />
+
+    <Move
+      SourceFiles="@(_FilesToRenameWebJobs)"
+      DestinationFiles="@(_FilesToRenameWebJobs->Replace('Microsoft.Azure.WebJobs.ItemTemplates','itemTemplates')->Replace('Microsoft.Azure.WebJobs.ProjectTemplates', 'projectTemplates'))" />
+  </Target>
+
+</Project>
