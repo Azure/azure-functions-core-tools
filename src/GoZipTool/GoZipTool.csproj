@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <Target Name="BuildGoZip" AfterTargets="Build">
+    <PropertyGroup>
+      <GoZipSource>gozip/main.go</GoZipSource>
+      <GoZipOutputDir Condition="'$(GoZipOutputDir)' == ''">$(OutputPath)</GoZipOutputDir>
+      <ResolvedRuntimeIdentifier Condition="'$(ResolvedRuntimeIdentifier)' == ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">windows</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">386</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x64'">windows</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x64'">amd64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-arm64'">windows</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-arm64'">arm64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-x64'">linux</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-x64'">amd64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-x64'">darwin</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-x64'">amd64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-arm64'">darwin</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-arm64'">arm64</GoArch>
+    </PropertyGroup>
+
+    <Error Condition="'$(GoOS)' == '' Or '$(GoArch)' == ''"
+      Text="Unsupported runtime: $(GoOS) - $(GoArch). RID: $(ResolvedRuntimeIdentifier)" />
+
+    <PropertyGroup>
+      <ExeSuffix Condition="'$(GoOS)' == 'windows'">.exe</ExeSuffix>
+      <GoZipOutput>$(GoZipOutputDir)\gozip$(ExeSuffix)</GoZipOutput>
+    </PropertyGroup>
+
+    <Exec
+      Command="go build -o $(GoZipOutput) $(GoZipSource)"
+      EnvironmentVariables="GOOS=$(GoOS);GOARCH=$(GoArch);CGO_ENABLED=0" />
+  </Target>
+</Project>
