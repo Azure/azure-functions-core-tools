@@ -595,7 +595,7 @@ namespace Build
 
 
                 // We leave the folders beginning with 'win' to generate the .msi files. They will be deleted in
-                // the ./generateMsiFiles.ps1 script
+                // the ./generate-msi-files.ps1 script
                 if (!runtime.StartsWith("win"))
                 {
                     try

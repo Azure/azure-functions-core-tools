@@ -56,7 +56,7 @@ jobs:
       versionSpec: '18.x'
 
   - pwsh: |
-      Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
+      Import-Module "./eng/scripts/modules/pipeline-utilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
 
@@ -78,7 +78,7 @@ jobs:
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 
   - pwsh: |
-      eng/scripts/validateWorkerVersions.ps1
+      eng/scripts/validate-worker-versions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
 
@@ -192,7 +192,7 @@ jobs:
         ]
 
   - pwsh: |
-      eng/scripts/repackageBinaries.ps1
+      eng/scripts/repackage-binaries.ps1
     displayName: Repackage signed binaries
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
@@ -210,7 +210,7 @@ jobs:
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 
   - pwsh: |
-      eng/scripts/generateMsiFiles.ps1
+      eng/scripts/generate-msi-files.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -250,7 +250,7 @@ jobs:
         ]
 
   - pwsh: |
-      eng/scripts/generateSha.ps1
+      eng/scripts/generate-sha-files.ps1
     displayName: 'Generate sha files'
 
   - pwsh: |
@@ -292,7 +292,7 @@ jobs:
         packagePublishDescription: 'Core tools default nightly build'
 
   - pwsh: |
-      eng/scripts/uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
+      eng/scripts/upload-to-storage.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
     env:
       IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)

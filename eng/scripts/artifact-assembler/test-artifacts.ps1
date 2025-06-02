@@ -25,10 +25,10 @@ Get-ChildItem -Path $StagingDirectory -Directory | ForEach-Object {
 
         if ($funcExePath) {
              Write-Host "Setting FUNC_PATH to: $funcExePath"
-        
+
             # Set the environment variable FUNC_PATH to the func.exe or func path
             [System.Environment]::SetEnvironmentVariable("FUNC_PATH", $funcExePath.FullName, "Process")
-        
+
             # Run dotnet test with the environment variable set
             Write-Host "Running 'dotnet test' on test project: $testProjectPath with default artifacts"
             dotnet test $testProjectPath --no-build --settings $defaultRuntimeSettings --logger "console;verbosity=detailed"
