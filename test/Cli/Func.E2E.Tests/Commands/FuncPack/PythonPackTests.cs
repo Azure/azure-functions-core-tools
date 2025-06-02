@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
@@ -17,10 +17,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncPack
     public class PythonPackTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        public async Task Pack_Python_From_Cache_WorksAsExpected()
+        public void Pack_PythonFromCache_WorksAsExpected()
         {
             var workingDir = WorkingDirectory;
-            var testName = nameof(Pack_Python_From_Cache_WorksAsExpected);
+            var testName = nameof(Pack_PythonFromCache_WorksAsExpected);
             var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
 
             // Step 1: Initialize a Python function app
@@ -63,7 +63,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncPack
             var pythonPackagesMd5Path = Path.Combine(workingDir, ".python_packages", "requirements.txt.md5");
             var packFilesToValidate = new List<(string FilePath, string[] ExpectedContent)>
             {
-                (pythonPackagesMd5Path, new[] { "" }) // Just check file exists, content can be empty
+                (pythonPackagesMd5Path, new[] { string.Empty }) // Just check file exists, content can be empty
             };
             firstPackResult.Should().FilesExistsWithExpectContent(packFilesToValidate);
 
