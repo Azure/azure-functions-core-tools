@@ -114,7 +114,7 @@ jobs:
         arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
         workingDirectory: '$(Pipeline.Workspace)'
 
-  - ${{ if startsWith(parameters.arch, 'win') }}:
+  - ${{ if startsWith(parameters.arch, 'win-x') }}:
     - task: PowerShell@2
       displayName: 'Generate MSI files'
       inputs:
