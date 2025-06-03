@@ -1,2 +1,2 @@
 variables:
-  thirdPartyBinariesToSign: 'AccentedCommandLineParser.dll,Autofac.dll,Colors.Net.dll,Dynamitey.dll,ImpromptuInterface.dll,NCrontab.Signed.dll,protobuf-net.*,System.IO.Abstractions.dll,Microsoft.CodeAnalysis.*,Microsoft.Extensions.*,Microsoft.Azure.*,YamlDotNet.dll,OpenTelemetry.*,**/tools/python/packapp/distlib/*'
+  thirdPartyBinariesToSign: 'AccentedCommandLineParser.dll,Autofac.dll,Colors.Net.dll,Dynamitey.dll,ImpromptuInterface.dll,NCrontab.Signed.dll,protobuf-net.*,System.IO.Abstractions.dll,Microsoft.CodeAnalysis.*,Microsoft.Extensions.*,Microsoft.Azure.*,YamlDotNet.dll,OpenTelemetry.*,t32.exe,t64.exe,w32.exe,w64.exe'
