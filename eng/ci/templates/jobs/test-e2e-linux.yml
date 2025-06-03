@@ -33,10 +33,8 @@ jobs:
       -f net8.0 `
       -r linux-x64 `
       --self-contained `
-      -o $(Build.ArtifactStagingDirectory)/artifacts/linux-x64 `
-      /p:CommitHash=$(Build.SourceVersion) `
-      /p:IntegrationBuildNumber=$(Build.BuildNumber)
-    displayName: 'Publish Cli for linux-x64'
+      -o $(Build.ArtifactStagingDirectory)/artifacts/linux-x64
+    displayName: 'Publish CLI (linux-x64)'
 
   - bash: |
       echo "Making CLI binaries executable..."

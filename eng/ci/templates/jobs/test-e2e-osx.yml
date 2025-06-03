@@ -43,10 +43,8 @@ jobs:
       -f net8.0 `
       -r osx-x64 `
       --self-contained `
-      -o $(Build.ArtifactStagingDirectory)/artifacts/osx-x64 `
-      /p:CommitHash=$(Build.SourceVersion) `
-      /p:IntegrationBuildNumber=$(Build.BuildNumber)
-    displayName: 'Publish Cli for osx-x64'
+      -o $(Build.ArtifactStagingDirectory)/artifacts/osx-x64
+    displayName: 'Publish CLI (osx-x64)'
 
   - bash: |
       echo "Making CLI binaries executable..."

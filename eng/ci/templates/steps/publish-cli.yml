@@ -4,3 +4,5 @@ steps:
       -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
       -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
   displayName: 'Build & publish CLI'
+  env:
+    TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
