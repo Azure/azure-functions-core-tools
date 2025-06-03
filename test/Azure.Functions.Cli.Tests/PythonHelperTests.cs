@@ -56,6 +56,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("Python|3.10", 3, 10, true)]
         [InlineData("Python|3.11", 3, 11, true)]
         [InlineData("Python|3.12", 3, 12, true)]
+        [InlineData("Python|3.13", 3, 13, true)]
         public void ShouldHaveMatchingLinuxFxVersion(string linuxFxVersion, int? major, int? minor, bool expectedResult)
         {
             bool result = PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(linuxFxVersion, major, minor);
@@ -75,6 +76,7 @@ namespace Azure.Functions.Cli.Tests
         [InlineData("3.10.0", false)]
         [InlineData("3.11.0", false)]
         [InlineData("3.12.0", false)]
+        [InlineData("3.13.0", false)]
         public void AssertPythonVersion(string pythonVersion, bool expectException)
         {
             WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonVersion, "python");
@@ -96,11 +98,11 @@ namespace Azure.Functions.Cli.Tests
             string[] pythons;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                pythons = new string[] { "python.exe", "python3.exe", "python37.exe", "python38.exe", "python39.exe", "python310.exe", "python311.exe", "python312.exe", "py.exe" };
+                pythons = new string[] { "python.exe", "python3.exe", "python39.exe", "python310.exe", "python311.exe", "python312.exe", "python313.exe", "py.exe" };
             }
             else
             {
-                pythons = new string[] { "python", "python3", "python37", "python38", "python39", "python310", "python311", "python312" };
+                pythons = new string[] { "python", "python3", "python39", "python310", "python311", "python312", "python313" };
             }
 
             string pythonExe = pythons.FirstOrDefault(p => CheckIfPythonExist(p));
