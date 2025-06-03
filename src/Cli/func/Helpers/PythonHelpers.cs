@@ -621,7 +621,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
 
-            return Constants.DockerImages.LinuxPython36ImageAmd64;
+            return Constants.DockerImages.LinuxPython312ImageAmd64;
         }
 
         private static bool IsVersionSupported(WorkerLanguageVersionInfo info)
@@ -629,7 +629,7 @@ namespace Azure.Functions.Cli.Helpers
             if (info?.Major == 3)
             {
                 switch (info?.Minor)
-                {   
+                {
                     case 13:
                     case 12:
                     case 11:
@@ -648,7 +648,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static bool IsLinuxFxVersionRuntimeVersionMatched(string linuxFxVersion, int? major, int? minor)
         {
-            // No linux fx version will default to python 3.11
+            // No linux fx version will default to python 3.12
             if (string.IsNullOrEmpty(linuxFxVersion))
             {
                 // Match if version is 3.12
