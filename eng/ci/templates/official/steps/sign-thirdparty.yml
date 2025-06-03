@@ -9,7 +9,7 @@ steps:
   - template: ci/sign-files.yml@eng
     parameters:
       displayName: 'Sign third-party binaries in ${{ ridDir }}'
-      folderPath: '$(Build.Repository.LocalPath)/artifacts/${{ ridDir }}'
+      folderPath: '$(Build.ArtifactStagingDirectory)/artifacts/${{ ridDir }}'
       pattern: ${{ parameters.signPatterns }}
       signType: inline
       inlineOperation: |

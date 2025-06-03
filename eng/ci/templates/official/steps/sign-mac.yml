@@ -9,7 +9,7 @@ steps:
 - template: ci/sign-files.yml@eng
   parameters:
     displayName: 'Mac signing'
-    folderPath: '$(Build.Repository.LocalPath)/artifacts-zipped/${{ ridDir }}'
+    folderPath: '$(Build.ArtifactStagingDirectory)/artifacts-zipped/${{ ridDir }}'
     pattern: '*.zip' # pattern: ${{ parameters.signPatterns }} ?
     signType: inline
     inlineOperation: |
