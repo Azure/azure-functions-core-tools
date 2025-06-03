@@ -68,30 +68,10 @@ jobs:
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      ridFolders:
-        - min.win-arm64
-        - min.win-x86
-        - min.win-x64
-        - linux-x64
-        - osx-x64
-        - osx-arm64
-        - win-x86
-        - win-x64
-        - win-arm64
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      ridFolders:
-        - min.win-arm64
-        - min.win-x86
-        - min.win-x64
-        - linux-x64
-        - osx-x64
-        - osx-arm64
-        - win-x86
-        - win-x64
-        - win-arm64
       signPatterns: $(thirdPartyBinariesToSign)
 
   # - template: /eng/ci/templates/official/steps/sign-mac.yml@self
