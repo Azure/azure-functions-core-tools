@@ -107,8 +107,8 @@ jobs:
       --self-contained `
       --no-build `
       -o $(Build.ArtifactStagingDirectory)\artifacts\osx-x64 `
-      -zip true `
-      -zipOutputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts-zipped'
+      -p:ZipAfterPublish=true `
+      -p:ZipArtifactsPath=$(Build.ArtifactStagingDirectory)\artifacts-zipped
     displayName: 'Publish & Zip CLI (osx-x64)'
 
   - pwsh: |
@@ -119,8 +119,8 @@ jobs:
       --self-contained `
       --no-build `
       -o $(Build.ArtifactStagingDirectory)\artifacts\osx-arm64 `
-      -zip true `
-      -zipOutputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts-zipped'
+      -p:ZipAfterPublish=true `
+      -p:ZipArtifactsPath=$(Build.ArtifactStagingDirectory)\artifacts-zipped
     displayName: 'Publish & Zip CLI (osx-arm64)'
 
   - template: /eng/ci/templates/official/steps/sign-mac.yml@self
