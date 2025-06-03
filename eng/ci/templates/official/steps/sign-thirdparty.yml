@@ -2,10 +2,7 @@ parameters:
   - name: ridFolders
     type: object
   - name: signPatterns
-    type: object
-    default:
-      - '*.dll'
-      - '*.exe'
+    type: string
 
 steps:
 - ${{ each ridDir in parameters.ridFolders }}:
@@ -13,7 +10,7 @@ steps:
     parameters:
       displayName: 'Sign third-party binaries in ${{ ridDir }}'
       folderPath: '$(Build.Repository.LocalPath)/artifacts/${{ ridDir }}'
-      pattern: ${{ join(',', parameters.signPatterns) }}
+      pattern: ${{ parameters.signPatterns }}
       signType: inline
       inlineOperation: |
         [

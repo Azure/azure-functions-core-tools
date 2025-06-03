@@ -2,7 +2,7 @@ parameters:
   - name: ridFolders
     type: object
   - name: signPatterns
-    type: object
+    type: string
 
 steps:
 - ${{ each ridDir in parameters.ridFolders }}:
@@ -10,7 +10,7 @@ steps:
   parameters:
     displayName: 'Mac signing'
     folderPath: '$(Build.Repository.LocalPath)/artifacts-zipped/${{ ridDir }}'
-    pattern: '*.zip'
+    pattern: '*.zip' # pattern: ${{ parameters.signPatterns }} ?
     signType: inline
     inlineOperation: |
       [

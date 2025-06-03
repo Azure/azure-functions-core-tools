@@ -1,4 +1,2 @@
 variables:
-  macBinariesToSign:
-  - func
-  - gozip
+  macBinariesToSign: 'func, gozip'
