@@ -6,7 +6,7 @@
   <Target Name="BuildGoZip" AfterTargets="Build">
     <PropertyGroup>
       <GoZipSource>gozip/main.go</GoZipSource>
-      <GoZipOutputDir Condition="'$(GoZipOutputDir)' == ''">$(OutputPath)</GoZipOutputDir>
+      <GoZipOutputDir Condition="'$(GoZipOutputDir)' == ''">$(OutDir)</GoZipOutputDir>
       <ResolvedRuntimeIdentifier Condition="'$(ResolvedRuntimeIdentifier)' == ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
     </PropertyGroup>
 

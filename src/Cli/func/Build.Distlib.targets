@@ -4,9 +4,7 @@
     <!-- Customize these properties as needed -->
     <DistLibVersion>0.3.9</DistLibVersion>
     <DistLibUrl>https://github.com/vsajip/distlib/archive/$(DistLibVersion).zip</DistLibUrl>
-    <EffectiveOutputPath Condition="'$(PublishDir)' != ''">$(PublishDir)</EffectiveOutputPath>
-    <EffectiveOutputPath Condition="'$(PublishDir)' == ''">$(OutputPath)</EffectiveOutputPath>
-    <ToolsPath>$(EffectiveOutputPath)\tools</ToolsPath>
+    <ToolsPath>$(OutDir)\tools</ToolsPath>
     <DistLibZip>$(ToolsPath)\distlib.zip</DistLibZip>
     <DistLibUnzipped>$(ToolsPath)\distlib-$(DistLibVersion)</DistLibUnzipped>
     <DestDistLib>$(ToolsPath)\python\packapp\distlib</DestDistLib>
@@ -49,6 +47,15 @@
     <!-- Cleanup -->
     <Delete Files="$(DistLibZip)" />
     <RemoveDir Directories="$(DistLibUnzipped)" />
+  </Target>
+
+  <Target Name="CopyDistlibOnPublish" AfterTargets="Publish">
+    <Message Text="Copy 'distlib/' to publish directory..." Importance="high" />
+    <ItemGroup>
+      <Distlib Include="$(OutDir)\tools\python\packapp\distlib\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(Distlib)"
+          DestinationFolder="$(PublishDir)\tools\python\packapp\distlib" />
   </Target>
 
 </Project>
