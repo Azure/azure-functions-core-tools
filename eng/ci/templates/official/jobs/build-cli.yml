@@ -7,6 +7,11 @@ jobs:
     image: 1es-windows-2022
     os: windows
 
+  variables:
+  - template: /eng/ci/templates/official/variables/authenticode-binaries-tosign.yml@self
+  - template: /eng/ci/templates/official/variables/thirdparty-binaries-tosign.yml@self
+  - template: /eng/ci/templates/official/variables/mac-binaries-tosign.yml@self
+
   steps:
   - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
     - pwsh: |
@@ -38,6 +43,8 @@ jobs:
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+
   - pwsh: ./eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
@@ -45,57 +52,78 @@ jobs:
   - pwsh: ./eng/scripts/check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
 
-  - pwsh: ./eng/scripts/build/replace-telemetry-key.ps1 -constantsFilePath "$(Build.SourcesDirectory)/src/Cli/func/Common/Constants.cs"
-    displayName: 'Replace telemetry key'
-    env:
-      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
-
-  - template: /eng/ci/templates/steps/restore-nuget.yml@self
-
-  - template: /eng/ci/templates/steps/publish-cli.yml@self
-
   - pwsh: |
       $version = ./eng/scripts/get-cli-version.ps1 -CsprojPath "$(Build.SourcesDirectory)/src/Cli/func/Azure.Functions.Cli.csproj"
       Write-Host "CLI version: $version"
       Write-Host "##vso[task.setvariable variable=CliVersion]$version"
     displayName: 'Get CLI version'
 
-  # CopyBinariesToSign
-  - pwsh: ./eng/scripts/build/copy-binaries-to-sign.ps1 -OutputDir $(Build.ArtifactStagingDirectory)/artifacts -CliVersion $(CliVersion)
-    displayName: "Copy binaries to sign directory"
-
-  # Zip
-  - pwsh: ./eng/scripts/build/zip-artifacts -OutputDir $(Build.ArtifactStagingDirectory)/artifacts -CliVersion $(CliVersion)
-    displayName: "Zip CLI artifacts"
-
-  # DotnetPublishForNupkg   # DotnetPack
   - pwsh: |
-      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
-        -c Release `
-        -f net8.0 `
-        /p:NoWorkers="true" `
-        /p:CommitHash="$(Build.SourceVersion)" `
-        /p:IntegrationBuildNumber="$(Build.BuildNumber)"
+      ./eng/scripts/publish-cli-all-rids.ps1 `
+        -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
+        -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
+    displayName: 'Build & publish CLI'
+    env:
+      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
-      dotnet pack src\Cli\func\Azure.Functions.Cli.csproj `
-        -o $(Build.ArtifactStagingDirectory)\artifacts `
-        -c Release `
-        -f net8.0 `
-        --no-build `
-        /p:NoWorkers="true" `
-        /p:CommitHash="$(Build.SourceVersion)" `
-        /p:IntegrationBuildNumber="$(Build.BuildNumber)"
-    displayName: 'Pack CLI for Nupkg'
+  - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
+    parameters:
+      ridFolders:
+        - min.win-arm64
+        - min.win-x86
+        - min.win-x64
+        - linux-x64
+        - osx-x64
+        - osx-arm64
+        - win-x86
+        - win-x64
+        - win-arm64
+      signPatterns: $(authenticodeBinariesToSign)
 
-  - template: /eng/ci/templates/official/steps/sign-cli.yml@self
+  - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
+    parameters:
+      ridFolders:
+        - min.win-arm64
+        - min.win-x86
+        - min.win-x64
+        - linux-x64
+        - osx-x64
+        - osx-arm64
+        - win-x86
+        - win-x64
+        - win-arm64
+      signPatterns: $(thirdPartyBinariesToSign)
 
-  - pwsh: ./eng/scripts/repackageBinaries.ps1
-    displayName: Repackage signed binaries
+  # - template: /eng/ci/templates/official/steps/sign-mac.yml@self
+  #   parameters:
+  #     ridFolders:
+  #       - osx-x64
+  #       - osx-arm64
+  #     signPatterns: $(macBinariesToSign)
 
   - script: |
       python -m pip install -r eng/tools/build-tools/verify-signatures/requirements.txt
       python eng/tools/build-tools/verify-signatures/verify.py --output-dir $(Build.ArtifactStagingDirectory)/artifacts
     displayName: 'Verify signed binaries'
+
+  - pwsh: |
+      ./eng/scripts/publish-cli-all-rids.ps1 `
+        -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
+        -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts' `
+        -zip true `
+        -zipOutputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts-zipped' `
+        -noBuild true
+    displayName: 'Zip CLI'
+    env:
+      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+
+  - pwsh: |
+        dotnet pack src\Cli\func\Azure.Functions.Cli.csproj `
+          -o $(Build.ArtifactStagingDirectory)\artifacts-zipped `
+          -c Release `
+          -f net8.0 `
+          /p:NoWorkers="true"
+    displayName: 'Pack CLI for NuGet'
 
   - template: /eng/ci/templates/official/steps/generate-sign-msi.yml@self
 

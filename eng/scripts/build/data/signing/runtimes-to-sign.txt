@@ -1,5 +1,0 @@
-min.win-arm64
-min.win-x86
-min.win-x64
-osx-arm64
-osx-x64

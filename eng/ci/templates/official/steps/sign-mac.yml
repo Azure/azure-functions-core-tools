@@ -1,0 +1,24 @@
+parameters:
+  - name: ridFolders
+    type: object
+  - name: signPatterns
+    type: object
+
+steps:
+- ${{ each ridDir in parameters.ridFolders }}:
+- template: ci/sign-files.yml@eng
+  parameters:
+    displayName: 'Mac signing'
+    folderPath: '$(Build.Repository.LocalPath)/artifacts-zipped/${{ ridDir }}'
+    pattern: '*.zip'
+    signType: inline
+    inlineOperation: |
+      [
+        {
+            "KeyCode" : "CP-401337-Apple",
+            "OperationCode" : "MacAppDeveloperSign",
+            "Parameters" : {},
+            "ToolName" : "sign",
+            "ToolVersion" : "1.0"
+        }
+      ]
