@@ -1,4 +1,6 @@
 parameters:
+- name: folderPath
+  type: string
 - name: signPatterns
   type: string
 
@@ -6,7 +8,7 @@ steps:
 - template: ci/sign-files.yml@eng
   parameters:
     displayName: 'Sign third-party binaries'
-    folderPath: '$(Build.ArtifactStagingDirectory)/artifacts'
+    folderPath: ${{ parameters.folderPath }}
     pattern: ${{ parameters.signPatterns }}
     signType: inline
     inlineOperation: |

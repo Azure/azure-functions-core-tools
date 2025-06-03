@@ -58,33 +58,84 @@ jobs:
       Write-Host "##vso[task.setvariable variable=CliVersion]$version"
     displayName: 'Get CLI version'
 
-  - pwsh: |
-      ./eng/scripts/publish-cli-all-rids.ps1 `
-        -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
-        -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
-    displayName: 'Build & publish CLI'
-    env:
-      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+  # - pwsh: |
+  #     ./eng/scripts/publish-cli-all-rids.ps1 `
+  #       -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
+  #       -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
+  #   displayName: 'Build & publish CLI'
+  #   env:
+  #     TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
+  # testing with build then publish
+  - pwsh: |
+      dotnet build src\Cli\func\Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r osx-x64 `
+      --self-contained `
+      --no-restore `
+      -o $(Build.ArtifactStagingDirectory)\buildoutput\osx-x64
+    displayName: 'Build CLI (osx-x64)'
+
+  - pwsh: |
+      dotnet build src\Cli\func\Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r osx-arm64 `
+      --self-contained `
+      --no-restore `
+      -o $(Build.ArtifactStagingDirectory)\buildoutput\osx-arm64
+    displayName: 'Build CLI (osx-arm64)'
+
+  # Sign in the build directory
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
+      folderPath: '$(Build.ArtifactStagingDirectory)\buildoutput'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
+      folderPath: '$(Build.ArtifactStagingDirectory)\buildoutput'
       signPatterns: $(thirdPartyBinariesToSign)
 
-  # - template: /eng/ci/templates/official/steps/sign-mac.yml@self
-  #   parameters:
-  #     ridFolders:
-  #       - osx-x64
-  #       - osx-arm64
-  #     signPatterns: $(macBinariesToSign)
+  # Publish with no-build to avoid rebuilding the CLI after signing
+  - pwsh: |
+      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r osx-x64 `
+      --self-contained `
+      --no-build `
+      -o $(Build.ArtifactStagingDirectory)\artifacts\osx-x64 `
+      -zip true `
+      -zipOutputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts-zipped'
+    displayName: 'Publish & Zip CLI (osx-x64)'
 
-  - script: |
-      python -m pip install -r eng/tools/build-tools/verify-signatures/requirements.txt
-      python eng/tools/build-tools/verify-signatures/verify.py --output-dir $(Build.ArtifactStagingDirectory)/artifacts
-    displayName: 'Verify signed binaries'
+  - pwsh: |
+      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
+      -c Release `
+      -f net8.0 `
+      -r osx-arm64 `
+      --self-contained `
+      --no-build `
+      -o $(Build.ArtifactStagingDirectory)\artifacts\osx-arm64 `
+      -zip true `
+      -zipOutputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts-zipped'
+    displayName: 'Publish & Zip CLI (osx-arm64)'
+
+  - template: /eng/ci/templates/official/steps/sign-mac.yml@self
+    parameters:
+      folderPath: '$(Build.ArtifactStagingDirectory)\artifacts-zipped'
+      signPatterns: $(macBinariesToSign)
+
+  # - script: |
+  #     python -m pip install -r eng/tools/build-tools/verify-signatures/requirements.txt
+  #     python eng/tools/build-tools/verify-signatures/verify.py --output-dir $(Build.ArtifactStagingDirectory)/artifacts
+  #   displayName: 'Verify signed binaries'
+
+  - task: CodeSign@1
+    inputs:
+      Targets: '.dll, .exe'
 
   - pwsh: |
       ./eng/scripts/publish-cli-all-rids.ps1 `

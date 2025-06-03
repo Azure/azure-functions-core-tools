@@ -1,16 +1,15 @@
 parameters:
-  - name: ridFolders
-    type: object
-  - name: signPatterns
-    type: string
+- name: folderPath
+  type: string
+- name: signPatterns
+  type: string
 
 steps:
-- ${{ each ridDir in parameters.ridFolders }}:
 - template: ci/sign-files.yml@eng
   parameters:
     displayName: 'Mac signing'
-    folderPath: '$(Build.ArtifactStagingDirectory)/artifacts-zipped/${{ ridDir }}'
-    pattern: '*.zip' # pattern: ${{ parameters.signPatterns }} ?
+    folderPath: '${{ parameters.folderPath }}'
+    pattern: '**\*osx-*.zip'
     signType: inline
     inlineOperation: |
       [
