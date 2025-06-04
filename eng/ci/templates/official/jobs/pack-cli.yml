@@ -74,9 +74,6 @@ jobs:
         /p:NoWorkers="true"
     displayName: 'Pack CLI for NuGet'
 
-  - pwsh: ./eng/scripts/generateSha.ps1
-    displayName: 'Generate sha files'
-
   - pwsh: |
       Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
     displayName: 'Move artifacts to ArtifactStagingDirectory'

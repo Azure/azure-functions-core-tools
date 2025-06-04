@@ -38,5 +38,6 @@
 
   <Import Project="$(MSBuildThisFileDirectory)Release.props" />
   <Import Project="$(MSBuildThisFileDirectory)Workers.Powershell.props" />
+  <Import Project="$(MSBuildThisFileDirectory)Workers.Python.props" />
 
 </Project>

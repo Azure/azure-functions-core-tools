@@ -56,10 +56,11 @@ jobs:
     displayName: "Check for security vulnerabilities"
 
   - pwsh: |
+      $runtime = '${{ parameters.runtime }}' -replace '^min\.', ''
       dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
         -c Release `
         -f net8.0 `
-        -r ${{ parameters.runtime }} `
+        -r $runtime `
         --self-contained `
         --no-restore
     displayName: 'Build CLI (${{ parameters.runtime }})'
@@ -75,8 +76,8 @@ jobs:
       signPatterns: $(thirdPartyBinariesToSign)
 
   - pwsh: |
-      $runtime = '${{ parameters.runtime }}'
-      $isMinified = if ($runtime.StartsWith('min')) { '/p:IsMinified=true' } else { '' }
+      $isMinified = if (${{ parameters.runtime }}.StartsWith('min')) { '/p:IsMinified=true' } else { '' }
+      $runtime = '${{ parameters.runtime }}' -replace '^min\.', ''
 
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
         -o "$(Build.Repository.LocalPath)/artifacts" `
@@ -86,7 +87,7 @@ jobs:
         --self-contained `
         --no-build `
         /p:ZipAfterPublish=true `
-        /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts" `
+        /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts/$runtime" `
         $isMinified
     displayName: 'Publish & Zip CLI'
     env:
