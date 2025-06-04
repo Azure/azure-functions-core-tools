@@ -73,8 +73,7 @@ jobs:
       -f net8.0 `
       -r osx-x64 `
       --self-contained `
-      --no-restore `
-      -o $(Build.ArtifactStagingDirectory)\buildoutput\osx-x64
+      --no-restore
     displayName: 'Build CLI (osx-x64)'
 
   - pwsh: |
@@ -83,19 +82,18 @@ jobs:
       -f net8.0 `
       -r osx-arm64 `
       --self-contained `
-      --no-restore `
-      -o $(Build.ArtifactStagingDirectory)\buildoutput\osx-arm64
+      --no-restore
     displayName: 'Build CLI (osx-arm64)'
 
   # Sign in the build directory
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      folderPath: '$(Build.ArtifactStagingDirectory)\buildoutput'
+      folderPath: '$(Build.SourcesDirectory)\out\bin\Azure.Functions.Cli'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      folderPath: '$(Build.ArtifactStagingDirectory)\buildoutput'
+      folderPath: '$(Build.SourcesDirectory)\out\bin\Azure.Functions.Cli'
       signPatterns: $(thirdPartyBinariesToSign)
 
   # Publish with no-build to avoid rebuilding the CLI after signing
