@@ -10,14 +10,34 @@ jobs:
 
   strategy:
     matrix:
-      dotnet:
+      dotnet_win_x64:
         languageWorker: 'Dotnet'
-      dotnetIsolated:
+        runtime: 'win-x64'
+      dotnet_win_arm64:
+        languageWorker: 'Dotnet'
+        runtime: 'win-arm64'
+
+      dotnetIsolated_win_x64:
         languageWorker: 'DotnetIsolated'
-      node:
+        runtime: 'win-x64'
+      dotnetIsolated_win_arm64:
+        languageWorker: 'DotnetIsolated'
+        runtime: 'win-arm64'
+
+      node_win_x64:
         languageWorker: 'Node'
-      powershell:
+        runtime: 'win-x64'
+      node_win_arm64:
+        languageWorker: 'Node'
+        runtime: 'win-arm64'
+
+      powershell_win_x64:
         languageWorker: 'Powershell'
+        runtime: 'win-x64'
+      powershell_win_arm64:
+        languageWorker: 'Powershell'
+        runtime: 'win-arm64'
+
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
@@ -31,11 +51,12 @@ jobs:
       dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
       -c Release `
       -f net8.0 `
-      -r win-x64 `
+      -r $(runtime) `
       --self-contained `
-      -o $(Build.ArtifactStagingDirectory)/artifacts/win-x64
-    displayName: 'Publish CLI (win-x64)'
+      -o $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
+    displayName: 'Publish CLI ($(runtime))'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
     parameters:
       worker: $(languageWorker)
+      runtime: $(runtime)

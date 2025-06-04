@@ -10,14 +10,18 @@ jobs:
 
   strategy:
     matrix:
-      dotnet:
+      dotnet_linux_x64:
         languageWorker: 'Dotnet'
-      dotnetIsolated:
+        runtime: 'linux-x64'
+      dotnetIsolated_linux_x64:
         languageWorker: 'DotnetIsolated'
-      node:
+        runtime: 'linux-x64'
+      node_linux_x64:
         languageWorker: 'Node'
-      powershell:
+        runtime: 'linux-x64'
+      powershell_linux_x64:
         languageWorker: 'Powershell'
+        runtime: 'linux-x64'
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
@@ -29,22 +33,19 @@ jobs:
 
   - pwsh: |
       dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
-      -c Release `
-      -f net8.0 `
-      -r linux-x64 `
-      --self-contained `
-      -o $(Build.ArtifactStagingDirectory)/artifacts/linux-x64
-    displayName: 'Publish CLI (linux-x64)'
+        -c Release `
+        -f net8.0 `
+        -r $(runtime) `
+        --self-contained `
+        -o $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
+    displayName: 'Publish CLI ($(runtime))'
 
   - bash: |
-      echo "Making CLI binaries executable..."
-
-      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/linux-x64/func
-      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/linux-x64/gozip
-      # chmod +x $(Build.ArtifactStagingDirectory)/artifacts/linux-x64/in-proc8/func
-      # chmod +x $(Build.ArtifactStagingDirectory)/artifacts/linux-x64/in-proc6/func
-    displayName: 'Make func-related binaries executable'
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
+    displayName: 'Make CLI binaries executable'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
     parameters:
       worker: $(languageWorker)
+      runtime: $(runtime)

@@ -1,18 +1,26 @@
 parameters:
-  - name: worker
-    type: string
+- name: worker
+  type: string
+- name: runtime
+  type: string
 
 steps:
 - pwsh: |
-    if ($IsWindows) {
-        $funcPath = "$(Build.ArtifactStagingDirectory)\artifacts\win-x64\func.exe"
+    $runtime = '${{ parameters.runtime }}'.ToLower()
+    if ($runtime -like 'win*') {
+        $funcPath = "$(Build.ArtifactStagingDirectory)\artifacts\$runtime\func.exe"
     }
-    elseif ($IsLinux) {
-        $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/linux-x64/func"
+    elseif ($runtime -like 'linux*') {
+        $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/$runtime/func"
+    }
+    elseif ($runtime -like 'osx*') {
+        $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/$runtime/func"
     }
     else {
-        $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/osx-x64/func"
+        Write-Error "Unsupported runtime: $runtime"
+        exit 1
     }
+
     Write-Host "##vso[task.setvariable variable=FUNC_PATH]$funcPath"
 
     if (-not $env:DURABLE_STORAGE_CONNECTION) {
@@ -22,6 +30,7 @@ steps:
     Write-Host "##vso[task.setvariable variable=DURABLE_FUNCTION_PATH]$(Build.SourcesDirectory)/test/Azure.Functions.Cli.Tests/Resources/DurableTestFolder"
     Write-Host "##vso[task.setvariable variable=INPROC_RUN_SETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2E.Tests/.runsettings/start_tests/ci_pipeline/dotnet_inproc.runsettings"
   displayName: 'Set environment variables for E2E tests'
+
 
 - pwsh: |
     $(FUNC_PATH) --version

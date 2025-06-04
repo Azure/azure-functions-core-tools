@@ -10,14 +10,34 @@ jobs:
 
   strategy:
     matrix:
-      dotnet:
+      dotnet_osx_x64:
         languageWorker: 'Dotnet'
-      dotnetIsolated:
+        runtime: 'osx-x64'
+      dotnet_osx_arm64:
+        languageWorker: 'Dotnet'
+        runtime: 'osx-arm64'
+
+      dotnetIsolated_osx_x64:
         languageWorker: 'DotnetIsolated'
-      node:
+        runtime: 'osx-x64'
+      dotnetIsolated_osx_arm64:
+        languageWorker: 'DotnetIsolated'
+        runtime: 'osx-arm64'
+
+      node_osx_x64:
         languageWorker: 'Node'
-      powershell:
+        runtime: 'osx-x64'
+      node_osx_arm64:
+        languageWorker: 'Node'
+        runtime: 'osx-arm64'
+
+      powershell_osx_x64:
         languageWorker: 'Powershell'
+        runtime: 'osx-x64'
+      powershell_osx_arm64:
+        languageWorker: 'Powershell'
+        runtime: 'osx-arm64'
+
 
   steps:
   - pwsh: ./eng/scripts/start-emulators.ps1 -NoWait
@@ -41,22 +61,17 @@ jobs:
       dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
       -c Release `
       -f net8.0 `
-      -r osx-x64 `
+      -r $(runtime) `
       --self-contained `
-      -o $(Build.ArtifactStagingDirectory)/artifacts/osx-x64
-    displayName: 'Publish CLI (osx-x64)'
+      -o $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)
+    displayName: 'Publish CLI ($(runtime))'
 
   - bash: |
-      echo "Making CLI binaries executable..."
-
-      ls -l $(Build.ArtifactStagingDirectory)/artifacts/osx-x64
-
-      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/func
-      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/gozip
-      # chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/in-proc6/func
-      # chmod +x $(Build.ArtifactStagingDirectory)/artifacts/osx-x64/in-proc8/func
-    displayName: 'Make func-related binaries executable'
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/func
+      chmod +x $(Build.ArtifactStagingDirectory)/artifacts/$(runtime)/gozip
+    displayName: 'Make CLI binaries executable'
 
   - template: /eng/ci/templates/steps/run-e2e-tests.yml@self
     parameters:
       worker: $(languageWorker)
+      runtime: $(runtime)
