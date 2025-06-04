@@ -1,9 +1,11 @@
 parameters:
 - name: folderPath
   type: string
+- name: runtime
+  type: string
 
 steps:
-- pwsh:  ./eng/scripts/generateMsiFiles.ps1
+- pwsh: ./eng/scripts/generateMsiFiles.ps1 -artifactsPath ${{ parameters.folderPath }} --runtime ${{ parameters.folderPath }}
   displayName: 'Generate MSI files'
 
 - template: ci/sign-files.yml@eng
