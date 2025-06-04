@@ -67,7 +67,8 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                 workingDirectory,
                 log,
                 args,
-                (path, name, logger) => new FuncInitCommand(path, name, logger));
+                (path, name, logger) => new FuncInitCommand(path, name, logger),
+                expectedExitCode: exitWith);
         }
 
         public static async Task<CommandResult?> FuncNewWithRetryAsync(
@@ -76,8 +77,7 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
             string workingDirectory,
             ITestOutputHelper log,
             IEnumerable<string> args,
-            string? workerRuntime = null,
-            int exitWith = 0)
+            string? workerRuntime = null)
         {
             return await ExecuteCommandWithRetryAsync(
                 funcPath,
