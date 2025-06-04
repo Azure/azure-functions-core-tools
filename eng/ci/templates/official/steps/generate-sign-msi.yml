@@ -1,3 +1,7 @@
+parameters:
+- name: folderPath
+  type: string
+
 steps:
 - pwsh:  ./eng/scripts/generateMsiFiles.ps1
   displayName: 'Generate MSI files'
@@ -5,7 +9,7 @@ steps:
 - template: ci/sign-files.yml@eng
   parameters:
     displayName: 'MSI Code Signing'
-    folderPath: '$(Build.Repository.LocalPath)/artifacts'
+    folderPath: ${{ parameters.folderPath }}
     pattern: '*.msi'
     signType: inline
     inlineOperation: |
