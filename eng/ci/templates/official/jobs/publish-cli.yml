@@ -92,18 +92,18 @@ jobs:
     env:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
-  - template: /eng/ci/templates/official/steps/sign-mac.yml@self
-    condition: contains('${{ parameters.runtime }}', 'osx')
-    parameters:
-      folderPath: '$(Build.Repository.LocalPath)\artifacts'
-      signPatterns: '*.osx-*.zip'
+  - ${{ if contains(parameters.runtime, 'osx') }}:
+    - template: /eng/ci/templates/official/steps/sign-mac.yml@self
+      parameters:
+        folderPath: '$(Build.Repository.LocalPath)\artifacts'
+        signPatterns: '*.osx-*.zip'
 
   # arm64 MSI signing is not supported yet, so we skip it for now.
-  - template: /eng/ci/templates/official/steps/generate-sign-msi.yml@self
-    condition: and(contains('${{ parameters.runtime }}', 'win'), not(contains('${{ parameters.runtime }}', 'arm64')))
-    parameters:
-      folderPath: '$(Build.Repository.LocalPath)/artifacts'
-      runtime: '${{ parameters.runtime }}'
+  - ${{ if and(contains(parameters.runtime, 'win'), not(contains(parameters.runtime, 'arm64'))) }}:
+    - template: /eng/ci/templates/official/steps/generate-sign-msi.yml@self
+      parameters:
+        folderPath: '$(Build.Repository.LocalPath)/artifacts'
+        runtime: '${{ parameters.runtime }}'
 
   - pwsh: ./eng/scripts/generateSha.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
     displayName: 'Generate sha files'
