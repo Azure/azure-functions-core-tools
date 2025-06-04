@@ -9,7 +9,7 @@ steps:
   parameters:
     displayName: 'Mac signing'
     folderPath: '${{ parameters.folderPath }}'
-    pattern: '**\*osx-*.zip'
+    pattern: '*.zip'
     signType: inline
     inlineOperation: |
       [

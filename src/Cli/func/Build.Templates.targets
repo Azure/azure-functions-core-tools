@@ -98,7 +98,7 @@
       DestinationFiles="@(_FilesToRenameWebJobs->Replace('microsoft.azure.webjobs.itemtemplates','itemTemplates')->Replace('microsoft.azure.webjobs.projecttemplates', 'projectTemplates'))" />
   </Target>
 
-  <Target Name="CopyTemplatesOnPublish" AfterTargets="Publish">
+  <Target Name="CopyTemplatesOnPublish" BeforeTargets="Publish">
     <Message Text="Copy 'templates/' to publish directory..." Importance="high" />
 
     <ItemGroup>

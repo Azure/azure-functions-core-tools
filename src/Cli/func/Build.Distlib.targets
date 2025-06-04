@@ -49,7 +49,7 @@
     <RemoveDir Directories="$(DistLibUnzipped)" />
   </Target>
 
-  <Target Name="CopyDistlibOnPublish" AfterTargets="Publish">
+  <Target Name="CopyDistlibOnPublish" BeforeTargets="Publish">
     <Message Text="Copy 'distlib/' to publish directory..." Importance="high" />
     <ItemGroup>
       <Distlib Include="$(OutDir)\tools\python\packapp\distlib\**\*.*" />

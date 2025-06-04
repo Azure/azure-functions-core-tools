@@ -6,7 +6,7 @@
   <Import Project="$(MSBuildThisFileDirectory)Build.Distlib.targets" />
   <Import Project="$(MSBuildThisFileDirectory)Build.Telemetry.targets" />
 
-  <Target Name="CopyGoZipToolOnPublish" AfterTargets="Publish">
+  <Target Name="CopyGoZipToolOnPublish" BeforeTargets="Publish">
     <Message Text="Copying 'gozip' to publish directory..." Importance="high" />
     <Copy SourceFiles="$(OutDir)\gozip$(ExeSuffix)" DestinationFolder="$(PublishDir)" />
   </Target>
