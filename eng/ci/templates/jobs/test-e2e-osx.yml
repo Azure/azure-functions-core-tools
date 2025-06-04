@@ -58,7 +58,7 @@ jobs:
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
   - pwsh: |
-      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
+      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
       -c Release `
       -f net8.0 `
       -r $(runtime) `

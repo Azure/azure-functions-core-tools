@@ -39,7 +39,7 @@ jobs:
     displayName: 'Restore GoZipTool'
     inputs:
       command: 'restore'
-      projects: 'src\GoZipTool\GoZipTool.csproj'
+      projects: 'src/GoZipTool/GoZipTool.csproj'
 
   - pwsh: ./eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
@@ -58,17 +58,17 @@ jobs:
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)\out\bin\Azure.Functions.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)\out\bin\Azure.Functions.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
       signPatterns: $(thirdPartyBinariesToSign)
 
   - pwsh: |
-      dotnet pack src\Cli\func\Azure.Functions.Cli.csproj `
-        -o $(Build.Repository.LocalPath)\artifacts `
+      dotnet pack src/Cli/func/Azure.Functions.Cli.csproj  `
+        -o $(Build.Repository.LocalPath)/artifacts `
         -c Release `
         --no-build `
         /p:NoWorkers="true"

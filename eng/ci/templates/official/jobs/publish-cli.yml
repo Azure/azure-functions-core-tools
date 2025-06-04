@@ -46,7 +46,7 @@ jobs:
     displayName: 'Restore GoZipTool'
     inputs:
       command: 'restore'
-      projects: 'src\GoZipTool\GoZipTool.csproj'
+      projects: 'src/GoZipTool/GoZipTool.csproj'
 
   - pwsh: ./eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
@@ -56,7 +56,7 @@ jobs:
     displayName: "Check for security vulnerabilities"
 
   - pwsh: |
-      dotnet build src\Cli\func\Azure.Functions.Cli.csproj `
+      dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
         -c Release `
         -f net8.0 `
         -r ${{ parameters.runtime }} `
@@ -66,27 +66,27 @@ jobs:
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)\out\bin\Azure.Functions.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)\out\bin\Azure.Functions.Cli'
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
       signPatterns: $(thirdPartyBinariesToSign)
 
   - pwsh: |
       $runtime = '${{ parameters.runtime }}'
       $isMinified = if ($runtime.StartsWith('min')) { '/p:IsMinified=true' } else { '' }
 
-      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
-        -o "$(Build.Repository.LocalPath)\artifacts" `
+      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
+        -o "$(Build.Repository.LocalPath)/artifacts" `
         -c Release `
         -f net8.0 `
         -r $runtime `
         --self-contained `
         --no-build `
         /p:ZipAfterPublish=true `
-        /p:ZipArtifactsPath="$(Build.Repository.LocalPath)\artifacts" `
+        /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts" `
         $isMinified
     displayName: 'Publish & Zip CLI'
     env:
@@ -95,7 +95,7 @@ jobs:
   - ${{ if contains(parameters.runtime, 'osx') }}:
     - template: /eng/ci/templates/official/steps/sign-mac.yml@self
       parameters:
-        folderPath: '$(Build.Repository.LocalPath)\artifacts'
+        folderPath: '$(Build.Repository.LocalPath)/artifacts'
         signPatterns: '*.osx-*.zip'
 
   # arm64 MSI signing is not supported yet, so we skip it for now.

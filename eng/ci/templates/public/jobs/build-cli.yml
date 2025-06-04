@@ -23,7 +23,7 @@ jobs:
   # - template: /eng/ci/templates/steps/publish-cli.yml@self
 
   - pwsh: |
-      dotnet publish src\Cli\func\Azure.Functions.Cli.csproj `
+      dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
       -c Release `
       -f net8.0 `
       -r win-arm64 `

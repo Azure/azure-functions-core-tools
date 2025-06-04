@@ -8,7 +8,7 @@ steps:
 - pwsh: |
     $runtime = '${{ parameters.runtime }}'.ToLower()
     if ($runtime -like 'win*') {
-        $funcPath = "$(Build.ArtifactStagingDirectory)\artifacts\$runtime\func.exe"
+        $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts\$runtime\func.exe"
     }
     elseif ($runtime -like 'linux*') {
         $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts/$runtime/func"
