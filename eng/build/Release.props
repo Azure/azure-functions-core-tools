@@ -23,9 +23,9 @@
       This is why there are seemingly redundant properties below, they represent a different stage in
       the contents of this property during the packaging process.
       -->
-    <ApplicationIcon>$(EngResourceRoot)functions.ico</ApplicationIcon>
-    <IconFile Condition="'$(IconFile)' == ''">$(EngResourceRoot)functions.ico</IconFile>
-    <PackageIcon Condition="'$(PackageIcon)' == ''">$(EngResourceRoot)functions.ico</PackageIcon>
+    <ApplicationIcon Condition="'$(ApplicationIcon)' == ''">$(EngResourceRoot)functions.ico</ApplicationIcon>
+    <IconFile Condition="'$(IconFile)' == ''">$(EngResourceRoot)functions.png</IconFile>
+    <PackageIcon Condition="'$(PackageIcon)' == ''">functions.png</PackageIcon>
     <ReadmeFile Condition="'$(ReadmeFile)' == ''">README.md</ReadmeFile>
     <PackageReadmeFile Condition="'$(PackageReadmeFile)' == '' AND Exists('$(ReadmeFile)')">$(ReadmeFile)</PackageReadmeFile>
     <ReleaseNotesFile Condition="'$(ReleaseNotesFile)' == ''">release_notes.md</ReleaseNotesFile>
@@ -53,6 +53,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="$(ApplicationIcon)" Pack="true" PackagePath="/" />
     <Content Include="$(IconFile)" Pack="true" PackagePath="/" />
     <Content Include="$(ReadmeFile)" Pack="true" PackagePath="/" Condition="Exists('$(ReadmeFile)')" />
   </ItemGroup>

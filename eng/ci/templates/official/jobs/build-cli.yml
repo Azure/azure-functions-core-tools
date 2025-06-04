@@ -21,16 +21,6 @@ jobs:
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  - pwsh: |
-      $isIntegrationBuild = $false
-      if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
-      {
-          $isIntegrationBuild = $true
-      }
-      Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
-      Write-Host "IsIntegrationBuild: $isIntegrationBuild"
-    displayName: 'Set IsIntegrationBuild variable'
-
   - task: AzureCLI@2
     displayName: Acquire access token
     inputs:
@@ -45,6 +35,12 @@ jobs:
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore GoZipTool'
+    inputs:
+      command: 'restore'
+      projects: 'src\GoZipTool\GoZipTool.csproj'
+
   - pwsh: ./eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
@@ -52,96 +48,81 @@ jobs:
   - pwsh: ./eng/scripts/check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
 
+  # testing with build then publish (single rid for now)
   - pwsh: |
-      $version = ./eng/scripts/get-cli-version.ps1 -CsprojPath "$(Build.SourcesDirectory)/src/Cli/func/Azure.Functions.Cli.csproj"
-      Write-Host "CLI version: $version"
-      Write-Host "##vso[task.setvariable variable=CliVersion]$version"
-    displayName: 'Get CLI version'
+      # Build CLI with no RID for nupkg later
+      dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
+        -c Release `
+        -f net8.0 `
+        --no-restore `
+        /p:NoWorkers="true"
 
-  - pwsh: |
-      ./eng/scripts/publish-cli-all-rids.ps1 `
-        -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
-        -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts'
-    displayName: 'Build & publish CLI'
-    env:
-      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
+      # Build CLI for osx-arm64 RID
+      dotnet build src\Cli\func\Azure.Functions.Cli.csproj `
+        -c Release `
+        -f net8.0 `
+        -r osx-arm64 `
+        --self-contained `
+        --no-restore
+    displayName: 'Build CLI (osx-arm64)'
 
+  - bash: |
+      # Ensure the environment variable is set
+      echo "Repository path: $(Build.Repository.LocalPath)"
+
+      # Print directory contents
+      echo "Listing contents of Azure.Functions.Cli output:"
+      ls -la "$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli"
+    displayName: 'List Azure.Functions.Cli output directory contents'
+
+  # Sign in the build directory
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      ridFolders:
-        - min.win-arm64
-        - min.win-x86
-        - min.win-x64
-        - linux-x64
-        - osx-x64
-        - osx-arm64
-        - win-x86
-        - win-x64
-        - win-arm64
+      folderPath: '$(Build.Repository.LocalPath)\out\bin\Azure.Functions.Cli'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      ridFolders:
-        - min.win-arm64
-        - min.win-x86
-        - min.win-x64
-        - linux-x64
-        - osx-x64
-        - osx-arm64
-        - win-x86
-        - win-x64
-        - win-arm64
+      folderPath: '$(Build.Repository.LocalPath)\out\bin\Azure.Functions.Cli'
       signPatterns: $(thirdPartyBinariesToSign)
 
-  # - template: /eng/ci/templates/official/steps/sign-mac.yml@self
-  #   parameters:
-  #     ridFolders:
-  #       - osx-x64
-  #       - osx-arm64
-  #     signPatterns: $(macBinariesToSign)
-
-  - script: |
-      python -m pip install -r eng/tools/build-tools/verify-signatures/requirements.txt
-      python eng/tools/build-tools/verify-signatures/verify.py --output-dir $(Build.ArtifactStagingDirectory)/artifacts
-    displayName: 'Verify signed binaries'
-
+  # Publish with no-build to avoid rebuilding the CLI after signing
   - pwsh: |
       ./eng/scripts/publish-cli-all-rids.ps1 `
         -projectFile 'src\Cli\func\Azure.Functions.Cli.csproj' `
-        -outputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts' `
+        -outputDirRoot '$(Build.Repository.LocalPath)\artifacts' `
         -zip true `
-        -zipOutputDirRoot '$(Build.ArtifactStagingDirectory)\artifacts-zipped' `
+        -zipOutputDirRoot '$(Build.Repository.LocalPath)\artifacts' `
         -noBuild true
-    displayName: 'Zip CLI'
+    displayName: 'Publish & Zip CLI'
     env:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
+  - template: /eng/ci/templates/official/steps/sign-mac.yml@self
+    parameters:
+      folderPath: '$(Build.Repository.LocalPath)\artifacts'
+      signPatterns: '*.osx-*.zip'
+
   - pwsh: |
-        dotnet pack src\Cli\func\Azure.Functions.Cli.csproj `
-          -o $(Build.ArtifactStagingDirectory)\artifacts-zipped `
-          -c Release `
-          -f net8.0 `
-          /p:NoWorkers="true"
+      dotnet pack src\Cli\func\Azure.Functions.Cli.csproj `
+        -o $(Build.Repository.LocalPath)\artifacts `
+        -c Release `
+        --no-build `
+        /p:NoWorkers="true"
     displayName: 'Pack CLI for NuGet'
 
   - template: /eng/ci/templates/official/steps/generate-sign-msi.yml@self
+    parameters:
+      folderPath: '$(Build.Repository.LocalPath)/artifacts'
 
   - pwsh: ./eng/scripts/generateSha.ps1
     displayName: 'Generate sha files'
 
   - pwsh: |
-      Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -Destination '$(Build.ArtifactStagingDirectory)'
       Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -Destination '$(Build.ArtifactStagingDirectory)'
+      Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/func.*' -Destination '$(Build.ArtifactStagingDirectory)'
       Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
-      if ($env:IntegrationBuildNumber -like "PreRelease*-*")
-      {
-          $sourcePath = Join-Path '$(Build.Repository.LocalPath)/artifacts' 'integrationTestsBuildManifest.json'
-          Move-Item -Path $sourcePath -Destination '$(Build.ArtifactStagingDirectory)'
-      }
-    env:
-      IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
-    displayName: 'Move artifacts'
+    displayName: 'Move artifacts to ArtifactStagingDirectory'
 
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeeded()
@@ -150,9 +131,7 @@ jobs:
       artifactName: 'drop'
       artifactType: 'pipeline'
 
-  - pwsh: ./eng/scripts/uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
-    env:
-      IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
-      IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
-    displayName: 'Upload Core Tools build to the storage account for integration tests'
-    condition: eq(variables.IsIntegrationBuild, 'true')
+  - task: CodeSign@1
+    inputs:
+      Path: '$(Build.ArtifactStagingDirectory)'
+      Targets: '.dll, .exe'

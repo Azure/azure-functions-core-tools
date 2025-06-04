@@ -287,15 +287,10 @@
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Condition="'$(RuntimeIdentifier)' != 'win-arm64'" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <EffectiveOutputPath Condition="'$(PublishDir)' != ''">$(PublishDir)</EffectiveOutputPath>
-    <EffectiveOutputPath Condition="'$(PublishDir)' == ''">$(OutputPath)</EffectiveOutputPath>
-  </PropertyGroup>
-
   <ItemGroup>
-    <!-- Don't feel great about this: RuntimeIdentifier-->
+    <!-- Don't feel great about this: RuntimeIdentifier - do we want to default it to windows? If we build with no RID we do not get gozip in the package -->
     <ProjectReference Include="$(SrcRoot)GoZipTool/GoZipTool.csproj" Condition="'$(RuntimeIdentifier)' != ''">
-      <Properties>GoZipOutputDir=$(EffectiveOutputPath);ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
+      <Properties>GoZipOutputDir=$(OutDir);ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
     </ProjectReference>
   </ItemGroup>
 

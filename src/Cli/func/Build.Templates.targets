@@ -6,9 +6,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <EffectiveOutputPath Condition="'$(PublishDir)' != ''">$(PublishDir)</EffectiveOutputPath>
-    <EffectiveOutputPath Condition="'$(PublishDir)' == ''">$(OutputPath)</EffectiveOutputPath>
-    <TemplatesOutputDir>$(EffectiveOutputPath)\templates</TemplatesOutputDir>
+    <TemplatesOutputDir>$(OutDir)\templates</TemplatesOutputDir>
     <TemplatesJsonZip>$(TemplatesOutputDir)\templates.zip</TemplatesJsonZip>
     <TemplatesNetIsolatedDir>$(TemplatesOutputDir)\net-isolated</TemplatesNetIsolatedDir>
   </PropertyGroup>
@@ -98,6 +96,18 @@
     <Move
       SourceFiles="@(_FilesToRenameWebJobs)"
       DestinationFiles="@(_FilesToRenameWebJobs->Replace('microsoft.azure.webjobs.itemtemplates','itemTemplates')->Replace('microsoft.azure.webjobs.projecttemplates', 'projectTemplates'))" />
+  </Target>
+
+  <Target Name="CopyTemplatesOnPublish" BeforeTargets="Publish">
+    <Message Text="Copy 'templates/' to publish directory..." Importance="high" />
+
+    <ItemGroup>
+      <TemplateFiles Include="$(OutDir)\templates\**\*.*" />
+    </ItemGroup>
+
+    <Copy
+        SourceFiles="@(TemplateFiles)"
+        DestinationFiles="@(TemplateFiles->'$(PublishDir)\templates\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
 </Project>

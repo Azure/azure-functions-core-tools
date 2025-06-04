@@ -1,28 +1,20 @@
 variables:
-  thirdPartyBinariesToSign:
-  - AccentedCommandLineParser.dll
-  - Autofac.dll
-  - BouncyCastle.Crypto.dll
-  - Colors.Net.dll
-  - DotNetZip.dll
-  - Dynamitey.dll
-  - HTTPlease.*
-  - ImpromptuInterface.dll
-  - KubeClient.*
-  - NCrontab.Signed.dll
-  - protobuf-net.*
-  - Remotion.Linq.dll
-  - System.IO.Abstractions.dll
-  - dotnet-aspnet-codegenerator-design.dll
-  - DotNetTI.BreakingChangeAnalysis.dll
-  - Microsoft.CodeAnalysis.*
-  - Microsoft.Extensions.*
-  - Microsoft.Azure.*
-  - Microsoft.Rest.ClientRuntime.*
-  - Microsoft.VisualStudio.Web.CodeGenera*
-  - System.Composition.*
-  - System.Interactive.Async.dll
-  - YamlDotNet.dll
-  - Marklio.Metadata.dll
-  - OpenTelemetry.*
-  - tools/python/packapp/distlib/*
+  thirdPartyBinariesToSign: >
+    AccentedCommandLineParser.dll,Autofac.dll,Azure.Security.KeyVault.*,Colors.Net.dll,Dynamitey.dll,
+    Google.Protobuf.dll,Grpc.AspNetCore.Server.ClientFactory.dll,Grpc.AspNetCore.Server.dll,Grpc.Core.dll,
+    Grpc.Core.Api.dll,Grpc.Net.Client.dll,Grpc.Net.ClientFactory.dll,Grpc.Net.Common.dll,ImpromptuInterface.dll,
+    NCrontab.Signed.dll,Newtonsoft.Json.dll,protobuf-net.dll,System.IO.Abstractions.dll,
+    Microsoft.Azure.KeyVault.*,Microsoft.AI.*.dll,Microsoft.Build.Framework.dll,Microsoft.Build.dll,
+    Microsoft.CodeAnalysis.dll,Microsoft.CodeAnalysis.CSharp.dll,Microsoft.CodeAnalysis.CSharp.Scripting.dll,
+    Microsoft.CodeAnalysis.Razor.dll,Microsoft.CodeAnalysis.Scripting.dll,Microsoft.DotNet.PlatformAbstractions.dll,
+    Microsoft.Extensions.DependencyModel.dll,Microsoft.Extensions.Logging.ApplicationInsights.dll,
+    Microsoft.IdentityModel.*,Microsoft.ApplicationInsights.*,Microsoft.WindowsAzure.Storage.dll,
+    Microsoft.AspNetCore.*,NuGet.*.dll,System.Configuration.ConfigurationManager.dll,
+    System.Diagnostics.PerformanceCounter.dll,System.IdentityModel.Tokens.Jwt.dll,System.Memory.Data.dll,
+    System.Net.Http.Formatting.dll,System.Private.ServiceModel.dll,System.Security.Cryptography.ProtectedData.dll,
+    YamlDotNet.dll,Microsoft.Azure.Storage.Common.dll,Microsoft.Azure.Storage.File.dll,OpenTelemetry.Api.dll,
+    OpenTelemetry.Api.ProviderBuilderExtensions.dll,OpenTelemetry.dll,OpenTelemetry.Exporter.Console.dll,
+    OpenTelemetry.Exporter.OpenTelemetryProtocol.dll,OpenTelemetry.Extensions.Hosting.dll,
+    OpenTelemetry.Instrumentation.AspNetCore.dll,OpenTelemetry.Instrumentation.Http.dll,
+    OpenTelemetry.PersistentStorage.Abstractions.dll,OpenTelemetry.PersistentStorage.FileSystem.dll,
+    t32.exe,t64.exe,w32.exe,w64.exe
