@@ -18,13 +18,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var port = ProcessHelper.GetAvailablePort();
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", language]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
 
             // Modify queue code to use connection string
             var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -84,13 +84,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             int port = ProcessHelper.GetAvailablePort();
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", languageWorker]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", languageWorker]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
 
             // Modify queue code to use connection string
             var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -133,13 +133,13 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var port = ProcessHelper.GetAvailablePort();
 
             // Initialize dotnet function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", languageWorker]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", languageWorker]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
 
             // Add Queue trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "QueueTrigger", "--name", "queue1"]);
 
             // Modify queue code to use connection string
             var queueCodePath = Path.Combine(WorkingDirectory, "queue1.cs");
@@ -229,14 +229,14 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
                 var port = ProcessHelper.GetAvailablePort();
 
                 // Initialize function app using retry helper
-                await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
+                _ = await FuncInitWithRetryAsync(logFileName, [".", "--worker-runtime", language]);
 
                 var funcNewArgs = new[] { ".", "--template", "HttpTrigger", "--name", "HttpTriggerFunc" }
                                     .Concat(!language.Contains("dotnet") ? ["--language", language] : Array.Empty<string>())
                                     .ToArray();
 
                 // Add HTTP trigger using retry helper
-                await FuncNewWithRetryAsync(logFileName, funcNewArgs);
+                _ = await FuncNewWithRetryAsync(logFileName, funcNewArgs);
 
                 // Delete local.settings.json
                 var localSettingsJson = Path.Combine(WorkingDirectory, "local.settings.json");
@@ -286,10 +286,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var testName = nameof(Start_LanguageWorker_InvalidFunctionJson_FailsWithExpectedError);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v3"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v3"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", functionName, "--language", "node"], workerRuntime: "node");
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", functionName, "--language", "node"], workerRuntime: "node");
 
             // Modify function.json to include an invalid binding type
             var filePath = Path.Combine(WorkingDirectory, functionName, "function.json");
@@ -321,10 +321,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.Core
             var testName = nameof(Start_EmptyEnvVars_HandledAsExpected);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Add empty setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)))
