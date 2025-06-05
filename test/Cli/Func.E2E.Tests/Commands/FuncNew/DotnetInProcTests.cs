@@ -17,20 +17,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         public async Task FuncNew_CreatesHttpTrigger_DotNetInProc()
         {
             var uniqueTestName = nameof(FuncNew_CreatesHttpTrigger_DotNetInProc);
-            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var workingDir = WorkingDirectory;
 
             // Initialize the function app
             await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Run func new
-            var funcNewResult = funcNewCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute([".", "--template", "HttpTrigger", "--name", "HttpDotTriggFunc"]);
+            var args = new[] { ".", "--template", "HttpTrigger", "--name", "HttpDotTriggFunc" };
+            var result = await FuncNewWithResultRetryAsync(uniqueTestName, args, "dotnet");
 
             // Validate result
-            funcNewResult.Should().ExitWith(0);
-            funcNewResult.Should().HaveStdOutContaining("The function \"HttpDotTriggFunc\" was created successfully");
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining("The function \"HttpDotTriggFunc\" was created successfully");
         }
 
         [Fact]
@@ -38,20 +36,18 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         public async Task FuncNew_CreatesHttpTrigger_AuthConfigured_Dotnet()
         {
             var uniqueTestName = nameof(FuncNew_CreatesHttpTrigger_AuthConfigured_Dotnet);
-            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log ?? throw new ArgumentNullException(nameof(Log)));
             var workingDir = WorkingDirectory;
 
             // Initialize the function app
             await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "dotnet" });
 
             // Run func new
-            var funcNewResult = funcNewCommand
-                .WithWorkingDirectory(workingDir)
-                .Execute([".", "--template", "HttpTrigger", "--name", "HttpAuthTriggFunc", "--authlevel", "function"]);
+            var args = new[] { ".", "--template", "HttpTrigger", "--name", "HttpAuthTriggFunc", "--authlevel", "function" };
+            var result = await FuncNewWithResultRetryAsync(uniqueTestName, args, "dotnet");
 
             // Validate result
-            funcNewResult.Should().ExitWith(0);
-            funcNewResult.Should().HaveStdOutContaining("The function \"HttpAuthTriggFunc\" was created successfully");
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining("The function \"HttpAuthTriggFunc\" was created successfully");
         }
 
         [Fact]

@@ -15,28 +15,26 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
     {
         [Fact]
         [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Powershell)]
-        public void FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds()
+        public async void FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds()
         {
             var testName = nameof(FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds);
+            var functionJsonPath = Path.Combine(WorkingDirectory, "MyHttpTriggerFunction", Common.Constants.FunctionJsonFileName);
+            var expectedcontent = new[] { "\"authLevel\": \"anonymous\"", "\"type\": \"httpTrigger\"" };
+            var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
+            {
+                (functionJsonPath, expectedcontent)
+            };
 
             // Initialize PowerShell project
-            new FuncInitCommand(FuncPath, testName, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--worker-runtime", "powershell"]);
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "powershell" });
 
-            // Create HTTP Trigger function with anonymous authlevel
-            var result = new FuncNewCommand(FuncPath, testName, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute([".", "--template", "HttpTrigger", "--name", "MyHttpTriggerFunction", "--authlevel", "Anonymous", "-a"]);
+            // Run func new
+            var args = new[] { ".", "--template", "HttpTrigger", "--name", "MyHttpTriggerFunction", "--authlevel", "Anonymous", "-a" };
+            var result = await FuncNewWithResultRetryAsync(testName, args, "powershell");
 
             // Verify output contains success message
             result.Should().HaveStdOutContaining("The function \"MyHttpTriggerFunction\" was created successfully from the \"HttpTrigger\" template.");
-
-            // Verify generated function.json and authLevel
-            var functionJsonPath = Path.Combine(WorkingDirectory, "MyHttpTriggerFunction", "function.json");
-            var functionJsonContent = File.ReadAllText(functionJsonPath);
-            functionJsonContent.Should().Contain("\"authLevel\": \"anonymous\"");
-            functionJsonContent.Should().Contain("\"type\": \"httpTrigger\"");
+            result.Should().FilesExistsWithExpectContent(filesToValidate);
         }
     }
 }

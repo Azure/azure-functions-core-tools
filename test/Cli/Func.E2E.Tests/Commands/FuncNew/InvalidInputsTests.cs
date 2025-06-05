@@ -14,9 +14,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
     {
         [Fact]
         [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
-        public void FuncNew_TimerTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
+        public void FuncNew_TimerTrigger_WithAuthLevelFunction_Node_InvalidAuthLevel()
         {
-            var testName = nameof(FuncNew_TimerTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully);
+            var testName = nameof(FuncNew_TimerTrigger_WithAuthLevelFunction_Node_InvalidAuthLevel);
 
             // Initialize function app with Node.js runtime and model version v3
             new FuncInitCommand(FuncPath, testName, Log)
