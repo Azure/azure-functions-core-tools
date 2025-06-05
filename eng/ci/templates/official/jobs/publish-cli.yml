@@ -76,8 +76,13 @@ jobs:
       signPatterns: $(thirdPartyBinariesToSign)
 
   - pwsh: |
-      $isMinified = if (${{ parameters.runtime }}.StartsWith('min')) { '/p:IsMinified=true' } else { '' }
-      $runtime = '${{ parameters.runtime }}' -replace '^min\.', ''
+      $runtime = "${{ parameters.runtime }}"
+      if ($runtime.StartsWith('min')) {
+          $isMinified = '/p:IsMinified=true'
+          $runtime = $runtime -replace '^min\.?', ''
+      } else {
+          $isMinified = ''
+      }
 
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
         -o "$(Build.Repository.LocalPath)/artifacts" `
