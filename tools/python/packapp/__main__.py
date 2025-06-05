@@ -158,7 +158,7 @@ def find_and_build_deps(args):
                              filename)
                 if m:
                     name, _, ver = m.group('namever').rpartition('-')
-                    if name and ver:
+                    if name and ver:                        
                         packages.append((name, ver))
 
     # Now that we know all dependencies, download or build wheels
