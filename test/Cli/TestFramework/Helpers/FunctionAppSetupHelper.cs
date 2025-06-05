@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System;
 using Azure.Functions.Cli.Abstractions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Xunit.Abstractions;
@@ -86,6 +87,72 @@ namespace Azure.Functions.Cli.TestFramework.Helpers
                         ((FuncNewCommand)command).WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
                     }
                 });
+        }
+
+        public static async Task<CommandResult> FuncNewWithResultRetryAsync(
+           string funcPath,
+           string testName,
+           string workingDirectory,
+           ITestOutputHelper log,
+           IEnumerable<string> args,
+           string? workerRuntime = null)
+        {
+            return await ExecuteCommandWithResultRetryAsync(
+                funcPath,
+                testName,
+                workingDirectory,
+                log,
+                args,
+                (path, name, logger) => new FuncNewCommand(path, name, logger),
+                command =>
+                {
+                    if (!string.IsNullOrEmpty(workerRuntime))
+                    {
+                        ((FuncNewCommand)command).WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", workerRuntime);
+                    }
+                });
+        }
+
+        public static async Task<CommandResult> ExecuteCommandWithResultRetryAsync(
+            string funcPath,
+            string testName,
+            string workingDirectory,
+            ITestOutputHelper log,
+            IEnumerable<string> args,
+            Func<string, string, ITestOutputHelper, FuncCommand> commandFactory,
+            Action<FuncCommand>? configureCommand = null)
+        {
+            int retryNumber = 1;
+            CommandResult lastResult = CommandResult.Empty;
+            await RetryHelper.RetryAsync(
+                () =>
+                {
+                    try
+                    {
+                        log.WriteLine($"Retry number: {retryNumber}");
+                        retryNumber += 1;
+                        FuncCommand command = commandFactory(funcPath, testName, log);
+                        configureCommand?.Invoke(command);
+                        lastResult = command
+                            .WithWorkingDirectory(workingDirectory)
+                            .Execute(args);
+                        log.WriteLine($"Done executing. ExitCode: {lastResult.ExitCode}");
+                        return Task.FromResult(lastResult.ExitCode == 0);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.WriteLine($"Exception during execution: {ex.Message}");
+                        return Task.FromResult(false);
+                    }
+                },
+                timeout: 300 * 10000);
+
+            if (lastResult.Equals(CommandResult.Empty))
+            {
+                throw new InvalidOperationException("Command execution failed after all retries.");
+            }
+
+            return lastResult;
         }
     }
 }
