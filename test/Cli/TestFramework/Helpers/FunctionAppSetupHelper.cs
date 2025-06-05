@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System;
 using Azure.Functions.Cli.Abstractions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Xunit.Abstractions;
