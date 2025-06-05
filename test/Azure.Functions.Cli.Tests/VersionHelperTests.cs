@@ -1,55 +1,20 @@
-using System;
-using System.IO;
-using System.Linq;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Net.Http;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.TestFramework.Commands;
-using Azure.Functions.Cli.Tests.E2E.Helpers;
 using FluentAssertions;
 using Moq.Protected;
 using Moq;
 using Xunit;
-using Xunit.Abstractions;
-using static Azure.Functions.Cli.Helpers.VersionHelper;
 
-namespace Azure.Functions.Cli.Tests.E2E
+namespace Azure.Functions.Cli.Tests
 {
-    public class VersionTests : BaseE2ETest
+    public class VersionHelperTests
     {
-        public VersionTests(ITestOutputHelper output) : base(output) { }
-
-        [Theory]
-        [InlineData("-v")]
-        [InlineData("-version")]
-        [InlineData("--version")]
-        public void Version_DisplaysVersionNumber(string args)
-        {
-            // Get the path to func.exe
-            string funcPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "Microsoft", "Azure Functions Core Tools",
-                "func.exe");
-
-            // If running in Linux or macOS
-            if (!File.Exists(funcPath))
-            {
-                funcPath = "func";
-            }
-
-            var versionCommand = new FuncVersionCommand(funcPath, nameof(Version_DisplaysVersionNumber), _output);
-            
-            // Execute the command
-            var result = versionCommand.Execute(new[] { args });
-            
-            // Verify the output contains a version number starting with "4."
-            result.StdOut.Should().Contain("4.");
-            result.ExitCode.Should().Be(0);
-        }
-
         [Fact]
         public async Task IsRunningAnOlderVersion_ShouldReturnTrue_WhenVersionIsOlder()
         {
