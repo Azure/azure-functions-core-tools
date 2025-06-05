@@ -15,14 +15,14 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart.InProcTests
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_InvalidHostJson_FailsWithExpectedError()
         {
-            await RunInvalidHostJsonTest("dotnet", nameof(Start_InProc_InvalidHostJson_FailsWithExpectedError));
+            await RunInvalidHostJsonTest("dotnet", true, nameof(Start_InProc_InvalidHostJson_FailsWithExpectedError));
         }
 
         [Fact]
         [Trait(TestTraits.Group, TestTraits.RequiresNestedInProcArtifacts)]
         public async Task Start_InProc_MissingHostJson_FailsWithExpectedError()
         {
-            await RunMissingHostJsonTest("dotnet", nameof(Start_InProc_MissingHostJson_FailsWithExpectedError));
+            await RunMissingHostJsonTest("dotnet", true, nameof(Start_InProc_MissingHostJson_FailsWithExpectedError));
         }
 
         [Theory]
