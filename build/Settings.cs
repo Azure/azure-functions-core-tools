@@ -176,9 +176,6 @@ namespace Build
 
         public static string MinifiedVersionPrefix = "min.";
 
-        public const string DistLibVersion = "distlib-0.3.0";
-
-        public const string DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.0.zip";
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
@@ -358,7 +355,7 @@ namespace Build
                 "OpenTelemetry.Instrumentation.Http.dll",
                 "OpenTelemetry.PersistentStorage.Abstractions.dll",
                 "OpenTelemetry.PersistentStorage.FileSystem.dll",
-                Path.Combine("tools", "python", "packapp", "distlib")
+                Path.Combine("tools", "python", "packapp")
             };
         }
     }

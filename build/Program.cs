@@ -21,7 +21,6 @@ namespace Build
                 .Then(DotnetPublishForZips)
                 .Then(FilterPowershellRuntimes)
                 .Then(FilterPythonRuntimes)
-                .Then(AddDistLib)
                 .Then(AddTemplatesNupkgs)
                 .Then(AddTemplatesJson)
                 .Then(AddGoZip)
