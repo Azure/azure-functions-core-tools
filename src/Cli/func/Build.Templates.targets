@@ -6,9 +6,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TemplatesOutputDir>$(OutDir)\templates</TemplatesOutputDir>
-    <TemplatesJsonZip>$(TemplatesOutputDir)\templates.zip</TemplatesJsonZip>
-    <TemplatesNetIsolatedDir>$(TemplatesOutputDir)\net-isolated</TemplatesNetIsolatedDir>
+    <TemplatesOutputDir>$(OutDir)templates\</TemplatesOutputDir>
+    <TemplatesNetIsolatedDir>$(TemplatesOutputDir)net-isolated\</TemplatesNetIsolatedDir>
+    <TemplatesJsonZip>$(TemplatesOutputDir)templates.zip</TemplatesJsonZip>
   </PropertyGroup>
 
   <!-- Download NuGet template packages -->
@@ -43,14 +43,14 @@
       DestinationFolder="$(TemplatesOutputDir)" />
 
     <Move
-      SourceFiles="$(TemplatesOutputDir)\templates\templates.json"
+      SourceFiles="$(TemplatesOutputDir)templates\templates.json"
       DestinationFolder="$(TemplatesOutputDir)" />
 
     <!-- Clean up -->
     <Delete Files="$(TemplatesJsonZip)" />
-    <RemoveDir Directories="$(TemplatesOutputDir)\bindings" />
-    <RemoveDir Directories="$(TemplatesOutputDir)\resources" />
-    <RemoveDir Directories="$(TemplatesOutputDir)\templates" />
+    <RemoveDir Directories="$(TemplatesOutputDir)bindings" />
+    <RemoveDir Directories="$(TemplatesOutputDir)resources" />
+    <RemoveDir Directories="$(TemplatesOutputDir)templates" />
   </Target>
 
   <!-- Target to copy the contents of downloaded NuGet packages -->
@@ -70,23 +70,23 @@
       SkipUnchangedFiles="true" />
 
     <ItemGroup>
-      <IsolatedPackages Include="$(TemplatesOutputDir)\microsoft.azure.functions.worker.*.nupkg" />
+      <IsolatedPackages Include="$(TemplatesOutputDir)microsoft.azure.functions.worker.*.nupkg" />
     </ItemGroup>
 
     <Move SourceFiles="@(IsolatedPackages)"
-      DestinationFiles="@(IsolatedPackages->'$(TemplatesNetIsolatedDir)\%(Filename)%(Extension)')" />
+      DestinationFiles="@(IsolatedPackages->'$(TemplatesNetIsolatedDir)%(Filename)%(Extension)')" />
   </Target>
 
   <Target Name="RenameTemplates" AfterTargets="CopyTemplatesFromPackages">
     <Message Text="Renaming template packages..." Importance="high" />
 
     <ItemGroup>
-      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\microsoft.azure.functions.worker.itemtemplates.*.nupkg" />
-      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)\microsoft.azure.functions.worker.projecttemplates.*.nupkg" />
+      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)microsoft.azure.functions.worker.itemtemplates.*.nupkg" />
+      <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)microsoft.azure.functions.worker.projecttemplates.*.nupkg" />
     </ItemGroup>
     <ItemGroup>
-      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\microsoft.azure.webjobs.itemtemplates.*.nupkg" />
-      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)\microsoft.azure.webjobs.projecttemplates.*.nupkg" />
+      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)microsoft.azure.webjobs.itemtemplates.*.nupkg" />
+      <_FilesToRenameWebJobs Include="$(TemplatesOutputDir)microsoft.azure.webjobs.projecttemplates.*.nupkg" />
     </ItemGroup>
 
     <Move
@@ -102,12 +102,12 @@
     <Message Text="Copy 'templates/' to publish directory..." Importance="high" />
 
     <ItemGroup>
-      <TemplateFiles Include="$(OutDir)\templates\**\*.*" />
+      <TemplateFiles Include="$(OutDir)templates\**\*.*" />
     </ItemGroup>
 
     <Copy
         SourceFiles="@(TemplateFiles)"
-        DestinationFiles="@(TemplateFiles->'$(PublishDir)\templates\%(RecursiveDir)%(Filename)%(Extension)')" />
+        DestinationFiles="@(TemplateFiles->'$(PublishDir)templates\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
 </Project>

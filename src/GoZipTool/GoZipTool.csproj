@@ -26,7 +26,7 @@
       <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-arm64'">arm64</GoArch>
 
       <ExeSuffix Condition="'$(GoOS)' == 'windows'">.exe</ExeSuffix>
-      <GoZipPath>$(IntermediateOutputPath)\gozip$(ExeSuffix)</GoZipPath>
+      <GoZipPath>$(IntermediateOutputPath)gozip$(ExeSuffix)</GoZipPath>
     </PropertyGroup>
 
     <Error Condition="'$(GoOS)' == '' Or '$(GoArch)' == ''"

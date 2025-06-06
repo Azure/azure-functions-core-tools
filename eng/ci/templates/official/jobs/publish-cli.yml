@@ -85,14 +85,14 @@ jobs:
       }
 
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
-        -o "$(Build.Repository.LocalPath)/artifacts" `
+        -o "$(Build.Repository.LocalPath)/artifacts/$runtime" `
         -c Release `
         -f net8.0 `
         -r $runtime `
         --self-contained `
         --no-build `
         /p:ZipAfterPublish=true `
-        /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts/$runtime" `
+        /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts" `
         $isMinified
     displayName: 'Publish & Zip CLI'
     env:
