@@ -282,15 +282,19 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
-    <!-- PythonWorker v4.35 introduced an error when being build for win-arm64. For now, we will not include this package when we build
-      core tools for win-arm64. This is a temporary measure as we figure out how we want this to go. -->
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Condition="'$(RuntimeIdentifier)' != 'win-arm64'" />
+  </ItemGroup>
+
+  <!-- PythonWorker v4.35 introduced an error when being build for win-arm64. For now, we will not include this package when we build
+  core tools for win-arm64. This is a temporary measure as we figure out how we want this to go. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' != 'win-arm64' and '$(RuntimeIdentifier)' != 'linux-arm64' and '$(NoWorkers)' != 'true'">
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Don't feel great about this: RuntimeIdentifier - do we want to default it to windows? If we build with no RID we do not get gozip in the package -->
+    <!-- transitive pass rid paramter to anothe project; -->
     <ProjectReference Include="$(SrcRoot)GoZipTool/GoZipTool.csproj" Condition="'$(RuntimeIdentifier)' != ''">
-      <Properties>GoZipOutputDir=$(OutDir);ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
+      <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
     </ProjectReference>
   </ItemGroup>
 
