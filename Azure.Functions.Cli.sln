@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.TestFra
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.E2E.Tests", "test\Cli\Func.E2E.Tests\Azure.Functions.Cli.E2E.Tests.csproj", "{D61226F6-3472-32C7-16F5-F07705F779CE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoZipTool", "src\GoZipTool\GoZipTool.csproj", "{7849148F-F156-4FAD-8087-3ADF22785A4B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -63,6 +65,10 @@ Global
 		{D61226F6-3472-32C7-16F5-F07705F779CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D61226F6-3472-32C7-16F5-F07705F779CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D61226F6-3472-32C7-16F5-F07705F779CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7849148F-F156-4FAD-8087-3ADF22785A4B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7849148F-F156-4FAD-8087-3ADF22785A4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7849148F-F156-4FAD-8087-3ADF22785A4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7849148F-F156-4FAD-8087-3ADF22785A4B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -77,6 +83,7 @@ Global
 		{0333D5B6-B628-4605-A51E-D0AEE4C3F1FC} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
 		{3A8E1907-E3A2-1CE0-BA8B-805B655FAF09} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
 		{D61226F6-3472-32C7-16F5-F07705F779CE} = {6EE1D011-2334-44F2-9D41-608B969DAE6D}
+		{7849148F-F156-4FAD-8087-3ADF22785A4B} = {5F51C958-39C0-4E0C-9165-71D0BCE647BC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FA1E01D6-A57B-4061-A333-EDC511D283C0}
