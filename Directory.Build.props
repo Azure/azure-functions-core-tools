@@ -1,11 +1,4 @@
 <Project>
-  <!-- paths -->
-  <PropertyGroup>
-    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
-    <RepoEngRoot>$(RepoRoot)eng/</RepoEngRoot>
-    <RepoSrcRoot>$(RepoRoot)src/</RepoSrcRoot>
-    <RepoTestRoot>$(RepoRoot)test/</RepoTestRoot>
-  </PropertyGroup>
 
   <!-- artifacts -->
   <PropertyGroup>
@@ -15,5 +8,17 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <Import Project="$(RepoEngRoot)Directory.Build.Common.props" />
+
+  <!-- paths -->
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <EngRoot>$(RepoRoot)eng/</EngRoot>
+    <EngBuildRoot>$(EngRoot)build/</EngBuildRoot>
+    <EngResourceRoot>$(EngRoot)res/</EngResourceRoot>
+    <SrcRoot>$(RepoRoot)src/</SrcRoot>
+    <TestRoot>$(RepoRoot)test/</TestRoot>
+  </PropertyGroup>
+
+  <Import Project="$(EngBuildRoot)Engineering.props" />
+
 </Project>

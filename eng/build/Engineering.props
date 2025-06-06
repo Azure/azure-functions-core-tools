@@ -1,0 +1,41 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Always suppress these warnings -->
+    <NoWarn>$(NoWarn);NU1507;NU1701;NU5118;SA0001</NoWarn>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU5123</WarningsNotAsErrors>
+
+    <!-- Nuget audit as warnings only, even in TreatWarningsAsErrors. -->
+    <!-- Except for in CI, critical will fail the build. -->
+    <WarningsNotAsErrors Condition="'$(CI)' == 'false'">$(WarningsNotAsErrors);NU1904</WarningsNotAsErrors>
+    <WarningsAsErrors Condition="'$(CI)' == 'true'">$(WarningsAsErrors);NU1904</WarningsAsErrors>
+
+    <!-- TreatWarningsAsErrors true only on CI -->
+    <TreatWarningsAsErrors>$(CI)</TreatWarningsAsErrors>
+
+    <!-- NuGet audit settings -->
+    <NuGetAuditLevel>moderate</NuGetAuditLevel> <!-- warn on moderate severity only. -->
+    <NuGetAuditMode>all</NuGetAuditMode> <!-- audit transitive dependencies. -->
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateRuntimeConfigDevFile>true</GenerateRuntimeConfigDevFile><!-- https://github.com/dotnet/runtime/issues/54684 -->
+    <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!-- We still need this config to set xmlHeader = false & documentation settings -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(RepoRoot)stylecop.json" Link="stylecop.json" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)Release.props" />
+
+</Project>

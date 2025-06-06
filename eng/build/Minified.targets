@@ -1,0 +1,32 @@
+<Project>
+
+  <PropertyGroup>
+    <IsMinified>false</IsMinified>
+  </PropertyGroup>
+
+  <!-- Workers to delete in minified builds -->
+  <ItemGroup Condition="'$(IsMinified)' == 'true'">
+    <_LanguageWorkers Include="$(PublishDir)\workers\python" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\java" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\powershell" />
+    <_LanguageWorkers Include="$(PublishDir)\workers\node" />
+  </ItemGroup>
+
+  <!-- Remove worker directories from minified builds -->
+  <!-- Cannot remove entire directory due to this bug: https://github.com/Azure/azure-functions-core-tools/issues/2380 -->
+  <Target Name="RemoveLanguageWorkersForMin" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' != '' AND '$(IsMinified)' == 'true'">
+    <Message Text="Removing language workers for minified build..." Importance="high" />
+    <RemoveDir Directories="@(_LanguageWorkers)" />
+  </Target>
+
+  <!-- Write artifactsconfig.json for minified builds -->
+  <Target Name="WriteArtifactsConfig" AfterTargets="RemoveLanguageWorkersForMin" Condition="'$(RuntimeIdentifier)' != '' AND '$(IsMinified)' == 'true'">
+    <Message Text="Creating artifactsconfig.json for minified build..." Importance="high" />
+    <WriteLinesToFile
+      File="$(PublishDir)artifactsconfig.json"
+      Lines='{"minifiedVersion": true}'
+      Overwrite="true"
+      Encoding="UTF-8" />
+  </Target>
+
+</Project>
