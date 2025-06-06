@@ -45,4 +45,4 @@ extends:
     stages:
       - stage: BuildCoreToolsHost
         jobs:
-        - template: /eng/ci/templates/official/jobs/build-core-tools-host.yml@self
+        - template: /eng/ci/templates/official/jobs/host-build-pack.yml@self

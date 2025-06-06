@@ -1,0 +1,42 @@
+parameters:
+- name: folderPath
+  type: string
+- name: runtime
+  type: string
+
+steps:
+- pwsh: >
+    ./eng/scripts/generateMsiFiles.ps1
+    -artifactsPath "${{ parameters.folderPath }}"
+    -runtime "${{ parameters.runtime }}"
+  displayName: 'Generate MSI files'
+
+- template: ci/sign-files.yml@eng
+  parameters:
+    displayName: 'MSI Code Signing'
+    folderPath: ${{ parameters.folderPath }}
+    pattern: '*.msi'
+    signType: inline
+    inlineOperation: |
+      [
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolSign",
+            "Parameters": {
+              "OpusName": "Microsoft",
+              "OpusInfo": "http://www.microsoft.com",
+              "FileDigest": "/fd \"SHA256\"",
+              "PageHash": "/NPH",
+              "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+            },
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          },
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolVerify",
+            "Parameters": {},
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          }
+      ]
