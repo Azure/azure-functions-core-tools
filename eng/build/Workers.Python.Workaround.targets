@@ -1,35 +1,7 @@
 <Project>
 
   <!-- Workaround to avoid the python worker error from _GetFunctionsPythonWorkerFilesForRuntime when we publish win-arm64-->
-
-  <!-- No-op for arm64: Don't generate any Python worker files -->
-  <Target Name="_GetFunctionsPythonWorkerFilesForRuntime" Condition="'$(RuntimeIdentifier)' == 'arm64'">
-    <Message Text="Skipping Python worker file generation for arm64 runtime." Importance="Low" />
-  </Target>
-
-  <Target Name="_GetFunctionsPythonWorkerFiles" Condition="'$(RuntimeIdentifier)' == 'arm64'">
-    <Message Text="Skipping _GetFunctionsPythonWorkerFiles for arm64; no workers/python folder will be generated." Importance="Low" />
-  </Target>
-
-  <!-- Original behavior for supported runtimes -->
-  <Target Name="_GetFunctionsPythonWorkerFilesForRuntime" Condition="'$(RuntimeIdentifier)' != 'arm64' and '$(RuntimeIdentifier)' != ''">
-    <PropertyGroup>
-      <_PythonWorkersRuntimeFolder>
-        @(_PythonSupportedRuntime->WithMetadataValue('Identity', '$(RuntimeIdentifier)')->Metadata('WorkerPath'))
-      </_PythonWorkersRuntimeFolder>
-    </PropertyGroup>
-
-    <ItemGroup>
-      <_PythonWorkerFiles Include="$(_PythonWorkerToolsDir)/*"
-                          CopyToOutputDirectory="PreserveNewest"
-                          CopyToPublishDirectory="PreserveNewest" />
-      <_PythonWorkerFiles Include="$(_PythonWorkerToolsDir)/**/$(_PythonWorkersRuntimeFolder)/**"
-                          CopyToOutputDirectory="PreserveNewest"
-                          CopyToPublishDirectory="PreserveNewest" />
-    </ItemGroup>
-
-    <Error Condition="'$(_PythonWorkersRuntimeFolder)' == ''"
-           Text="Runtime '$(RuntimeIdentifier)' is not supported by the Python worker. Supported runtimes are @(_PythonSupportedRuntime)." />
-  </Target>
+  <Target Name="_GetFunctionsPythonWorkerFilesForRuntime"></Target>
+  <Target Name="_GetFunctionsPythonWorkerFiles"></Target>
 
 </Project>
