@@ -29,6 +29,10 @@ resources:
     name: 1ESPipelineTemplates/1ESPipelineTemplates
     ref: refs/tags/release
 
+variables:
+  - name: supportedRuntimes
+    value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+
 extends:
   template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
   parameters:
@@ -48,7 +52,11 @@ extends:
       - stage: Build
 
         jobs:
-        - template: /eng/ci/templates/public/jobs/build-cli.yml@self
+        - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+          - template: /eng/ci/templates/public/jobs/build-cli.yml@self
+            parameters:
+              runtime: ${{ runtime }}
+              jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
 
       - stage: UnitTest
         dependsOn: ''

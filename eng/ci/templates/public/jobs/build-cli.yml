@@ -1,5 +1,12 @@
+parameters:
+  - name: runtime
+    type: string
+  - name: jobNameSuffix
+    type: string
+
 jobs:
-- job: Build_CLI
+- job: Build_${{ parameters.jobNameSuffix }}
+  displayName: 'Build ${{ parameters.runtime }}'
   timeoutInMinutes: "180"
 
   pool:
@@ -18,23 +25,28 @@ jobs:
   - pwsh: ./eng/scripts/check-vulnerabilities.ps1
     displayName: 'Check for security vulnerabilities'
 
-  # Do we need to publish the CLI for the public build? Should we just build the .sln and publish one RID instead?
-  # We can also use a statergy matrix to build all supported RIDs.
-  # - template: /eng/ci/templates/steps/publish-cli.yml@self
-
   - pwsh: |
+      $runtime = "${{ parameters.runtime }}"
+      if ($runtime.StartsWith('min')) {
+          $isMinified = '/p:IsMinified=true'
+          $runtime = $runtime -replace '^min\.?', ''
+      } else {
+          $isMinified = ''
+      }
+
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `
-      -c Release `
-      -f net8.0 `
-      -r win-arm64 `
-      --self-contained `
-      -o $(Build.ArtifactStagingDirectory)/artifacts/win-arm64 `
-      -p:ZipAfterPublish=true `
-      -p:ZipArtifactsPath=$(Build.ArtifactStagingDirectory)/artifacts-zipped
-    displayName: 'Publish CLI (win-arm64)'
+        -o "$(Build.ArtifactStagingDirectory)/artifacts/$runtime" `
+        -c Release `
+        -f net8.0 `
+        -r $runtime `
+        --self-contained `
+        /p:ZipAfterPublish=true `
+        /p:ZipArtifactsPath="$(Build.ArtifactStagingDirectory)/artifacts-zipped" `
+        $isMinified
+    displayName: 'Build & Zip CLI'
 
   templateContext:
     outputs:
     - output: pipelineArtifact
       path: '$(Build.ArtifactStagingDirectory)/artifacts-zipped'
-      artifact: func-cli
+      artifact: func-cli-${{ parameters.runtime }}-$(Build.BuildId)_$(System.JobAttempt)
