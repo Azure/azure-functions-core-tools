@@ -9,7 +9,7 @@ steps:
     versionSpec:
   displayName: 'Install NuGet'
 
-- template: eng/ci/templates/steps/install-dotnet.yml
+- template: eng/ci/templates/steps/install-dotnet.yml@self
 
 - task: UsePythonVersion@0
   inputs:

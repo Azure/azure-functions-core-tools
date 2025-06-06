@@ -37,6 +37,5 @@
   </ItemGroup>
 
   <Import Project="$(MSBuildThisFileDirectory)Release.props" />
-  <Import Project="$(MSBuildThisFileDirectory)Workers.Powershell.props" />
 
 </Project>

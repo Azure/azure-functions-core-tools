@@ -1,6 +1,8 @@
 <Project>
 
-  <!-- Workaround to avoid the python worker error from _GetFunctionsPythonWorkerFilesForRuntime when we publish win-arm64-->
+  <!-- PythonWorker v4.35 introduced an error when being build for win-arm64 (or any unsupported RID).
+   This workaround is to skip the targets that cause the error as we still need to build win-arm64 for core tools. -->
+
   <Target Name="_GetFunctionsPythonWorkerFilesForRuntime"></Target>
   <Target Name="_GetFunctionsPythonWorkerFiles"></Target>
 

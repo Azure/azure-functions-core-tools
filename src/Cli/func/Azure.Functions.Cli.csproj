@@ -282,11 +282,6 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
-  </ItemGroup>
-
-  <!-- PythonWorker v4.35 introduced an error when being build for win-arm64. For now, we will not include this package when we build
-  core tools for win-arm64. This is a temporary measure as we figure out how we want this to go. -->
-  <ItemGroup Condition="'$(RuntimeIdentifier)' != 'win-arm64' and '$(RuntimeIdentifier)' != 'linux-arm64' and '$(NoWorkers)' != 'true'">
     <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
   </ItemGroup>
 

@@ -2,8 +2,12 @@
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
 
-  <Import Project="$(MSBuildThisFileDirectory)Build.Templates.targets" />
-  <Import Project="$(MSBuildThisFileDirectory)Build.Distlib.targets" />
-  <Import Project="$(MSBuildThisFileDirectory)Build.Telemetry.targets" />
+  <Import Project="$(EngBuildRoot)Workers.Powershell.targets" />
+  <Import Project="$(EngBuildRoot)Workers.Python.Workaround.targets" Condition="'$(RuntimeIdentifier)' == 'win-arm64'" />
+
+  <Import Project="$(EngBuildRoot)Distlib.targets" />
+  <Import Project="$(EngBuildRoot)Minified.targets" />
+  <Import Project="$(EngBuildRoot)Telemetry.targets" />
+  <Import Project="$(EngBuildRoot)Templates.targets" />
 
 </Project>
