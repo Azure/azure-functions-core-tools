@@ -1,6 +1,6 @@
 jobs:
 - job: Publish_Nupkg
-  displayName: 'Publish Nupkg'
+  displayName: 'Publish nupkg'
   timeoutInMinutes: "180"
 
   pool:
