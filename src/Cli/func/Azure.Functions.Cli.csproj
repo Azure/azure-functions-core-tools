@@ -293,7 +293,7 @@
   <ItemGroup>
     <!-- Don't feel great about this: RuntimeIdentifier - do we want to default it to windows? If we build with no RID we do not get gozip in the package -->
     <!-- transitive pass rid paramter to anothe project; -->
-    <ProjectReference Include="$(SrcRoot)GoZipTool/GoZipTool.csproj" Condition="'$(RuntimeIdentifier)' != ''">
+    <ProjectReference Include="$(SrcRoot)GoZipTool\GoZipTool.csproj" Condition="'$(RuntimeIdentifier)' != ''">
       <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
     </ProjectReference>
   </ItemGroup>
