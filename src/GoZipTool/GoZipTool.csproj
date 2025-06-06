@@ -1,12 +1,11 @@
 <Project Sdk="Microsoft.Build.NoTargets">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <ResolvedRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
   </PropertyGroup>
 
   <Target Name="SetGoZipPath">
     <PropertyGroup>
-      <ResolvedRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
-
       <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">windows</GoOS>
       <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">386</GoArch>
 
@@ -45,7 +44,7 @@
       EnvironmentVariables="GOOS=$(GoOS);GOARCH=$(GoArch);CGO_ENABLED=0" />
   </Target>
 
-  <Target Name="CollectGoZipOutput" DependsOnTargets="SetGoZipPath;BuildGoZip" BeforeTargets="AssignTargetPaths">
+  <Target Name="CollectGoZipOutput" DependsOnTargets="SetGoZipPath;BuildGoZip" BeforeTargets="AssignTargetPaths" Condition="'$(ResolvedRuntimeIdentifier)' != ''">
     <Message Importance="high" Text="Collecting GoZip output: $(GoZipPath)" />
     <ItemGroup>
       <None Include="$(GoZipPath)" CopyToOutputDirectory="PreserveNewest" />

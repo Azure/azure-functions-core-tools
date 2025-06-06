@@ -42,12 +42,6 @@ jobs:
 
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
-  - task: DotNetCoreCLI@2
-    displayName: 'Restore GoZipTool'
-    inputs:
-      command: 'restore'
-      projects: 'src/GoZipTool/GoZipTool.csproj'
-
   - pwsh: ./eng/scripts/validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
