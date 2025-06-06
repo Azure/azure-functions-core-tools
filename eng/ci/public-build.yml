@@ -6,8 +6,6 @@ schedules:
       - main
   always: true
 
-name: $(Build.SourceBranchName)_$(Build.Reason)
-
 pr:
   branches:
     include:
@@ -31,6 +29,10 @@ resources:
     name: 1ESPipelineTemplates/1ESPipelineTemplates
     ref: refs/tags/release
 
+variables:
+  - name: supportedRuntimes
+    value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+
 extends:
   template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
   parameters:
@@ -47,7 +49,38 @@ extends:
       # PR's from forks do not have sufficient permissions to set tags.
       skipBuildTagsForGitHubPullRequests: ${{ variables['System.PullRequest.IsFork'] }}
     stages:
-      - stage: BuildAndTest
-        jobs:
-        - template: /eng/ci/templates/public/jobs/build-test-public.yml@self
+      - stage: Build
 
+        jobs:
+        - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+          - template: /eng/ci/templates/public/jobs/build-cli.yml@self
+            parameters:
+              runtime: ${{ runtime }}
+              jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
+
+      - stage: UnitTest
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-unit-windows.yml@self
+        - template: /eng/ci/templates/jobs/test-unit-linux.yml@self
+
+      # Do we want the E2E tests for the public build?
+      # Might need this at first whilst we work on building out solid unit tests
+      - stage: E2ETestWindows
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+
+      - stage: E2ETestLinux
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+
+      - stage: E2ETestOSX
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self

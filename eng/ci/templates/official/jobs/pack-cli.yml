@@ -1,0 +1,80 @@
+jobs:
+- job: Publish_Nupkg
+  displayName: 'Publish nupkg'
+  timeoutInMinutes: "180"
+
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  variables:
+  - template: /eng/ci/templates/official/variables/authenticode-binaries-tosign.yml@self
+  - template: /eng/ci/templates/official/variables/thirdparty-binaries-tosign.yml@self
+
+  steps:
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - pwsh: |
+        # Check if this is a scheduled build
+        Write-Host "##vso[build.addbuildtag]nightly-build"
+      displayName: 'Add build tag for scheduled builds'
+
+  - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  - task: AzureCLI@2
+    displayName: Acquire access token
+    inputs:
+      azureSubscription: $(E2ETestServiceConnectionName)
+      scriptType: ps
+      scriptLocation: inlineScript
+      signType: inline
+      inlineScript: |
+        # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
+        $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
+        echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
+
+  - pwsh: ./eng/scripts/validateWorkerVersions.ps1
+    displayName: 'Validate worker versions'
+    condition: ne(variables['skipWorkerVersionValidation'], 'true')
+
+  - pwsh: ./eng/scripts/check-vulnerabilities.ps1
+    displayName: "Check for security vulnerabilities"
+
+  - pwsh: |
+      dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
+        -c Release `
+        -f net8.0 `
+        --no-restore `
+        /p:NoWorkers="true"
+    displayName: 'Build CLI'
+
+  - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
+    parameters:
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+      signPatterns: $(authenticodeBinariesToSign)
+
+  - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
+    parameters:
+      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+      signPatterns: $(thirdPartyBinariesToSign)
+
+  - pwsh: |
+      dotnet pack src/Cli/func/Azure.Functions.Cli.csproj  `
+        -o $(Build.Repository.LocalPath)/artifacts `
+        -c Release `
+        --no-build `
+        /p:NoWorkers="true"
+    displayName: 'Pack CLI for NuGet'
+
+  - pwsh: |
+      Move-Item -Path '$(Build.Repository.LocalPath)/artifacts/Microsoft.Azure.Functions.CoreTools*.nupkg' -Destination '$(Build.ArtifactStagingDirectory)'
+    displayName: 'Move artifacts to ArtifactStagingDirectory'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeeded()
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifactName: 'func-cli-nupkg'
+      artifactType: 'pipeline'
