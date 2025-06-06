@@ -10,17 +10,11 @@ import subprocess
 import sys
 import tempfile
 import zipfile
-import json
-import hashlib
 import stat
-from email.parser import Parser
-from email import message_from_string
 
 from enum import IntEnum
 
-class SimpleWheel:
-    """Simple wheel file handler using native Python libraries"""
-    
+class Wheel:
     def __init__(self, wheel_path):
         self.wheel_path = wheel_path
         self.filename = os.path.basename(wheel_path)
@@ -83,7 +77,7 @@ class SimpleWheel:
                     os.chmod(dest_path, os.stat(dest_path).st_mode | stat.S_IEXEC)
 
 
-class SimpleScriptMaker:    
+class ScriptMaker:    
     def __init__(self, source_dir, target_dir):
         self.source_dir = source_dir
         self.target_dir = target_dir
@@ -195,14 +189,14 @@ def find_and_build_deps(args):
                 data = venv
             else:
                 die(f'unsupported platform: {args.platform}')
-            
-            maker = SimpleScriptMaker(None, None)
+
+            maker = ScriptMaker(None, None)
 
             for filename in os.listdir(td):
                 if not filename.endswith('.whl'):
                     continue
 
-                wheel = SimpleWheel(os.path.join(td, filename))
+                wheel = Wheel(os.path.join(td, filename))
 
                 paths = {
                     'prefix': venv,
