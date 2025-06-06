@@ -183,7 +183,7 @@ jobs:
     inputs:
       targetType: filePath
       filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-sha-files.ps1'
-      arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'
+      arguments: '-artifactsPath "$(Pipeline.Workspace)/staging"'
 
   - task: CopyFiles@2
     displayName: 'Copy Files to Artifact Staging Directory'
