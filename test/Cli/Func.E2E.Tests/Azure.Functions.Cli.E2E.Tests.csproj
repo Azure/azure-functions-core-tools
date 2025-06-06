@@ -12,7 +12,7 @@
     <None Include=".runsettings\start_tests\artifact_consolidation_pipeline\default.runsettings" />
     <None Include=".runsettings\start_tests\artifact_consolidation_pipeline\dotnet_inproc.runsettings" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Moq" />
@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoSrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
-    <ProjectReference Include="$(RepoTestRoot)Cli\TestFramework\Azure.Functions.Cli.TestFramework.csproj" />
+    <ProjectReference Include="$(SrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
+    <ProjectReference Include="$(TestRoot)Cli\TestFramework\Azure.Functions.Cli.TestFramework.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
