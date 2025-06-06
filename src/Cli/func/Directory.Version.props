@@ -1,0 +1,9 @@
+<Project>
+
+  <PropertyGroup>
+    <VersionPrefix>4.0.10000</VersionPrefix>
+    <VersionSuffix></VersionSuffix>
+    <UpdateBuildNumber>true</UpdateBuildNumber>
+  </PropertyGroup>
+
+</Project>
