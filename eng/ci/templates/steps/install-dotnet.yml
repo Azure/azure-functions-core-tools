@@ -1,5 +1,4 @@
 steps:
-
 - task: UseDotNet@2
   displayName: Install .NET 6
   inputs:
