@@ -11,7 +11,7 @@
   <!-- abstractions-->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta4.25071.2" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5.25306.101" />
   </ItemGroup>
 
   <!-- func -->
