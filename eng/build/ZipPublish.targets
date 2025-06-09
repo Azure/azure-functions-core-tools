@@ -8,6 +8,10 @@
     </ZipArtifact>
   </ItemDefinitionGroup>
 
+  <PropertyGroup>
+    <MinifiedSuffix Condition="'$(IsMinified)' == 'true'">.min</MinifiedSuffix>
+  </PropertyGroup>
+
   <Target Name="PrepareZipArtifacts" AfterTargets="Publish">
     <PropertyGroup>
       <!-- By default, we zip to package output path (as this is the 'packed' publish artifact). -->
@@ -18,7 +22,7 @@
 
     <!-- If no publish artifact is available, we will add the publish directory as a default. -->
     <ItemGroup Condition="'$(ZipArtifactsPath)' != '' AND '@(ZipArtifact)' == ''">
-      <ZipArtifact Include="$(PublishDir)" TargetPath="$(ZipArtifactsPath)$(AssemblyName).$(Version)$(_RuntimeIdentifierWithPeriod).zip" />
+      <ZipArtifact Include="$(PublishDir)" TargetPath="$(ZipArtifactsPath)$(AssemblyName).$(Version)$(MinifiedSuffix)$(_RuntimeIdentifierWithPeriod).zip" />
     </ItemGroup>
   </Target>
 
