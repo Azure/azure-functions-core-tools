@@ -37,7 +37,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncPack
             var funcNewCommand = new FuncNewCommand(FuncPath, testName, Log);
             var newResult = funcNewCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--template", "Httptrigger", "--name", "httptrigger"]);
+                .Execute([".", "--template", "\"HTTP Trigger\"", "--name", "httptrigger", "--authlevel", "anonymous"]);
 
             newResult.Should().ExitWith(0);
 
