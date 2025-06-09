@@ -8,21 +8,19 @@
     </ZipArtifact>
   </ItemDefinitionGroup>
 
-  <PropertyGroup>
-    <MinifiedSuffix Condition="'$(IsMinified)' == 'true'">.min</MinifiedSuffix>
-  </PropertyGroup>
-
   <Target Name="PrepareZipArtifacts" AfterTargets="Publish">
     <PropertyGroup>
       <!-- By default, we zip to package output path (as this is the 'packed' publish artifact). -->
       <ZipArtifactsPath Condition="'$(ZipArtifactsPath)' == '' AND '$(ZipAfterPublish)' == 'true'">$(PackageOutputPath)</ZipArtifactsPath>
       <ZipArtifactsPath Condition="'$(ZipArtifactsPath)' != ''">$([MSBuild]::EnsureTrailingSlash('$(ZipArtifactsPath)'))</ZipArtifactsPath>
       <_RuntimeIdentifierWithPeriod Condition="'$(RuntimeIdentifier)' != ''">.$(RuntimeIdentifier.ToLowerInvariant())</_RuntimeIdentifierWithPeriod>
+      <_MinifiedSuffixWithPeriod Condition="'$(IsMinified)' == 'true'">.min</_MinifiedSuffixWithPeriod>
+      <_CliDisplayName>Azure.Functions.Cli</_CliDisplayName>
     </PropertyGroup>
 
     <!-- If no publish artifact is available, we will add the publish directory as a default. -->
     <ItemGroup Condition="'$(ZipArtifactsPath)' != '' AND '@(ZipArtifact)' == ''">
-      <ZipArtifact Include="$(PublishDir)" TargetPath="$(ZipArtifactsPath)$(AssemblyName).$(Version)$(MinifiedSuffix)$(_RuntimeIdentifierWithPeriod).zip" />
+      <ZipArtifact Include="$(PublishDir)" TargetPath="$(ZipArtifactsPath)$(_CliDisplayName)$(_MinifiedSuffixWithPeriod)$(_RuntimeIdentifierWithPeriod).$(Version).zip" />
     </ItemGroup>
   </Target>
 
