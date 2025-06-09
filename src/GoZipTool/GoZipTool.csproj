@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.Build.NoTargets">
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ResolvedRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
