@@ -4,6 +4,10 @@
     <ResolvedRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
   </PropertyGroup>
 
+  <ItemGroup>
+    <GoZipSource Include="gozip\**\*.go" />
+  </ItemGroup>
+
   <Target Name="SetGoZipPath">
     <PropertyGroup>
       <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">windows</GoOS>
@@ -34,13 +38,9 @@
     <Message Importance="high" Text="GoZip path set to: $(GoZipPath)" />
   </Target>
 
-  <Target Name="BuildGoZip" Condition="'$(NoBuild)' != 'true'">
-    <PropertyGroup>
-      <GoZipSource>gozip/main.go</GoZipSource>
-    </PropertyGroup>
-
+  <Target Name="BuildGoZip" Condition="'$(NoBuild)' != 'true'" Inputs="@(GoZipSource)" Outputs="$(GoZipPath)">
     <Exec
-      Command="go build -o $(GoZipPath) $(GoZipSource)"
+      Command="go build -o $(GoZipPath) @(GoZipSource)"
       EnvironmentVariables="GOOS=$(GoOS);GOARCH=$(GoArch);CGO_ENABLED=0" />
   </Target>
 
