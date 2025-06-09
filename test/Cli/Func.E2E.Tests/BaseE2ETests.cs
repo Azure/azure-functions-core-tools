@@ -61,5 +61,10 @@ namespace Azure.Functions.Cli.E2E.Tests
         {
             await FunctionAppSetupHelper.FuncNewWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args, workerRuntime);
         }
+
+        public async Task FuncSettingsWithRetryAsync(string testName, IEnumerable<string> args)
+        {
+            await FunctionAppSetupHelper.FuncSettingsWithRetryAsync(FuncPath, testName, WorkingDirectory, Log, args);
+        }
     }
 }
