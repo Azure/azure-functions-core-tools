@@ -50,13 +50,21 @@ jobs:
     displayName: "Check for security vulnerabilities"
 
   - pwsh: |
-      $runtime = '${{ parameters.runtime }}' -replace '^min\.', ''
+      $runtime = "${{ parameters.runtime }}"
+      if ($runtime.StartsWith('min')) {
+          $isMinified = '/p:IsMinified=true'
+          $runtime = $runtime -replace '^min\.?', ''
+      } else {
+          $isMinified = ''
+      }
+
       dotnet build src/Cli/func/Azure.Functions.Cli.csproj `
         -c Release `
         -f net8.0 `
         -r $runtime `
         --self-contained `
-        --no-restore
+        --no-restore `
+         $isMinified
     displayName: 'Build CLI (${{ parameters.runtime }})'
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
