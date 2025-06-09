@@ -1,8 +1,13 @@
 <Project Sdk="Microsoft.Build.NoTargets">
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ResolvedRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
   </PropertyGroup>
+
+  <ItemGroup>
+    <GoZipSource Include="gozip\**\*.go" />
+  </ItemGroup>
 
   <Target Name="SetGoZipPath">
     <PropertyGroup>
@@ -31,21 +36,16 @@
     <Error Condition="'$(GoOS)' == '' Or '$(GoArch)' == ''"
       Text="Unsupported runtime: $(GoOS) - $(GoArch). RID: $(ResolvedRuntimeIdentifier)" />
 
-    <Message Importance="high" Text="GoZip path set to: $(GoZipPath)" />
   </Target>
 
-  <Target Name="BuildGoZip" Condition="'$(NoBuild)' != 'true'">
-    <PropertyGroup>
-      <GoZipSource>gozip/main.go</GoZipSource>
-    </PropertyGroup>
-
+  <Target Name="BuildGoZip" Condition="'$(NoBuild)' != 'true'" Inputs="@(GoZipSource)" Outputs="$(GoZipPath)">
     <Exec
-      Command="go build -o $(GoZipPath) $(GoZipSource)"
+      Command="go build -o $(GoZipPath) @(GoZipSource)"
       EnvironmentVariables="GOOS=$(GoOS);GOARCH=$(GoArch);CGO_ENABLED=0" />
   </Target>
 
   <Target Name="CollectGoZipOutput" DependsOnTargets="SetGoZipPath;BuildGoZip" BeforeTargets="AssignTargetPaths" Condition="'$(ResolvedRuntimeIdentifier)' != ''">
-    <Message Importance="high" Text="Collecting GoZip output: $(GoZipPath)" />
+    <Message Importance="low" Text="Collecting GoZip output: $(GoZipPath)" />
     <ItemGroup>
       <None Include="$(GoZipPath)" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
