@@ -2,11 +2,11 @@
     .SYNOPSIS
         Used to validate and/or update worker package versions
     .EXAMPLE
-        ./validateWorkerVersions.ps1
+        ./validate-worker-versions.ps1
 
         Validates the workers match the existing host version and throws an error if they don't
     .EXAMPLE
-        ./validateWorkerVersions.ps1 -Update -HostVersion 4.1037.0
+        ./validate-worker-versions.ps1 -Update -HostVersion 4.1037.0
 
         Updates the host reference to 4.1037.0 and the workers to their matching versions
 #>
@@ -120,7 +120,7 @@ if ($Update) {
     $packagesPropsXml.Save($packagesPropsPath)
     Write-Output "Updated worker versions! 🚀"
 } elseif ($failedValidation) {
-    Write-Output "You can run './validateWorkerVersions.ps1 -Update' locally to fix worker versions."
+    Write-Output "You can run './validate-worker-versions.ps1 -Update' locally to fix worker versions."
     throw "Not all worker versions matched. 😢 See output for more info"
 } else {
     Write-Output "Worker versions match! 🥳"
