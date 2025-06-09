@@ -7,14 +7,15 @@
     <authors>Microsoft</authors>
     <owners>nugetazurefunctions</owners>
     <projectUrl>https://github.com/Azure/azure-functions-core-tools</projectUrl>
-    <iconUrl>https://raw.githubusercontent.com/Azure/azure-functions-core-tools/refs/heads/main/eng/res/functions.png</iconUrl>
-    <licenseUrl>https://raw.githubusercontent.com/Azure/azure-functions-core-tools/refs/heads/main/LICENSE</licenseUrl>
+    <icon>images\functions.png</icon>
+    <license type="expression">MIT</license>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <tags>azure functions azure-function cli core-tools</tags>
     <summary>The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.</summary>
     <description>The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.</description>
   </metadata>
   <files>
-    <file src="tools\**" target="tools" />
+    <file src="tools\**" target="tools\" />
+    <file src="..\..\..\res\functions.png" target="images\" />
   </files>
 </package>
