@@ -103,7 +103,7 @@ jobs:
     continueOnError: true
     inputs:
       targetPath: '$(Build.SourcesDirectory)/TestLogs'
-      artifactName: 'TestLogs_$(System.JobAttempt)'
+      artifactName: 'TestLogs_$(System.JobId)_$(System.JobAttempt)'
       artifactType: 'pipeline'
 
   - template: ci/sign-files.yml@eng
