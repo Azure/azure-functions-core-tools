@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.Build.NoTargets">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ResolvedRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <GoZipSource Include="gozip\**\*.go" />
+  </ItemGroup>
+
+  <Target Name="SetGoZipPath">
+    <PropertyGroup>
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">windows</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">386</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x64'">windows</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x64'">amd64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-arm64'">windows</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-arm64'">arm64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-x64'">linux</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'linux-x64'">amd64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-x64'">darwin</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-x64'">amd64</GoArch>
+
+      <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-arm64'">darwin</GoOS>
+      <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-arm64'">arm64</GoArch>
+
+      <ExeSuffix Condition="'$(GoOS)' == 'windows'">.exe</ExeSuffix>
+      <GoZipPath>$(IntermediateOutputPath)gozip$(ExeSuffix)</GoZipPath>
+    </PropertyGroup>
+
+    <Error Condition="'$(GoOS)' == '' Or '$(GoArch)' == ''"
+      Text="Unsupported runtime: $(GoOS) - $(GoArch). RID: $(ResolvedRuntimeIdentifier)" />
+
+  </Target>
+
+  <Target Name="BuildGoZip" Condition="'$(NoBuild)' != 'true'" Inputs="@(GoZipSource)" Outputs="$(GoZipPath)">
+    <Exec
+      Command="go build -o $(GoZipPath) @(GoZipSource)"
+      EnvironmentVariables="GOOS=$(GoOS);GOARCH=$(GoArch);CGO_ENABLED=0" />
+  </Target>
+
+  <Target Name="CollectGoZipOutput" DependsOnTargets="SetGoZipPath;BuildGoZip" BeforeTargets="AssignTargetPaths" Condition="'$(ResolvedRuntimeIdentifier)' != ''">
+    <Message Importance="low" Text="Collecting GoZip output: $(GoZipPath)" />
+    <ItemGroup>
+      <None Include="$(GoZipPath)" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+</Project>
