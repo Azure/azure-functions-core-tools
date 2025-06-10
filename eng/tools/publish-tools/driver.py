@@ -8,13 +8,13 @@ from shared import constants
 
 def main(*args):
     # assume follow semantic versioning 2.0.0
-    
+
     packageNamePostfix = ""
-    
+
     print(f"args: {args}  {len(args)}")
     if (len(args) >= 4):
         packageNamePostfix = "-" + args[3]
-    
+
     constants.PACKAGENAME = constants.PACKAGENAME + packageNamePostfix
     print(f"constants.PACKAGENAME: {constants.PACKAGENAME}")
 
