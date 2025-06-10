@@ -22,8 +22,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
             await FuncInitWithRetryAsync(uniqueTestName, new[] { ".", "--worker-runtime", "custom", "--no-bundle" });
 
             // Run func new
-            var args = new[] { ".", "--template", "HttpTrigger", "--name", "CustomFunc" };
-            var result = await FuncNewWithResultRetryAsync(uniqueTestName, args, "custom");
+            var funcNewCommand = new FuncNewCommand(FuncPath, uniqueTestName, Log);
+            var result = funcNewCommand
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(new[] { ".", "--template", "HttpTrigger", "--name", "CustomFunc" });
 
             // Validate result
             result.Should().ExitWith(0);
