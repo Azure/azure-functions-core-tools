@@ -6,7 +6,7 @@ services:
       dockerfile: docker/Dockerfile
       args:
         TARGET_RUNTIME: linux-x64
-    platform: linux/amd64 # Uncomment if you are on a Mac with Apple silicon for non-ARM RID builds
+    # platform: linux/amd64 # Uncomment if you are on a Mac with Apple silicon for non-ARM RID builds
     container_name: func-cli
     image: func-cli
     ports:
