@@ -367,7 +367,7 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 --logger trx --settings {Settings.RuntimeSettings} --blame-hang-timeout 10m");
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger trx --settings {Settings.RuntimeSettings} --blame-hang-timeout 10m");
         }
 
         public static void CopyBinariesToSign()
