@@ -36,7 +36,8 @@
     <DownloadFile
       SourceUrl="https://cdn.functions.azure.com/public/TemplatesApi/$(TemplatesJsonVersion).zip"
       DestinationFolder="$(TemplatesStagingDir)"
-      DestinationFileName="templates.zip">
+      DestinationFileName="templates.zip"
+      Condition="!Exists('$(TemplatesJsonZip)')" >
     </DownloadFile>
 
     <Unzip
@@ -107,19 +108,19 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Include="$(TemplatesOutputDir)itemTemplates.*.nupkg">
-        <Link>templates\itemTemplates.nupkg</Link>
+        <Link>templates\itemTemplates.$(TemplatesVersion).nupkg</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Include="$(TemplatesOutputDir)projectTemplates.*.nupkg">
-        <Link>templates\projectTemplates.nupkg</Link>
+        <Link>templates\projectTemplates.$(TemplatesVersion).nupkg</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Include="$(TemplatesNetIsolatedDir)itemTemplates.*.nupkg">
-        <Link>templates\net-templates\itemTemplates.nupkg</Link>
+        <Link>templates\net-templates\itemTemplates.$(TemplatesVersion).nupkg</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Include="$(TemplatesNetIsolatedDir)projectTemplates.*.nupkg">
-        <Link>templates\net-templates\projectTemplates.nupkg</Link>
+        <Link>templates\net-templates\projectTemplates.$(TemplatesVersion).nupkg</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>
