@@ -11,6 +11,9 @@ jobs:
   # Need to find an arm64 image/agent for windows
   strategy:
     matrix:
+      dotnet_win_x86:
+        languageWorker: 'Dotnet'
+        runtime: 'win-x86'
       dotnet_win_x64:
         languageWorker: 'Dotnet'
         runtime: 'win-x64'
@@ -18,6 +21,9 @@ jobs:
       #   languageWorker: 'Dotnet'
       #   runtime: 'win-arm64'
 
+      dotnetIsolated_win_x86:
+        languageWorker: 'DotnetIsolated'
+        runtime: 'win-x86'
       dotnetIsolated_win_x64:
         languageWorker: 'DotnetIsolated'
         runtime: 'win-x64'
@@ -25,6 +31,9 @@ jobs:
       #   languageWorker: 'DotnetIsolated'
       #   runtime: 'win-arm64'
 
+      node_win_x86:
+        languageWorker: 'Node'
+        runtime: 'win-x86'
       node_win_x64:
         languageWorker: 'Node'
         runtime: 'win-x64'
@@ -32,6 +41,9 @@ jobs:
       #   languageWorker: 'Node'
       #   runtime: 'win-arm64'
 
+      powershell_win_x86:
+        languageWorker: 'Powershell'
+        runtime: 'win-x86'
       powershell_win_x64:
         languageWorker: 'Powershell'
         runtime: 'win-x64'
