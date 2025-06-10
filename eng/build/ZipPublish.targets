@@ -36,7 +36,7 @@
     DependsOnTargets="PrepareZipArtifacts"
     Condition="'$(ZipArtifactsPath)' != '' AND '@(ZipArtifact)' != '' AND '$(IsCrossTargetingBuild)' != 'true' AND '$(IsPackable)' == 'true'">
 
-    <Message Importance="High" Text="Zipping publish artifacts to '$(ZipArtifactsPath)'..." />
+    <Message Importance="low" Text="Zipping publish artifacts to '$(ZipArtifactsPath)'..." />
 
     <ItemGroup Condition="'$(ZipArtifactsPath)' != ''">
       <ZipArtifact Condition="'%(TargetPath)' == '' AND '%(TargetName)' != ''">

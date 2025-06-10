@@ -31,7 +31,7 @@
 
   <!-- Target to download and extract templates.json zip -->
   <Target Name="DownloadAndExtractTemplatesJson" BeforeTargets="Build" Outputs="$(TemplatesJsonZip)">
-    <Message Importance="high" Text="Downloading templates.json file to '$(TemplatesOutputDir)'..." />
+    <Message Importance="low" Text="Downloading templates.json file to '$(TemplatesOutputDir)'..." />
 
     <DownloadFile
       SourceUrl="https://cdn.functions.azure.com/public/TemplatesApi/$(TemplatesJsonVersion).zip"
@@ -51,7 +51,7 @@
 
   <!-- Target to copy the contents of downloaded NuGet packages -->
   <Target Name="CopyTemplatesFromNugetCache" AfterTargets="DownloadAndExtractTemplatesJson">
-    <Message Importance="high" Text="Copying template nupkgs from cache to '$(TemplatesOutputDir)'..." />
+    <Message Importance="low" Text="Copying template nupkgs from cache to '$(TemplatesOutputDir)'..." />
 
     <ItemGroup>
       <!-- Resolve the .nupkg file paths in the NuGet cache -->
@@ -76,7 +76,7 @@
 
   <!-- Target to rename the template packages to match the expected naming format -->
   <Target Name="RenameTemplates" AfterTargets="CopyTemplatesFromNugetCache" Outputs="$(TemplatesNetIsolatedDir)itemTemplates.*.nupkg;$(TemplatesNetIsolatedDir)projectTemplates.*.nupkg">
-    <Message Importance="high" Text="Renaming template packages..." />
+    <Message Importance="low" Text="Renaming template packages..." />
 
     <ItemGroup>
       <_FilesToRenameIsolated Include="$(TemplatesNetIsolatedDir)microsoft.azure.functions.worker.itemtemplates.*.nupkg" />
@@ -99,7 +99,7 @@
 
   <!-- Target to collect all templates and output them to the expected location -->
   <Target Name="CollectTemplates" DependsOnTargets="DownloadAndExtractTemplatesJson;CopyTemplatesFromNugetCache;RenameTemplates" BeforeTargets="AssignTargetPaths">
-    <Message Importance="high" Text="Collecting templates output: $(TemplatesOutputDir)" />
+    <Message Importance="low" Text="Collecting templates output: $(TemplatesOutputDir)" />
 
     <ItemGroup>
       <None Include="$(TemplatesOutputDir)templates.json">

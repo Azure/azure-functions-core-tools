@@ -11,13 +11,13 @@
   <!-- Remove worker directories from minified builds -->
   <!-- Cannot remove entire directory due to this bug: https://github.com/Azure/azure-functions-core-tools/issues/2380 -->
   <Target Name="RemoveLanguageWorkersForMin" AfterTargets="Publish" BeforeTargets="PrepareZipArtifacts" Condition="'$(RuntimeIdentifier)' != ''">
-    <Message Text="Removing language workers for minified build..." Importance="high" />
+    <Message Importance="low" Text="Removing language workers for minified build..."  />
     <RemoveDir Directories="@(_LanguageWorkers)" />
   </Target>
 
   <!-- Write artifactsconfig.json for minified builds -->
   <Target Name="WriteArtifactsConfig" AfterTargets="RemoveLanguageWorkersForMin" Condition="'$(RuntimeIdentifier)' != ''">
-    <Message Text="Creating artifactsconfig.json for minified build..." Importance="high" />
+    <Message Importance="low" Text="Creating artifactsconfig.json for minified build..."  />
     <WriteLinesToFile
       File="$(PublishDir)artifactsconfig.json"
       Lines='{"minifiedVersion": true}'

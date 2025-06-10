@@ -1,7 +1,7 @@
 <Project>
 
   <Target Name="RemovePowershellWorkerRuntimes" BeforeTargets="AssignTargetPaths" Condition="'$(RuntimeIdentifier)' != ''">
-    <Message Text="Filter PowerShell worker runtimes for $(RuntimeIdentifier)..." Importance="high" />
+    <Message Importance="low" Text="Filter PowerShell worker runtimes for $(RuntimeIdentifier)..."  />
     <ItemGroup>
       <_KeepPowerShellRuntime Include="win;win-x86;win10-x86;win-x64;win10-x64" Condition="$(RuntimeIdentifier.StartsWith('win')) and !$(RuntimeIdentifier.Contains('arm'))" />
       <_KeepPowerShellRuntime Include="win;win-arm;win-arm64" Condition="'$(RuntimeIdentifier)' == 'win-arm64'" />

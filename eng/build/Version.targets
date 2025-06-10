@@ -17,7 +17,7 @@
   <!-- When building in Azure pipelines, update the build number. -->
   <!-- Specifically use '$(TF_BUILD)' and not '$(CI)' to ensure we are in Azure pipelines. -->
   <Target Name="UpdateAzDoBuildNumber" Condition="'$(TF_BUILD)' == 'true' AND '$(UpdateBuildNumber)' == 'true'" BeforeTargets="BeforeBuild">
-    <Message Importance="high" Text="##vso[build.updatebuildnumber]$(Version)" />
+    <Message Importance="low" Text="##vso[build.updatebuildnumber]$(Version)" />
   </Target>
 
 </Project>
