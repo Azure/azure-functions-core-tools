@@ -64,8 +64,11 @@ jobs:
         -r $runtime `
         --self-contained `
         --no-restore `
-         $isMinified
+         $isMinified `
+         /p:TelemetryInstrumentationKey="$(TELEMETRY_INSTRUMENTATION_KEY)"
     displayName: 'Build CLI (${{ parameters.runtime }})'
+    env:
+      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
@@ -97,8 +100,6 @@ jobs:
         /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts" `
         $isMinified
     displayName: 'Publish & Zip CLI'
-    env:
-      TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
   - ${{ if contains(parameters.runtime, 'osx') }}:
     - template: /eng/ci/templates/official/steps/sign-mac.yml@self
