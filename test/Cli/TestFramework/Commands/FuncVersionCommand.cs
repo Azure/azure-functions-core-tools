@@ -1,35 +1,31 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.IO;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Commands
 {
-    /// <summary>
-    /// Command for executing 'func --version' and version-related operations
-    /// </summary>
-    public class FuncVersionCommand : FuncCommand
+    public class FuncVersionCommand(string funcPath, string testName, ITestOutputHelper log) : FuncCommand(log)
     {
-        public FuncVersionCommand(string funcExePath, string testName, ITestOutputHelper log)
-            : base(log)
-        {
-            FuncExePath = funcExePath;
-            TestName = testName;
-        }
+        private readonly string _commandName = "version";
+        private readonly string _funcPath = funcPath;
+        private readonly string _testName = testName;
 
-        public string FuncExePath { get; }
-        
-        public string TestName { get; }
-
-        protected override CommandInfo CreateCommandInfo(System.Collections.Generic.IEnumerable<string> args)
+        protected override CommandInfo CreateCommand(IEnumerable<string> args)
         {
-            var commandInfo = new CommandInfo
+            var arguments = new List<string> { _commandName }.Concat(args).ToList();
+
+            if (WorkingDirectory is null)
             {
-                FileName = FuncExePath,
-                WorkingDirectory = Path.GetDirectoryName(FuncExePath),
-                Arguments = args
+                throw new InvalidOperationException("Working Directory must be set");
+            }
+
+            var commandInfo = new CommandInfo()
+            {
+                FileName = _funcPath,
+                Arguments = arguments,
+                WorkingDirectory = WorkingDirectory,
+                TestName = _testName,
             };
 
             return commandInfo;
