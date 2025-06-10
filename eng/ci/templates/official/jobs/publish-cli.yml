@@ -117,12 +117,12 @@ jobs:
     displayName: 'Generate sha files'
 
   - pwsh: |
-      $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -ErrorAction SilentlyContinue
+      $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/*.msi' -ErrorAction SilentlyContinue
       if ($msiFiles) {
         Move-Item -Path $msiFiles.FullName -Destination '$(Build.ArtifactStagingDirectory)'
       }
 
-      $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func.*' -ErrorAction SilentlyContinue
+      $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -ErrorAction SilentlyContinue
       if ($funcZips) {
         Move-Item -Path $funcZips.FullName -Destination '$(Build.ArtifactStagingDirectory)'
       }
