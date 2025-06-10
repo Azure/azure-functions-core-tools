@@ -1,0 +1,14 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Default value; overridden in CI via /p:TelemetryInstrumentationKey -->
+    <TelemetryInstrumentationKey>00000000-0000-0000-0000-000000000000</TelemetryInstrumentationKey>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Azure.Functions.Cli.Common.TelemetryInstrumentationKeyAttribute">
+      <_Parameter1>$(TelemetryInstrumentationKey)</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>
