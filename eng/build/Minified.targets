@@ -2,10 +2,10 @@
 
   <!-- Workers to delete in minified builds -->
   <ItemGroup Condition="'$(IsMinified)' == 'true'">
-    <_LanguageWorkers Include="$(PublishDir)\workers\python" />
-    <_LanguageWorkers Include="$(PublishDir)\workers\java" />
-    <_LanguageWorkers Include="$(PublishDir)\workers\powershell" />
-    <_LanguageWorkers Include="$(PublishDir)\workers\node" />
+    <_LanguageWorkers Include="$(PublishDir)workers\python" />
+    <_LanguageWorkers Include="$(PublishDir)workers\java" />
+    <_LanguageWorkers Include="$(PublishDir)workers\powershell" />
+    <_LanguageWorkers Include="$(PublishDir)workers\node" />
   </ItemGroup>
 
   <!-- Remove worker directories from minified builds -->

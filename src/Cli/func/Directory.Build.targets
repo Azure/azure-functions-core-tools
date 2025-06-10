@@ -2,9 +2,7 @@
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
 
-  <Import Project="$(EngBuildRoot)Distlib.targets" />
   <Import Project="$(EngBuildRoot)Minified.targets" Condition="'$(IsMinified)' == 'true'" />
-  <Import Project="$(EngBuildRoot)Telemetry.targets" />
   <Import Project="$(EngBuildRoot)Templates.targets" />
 
   <Import Project="$(EngBuildRoot)Workers.Powershell.targets" />
