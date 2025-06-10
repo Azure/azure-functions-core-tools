@@ -6,4 +6,8 @@
   <Target Name="_GetFunctionsPythonWorkerFilesForRuntime"></Target>
   <Target Name="_GetFunctionsPythonWorkerFiles"></Target>
 
+  <Target Name="_IncorrectWorkaroundImport" BeforeTargets="Build" Condition="'$(RuntimeIdentifier)' != 'win-arm64'">
+    <Error Text="File '$(MSBuildThisFile)' must only be imported for runtime identifier 'win-arm64'. Actual runtime: '$(RuntimeIdentifier)'" />
+  </Target>
+
 </Project>
