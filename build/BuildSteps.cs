@@ -227,29 +227,6 @@ namespace Build
             // No action needed for the "_net8.0" versions of these artifacts as they have an empty "workers" directory.
         }
 
-        public static void AddDistLib()
-        {
-            var distLibDir = Path.Combine(Settings.OutputDir, "distlib");
-            var distLibZip = Path.Combine(Settings.OutputDir, "distlib.zip");
-            using (var client = new WebClient())
-            {
-                client.DownloadFile(Settings.DistLibUrl, distLibZip);
-            }
-
-            ZipFile.ExtractToDirectory(distLibZip, distLibDir);
-
-            foreach (var runtime in Settings.TargetRuntimes)
-            {
-                var dist = Path.Combine(Settings.OutputDir, runtime, "tools", "python", "packapp", "distlib");
-                Directory.CreateDirectory(dist);
-                FileHelpers.RecursiveCopy(Path.Combine(distLibDir, Directory.GetDirectories(distLibDir).First(), "distlib"), dist);
-            }
-
-            File.Delete(distLibZip);
-            Directory.Delete(distLibDir, recursive: true);
-
-            // No action needed for the "_net8.0" versions of these artifacts as we don't ship workers for them.
-        }
 
         public static void AddTemplatesNupkgs()
         {
