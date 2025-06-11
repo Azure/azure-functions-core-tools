@@ -58,7 +58,13 @@ function Find-DotnetVersionsToInstall
             Where-Object { $_.StartsWith("$majorMinorVersion.") }
 
         if ($majorMinorVersion -eq '9.0') {
+            # Check if exactly 9.0.106 is installed, not just any 9.0.x version
             $acceptableSdks = $acceptableSdks | Where-Object { $_ -eq '9.0.106' }
+            $firstAcceptable = $acceptableSdks | Select-Object -First 1
+        } else {
+            $firstAcceptable = $acceptableSdks |
+                Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
+                Select-Object -First 1
         }
 
         $firstAcceptable = $acceptableSdks |
