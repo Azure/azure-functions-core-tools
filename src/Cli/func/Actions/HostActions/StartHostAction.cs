@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections;
@@ -670,7 +670,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
             if (isPreCompiledApp && !File.Exists(hostJsonPath))
             {
-                throw new CliException($"Host.json file in missing. Please make sure host.json file is present at {Environment.CurrentDirectory}");
+                throw new CliException($"Host.json file is missing. Please make sure host.json file is present at {Environment.CurrentDirectory}");
             }
 
             // BuildHostJsonConfigutation only if host.json file exists.
