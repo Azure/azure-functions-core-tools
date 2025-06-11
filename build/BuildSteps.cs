@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -349,7 +350,51 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --blame-hang-timeout 10m --logger \"console;verbosity=detailed\"");
+            // Get the repo root (parent of build directory)
+            var currentDir = Directory.GetCurrentDirectory();
+            var repoRoot = Directory.GetParent(currentDir)?.FullName;
+
+            if (repoRoot != null && File.Exists(Path.Combine(repoRoot, "global.json")))
+            {
+                Console.WriteLine($"Found global.json in repo root: {repoRoot}");
+                Console.WriteLine($"global.json content: {File.ReadAllText(Path.Combine(repoRoot, "global.json"))}");
+
+                // Since NewTestProjectFile is relative from build directory ("../test/..."), 
+                // from repo root it's just "test/..."
+                var relativePath = Path.Combine("test", "Cli", "Func.E2E.Tests", "Azure.Functions.Cli.E2E.Tests.csproj");
+                Console.WriteLine($"Running test from repo root with relative path: {relativePath}");
+
+                // Run dotnet test with repo root as working directory
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    Arguments = $"test {relativePath} -f net9.0 --blame-hang-timeout 10m --logger \"console;verbosity=detailed\"",
+                    WorkingDirectory = repoRoot,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using var process = Process.Start(processInfo);
+
+                // Forward output to console
+                process.OutputDataReceived += (sender, e) => { if (e.Data != null) Console.WriteLine(e.Data); };
+                process.ErrorDataReceived += (sender, e) => { if (e.Data != null) Console.WriteLine(e.Data); };
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                process.WaitForExit();
+
+                if (process.ExitCode != 0)
+                {
+                    throw new Exception($"Test execution failed with exit code {process.ExitCode}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Warning: global.json not found in repo root, running from current directory");
+                Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --blame-hang-timeout 10m --logger \"console;verbosity=detailed\"");
+            }
         }
 
         public static void TestNewE2EProjectDotnetInProc()
