@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ResolvedRuntimeIdentifier></ResolvedRuntimeIdentifier>
+    <ResolvedRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</ResolvedRuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
@@ -57,7 +57,7 @@
   </Target>
 
   <Target Name="BuildGoZip" Condition="'$(NoBuild)' != 'true'" Inputs="@(GoZipSource)" Outputs="$(GoZipPath)">
-    <Message Importance="high" Text="Building 'gozip' for $(GoOS) - $(GoArch)..." />
+    <Message Importance="low" Text="Building 'gozip' for $(GoOS) - $(GoArch)..." />
     <Exec
       Command="go build -o $(GoZipPath) @(GoZipSource)"
       EnvironmentVariables="GOOS=$(GoOS);GOARCH=$(GoArch);CGO_ENABLED=0" />
