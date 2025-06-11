@@ -20,7 +20,9 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncVersion
             var versionCommand = new FuncVersionCommand(FuncPath, testName, Log);
 
             // Execute the command
-            var result = versionCommand.Execute(new[] { args });
+            var result = versionCommand
+                        .WithWorkingDirectory(WorkingDirectory)
+                        .Execute(new[] { args });
 
             // Verify the output contains a version number starting with "4."
             result.Should().HaveStdOutContaining("4.");
