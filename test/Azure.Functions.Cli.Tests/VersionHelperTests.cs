@@ -6,7 +6,6 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Helpers;
-using FluentAssertions;
 using Moq.Protected;
 using Moq;
 using Xunit;
@@ -24,7 +23,7 @@ namespace Azure.Functions.Cli.Tests
             VersionHelper.CliVersion = "4.0.5";
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
-            result.Should().Be(true);
+            Assert.True(result);
         }
 
         [Fact]
@@ -36,7 +35,7 @@ namespace Azure.Functions.Cli.Tests
             VersionHelper.CliVersion = "4.0.6610";
             var result = await VersionHelper.IsRunningAnOlderVersion(mockHttpClient);
 
-            result.Should().Be(false);
+            Assert.False(result);
         }
 
         // Method to return a mocked HttpClient
