@@ -80,8 +80,8 @@ jobs:
         folderPath: '$(Build.Repository.LocalPath)/artifacts'
         signPatterns: '*.osx-*.zip'
 
-  # arm64 MSI signing is not supported yet, so we skip it for now.
-  - ${{ if and(contains(parameters.runtime, 'win'), not(contains(parameters.runtime, 'arm64'))) }}:
+  # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
+  - ${{ if and(contains(parameters.runtime, 'win'), not(contains(parameters.runtime, 'arm64')), not(contains(parameters.runtime, '.min'))) }}:
     - template: /eng/ci/templates/official/steps/generate-sign-msi.yml@self
       parameters:
         folderPath: '$(Build.Repository.LocalPath)/artifacts'
