@@ -54,10 +54,17 @@ function Find-DotnetVersionsToInstall
     $missingVersions = [System.Collections.Generic.List[string]]::new()
     foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
         $minimalVersion = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].MinimalPatch)"
-        $firstAcceptable = $installedDotnetSdks |
-                                Where-Object { $_.StartsWith("$majorMinorVersion.") } |
-                                Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
-                                Select-Object -First 1
+        $acceptableSdks = $installedDotnetSdks |
+            Where-Object { $_.StartsWith("$majorMinorVersion.") }
+
+        if ($majorMinorVersion -eq '9.0') {
+            $acceptableSdks = $acceptableSdks | Where-Object { $_ -eq '9.0.106' }
+        }
+
+        $firstAcceptable = $acceptableSdks |
+            Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
+            Select-Object -First 1
+
         if ($firstAcceptable) {
             Write-Host "Found dotnet SDK $firstAcceptable for .NET Core $majorMinorVersion."
         }
