@@ -1,0 +1,11 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
+
+  <Import Project="$(EngBuildRoot)Minified.targets" Condition="'$(IsMinified)' == 'true'" />
+  <Import Project="$(EngBuildRoot)Templates.targets" />
+
+  <Import Project="$(EngBuildRoot)Workers.Powershell.targets" />
+  <Import Project="$(EngBuildRoot)Workers.Python.Workaround.targets" Condition="'$(RuntimeIdentifier)' == 'win-arm64'" />
+
+</Project>
