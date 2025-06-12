@@ -39,7 +39,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize function app with unsupported worker runtime
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, "powershell")
                 .Execute(["--docker-only"]);
 
             // Validate expected output content
