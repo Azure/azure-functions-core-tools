@@ -73,6 +73,7 @@ jobs:
         $isMinified
     displayName: 'Publish & Zip CLI'
 
+  # What can we do for linux signing? We have nothing to sign func and gozip binaries on linux at the moment.
   - ${{ if contains(parameters.runtime, 'osx') }}:
     - template: /eng/ci/templates/official/steps/sign-mac.yml@self
       parameters:
