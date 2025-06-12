@@ -21,7 +21,7 @@ steps:
 
 - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
-- pwsh: ./eng/scripts/validateWorkerVersions.ps1
+- pwsh: ./eng/scripts/validate-worker-versions.ps1
   displayName: 'Validate worker versions'
   condition: ne(variables['skipWorkerVersionValidation'], 'true')
 

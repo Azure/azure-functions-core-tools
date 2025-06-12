@@ -72,3 +72,11 @@ extends:
 
         jobs:
         - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self
+
+      - stage: ConsolidateArtifacts
+        dependsOn: 'Publish'
+
+        jobs:
+        - template: /eng/ci/templates/official/jobs/consolidate-cli-artifacts.yml@self
+          parameters:
+            supportedRuntimes: ${{ variables.supportedRuntimes }}

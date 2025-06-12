@@ -17,7 +17,6 @@ jobs:
   variables:
   - template: /eng/ci/templates/official/variables/authenticode-binaries-tosign.yml@self
   - template: /eng/ci/templates/official/variables/thirdparty-binaries-tosign.yml@self
-  - template: /eng/ci/templates/official/variables/mac-binaries-tosign.yml@self
 
   steps:
   - template: /eng/ci/templates/official/steps/prebuild-common.yml@self
@@ -82,12 +81,17 @@ jobs:
 
   # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
   - ${{ if and(contains(parameters.runtime, 'win'), not(contains(parameters.runtime, 'arm64')), not(contains(parameters.runtime, '.min'))) }}:
-    - template: /eng/ci/templates/official/steps/generate-sign-msi.yml@self
+    - pwsh: >
+        ./eng/scripts/generate-msi-files.ps1
+        -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
+        -runtime "${{ parameters.runtime }}"
+      displayName: 'Generate MSI files'
+
+    - template: /eng/ci/templates/official/steps/sign-msi.yml@self
       parameters:
         folderPath: '$(Build.Repository.LocalPath)/artifacts'
-        runtime: '${{ parameters.runtime }}'
 
-  - pwsh: ./eng/scripts/generateSha.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
+  - pwsh: ./eng/scripts/generate-sha-files.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
     displayName: 'Generate sha files'
 
   - pwsh: |

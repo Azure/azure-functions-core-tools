@@ -1,0 +1,57 @@
+parameters:
+  - name: supportedRuntimes
+    type: string
+
+jobs:
+- job: Consolidate_Artifacts
+  displayName: 'Consolidate CLI Artifacts'
+  timeoutInMinutes: "180"
+
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  steps:
+  - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download func-cli-${{ runtime }}'
+      inputs:
+        artifact: 'func-cli-${{ runtime }}'
+        path: '$(Pipeline.Workspace)/all-cli/func-cli-${{ runtime }}'
+
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download func-cli-nupkg'
+    inputs:
+      artifact: 'func-cli-nupkg'
+      path: '$(Pipeline.Workspace)/all-cli/func-cli-nupkg'
+
+  - script: |
+      mkdir $(Build.ArtifactStagingDirectory)/func-cli
+      cp -r $(Pipeline.Workspace)/all-cli/* $(Build.ArtifactStagingDirectory)/func-cli
+    displayName: "Bundle all func-cli artifacts into one directory"
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeeded()
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/func-cli'
+      artifactName: 'func-cli'
+      artifactType: 'pipeline'
+
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: PowerShell@2
+      displayName: 'Generate nightly build package version for feed'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-nightly-build-version.ps1'
+
+    - task: UniversalPackages@0
+      displayName: Publish
+      inputs:
+        command: publish
+        publishDirectory: '$(Build.ArtifactStagingDirectory)'
+        vstsFeedPublish: 'internal/core-tools-nightly-build'
+        vstsFeedPackagePublish: 'func-cli'
+        versionOption: custom
+        versionPublish: '$(NightlyBuildVersion)'
+        packagePublishDescription: 'Core tools default nightly build'
