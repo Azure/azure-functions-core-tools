@@ -81,7 +81,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .WithEnvironmentVariable("")
+                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "powershell")
                 .Execute(["--docker-only"]);
 
             // Validate expected output content
