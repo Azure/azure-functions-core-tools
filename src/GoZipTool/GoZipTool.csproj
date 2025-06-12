@@ -9,7 +9,25 @@
     <GoZipSource Include="gozip\**\*.go" />
   </ItemGroup>
 
+  <Target Name="MustProvideRIDOnPublish"
+        Condition="'$(_IsPublishing)' == 'true' and '$(ResolvedRuntimeIdentifier)' == ''"
+        BeforeTargets="AssignTargetPaths">
+    <Error Text="You must provide a 'RuntimeIdentifier' on publish to ensure GoZip is built for the right OS and architecture." />
+  </Target>
+
+  <Target Name="EnsureRuntimeIsSetOnBuild" Condition="'$(ResolvedRuntimeIdentifier)' == '' and '$(_IsPublishing)' != 'true'">
+    <Message Importance="high" Text="No RuntimeIdentifier specified. Defaulting to '$(NETCoreSdkPortableRuntimeIdentifier)'." />
+    <PropertyGroup>
+      <ResolvedRuntimeIdentifier>$(NETCoreSdkPortableRuntimeIdentifier)</ResolvedRuntimeIdentifier>
+    </PropertyGroup>
+  </Target>
+
   <Target Name="SetGoZipPath">
+    <!-- Since we cannot transitively pass in the RID, we need to construct our own output path to ensure we have a path for each RID build of gozip -->
+    <PropertyGroup>
+      <ResolvedIntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration.ToLowerInvariant())_$(ResolvedRuntimeIdentifier)\</ResolvedIntermediateOutputPath>
+    </PropertyGroup>
+
     <PropertyGroup>
       <GoOS Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">windows</GoOS>
       <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'win-x86'">386</GoArch>
@@ -30,7 +48,7 @@
       <GoArch Condition="'$(ResolvedRuntimeIdentifier)' == 'osx-arm64'">arm64</GoArch>
 
       <ExeSuffix Condition="'$(GoOS)' == 'windows'">.exe</ExeSuffix>
-      <GoZipPath>$(IntermediateOutputPath)gozip$(ExeSuffix)</GoZipPath>
+      <GoZipPath>$(ResolvedIntermediateOutputPath)gozip$(ExeSuffix)</GoZipPath>
     </PropertyGroup>
 
     <Error Condition="'$(GoOS)' == '' Or '$(GoArch)' == ''"
@@ -39,16 +57,21 @@
   </Target>
 
   <Target Name="BuildGoZip" Condition="'$(NoBuild)' != 'true'" Inputs="@(GoZipSource)" Outputs="$(GoZipPath)">
+    <Message Importance="low" Text="Building 'gozip' for $(GoOS) - $(GoArch)..." />
     <Exec
       Command="go build -o $(GoZipPath) @(GoZipSource)"
       EnvironmentVariables="GOOS=$(GoOS);GOARCH=$(GoArch);CGO_ENABLED=0" />
   </Target>
 
-  <Target Name="CollectGoZipOutput" DependsOnTargets="SetGoZipPath;BuildGoZip" BeforeTargets="AssignTargetPaths" Condition="'$(ResolvedRuntimeIdentifier)' != ''">
+  <Target Name="CollectGoZipOutput" DependsOnTargets="EnsureRuntimeIsSetOnBuild;SetGoZipPath;BuildGoZip" BeforeTargets="AssignTargetPaths">
     <Message Importance="low" Text="Collecting GoZip output: $(GoZipPath)" />
     <ItemGroup>
       <None Include="$(GoZipPath)" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
+  </Target>
+
+  <Target Name="GoZipMissing" AfterTargets="Publish" Condition="'$(GoZipPath)' == ''">
+    <Error Text="⚠️ GoZip executable is missing. Make sure you publish with a 'RuntimeIdentifier' to ensure GoZip is built and packaged.'" />
   </Target>
 
 </Project>
