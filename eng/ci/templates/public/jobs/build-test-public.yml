@@ -12,8 +12,8 @@ jobs:
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
 
   steps:
-  - pwsh: . "eng/scripts/start-emulators.ps1" -NoWait
-    displayName: "Start emulators (NoWait)"
+  #- pwsh: . "eng/scripts/start-emulators.ps1" -NoWait
+  #  displayName: "Start emulators (NoWait)"
 
   - pwsh: |
       $isIntegrationBuild = $false
