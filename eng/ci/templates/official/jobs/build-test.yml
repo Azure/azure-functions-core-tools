@@ -278,7 +278,7 @@ jobs:
       displayName: 'Generate nightly build package version for feed'
       inputs:
         targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-nightly-build-version.ps1'
 
     - task: UniversalPackages@0
       displayName: Publish

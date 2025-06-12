@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Common
     internal static partial class Constants
     {
         public static readonly string TelemetryInstrumentationKey =
-            typeof(Constants).Assembly.GetCustomAttribute<TelemetryInstrumentationKeyAttribute>().Value
+            typeof(Constants).Assembly.GetCustomAttribute<TelemetryInstrumentationKeyAttribute>()?.Value
             ?? "00000000-0000-0000-0000-000000000000";
     }
 
