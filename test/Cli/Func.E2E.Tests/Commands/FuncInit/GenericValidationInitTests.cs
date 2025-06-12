@@ -70,7 +70,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             var testName = nameof(Init_WithWorkerRuntimeTypescript_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
-            // Initialize dotnet function app
+            // Initialize typescript function app
             var funcInitResult = funcInitCommand
                .WithWorkingDirectory(workingDir)
                .Execute(["--worker-runtime", "typescript"]);

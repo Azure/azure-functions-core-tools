@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
                .WithWorkingDirectory(workinDir)
-               .Execute(["--worker-runtime", "dotnet-isolated"]);
+               .Execute(["--worker-runtime", "dotnet-isolated", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workinDir);
@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute([projectName, "--worker-runtime", "dotnet-isolated", "--target-framework", "net9.0"]);
+                .Execute([projectName, "--worker-runtime", "dotnet-isolated", "--target-framework", "net9.0", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
@@ -79,7 +79,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "dotnet-isolated", "--docker"]);
+                .Execute(["--worker-runtime", "dotnet-isolated", "--docker", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
@@ -108,7 +108,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet-isolated function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework, "--docker"]);
+                .Execute(["--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework, "--docker", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
@@ -139,7 +139,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only"]);
+                .Execute(["--docker-only", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
