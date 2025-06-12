@@ -77,7 +77,7 @@ namespace Azure.Functions.Cli.Helpers
                         ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                         : string.Empty;
                     await Task.Delay(10000);
-                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}");
+                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)} -v diag");
                     var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
@@ -356,7 +356,7 @@ namespace Azure.Functions.Cli.Helpers
 
             foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
             {
-                var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
+                var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\" -v diag");
                 await exe.RunAsync();
             }
         }
