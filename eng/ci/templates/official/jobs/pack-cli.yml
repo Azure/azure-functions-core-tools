@@ -20,7 +20,8 @@ jobs:
         -c Release `
         -f net8.0 `
         --no-restore `
-        /p:NoWorkers="true"
+        /p:NoWorkers="true" `
+        /p:SkipTemplates="true"
     displayName: 'Build CLI'
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
@@ -38,7 +39,8 @@ jobs:
         -o $(Build.Repository.LocalPath)/artifacts `
         -c Release `
         --no-build `
-        /p:NoWorkers="true"
+        /p:NoWorkers="true" `
+        /p:SkipTemplates="true"
     displayName: 'Pack CLI for NuGet'
 
   - pwsh: |

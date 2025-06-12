@@ -16,7 +16,7 @@
   </Target>
 
   <Target Name="EnsureRuntimeIsSetOnBuild" Condition="'$(ResolvedRuntimeIdentifier)' == '' and '$(_IsPublishing)' != 'true'">
-    <Message Importance="high" Text="No RuntimeIdentifier specified. Defaulting to '$(NETCoreSdkPortableRuntimeIdentifier)'." />
+    <Message Importance="low" Text="No RuntimeIdentifier specified. Defaulting to '$(NETCoreSdkPortableRuntimeIdentifier)'." />
     <PropertyGroup>
       <ResolvedRuntimeIdentifier>$(NETCoreSdkPortableRuntimeIdentifier)</ResolvedRuntimeIdentifier>
     </PropertyGroup>
