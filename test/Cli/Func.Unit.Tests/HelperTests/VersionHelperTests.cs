@@ -1,38 +1,20 @@
-using System;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Net.Http;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
-using Azure.Functions.Cli.Tests.E2E.Helpers;
+using FluentAssertions;
 using Moq.Protected;
 using Moq;
 using Xunit;
-using Xunit.Abstractions;
-using static Azure.Functions.Cli.Helpers.VersionHelper;
-using FluentAssertions;
 
-namespace Azure.Functions.Cli.Tests.E2E
+namespace Azure.Functions.Cli.Unit.Tests
 {
-    public class VersionTests : BaseE2ETest
+    public class VersionHelperTests
     {
-        public VersionTests(ITestOutputHelper output) : base(output) { }
-
-        [Theory]
-        [InlineData("-v")]
-        [InlineData("-version")]
-        [InlineData("--version")]
-        public async Task version(string args)
-        {
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[] { args },
-                OutputContains = new[] { "4." },
-                CommandTimeout = TimeSpan.FromSeconds(30)
-            }, _output);
-        }
-
         [Fact]
         public async Task IsRunningAnOlderVersion_ShouldReturnTrue_WhenVersionIsOlder()
         {
