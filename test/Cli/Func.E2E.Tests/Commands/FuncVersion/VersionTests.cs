@@ -24,8 +24,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncVersion
                         .WithWorkingDirectory(WorkingDirectory)
                         .Execute(new[] { args });
 
-            // Verify the output contains a version number starting with "4."
-            result.Should().HaveStdOutContaining("4.");
+            // Verify the output contains the actual CLI version
+            result.Should().HaveStdOutContaining(Azure.Functions.Cli.Common.Constants.CliVersion);
             result.Should().ExitWith(0);
         }
     }
