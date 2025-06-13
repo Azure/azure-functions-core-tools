@@ -17,7 +17,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncVersion
         public void Version_DisplaysVersionNumber(string args)
         {
             var testName = nameof(Version_DisplaysVersionNumber);
-            var versionCommand = new FuncVersionCommand(FuncPath, testName, Log);
+            var versionCommand = new FuncVersionCommand(FuncPath, args, testName, Log);
 
             // Execute the command
             var result = versionCommand

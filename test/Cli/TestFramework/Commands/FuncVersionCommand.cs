@@ -5,9 +5,9 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Commands
 {
-    public class FuncVersionCommand(string funcPath, string testName, ITestOutputHelper log) : FuncCommand(log)
+    public class FuncVersionCommand(string funcPath, string commandName, string testName, ITestOutputHelper log) : FuncCommand(log)
     {
-        private readonly string _commandName = "version";
+        private readonly string _commandName = commandName;
         private readonly string _funcPath = funcPath;
         private readonly string _testName = testName;
 
