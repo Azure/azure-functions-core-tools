@@ -79,7 +79,7 @@ namespace Azure.Functions.Cli.Helpers
                         : string.Empty;
                     await Task.Delay(10000);
                     var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)} -v diag");
-                    var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+                    var exitCode = await exe.RunAsync(o => { ColoredConsole.Out.WriteLine(o); }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
                         throw new CliException("Error creating project template");
@@ -361,38 +361,9 @@ namespace Azure.Functions.Cli.Helpers
 
             foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
             {
-                var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\" -v diag");
+                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\" -v diag");
                 await exe.RunAsync(o => ColoredConsole.Out.WriteLine(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
             }
-        }
-
-        private static async Task WaitForTemplateAvailability(string templateName, TimeSpan timeout)
-        {
-            var stopwatch = Stopwatch.StartNew();
-
-            while (stopwatch.Elapsed < timeout)
-            {
-                try
-                {
-                    // Check if the template is available by listing templates
-                    var exe = new Executable("dotnet", "new list");
-
-                    StringBuilder output = new();
-                    var result = await exe.RunAsync(o => output.Append(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
-
-                    if (output.ToString().Contains(templateName))
-                    {
-                        ColoredConsole.Out.WriteLine($"Template '{templateName}' is available.");
-                        return;
-                    }
-                }
-                catch
-                {
-                    // Ignore errors during template checking
-                }
-            }
-
-            throw new TimeoutException($"Template '{templateName}' was not available within {timeout.TotalSeconds} seconds");
         }
     }
 }
