@@ -356,6 +356,8 @@ namespace Build
                 "OpenTelemetry.Extensions.Hosting.dll",
                 "OpenTelemetry.Instrumentation.AspNetCore.dll",
                 "OpenTelemetry.Instrumentation.Http.dll",
+                "OpenTelemetry.Instrumentation.Process.dll",
+                "OpenTelemetry.Instrumentation.Runtime.dll",
                 "OpenTelemetry.PersistentStorage.Abstractions.dll",
                 "OpenTelemetry.PersistentStorage.FileSystem.dll",
                 Path.Combine("tools", "python", "packapp", "distlib")
