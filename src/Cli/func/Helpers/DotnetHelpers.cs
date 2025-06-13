@@ -297,9 +297,10 @@ namespace Azure.Functions.Cli.Helpers
             {
                 await UninstallWebJobsTemplates();
                 await InstallIsolatedTemplates();
+                await Task.Delay(10000); // Allow some time for the templates to be installed
 
                 // Wait for templates to be available before proceeding
-                await WaitForTemplateAvailability("func", TimeSpan.FromSeconds(30));
+                // await WaitForTemplateAvailability("func", TimeSpan.FromSeconds(30));
                 await action();
             }
             finally
