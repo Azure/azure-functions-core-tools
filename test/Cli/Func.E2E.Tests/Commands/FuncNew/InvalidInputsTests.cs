@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
     public class InvalidInputsTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public void FuncNew_TimerTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
         {
             var testName = nameof(FuncNew_TimerTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully);
@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task FuncNew_HttpTrigger_InvalidAuthLevel_ShowsError()
         {
             var uniqueTestName = nameof(FuncNew_HttpTrigger_InvalidAuthLevel_ShowsError);
@@ -53,7 +53,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
         public async Task FuncNew_InvalidTemplate_ShowsError()
         {
             var methodName = nameof(FuncNew_InvalidTemplate_ShowsError);
@@ -74,7 +74,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
         public async Task FuncNew_WithoutName_ShowsError()
         {
             var methodName = nameof(FuncNew_WithoutName_ShowsError);

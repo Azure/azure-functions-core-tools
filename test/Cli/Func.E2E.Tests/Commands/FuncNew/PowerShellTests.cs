@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
     public class PowerShellTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Powershell)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Powershell)]
         public void FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds()
         {
             var testName = nameof(FuncNew_HttpTrigger_AuthLevelConfigured_PowerShell_Succeeds);

@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 {
-    [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
+    [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
     public class NodeTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
         public async Task FuncNew_UsingLanguageJS_CreatesFunctionSuccessfully()
         {
             var testName = nameof(FuncNew_UsingLanguageJS_CreatesFunctionSuccessfully);

@@ -41,7 +41,11 @@ namespace Build
 
         public static readonly string NewTestProjectFile = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", "Azure.Functions.Cli.E2E.Tests.csproj");
 
-        public static readonly string RuntimeSettings = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", ".runsettings", "start_tests", "ci_pipeline", "dotnet_inproc.runsettings");
+        public static readonly string FuncStartRuntimeSettingsInProc = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", ".runsettings", "start_tests", "ci_pipeline", "dotnet_inproc.runsettings");
+
+        public static readonly string DotnetTemplatesRuntimeSettings = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", ".runsettings", "new_and_init_tests", "ci_pipeline", "default.runsettings");
+
+        public static readonly string DotnetTemplatesRuntimeSettingsInProc = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", ".runsettings", "new_and_init_tests", "ci_pipeline", "dotnet_inproc.runsettings");
 
         public static readonly string[] TargetRuntimes = new[] {
             "min.win-arm64",

@@ -10,10 +10,11 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 {
+    [Trait(TestTraits.Group, TestTraits.UsesDotnetTemplates)]
     public class DotnetInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
         public async Task FuncNew_CreatesHttpTrigger_DotNetInProc()
         {
             var uniqueTestName = nameof(FuncNew_CreatesHttpTrigger_DotNetInProc);
@@ -34,7 +35,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
         public async Task FuncNew_CreatesHttpTrigger_AuthConfigured_Dotnet()
         {
             var uniqueTestName = nameof(FuncNew_CreatesHttpTrigger_AuthConfigured_Dotnet);
@@ -55,7 +56,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
         }
 
         [Fact]
-        [Trait(TestTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
+        [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
         public void FuncNew_HttpTrigger_CsxMode_WithoutInit_Succeeds()
         {
             var testName = nameof(FuncNew_HttpTrigger_CsxMode_WithoutInit_Succeeds);
