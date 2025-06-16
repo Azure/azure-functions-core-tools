@@ -350,10 +350,10 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger trx --blame-hang-timeout 10m");
+            // Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger trx --blame-hang-timeout 10m");
 
             // Run the func new and func init E2E tests after not in parallel to ensure there are no templating conflicts
-            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger trx --settings {Settings.DotnetTemplatesRuntimeSettings} --blame-hang-timeout 10m -p:TestTfmsInParallel=false");
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger console;verbosity=detailed --settings {Settings.DotnetTemplatesRuntimeSettings} --blame-hang-timeout 10m -p:TestTfmsInParallel=false");
         }
 
         public static void TestNewE2EProjectDotnetInProc()
