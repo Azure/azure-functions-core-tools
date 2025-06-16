@@ -59,7 +59,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
                         .Execute(["--port", port.ToString(), "--verbose"]);
 
             // Validate we see detailed worker logs
-            result.Should().HaveStdOutContaining("Workers Directory set to");
+            result.Should().HaveStdOutContaining("\"OriginalFunctionWorkerRuntime\": \"node\",");
         }
 
         [Fact]
