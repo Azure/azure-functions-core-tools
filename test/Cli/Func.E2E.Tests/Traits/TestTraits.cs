@@ -34,6 +34,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Traits
         /// </summary>
         public const string InProc = "InProc";
 
-        public const string UsesDotnetTemplates = "UseDotnetTemplates";
+        public const string UsesDotnetTemplates = "UsesDotnetTemplates";
     }
 }
