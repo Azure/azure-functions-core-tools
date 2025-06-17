@@ -13,7 +13,7 @@ jobs:
     os: windows
 
   steps:
-  - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+  - ${{ each runtime in split(parameters.supportedRuntimes,',') }}:
     - task: DownloadPipelineArtifact@2
       displayName: 'Download func-cli-${{ runtime }}'
       inputs:
