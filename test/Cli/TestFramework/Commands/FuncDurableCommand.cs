@@ -31,5 +31,4 @@ namespace Azure.Functions.Cli.TestFramework.Commands
             return commandInfo;
         }
     }
-
 }
