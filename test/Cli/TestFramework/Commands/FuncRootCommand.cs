@@ -5,15 +5,17 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.TestFramework.Commands
 {
-    public class FuncVersionCommand(string funcPath, string commandName, string testName, ITestOutputHelper log) : FuncCommand(log)
+    /// <summary>
+    /// Represents the root context for the `func` command.
+    /// </summary>
+    public class FuncRootCommand(string funcPath, string testName, ITestOutputHelper log) : FuncCommand(log)
     {
-        private readonly string _commandName = commandName;
         private readonly string _funcPath = funcPath;
         private readonly string _testName = testName;
 
         protected override CommandInfo CreateCommand(IEnumerable<string> args)
         {
-            var arguments = new List<string> { _commandName }.Concat(args).ToList();
+            var arguments = args.ToList();
 
             if (WorkingDirectory is null)
             {

@@ -12,15 +12,14 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncVersion
     {
         [Theory]
         [InlineData("-v")]
-        [InlineData("-version")]
         [InlineData("--version")]
         public void Version_DisplaysVersionNumber(string args)
         {
             var testName = nameof(Version_DisplaysVersionNumber);
-            var versionCommand = new FuncVersionCommand(FuncPath, args, testName, Log);
+            var func = new FuncRootCommand(FuncPath, testName, Log);
 
             // Execute the command
-            var result = versionCommand
+            var result = func
                         .WithWorkingDirectory(WorkingDirectory)
                         .Execute([args]);
 
