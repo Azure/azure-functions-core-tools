@@ -2,6 +2,6 @@
 
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
-    <Import Project="$(EngBuildRoot)Telemetry.props" Condition="'$(SkipTemplates)' != 'true'" />
+    <Import Project="$(EngBuildRoot)Telemetry.props" />
 
 </Project>
