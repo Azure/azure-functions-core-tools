@@ -22,10 +22,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncVersion
             // Execute the command
             var result = versionCommand
                         .WithWorkingDirectory(WorkingDirectory)
-                        .Execute(new[] { args });
+                        .Execute([args]);
 
             // Verify the output contains the actual CLI version
-            result.Should().HaveStdOutContaining(Azure.Functions.Cli.Common.Constants.CliVersion);
+            result.Should().HaveStdOutContaining(Common.Constants.CliVersion);
             result.Should().ExitWith(0);
         }
     }

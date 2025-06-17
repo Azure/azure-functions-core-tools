@@ -5,7 +5,7 @@
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Moq" />

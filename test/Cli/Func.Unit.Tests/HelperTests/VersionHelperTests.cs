@@ -1,14 +1,14 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Net.Http;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Helpers;
 using FluentAssertions;
-using Moq.Protected;
 using Moq;
+using Moq.Protected;
 using Xunit;
 
 namespace Azure.Functions.Cli.Unit.Tests
@@ -55,7 +55,8 @@ namespace Azure.Functions.Cli.Unit.Tests
 
             // Mock the SendAsync method to return a mocked response
             mockHandler.Protected()
-                .Setup<Task<HttpResponseMessage>>("SendAsync",
+                .Setup<Task<HttpResponseMessage>>(
+                    "SendAsync",
                     ItExpr.IsAny<HttpRequestMessage>(),
                     ItExpr.IsAny<CancellationToken>())
                 .ReturnsAsync(new HttpResponseMessage
