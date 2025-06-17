@@ -15,6 +15,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
+        private static readonly string _templateLockPath = Path.Combine(Path.GetTempPath(), "azure_func_template_install.lock");
 
         public static void EnsureDotnet()
         {
@@ -347,16 +348,42 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task DotnetTemplatesAction(string action, string templateDirectory)
         {
-            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), templateDirectory);
-            if (!FileSystemHelpers.DirectoryExists(templatesLocation))
+            using (new FileLock(_templateLockPath))
             {
-                throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
+                var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), templateDirectory);
+                if (!FileSystemHelpers.DirectoryExists(templatesLocation))
+                {
+                    throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
+                }
+
+                foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
+                {
+                    var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
+                    await exe.RunAsync();
+                }
+            }
+        }
+
+        // Move out to its own helper class
+        private sealed class FileLock : IDisposable
+        {
+            private readonly string _lockFilePath;
+            private FileStream _lockStream;
+
+            public FileLock(string lockFilePath)
+            {
+                _lockFilePath = lockFilePath;
+                _lockStream = new FileStream(
+                    _lockFilePath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.Delete);
             }
 
-            foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
+            public void Dispose()
             {
-                var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
-                await exe.RunAsync();
+                _lockStream?.Dispose();
+                _lockStream = null;
             }
         }
     }
