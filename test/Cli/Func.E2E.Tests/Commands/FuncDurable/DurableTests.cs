@@ -187,5 +187,76 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncDurable
             result.Should().HaveStdOutContaining("\"OrchestrationStatus\": 6");
             File.Delete(filename);
         }
+
+        [SkippableFact]
+        public void GetHistory_WithValidInstanceAndTaskHubName_ReturnsExpectedOutput()
+        {
+            Skip.If(string.IsNullOrEmpty(_fixture.StorageConnectionString), StorageReason);
+
+            var instanceId = $"{Guid.NewGuid():N}";
+            var taskHubName = "getHistoryTest";
+            var funcDurableCommand = new FuncDurableCommand(_fixture.FuncPath, nameof(GetHistory_WithValidInstanceAndTaskHubName_ReturnsExpectedOutput), _fixture.Log);
+
+            // Start new orchestration
+            funcDurableCommand.WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["start-new", "--function-name", "Counter", "--id", instanceId, "--task-hub-name", taskHubName])
+                .Should().ExitWith(0)
+                .HaveStdOutContaining("Started 'Counter'");
+
+            // Raise event
+            funcDurableCommand.WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["raise-event", "--id", instanceId, "--event-name", "operation", "--event-data", "add", "--task-hub-name", taskHubName])
+                .Should().ExitWith(0);
+
+            // Get history
+            var result = funcDurableCommand.WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["get-history", "--id", instanceId, "--task-hub-name", taskHubName]);
+
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining("OrchestratorStarted");
+            result.Should().HaveStdOutContaining("ExecutionStarted");
+            result.Should().HaveStdOutContaining("OrchestratorCompleted");
+        }
+
+        [SkippableFact]
+        public void Rewind_WithValidInstanceAndTaskHubName_DisplaysExpectedOutput()
+        {
+            Skip.If(string.IsNullOrEmpty(_fixture.StorageConnectionString), StorageReason);
+
+            var instanceId = $"{Guid.NewGuid():N}";
+            var taskHubName = "rewindTest";
+            var funcDurableCommand = new FuncDurableCommand(_fixture.FuncPath, nameof(Rewind_WithValidInstanceAndTaskHubName_DisplaysExpectedOutput), _fixture.Log);
+            funcDurableCommand.WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["start-new", "--function-name", "Counter", "--input", "3", "--id", instanceId, "--task-hub-name", taskHubName]);
+            funcDurableCommand.WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["raise-event", "--id", instanceId, "--event-name", "operation", "--event-data", "baddata", "--task-hub-name", taskHubName]);
+
+            var result = funcDurableCommand
+                .WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["rewind", "--id", instanceId, "--task-hub-name", taskHubName]);
+
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining("Status before rewind: Failed");
+            result.Should().HaveStdOutContaining("Status after rewind:");
+        }
+
+        [SkippableFact]
+        public void TerminateInstance_WithTaskHubName_DisplaysSuccessMessage()
+        {
+            Skip.If(string.IsNullOrEmpty(_fixture.StorageConnectionString), StorageReason);
+
+            var instanceId = $"{Guid.NewGuid():N}";
+            var taskHubName = "terminateTest";
+            var funcDurableCommand = new FuncDurableCommand(_fixture.FuncPath, nameof(TerminateInstance_WithTaskHubName_DisplaysSuccessMessage), _fixture.Log);
+            funcDurableCommand.WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["start-new", "--function-name", "Counter", "--id", instanceId, "--task-hub-name", taskHubName]);
+
+            var result = funcDurableCommand
+                .WithWorkingDirectory(_fixture.WorkingDirectory)
+                .Execute(["terminate", "--id", instanceId, "--task-hub-name", taskHubName]);
+
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining($"Successfully terminated '{instanceId}'");
+        }
     }
 }
