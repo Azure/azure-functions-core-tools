@@ -116,11 +116,11 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Include="$(TemplatesNetIsolatedDir)itemTemplates.*.nupkg">
-        <Link>templates\net-templates\itemTemplates.$(TemplatesVersion).nupkg</Link>
+        <Link>templates\net-isolated\itemTemplates.$(TemplatesVersion).nupkg</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Include="$(TemplatesNetIsolatedDir)projectTemplates.*.nupkg">
-        <Link>templates\net-templates\projectTemplates.$(TemplatesVersion).nupkg</Link>
+        <Link>templates\net-isolated\projectTemplates.$(TemplatesVersion).nupkg</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>
