@@ -9,11 +9,78 @@ import shutil
 import subprocess
 import sys
 import tempfile
-
-import distlib.scripts
-import distlib.wheel
+import zipfile
+import stat
 
 from enum import IntEnum
+
+class Wheel:
+    def __init__(self, wheel_path):
+        self.wheel_path = wheel_path
+        self.filename = os.path.basename(wheel_path)
+        # Parse wheel filename: {distribution}-{version}(-{build tag})?-{python tag}-{abi tag}-{platform tag}.whl
+        parts = self.filename[:-4].split('-')  # Remove .whl extension
+        self.name = parts[0]
+        self.version = parts[1]
+        # Skip build tag if present (starts with digit)
+        start_idx = 2
+        if len(parts) > 2 and parts[2] and parts[2][0].isdigit():
+            start_idx = 3
+        if len(parts) >= start_idx + 3:
+            self.python_tag = parts[start_idx]
+            self.abi_tag = parts[start_idx + 1] 
+            self.platform_tag = parts[start_idx + 2]
+    
+    def install(self, paths, maker):
+        """Install wheel contents to specified paths"""
+        with zipfile.ZipFile(self.wheel_path, 'r') as zf:
+            # Extract all files
+            name_ver = f'{self.name}-{self.version}'
+            data_dir = f'{name_ver}.data'
+            info_dir = f'{name_ver}.dist-info'
+            
+            for member in zf.namelist():
+                if member.endswith('/'):
+                    continue  # Skip directories
+                    
+                # Determine destination based on file location in wheel
+                if member.startswith(f'{info_dir}/'):
+                    # Skip dist-info for now - we don't need it for basic installation
+                    continue
+                elif member.startswith(f'{data_dir}/'):
+                    # Handle data files
+                    rel_path = member[len(f'{data_dir}/'):]
+                    if rel_path.startswith('scripts/'):
+                        dest_dir = paths['scripts']
+                        dest_path = os.path.join(dest_dir, rel_path[8:])  # Remove 'scripts/'
+                    elif rel_path.startswith('headers/'):
+                        dest_dir = paths['headers']
+                        dest_path = os.path.join(dest_dir, rel_path[8:])  # Remove 'headers/'
+                    else:
+                        dest_dir = paths['data']
+                        dest_path = os.path.join(dest_dir, rel_path)
+                else:
+                    # Regular package files go to purelib/platlib
+                    dest_dir = paths['purelib']
+                    dest_path = os.path.join(dest_dir, member)
+                
+                # Create destination directory
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                
+                # Extract file
+                with zf.open(member) as src:
+                    with open(dest_path, 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+                
+                # Make scripts executable on Unix-like systems
+                if member.startswith(f'{data_dir}/scripts/') and os.name != 'nt':
+                    os.chmod(dest_path, os.stat(dest_path).st_mode | stat.S_IEXEC)
+
+
+class ScriptMaker:    
+    def __init__(self, source_dir, target_dir):
+        self.source_dir = source_dir
+        self.target_dir = target_dir
 
 _platform_map = {
     'linux': 'manylinux1_x86_64',
@@ -95,7 +162,7 @@ def find_and_build_deps(args):
                         packages.append((name, ver))
 
     # Now that we know all dependencies, download or build wheels
-    # for them for the correct platform and Python verison.
+    # for them for the correct platform and Python version.
     with tempfile.TemporaryDirectory(prefix='azureworker') as td:
         for name, ver in packages:
             ensure_wheel(name, ver, args=args, dest=td)
@@ -123,13 +190,13 @@ def find_and_build_deps(args):
             else:
                 die(f'unsupported platform: {args.platform}')
 
-            maker = distlib.scripts.ScriptMaker(None, None)
+            maker = ScriptMaker(None, None)
 
             for filename in os.listdir(td):
                 if not filename.endswith('.whl'):
                     continue
 
-                wheel = distlib.wheel.Wheel(os.path.join(td, filename))
+                wheel = Wheel(os.path.join(td, filename))
 
                 paths = {
                     'prefix': venv,
@@ -157,12 +224,12 @@ def find_and_build_deps(args):
 
 
 def ensure_wheel(name, version, args, dest):
+    # Determine the correct ABI tag based on Python version
     cmd = [
-        'pip', 'download', '--no-deps', '--only-binary', ':all:',
-        '--platform', _platform_map.get(args.platform),
+        sys.executable, '-m', 'pip', 'download', '--no-deps', '--only-binary', ':all:',
         '--python-version', args.python_version,
         '--implementation', 'cp',
-        '--abi', f'cp{args.python_version}m',
+        '--abi', f'cp{args.python_version}',
         '--dest', dest,
         f'{name}=={version}'
     ]
@@ -177,7 +244,7 @@ def ensure_wheel(name, version, args, dest):
 def build_independent_wheel(name, version, args, dest):
     with tempfile.TemporaryDirectory(prefix='azureworker') as td:
         cmd = [
-            'pip', 'wheel', '--no-deps', '--no-binary', ':all:',
+            sys.executable, '-m', 'pip', 'wheel', '--no-deps', '--no-binary', ':all:',
             '--wheel-dir', td,
             f'{name}=={version}'
         ]
