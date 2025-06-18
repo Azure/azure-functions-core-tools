@@ -1,4 +1,4 @@
-﻿using Azure.Functions.Cli.Diagnostics;
+using Azure.Functions.Cli.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -11,7 +11,7 @@ using System.Text;
 using Xunit;
 using System;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests
 {
     public class ColoredConsoleLoggerTests
     {
