@@ -410,8 +410,11 @@ namespace Azure.Functions.Cli.Helpers
 
             private static bool IsFileLockException(IOException ex)
             {
-                return ex.HResult == unchecked((int)0x80070020) || // ERROR_SHARING_VIOLATION
-                       ex.HResult == unchecked((int)0x80070021);    // ERROR_LOCK_VIOLATION
+                const int ERROR_SHARING_VIOLATION = 32;
+                const int ERROR_LOCK_VIOLATION = 33;
+
+                return ex.HResult == unchecked(ERROR_SHARING_VIOLATION) ||
+                       ex.HResult == unchecked(ERROR_LOCK_VIOLATION);
             }
 
             public void Dispose()
