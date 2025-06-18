@@ -26,7 +26,7 @@ jobs:
       artifact: 'func-cli-nupkg'
       path: '$(Pipeline.Workspace)/all-cli/func-cli-nupkg'
 
-  - script: |
+  - bash: |
       mkdir $(Build.ArtifactStagingDirectory)/func-cli
       cp -r $(Pipeline.Workspace)/all-cli/* $(Build.ArtifactStagingDirectory)/func-cli
     displayName: "Bundle all func-cli artifacts into one directory"
