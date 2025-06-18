@@ -1,11 +1,11 @@
-﻿using Microsoft.Azure.WebJobs.Script.Configuration;
+using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests
 {
     public class UtilitiesTests
     {

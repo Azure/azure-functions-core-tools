@@ -1,9 +1,9 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests
 {
     public static class TestUtils
     {

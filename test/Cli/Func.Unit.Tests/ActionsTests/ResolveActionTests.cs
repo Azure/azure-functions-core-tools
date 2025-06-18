@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Autofac;
 using FluentAssertions;
@@ -14,7 +14,7 @@ using NSubstitute;
 using Xunit;
 using System.IO.Abstractions;
 
-namespace Azure.Functions.Cli.Tests.ActionsTests
+namespace Azure.Functions.Cli.Unit.Tests.ActionsTests
 {
     public class ResolveActionTests
     {

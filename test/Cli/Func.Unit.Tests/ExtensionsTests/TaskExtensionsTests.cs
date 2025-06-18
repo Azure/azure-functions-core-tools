@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Azure.Functions.Cli.Extensions;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests.ExtensionsTests
+namespace Azure.Functions.Cli.Unit.Tests.ExtensionsTests
 {
     public class TaskExtensionsTests
     {

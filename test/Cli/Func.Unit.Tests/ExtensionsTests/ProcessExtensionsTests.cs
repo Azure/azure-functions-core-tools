@@ -1,11 +1,11 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Azure.Functions.Cli.Extensions;
 using Xunit;
 using System.Runtime.InteropServices;
 
-namespace Azure.Functions.Cli.Tests.ExtensionsTests
+namespace Azure.Functions.Cli.Unit.Tests.ExtensionsTests
 {
     public class ProcessExtensionsTests
     {
