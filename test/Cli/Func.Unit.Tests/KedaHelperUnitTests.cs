@@ -1,10 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using Azure.Functions.Cli.Kubernetes.KEDA.V1;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests
 {
     public class KedaHelperUnitTests
     {

@@ -1,8 +1,8 @@
-﻿using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Common;
 using FluentAssertions;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests
 {
     /// <summary>
     /// This is a C# reimplementation of https://github.com/codemix/gitignore-parser
@@ -23,27 +23,27 @@ namespace Azure.Functions.Cli.Tests
     public class GitIgnoreParserTests
     {
         const string gitIgnoreFile = @"# This is a comment in a .gitignore file!
-/node_modules
+./node_modules
 *.log
 
 # Ignore this nonexistent file
-/nonexistent
+./nonexistent
 
 # Do not ignore this file
 !/nonexistent/foo
 
 # Ignore some files
 
-/baz
+./baz
 
-/foo/*.wat
+./foo/*.wat
 
-/test1
+./test1
 
 test2
 
 # Ignore some deep sub folders
-/othernonexistent/**/what
+./othernonexistent/**/what
 
 # Unignore some other sub folders
 !/othernonexistent/**/what/foo
