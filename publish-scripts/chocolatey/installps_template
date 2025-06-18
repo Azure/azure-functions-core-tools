@@ -45,7 +45,6 @@ foreach ($file in $files) {
   if (!$file.Name.Equals("func.exe") -or (!($file.DirectoryName -eq $toolsDir) -and
       $file.Name.Equals("func.exe"))) {
     #generate an ignore file
-    New-Item "$file.ignore" -type file -force | Out-Null
     $ignoreFilePath = Join-Path -Path $file.DirectoryName -ChildPath "$($file.Name).ignore"
     New-Item -Path $ignoreFilePath -Type File -Force | Out-Null
   }
