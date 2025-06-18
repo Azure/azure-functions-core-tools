@@ -302,7 +302,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             finally
             {
-                await UninstallIsolatedTemplates();
+                // await UninstallIsolatedTemplates();
             }
         }
 
@@ -316,7 +316,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             finally
             {
-                await UninstallWebJobsTemplates();
+                // await UninstallWebJobsTemplates();
             }
         }
 
