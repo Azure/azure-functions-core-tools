@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
@@ -15,6 +15,7 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
+        private static readonly string _templateLockPath = Path.Combine(Path.GetTempPath(), "azure_func_template_install.lock");
 
         public static void EnsureDotnet()
         {
@@ -278,14 +279,16 @@ namespace Azure.Functions.Cli.Helpers
         private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
-
-            if (workerRuntime == WorkerRuntime.DotnetIsolated)
+            using (new FileLock(_templateLockPath))
             {
-                return IsolatedTemplateOperation(action);
-            }
-            else
-            {
-                return WebJobsTemplateOperation(action);
+                if (workerRuntime == WorkerRuntime.DotnetIsolated)
+                {
+                    return IsolatedTemplateOperation(action);
+                }
+                else
+                {
+                    return WebJobsTemplateOperation(action);
+                }
             }
         }
 
@@ -357,6 +360,29 @@ namespace Azure.Functions.Cli.Helpers
             {
                 var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();
+            }
+        }
+
+        // Move out to its own helper class
+        private sealed class FileLock : IDisposable
+        {
+            private readonly string _lockFilePath;
+            private FileStream _lockStream;
+
+            public FileLock(string lockFilePath)
+            {
+                _lockFilePath = lockFilePath;
+                _lockStream = new FileStream(
+                    _lockFilePath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.Delete);
+            }
+
+            public void Dispose()
+            {
+                _lockStream?.Dispose();
+                _lockStream = null;
             }
         }
     }
