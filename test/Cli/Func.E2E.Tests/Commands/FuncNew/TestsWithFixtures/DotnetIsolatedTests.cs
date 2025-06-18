@@ -13,7 +13,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew.TestsWithFixtures
 {
     [Collection("DotnetIsolated")]
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
-    [Trait(TestTraits.Group, TestTraits.UsesDotnetTemplates)]
     public class DotnetIsolatedTests : IClassFixture<DotnetIsolatedFunctionAppFixture>
     {
         private readonly DotnetIsolatedFunctionAppFixture _fixture;

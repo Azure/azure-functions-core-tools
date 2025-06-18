@@ -10,7 +10,6 @@ using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncNew
 {
-    [Trait(TestTraits.Group, TestTraits.UsesDotnetTemplates)]
     public class DotnetInProcTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
