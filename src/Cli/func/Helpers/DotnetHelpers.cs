@@ -363,26 +363,74 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        // Move out to its own helper class
         private sealed class FileLock : IDisposable
         {
             private readonly string _lockFilePath;
+            private readonly int _maxRetryAttempts;
+            private readonly TimeSpan _retryDelay;
             private FileStream _lockStream;
 
-            public FileLock(string lockFilePath)
+            public FileLock(string lockFilePath, int maxRetryAttempts = 30, TimeSpan? retryDelay = null)
             {
                 _lockFilePath = lockFilePath;
-                _lockStream = new FileStream(
-                    _lockFilePath,
-                    FileMode.OpenOrCreate,
-                    FileAccess.ReadWrite,
-                    FileShare.Delete);
+                _maxRetryAttempts = maxRetryAttempts;
+                _retryDelay = retryDelay ?? TimeSpan.FromSeconds(1);
+
+                AcquireLock();
+            }
+
+            private void AcquireLock()
+            {
+                int attempt = 0;
+                while (attempt < _maxRetryAttempts)
+                {
+                    try
+                    {
+                        _lockStream = new FileStream(
+                            _lockFilePath,
+                            FileMode.OpenOrCreate,
+                            FileAccess.ReadWrite,
+                            FileShare.Delete);
+                        return; // Successfully acquired lock
+                    }
+                    catch (IOException ex) when (IsFileLockException(ex))
+                    {
+                        attempt++;
+                        if (attempt >= _maxRetryAttempts)
+                        {
+                            throw new CliException($"Unable to acquire lock on '{_lockFilePath}' after {_maxRetryAttempts} attempts. " +
+                                                 "Another Azure Functions CLI process may be running template operations.");
+                        }
+
+                        // Wait before retrying
+                        Thread.Sleep(_retryDelay);
+                    }
+                }
+            }
+
+            private static bool IsFileLockException(IOException ex)
+            {
+                return ex.HResult == unchecked((int)0x80070020) || // ERROR_SHARING_VIOLATION
+                       ex.HResult == unchecked((int)0x80070021);    // ERROR_LOCK_VIOLATION
             }
 
             public void Dispose()
             {
                 _lockStream?.Dispose();
                 _lockStream = null;
+
+                // Clean up the lock file if it exists and we can delete it
+                try
+                {
+                    if (File.Exists(_lockFilePath))
+                    {
+                        File.Delete(_lockFilePath);
+                    }
+                }
+                catch (IOException)
+                {
+                    // Ignore cleanup errors - another process might still be using it
+                }
             }
         }
     }
