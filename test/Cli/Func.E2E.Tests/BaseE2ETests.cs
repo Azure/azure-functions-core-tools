@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Runtime.InteropServices;
+using Azure.Functions.Cli.Abstractions;
 using Azure.Functions.Cli.TestFramework.Helpers;
 using Xunit;
 using Xunit.Abstractions;

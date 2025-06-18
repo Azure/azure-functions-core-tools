@@ -1,6 +1,7 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -76,8 +77,9 @@ namespace Azure.Functions.Cli.Helpers
                     var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                         ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                         : string.Empty;
-                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}");
-                    var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
+                    await Task.Delay(10000);
+                    var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)} -v diag");
+                    var exitCode = await exe.RunAsync(o => { ColoredConsole.Out.WriteLine(o); }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
                         throw new CliException("Error creating project template");
@@ -295,6 +297,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 await UninstallWebJobsTemplates();
                 await InstallIsolatedTemplates();
+                await Task.Delay(60000); // Allow some time for the templates to be installed
                 await action();
             }
             finally
@@ -355,8 +358,8 @@ namespace Azure.Functions.Cli.Helpers
 
             foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
             {
-                var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
-                await exe.RunAsync();
+                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\" -v diag");
+                await exe.RunAsync(o => ColoredConsole.Out.WriteLine(o), e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
             }
         }
     }

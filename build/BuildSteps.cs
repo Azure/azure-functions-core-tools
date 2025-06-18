@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -326,7 +327,10 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 --blame-hang-timeout 10m --logger \"console;verbosity=detailed\"");
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger trx --blame-hang-timeout 10m");
+
+            // Run the func new and func init E2E tests after not in parallel to ensure there are no templating conflicts
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger console;verbosity=detailed --settings {Settings.DotnetTemplatesRuntimeSettings} --blame-hang-timeout 10m -p:TestTfmsInParallel=false");
         }
 
         public static void TestNewE2EProjectDotnetInProc()
@@ -344,7 +348,10 @@ namespace Build
 
             Environment.SetEnvironmentVariable("DURABLE_FUNCTION_PATH", Settings.DurableFolder);
 
-            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net8.0 --logger trx --settings {Settings.RuntimeSettings} --blame-hang-timeout 10m");
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger trx --settings {Settings.FuncStartRuntimeSettingsInProc} --blame-hang-timeout 10m");
+
+            // Run the func new and func init E2E tests after not in parallel to ensure there are no templating conflicts
+            Shell.Run("dotnet", $"test {Settings.NewTestProjectFile} -f net9.0 --logger trx --settings {Settings.DotnetTemplatesRuntimeSettingsInProc} --blame-hang-timeout 10m -p:TestTfmsInParallel=false");
         }
 
         public static void CopyBinariesToSign()

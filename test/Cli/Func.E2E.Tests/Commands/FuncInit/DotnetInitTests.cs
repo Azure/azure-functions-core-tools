@@ -10,6 +10,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 {
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Dotnet)]
+    [Trait(TestTraits.Group, TestTraits.UsesDotnetTemplates)]
     public class DotnetInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
         [Fact]
@@ -28,7 +29,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet function app
             var funcInitResult = funcInitCommand
                .WithWorkingDirectory(workingDir)
-               .Execute(["--worker-runtime", "dotnet"]);
+               .Execute(["--worker-runtime", "dotnet", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
@@ -57,7 +58,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute([projectName, "--worker-runtime", "dotnet", "--target-framework", targetFramework]);
+                .Execute([projectName, "--worker-runtime", "dotnet", "--target-framework", targetFramework, "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
@@ -75,7 +76,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["dotnet-funcs", "--worker-runtime", "dotnet", "--target-framework", unsupportedTargetFramework]);
+                .Execute(["dotnet-funcs", "--worker-runtime", "dotnet", "--target-framework", unsupportedTargetFramework, "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(1);
@@ -100,7 +101,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "dotnet", "--docker", csxParam]);
+                .Execute(["--worker-runtime", "dotnet", "--docker", csxParam, "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
@@ -124,7 +125,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             // Initialize dotnet function app
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--worker-runtime", "dotnet", "--csx"]);
+                .Execute(["--worker-runtime", "dotnet", "--csx", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workingDir);
@@ -149,7 +150,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only"]);
+                .Execute(["--docker-only", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
@@ -175,7 +176,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
-                .Execute(["--docker-only", "--csx"]);
+                .Execute(["--docker-only", "--csx", "--debug"]);
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
