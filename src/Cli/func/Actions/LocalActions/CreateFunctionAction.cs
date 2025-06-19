@@ -113,7 +113,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
+            ColoredConsole.WriteLine("Right before updating language and runtime");
+
             await UpdateLanguageAndRuntime();
+
+            ColoredConsole.WriteLine("ayo updated fr");
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) && !Csx)
             {
@@ -200,6 +204,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
+                ColoredConsole.WriteLine("ok you made it to the else statement");
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
                 string templateLanguage;
                 try
@@ -211,6 +216,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     // Ideally this should never happen.
                     templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(_workerRuntime);
                 }
+
+                ColoredConsole.WriteLine("lmaooooo");
 
                 TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(templateLanguage));
