@@ -322,7 +322,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else if (!WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
-                    var displayList = _templates.Value
+                    Console.WriteLine($"List of languages: {languages}");
+                    Console.WriteLine($"Is templates null: { _templates.Value == null}");
+                    var displayList = _templates?.Value
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
