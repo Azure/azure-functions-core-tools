@@ -14,6 +14,7 @@ namespace Azure.Functions.Cli.TestFramework.Commands
         protected override CommandInfo CreateCommand(IEnumerable<string> args)
         {
             var arguments = new List<string> { _commandName }.Concat(args).ToList();
+            arguments.Add("--verbose");
 
             if (WorkingDirectory is null)
             {
