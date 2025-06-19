@@ -287,12 +287,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public async Task UpdateLanguageAndRuntime()
         {
             _workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            Console.WriteLine($"Current worker runtime: {_workerRuntime}");
             if (!CurrentPathHasLocalSettings())
             {
+                Console.WriteLine($"Did not detect localsettings.json");
+
                 // we're assuming "func init" has not been run
                 await _initAction.RunAsync();
                 _workerRuntime = _initAction.ResolvedWorkerRuntime;
                 Language = _initAction.ResolvedLanguage;
+
+                Console.WriteLine($"Detected local.settings.json with {_workerRuntime} and {Language}");
             }
 
             if (_workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
@@ -307,6 +312,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (string.IsNullOrWhiteSpace(Language))
             {
+                Console.WriteLine($"in here bro");
                 if (_workerRuntime == WorkerRuntime.None)
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
@@ -338,8 +344,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (!string.IsNullOrWhiteSpace(Language))
             {
+                Console.WriteLine($"last chain fr");
                 _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
+
+            Console.WriteLine($"ok you done. value of workerRuntime is: {_workerRuntime}");
         }
 
         private IEnumerable<string> GetTriggerNames(string templateLanguage, bool forNewModelHelp = false)
