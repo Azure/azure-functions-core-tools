@@ -120,7 +120,7 @@ jobs:
       inputs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-msi-files.ps1'
-        arguments: '-ArtifactsPath "$(Pipeline.Workspace)\staging\coretools-cli"'
+        arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/build'
 
   - ${{ if startsWith(parameters.arch, 'win-x') }}:

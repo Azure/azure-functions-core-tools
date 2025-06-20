@@ -3,6 +3,7 @@
 
 // Based off of: https://github.com/dotnet/sdk/blob/e793aa4709d28cd783712df40413448250e26fea/test/Microsoft.NET.TestFramework/Assertions/CommandResultAssertions.cs
 using System.Text.RegularExpressions;
+using Azure.Functions.Cli.Abstractions;
 using FluentAssertions;
 using FluentAssertions.Execution;
 
