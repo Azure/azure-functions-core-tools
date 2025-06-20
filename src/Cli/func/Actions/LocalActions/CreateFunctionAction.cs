@@ -338,8 +338,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         Console.WriteLine(ex.ToString());
                     }
 
-
-
                     var displayList = _templates?.Value?
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
