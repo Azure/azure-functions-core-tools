@@ -29,6 +29,8 @@ resources:
 
 variables:
   - template: /ci/variables/cfs.yml@eng
+  - name: supportedRuntimes
+    value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -43,7 +45,43 @@ extends:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
     stages:
-      - stage: BuildAndTest
+      - stage: Publish
         jobs:
-        - template: /eng/ci/templates/official/jobs/build-test.yml@self
+        - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+          - template: /eng/ci/templates/official/jobs/publish-cli.yml@self
+            parameters:
+              runtime: ${{ runtime }}
+              jobNameSuffix: ${{ replace(replace(runtime, '-', ''), '.', '') }}
 
+        - template: /eng/ci/templates/official/jobs/pack-cli.yml@self
+
+      - stage: Merge
+        dependsOn: 'Publish'
+
+        jobs:
+        - template: /eng/ci/templates/official/jobs/merge-artifacts.yml@self
+
+      - stage: PublishToNightlyFeed
+        dependsOn: 'Merge'
+        condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
+
+        jobs:
+        - template: /eng/ci/templates/official/jobs/publish-cli-to-feed.yml@self
+
+      - stage: E2ETestWindows
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+
+      - stage: E2ETestLinux
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+
+      - stage: E2ETestOSX
+        dependsOn: ''
+
+        jobs:
+        - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self

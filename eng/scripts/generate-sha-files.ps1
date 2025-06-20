@@ -1,5 +1,5 @@
 param (
-    [Mandatory]
+    [Parameter(Mandatory=$true)]
     [string]$artifactsPath
 )
 # Find all zip files
