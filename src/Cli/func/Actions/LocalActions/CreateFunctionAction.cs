@@ -45,26 +45,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => EnsureTemplatesLoaded(tm => tm.UserPrompts, "User Prompts"));
         }
 
-        private IEnumerable<T> EnsureTemplatesLoaded<T>(Func<ITemplatesManager, Task<IEnumerable<T>>> templateGetter, string templateType)
-        {
-            try
-            {
-                IEnumerable<T> templates = templateGetter(_templatesManager).Result;
-                if (templates == null)
-                {
-                    ColoredConsole.WriteLine(ErrorColor($"{templateType} could not be loaded - returning empty collection"));
-                    return [];
-                }
-
-                return templates;
-            }
-            catch (Exception ex)
-            {
-                ColoredConsole.WriteLine(ErrorColor($"Failed to load {templateType.ToLowerInvariant()}: {ex.Message}"));
-                return [];
-            }
-        }
-
         public string Language { get; set; }
 
         public string TemplateName { get; set; }
@@ -585,6 +565,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private bool CurrentPathHasLocalSettings()
         {
             return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json"));
+        }
+
+        private IEnumerable<T> EnsureTemplatesLoaded<T>(Func<ITemplatesManager, Task<IEnumerable<T>>> templateGetter, string templateType)
+        {
+            try
+            {
+                IEnumerable<T> templates = templateGetter(_templatesManager).Result;
+                if (templates == null)
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"{templateType} could not be loaded - returning empty collection"));
+                    return [];
+                }
+
+                return templates;
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.WriteLine(ErrorColor($"Failed to load {templateType.ToLowerInvariant()}: {ex.Message}"));
+                return [];
+            }
         }
     }
 }
