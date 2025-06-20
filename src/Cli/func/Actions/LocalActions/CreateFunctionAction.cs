@@ -324,7 +324,21 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
 
                     Console.WriteLine($"Languages from worker: {string.Join(", ", languages)}");
-                    Console.WriteLine($"Templates count: {_templates?.Value?.Count()}");
+
+                    try
+                    {
+                        var templatesResult = _templatesManager.Templates;
+                        Console.WriteLine($"Templates task status: {templatesResult.Status}");
+                        var templates = templatesResult.Result;
+                        Console.WriteLine($"Templates loaded: {templates?.Count() ?? 0}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("🔥 Exception while loading templates:");
+                        Console.WriteLine(ex.ToString());
+                    }
+
+
 
                     var displayList = _templates?.Value?
                             .Select(t => t.Metadata.Language)
