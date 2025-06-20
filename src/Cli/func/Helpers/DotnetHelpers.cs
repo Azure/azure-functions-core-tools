@@ -1,6 +1,7 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -291,30 +292,106 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task IsolatedTemplateOperation(Func<Task> action)
         {
-            try
-            {
-                await UninstallWebJobsTemplates();
-                await InstallIsolatedTemplates();
-                await action();
-            }
-            finally
-            {
-                await UninstallIsolatedTemplates();
-            }
+            await EnsureIsolatedTemplatesInstalled();
+            await action();
         }
 
         private static async Task WebJobsTemplateOperation(Func<Task> action)
         {
-            try
+            await EnsureWebJobsTemplatesInstalled();
+            await action();
+
+            // No uninstall - templates stay installed
+        }
+
+        private static async Task EnsureIsolatedTemplatesInstalled()
+        {
+            // Check if isolated templates are already available
+            if (await AreIsolatedTemplatesAvailable())
             {
-                await UninstallIsolatedTemplates();
-                await InstallWebJobsTemplates();
-                await action();
+                ColoredConsole.WriteLine("Isolated templates are already available");
+                return; // Already installed and available
             }
-            finally
+
+            // Clean conflicting WebJobs templates if they exist
+            if (await AreWebJobsTemplatesAvailable())
             {
+                ColoredConsole.WriteLine("Uninstalling web jobs templates templates are already available");
                 await UninstallWebJobsTemplates();
             }
+
+            await InstallIsolatedTemplates();
+
+            ColoredConsole.WriteLine("Isolated templates installed successfully");
+        }
+
+        private static async Task EnsureWebJobsTemplatesInstalled()
+        {
+            // Check if WebJobs templates are already available
+            if (await AreWebJobsTemplatesAvailable())
+            {
+                ColoredConsole.WriteLine("WebJobs templates already installed");
+                return; // Already installed and available
+            }
+
+            // Clean conflicting Isolated templates if they exist
+            if (await AreIsolatedTemplatesAvailable())
+            {
+                await UninstallIsolatedTemplates();
+            }
+
+            await InstallWebJobsTemplates();
+
+            ColoredConsole.WriteLine("WebJobs templates installed successfully");
+        }
+
+        private static async Task<bool> AreIsolatedTemplatesAvailable()
+        {
+            try
+            {
+                var templateList = await GetInstalledTemplateList();
+
+                // Check for key isolated templates that should be available
+                return templateList.Contains($"{IsolatedTemplateBasePackId}.ProjectTemplates") &&
+                       templateList.Contains($"{IsolatedTemplateBasePackId}.ItemTemplates");
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.WriteLine($"Error checking isolated templates: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static async Task<bool> AreWebJobsTemplatesAvailable()
+        {
+            try
+            {
+                var templateList = await GetInstalledTemplateList();
+
+                // Check for key WebJobs templates
+                return templateList.Contains($"{WebJobsTemplateBasePackId}.ProjectTemplates") &&
+                       templateList.Contains($"{WebJobsTemplateBasePackId}.ItemTemplates");
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.WriteLine($"Error checking WebJobs templates: {ex.Message}");
+            }
+
+            return false;
+        }
+
+        private static async Task<string> GetInstalledTemplateList()
+        {
+            var exe = new Executable("dotnet", "new list");
+            var output = new StringBuilder();
+            var exitCode = await exe.RunAsync(o => output.Append(o), e => { });
+
+            if (exitCode != 0)
+            {
+                throw new CliException("Failed to get template list from dotnet CLI");
+            }
+
+            return output.ToString().ToLowerInvariant();
         }
 
         private static async Task UninstallIsolatedTemplates()

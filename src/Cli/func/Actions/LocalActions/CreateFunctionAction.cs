@@ -40,9 +40,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
             _userInputHandler = new UserInputHandler(_templatesManager);
-            _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
-            _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
-            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
+            _templates = new Lazy<IEnumerable<Template>>(() => EnsureTemplatesLoaded(tm => tm.Templates, "Templates"));
+            _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => EnsureTemplatesLoaded(tm => tm.NewTemplates, "New Templates"));
+            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => EnsureTemplatesLoaded(tm => tm.UserPrompts, "User Prompts"));
         }
 
         public string Language { get; set; }
@@ -309,12 +309,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else if (!WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
-                    var displayList = _templates.Value
+
+                    // If templates are not loaded yet, we need to check the task status and force it to populate if it hasn't already
+                    if (!_templates.IsValueCreated)
+                    {
+                        ColoredConsole.WriteLine("Templates not loaded yet, checking task status...");
+                        var taskStatus = _templatesManager.Templates.Status;
+                        ColoredConsole.WriteLine($"Templates task status: {taskStatus}");
+                        _ = _templatesManager.Templates.Result; // This should force templates to load in templatesManager
+                    }
+
+                    var displayList = _templates.Value?
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToArray();
-                    if (displayList.Length == 1)
+
+                    if (displayList?.Length == 1)
                     {
                         Language = displayList.First();
                     }
@@ -536,6 +547,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private bool CurrentPathHasLocalSettings()
         {
             return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json"));
+        }
+
+        private IEnumerable<T> EnsureTemplatesLoaded<T>(Func<ITemplatesManager, Task<IEnumerable<T>>> templateGetter, string templateType)
+        {
+            try
+            {
+                IEnumerable<T> templates = templateGetter(_templatesManager).Result;
+                if (templates == null)
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"{templateType} could not be loaded - returning empty collection"));
+                    return [];
+                }
+
+                return templates;
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.WriteLine(ErrorColor($"Failed to load {templateType.ToLowerInvariant()}: {ex.Message}"));
+                return [];
+            }
         }
     }
 }
