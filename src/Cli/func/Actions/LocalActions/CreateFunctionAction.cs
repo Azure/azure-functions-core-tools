@@ -322,7 +322,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else if (!WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
-                    Console.WriteLine($"List of languages: {languages}");
+
+                    Console.WriteLine($"Languages from worker: {string.Join(", ", languages)}");
+                    Console.WriteLine($"Templates count: {_templates?.Value?.Count()}");
 
                     var displayList = _templates?.Value?
                             .Select(t => t.Metadata.Language)
@@ -330,7 +332,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToArray();
 
-                    Console.WriteLine($"Length of display list: {displayList?.Length}");
+                    Console.WriteLine($"Display list: {string.Join(", ", displayList ?? new string[] { "null or empty" })}");
                     if (displayList?.Length == 1)
                     {
                         Language = displayList.First();
