@@ -1,0 +1,36 @@
+parameters:
+- name: folderPath
+  type: string
+- name: signPatterns
+  type: string
+
+steps:
+- template: ci/sign-files.yml@eng
+  parameters:
+    displayName: 'Authenticode signing (dll)'
+    folderPath: ${{ parameters.folderPath }}
+    pattern: ${{ parameters.signPatterns }}
+    signType: inline
+    inlineOperation: |
+      [
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolSign",
+            "Parameters": {
+              "OpusName": "Microsoft",
+              "OpusInfo": "http://www.microsoft.com",
+              "FileDigest": "/fd \"SHA256\"",
+              "PageHash": "/NPH",
+              "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+            },
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          },
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolVerify",
+            "Parameters": {},
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          }
+      ]
