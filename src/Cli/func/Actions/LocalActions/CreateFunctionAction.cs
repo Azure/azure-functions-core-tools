@@ -113,11 +113,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            ColoredConsole.WriteLine("Right before updating language and runtime");
-
             await UpdateLanguageAndRuntime();
-
-            ColoredConsole.WriteLine("ayo updated fr");
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) && !Csx)
             {
@@ -204,7 +200,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else
             {
-                ColoredConsole.WriteLine("ok you made it to the else statement");
                 SelectionMenuHelper.DisplaySelectionWizardPrompt("template");
                 string templateLanguage;
                 try
@@ -216,8 +211,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     // Ideally this should never happen.
                     templateLanguage = WorkerRuntimeLanguageHelper.GetDefaultTemplateLanguageFromWorker(_workerRuntime);
                 }
-
-                ColoredConsole.WriteLine("lmaooooo");
 
                 TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "language", templateLanguage);
                 TemplateName = TemplateName ?? SelectionMenuHelper.DisplaySelectionWizard(GetTriggerNames(templateLanguage));
@@ -287,17 +280,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public async Task UpdateLanguageAndRuntime()
         {
             _workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
-            Console.WriteLine($"Current worker runtime: {_workerRuntime}");
             if (!CurrentPathHasLocalSettings())
             {
-                Console.WriteLine($"Did not detect localsettings.json");
-
                 // we're assuming "func init" has not been run
                 await _initAction.RunAsync();
                 _workerRuntime = _initAction.ResolvedWorkerRuntime;
                 Language = _initAction.ResolvedLanguage;
-
-                Console.WriteLine($"Detected local.settings.json with {_workerRuntime} and {Language}");
             }
 
             if (_workerRuntime != WorkerRuntime.None && !string.IsNullOrWhiteSpace(Language))
@@ -325,15 +313,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     // If templates are not loaded yet, we need to check the task status and force it to populate if it hasn't already
                     if (!_templates.IsValueCreated)
                     {
-                        Console.WriteLine("Templates not loaded yet, checking task status...");
+                        ColoredConsole.WriteLine("Templates not loaded yet, checking task status...");
                         var taskStatus = _templatesManager.Templates.Status;
-                        Console.WriteLine($"Templates task status: {taskStatus}");
+                        ColoredConsole.WriteLine($"Templates task status: {taskStatus}");
 
                         if (taskStatus == TaskStatus.Created)
                         {
                             // Task hasn't even started yet
-                            Console.WriteLine("Forcing task to start...");
-                            _ = _templatesManager.Templates.Result; // This should force _template to populate
+                            ColoredConsole.WriteLine("Forcing task to start...");
+                            _ = _templatesManager.Templates.Result; // This should force _templates to populate
                         }
                     }
 

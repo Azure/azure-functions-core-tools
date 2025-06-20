@@ -16,8 +16,6 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
-        private static readonly string _templateLockPath = Path.Combine(Path.GetTempPath(), "azure_func_template_install.lock");
-        private static readonly ConcurrentDictionary<WorkerRuntime, bool> _templatesInstalled = new();
 
         public static void EnsureDotnet()
         {
@@ -296,8 +294,6 @@ namespace Azure.Functions.Cli.Helpers
         {
             await EnsureIsolatedTemplatesInstalled();
             await action();
-
-            // No uninstall - templates stay installed
         }
 
         private static async Task WebJobsTemplateOperation(Func<Task> action)
@@ -438,80 +434,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
                 await exe.RunAsync();
-            }
-        }
-
-        private sealed class FileLock : IDisposable
-        {
-            private readonly string _lockFilePath;
-            private readonly int _maxRetryAttempts;
-            private readonly TimeSpan _retryDelay;
-            private FileStream _lockStream;
-
-            public FileLock(string lockFilePath, int maxRetryAttempts = 30, TimeSpan? retryDelay = null)
-            {
-                _lockFilePath = lockFilePath;
-                _maxRetryAttempts = maxRetryAttempts;
-                _retryDelay = retryDelay ?? TimeSpan.FromSeconds(1);
-
-                AcquireLock();
-            }
-
-            private void AcquireLock()
-            {
-                int attempt = 0;
-                while (attempt < _maxRetryAttempts)
-                {
-                    try
-                    {
-                        _lockStream = new FileStream(
-                            _lockFilePath,
-                            FileMode.OpenOrCreate,
-                            FileAccess.ReadWrite,
-                            FileShare.Delete);
-                        return; // Successfully acquired lock
-                    }
-                    catch (IOException ex) when (IsFileLockException(ex))
-                    {
-                        attempt++;
-                        if (attempt >= _maxRetryAttempts)
-                        {
-                            throw new CliException($"Unable to acquire lock on '{_lockFilePath}' after {_maxRetryAttempts} attempts. " +
-                                                 "Another Azure Functions CLI process may be running template operations.");
-                        }
-
-                        // Wait before retrying
-                        Thread.Sleep(_retryDelay);
-                    }
-                }
-            }
-
-            private static bool IsFileLockException(IOException ex)
-            {
-                const int ERROR_SHARING_VIOLATION = 32;
-                const int ERROR_LOCK_VIOLATION = 33;
-
-                return ex.HResult == unchecked(ERROR_SHARING_VIOLATION) ||
-                       ex.HResult == unchecked(ERROR_LOCK_VIOLATION);
-            }
-
-            public void Dispose()
-            {
-                _lockStream?.Dispose();
-                _lockStream = null;
-
-                // Clean up the lock file if it exists and we can delete it
-                try
-                {
-                    if (File.Exists(_lockFilePath))
-                    {
-                        File.Delete(_lockFilePath);
-                    }
-                }
-                catch (IOException)
-                {
-                    // Ignore cleanup errors - another process might still be using it
-                }
             }
         }
     }
