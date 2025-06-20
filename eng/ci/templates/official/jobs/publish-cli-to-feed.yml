@@ -10,12 +10,13 @@ jobs:
 
   steps:
   - task: DownloadPipelineArtifact@2
+    displayName: Download CLI
     inputs:
       artifact: 'func-cli-$(Build.BuildNumber)'
       path: $(Build.ArtifactStagingDirectory)/cli
 
   - task: UniversalPackages@0
-    displayName: Publish
+    displayName: Publish to feed
     inputs:
       command: publish
       publishDirectory: '$(Build.ArtifactStagingDirectory)/cli'
