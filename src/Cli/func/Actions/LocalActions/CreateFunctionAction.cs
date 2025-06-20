@@ -316,7 +316,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         ColoredConsole.WriteLine("Templates not loaded yet, checking task status...");
                         var taskStatus = _templatesManager.Templates.Status;
                         ColoredConsole.WriteLine($"Templates task status: {taskStatus}");
-                        _ = _templatesManager.Templates.Result; // This should force _templates to populate
                     }
 
                     var displayList = _templates.Value?
@@ -553,7 +552,60 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             try
             {
-                IEnumerable<T> templates = templateGetter(_templatesManager).Result;
+                Task<IEnumerable<T>> task = templateGetter(_templatesManager);
+                if (task.IsFaulted)
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"{templateType} task failed. Errors:"));
+                    foreach (var ex in task.Exception?.InnerExceptions)
+                    {
+                        ColoredConsole.WriteLine(ErrorColor($"  - {ex.Message}"));
+                    }
+
+                    return Enumerable.Empty<T>();
+                }
+
+                if (task.IsCanceled)
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"{templateType} task was canceled"));
+                    return Enumerable.Empty<T>();
+                }
+
+                if (!task.IsCompleted)
+                {
+                    ColoredConsole.WriteLine($"Waiting for {templateType.ToLowerInvariant()} to complete...");
+
+                    var timeout = TimeSpan.FromSeconds(30);
+                    var startTime = DateTime.UtcNow;
+
+                    while (!task.IsCompleted && (DateTime.UtcNow - startTime) < timeout)
+                    {
+                        Console.WriteLine($"Still waiting... Task status: {task.Status}");
+                        Thread.Sleep(500); // Check every 500ms
+
+                        // Check if task faulted or was canceled during the wait
+                        if (task.IsFaulted)
+                        {
+                            ColoredConsole.WriteLine(ErrorColor($"{templateType} task faulted while waiting"));
+                            break;
+                        }
+
+                        if (task.IsCanceled)
+                        {
+                            ColoredConsole.WriteLine(ErrorColor($"{templateType} task was canceled while waiting"));
+                            break;
+                        }
+                    }
+
+                    if (!task.IsCompleted)
+                    {
+                        ColoredConsole.WriteLine(ErrorColor($"Timeout waiting for {templateType.ToLowerInvariant()} to load after 30 seconds"));
+                        return Enumerable.Empty<T>();
+                    }
+
+                    ColoredConsole.WriteLine($"{templateType} completed after {(DateTime.UtcNow - startTime).TotalSeconds:F1} seconds");
+                }
+
+                IEnumerable<T> templates = task.Result;
                 if (templates == null)
                 {
                     ColoredConsole.WriteLine(ErrorColor($"{templateType} could not be loaded - returning empty collection"));
