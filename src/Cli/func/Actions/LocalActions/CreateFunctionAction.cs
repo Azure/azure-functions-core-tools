@@ -342,6 +342,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
 
+                    // If templates are not loaded yet, we need to check the task status and force it to populate if it hasn't already
                     if (!_templates.IsValueCreated)
                     {
                         Console.WriteLine("Templates not loaded yet, checking task status...");
@@ -352,7 +353,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         {
                             // Task hasn't even started yet
                             Console.WriteLine("Forcing task to start...");
-                            _ = _templatesManager.Templates.Result; // This should start the task
+                            _ = _templatesManager.Templates.Result; // This should force _template to populate
                         }
                     }
 
