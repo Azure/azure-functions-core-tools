@@ -316,7 +316,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         ColoredConsole.WriteLine("Templates not loaded yet, checking task status...");
                         var taskStatus = _templatesManager.Templates.Status;
                         ColoredConsole.WriteLine($"Templates task status: {taskStatus}");
-                        _ = _templatesManager.Templates.Result; // This should force _templates to populate
+                        _ = _templatesManager.Templates.Result; // This should force templates to load in templatesManager
                     }
 
                     var displayList = _templates.Value?
