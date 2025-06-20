@@ -40,9 +40,29 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
             _userInputHandler = new UserInputHandler(_templatesManager);
-            _templates = new Lazy<IEnumerable<Template>>(() => { return _templatesManager.Templates.Result; });
-            _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => { return _templatesManager.NewTemplates.Result; });
-            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => { return _templatesManager.UserPrompts.Result; });
+            _templates = new Lazy<IEnumerable<Template>>(() => EnsureTemplatesLoaded(tm => tm.Templates, "Templates"));
+            _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => EnsureTemplatesLoaded(tm => tm.NewTemplates, "New Templates"));
+            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => EnsureTemplatesLoaded(tm => tm.UserPrompts, "User Prompts"));
+        }
+
+        private IEnumerable<T> EnsureTemplatesLoaded<T>(Func<ITemplatesManager, Task<IEnumerable<T>>> templateGetter, string templateType)
+        {
+            try
+            {
+                IEnumerable<T> templates = templateGetter(_templatesManager).Result;
+                if (templates == null)
+                {
+                    ColoredConsole.WriteLine(ErrorColor($"{templateType} could not be loaded - returning empty collection"));
+                    return [];
+                }
+
+                return templates;
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.WriteLine(ErrorColor($"Failed to load {templateType.ToLowerInvariant()}: {ex.Message}"));
+                return [];
+            }
         }
 
         public string Language { get; set; }
@@ -312,7 +332,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (string.IsNullOrWhiteSpace(Language))
             {
-                Console.WriteLine($"in here bro");
                 if (_workerRuntime == WorkerRuntime.None)
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
@@ -323,28 +342,26 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
 
-                    Console.WriteLine($"Languages from worker: {string.Join(", ", languages)}");
-
-                    try
+                    if (!_templates.IsValueCreated)
                     {
-                        var templatesResult = _templatesManager.Templates;
-                        Console.WriteLine($"Templates task status: {templatesResult.Status}");
-                        var templates = templatesResult.Result;
-                        Console.WriteLine($"Templates loaded: {templates?.Count() ?? 0}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("🔥 Exception while loading templates:");
-                        Console.WriteLine(ex.ToString());
+                        Console.WriteLine("Templates not loaded yet, checking task status...");
+                        var taskStatus = _templatesManager.Templates.Status;
+                        Console.WriteLine($"Templates task status: {taskStatus}");
+
+                        if (taskStatus == TaskStatus.Created)
+                        {
+                            // Task hasn't even started yet
+                            Console.WriteLine("Forcing task to start...");
+                            _ = _templatesManager.Templates.Result; // This should start the task
+                        }
                     }
 
-                    var displayList = _templates?.Value?
+                    var displayList = _templates.Value?
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToArray();
 
-                    Console.WriteLine($"Display list: {string.Join(", ", displayList ?? new string[] { "null or empty" })}");
                     if (displayList?.Length == 1)
                     {
                         Language = displayList.First();
@@ -362,11 +379,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (!string.IsNullOrWhiteSpace(Language))
             {
-                Console.WriteLine($"last chain fr");
                 _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
             }
-
-            Console.WriteLine($"ok you done. value of workerRuntime is: {_workerRuntime}");
         }
 
         private IEnumerable<string> GetTriggerNames(string templateLanguage, bool forNewModelHelp = false)
