@@ -586,6 +586,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         if (task.IsFaulted)
                         {
                             ColoredConsole.WriteLine(ErrorColor($"{templateType} task faulted while waiting"));
+                            ColoredConsole.WriteLine(ErrorColor($"Error message: {task.Exception?.Message}"));
+                            foreach (var ex in task.Exception?.InnerExceptions)
+                            {
+                                ColoredConsole.WriteLine(ErrorColor($"  - {ex.Message}"));
+                            }
+
                             break;
                         }
 
