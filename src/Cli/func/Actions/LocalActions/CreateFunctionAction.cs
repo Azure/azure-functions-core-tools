@@ -323,13 +323,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
                     Console.WriteLine($"List of languages: {languages}");
-                    Console.WriteLine($"Is templates null: {_templates.Value == null}");
-                    var displayList = _templates?.Value
+
+                    var displayList = _templates?.Value?
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToArray();
-                    if (displayList.Length == 1)
+
+                    Console.WriteLine($"Length of display list: {displayList?.Length}");
+                    if (displayList?.Length == 1)
                     {
                         Language = displayList.First();
                     }
