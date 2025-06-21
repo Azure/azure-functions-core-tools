@@ -77,7 +77,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             };
 
             // Initialize dotnet function app with retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "powershell"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "powershell"]);
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)

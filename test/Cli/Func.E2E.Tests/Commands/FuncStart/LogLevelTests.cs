@@ -36,10 +36,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_LanguageWorker_LogLevelOverridenViaSettings_LogLevelSetToExpectedValue);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Add debug log level setting
             var funcSettingsResult = new FuncSettingsCommand(FuncPath, testName, Log)
@@ -70,10 +70,10 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_LanguageWorker_LogLevelOverridenViaHostJson_LogLevelSetToExpectedValue);
 
             // Initialize Node.js function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "node", "-m", "v4"]);
 
             // Add HTTP trigger using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "HttpTrigger", "--name", "HttpTrigger", "--language", "node"], workerRuntime: "node");
 
             // Modify host.json to set log level
             var hostJsonPath = Path.Combine(WorkingDirectory, "host.json");

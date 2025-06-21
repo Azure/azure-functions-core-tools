@@ -22,12 +22,12 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var testName = nameof(Start_FunctionsStartArgument_OnlySelectedFunctionsRun);
 
             // Initialize JavaScript function app using retry helper
-            await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "javascript"]);
+            _ = await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "javascript"]);
 
             // Add multiple HTTP triggers using retry helper
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http2"]);
-            await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http3"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http1"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http2"]);
+            _ = await FuncNewWithRetryAsync(testName, [".", "--template", "Httptrigger", "--name", "http3"]);
 
             // Call func start with specific functions
             var funcStartCommand = new FuncStartCommand(FuncPath, testName, Log);

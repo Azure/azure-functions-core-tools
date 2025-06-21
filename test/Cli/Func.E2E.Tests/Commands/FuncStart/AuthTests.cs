@@ -29,8 +29,8 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncStart
             var uniqueTestName = $"{methodName}_{authLevel}_{enableAuth}";
 
             // Call func init and func new
-            await FuncInitWithRetryAsync(uniqueTestName, [".", "--worker-runtime", "dotnet-isolated"]);
-            await FuncNewWithRetryAsync(uniqueTestName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel]);
+            _ = await FuncInitWithRetryAsync(uniqueTestName, [".", "--worker-runtime", "dotnet-isolated"]);
+            _ = await FuncNewWithRetryAsync(uniqueTestName, [".", "--template", "Httptrigger", "--name", "HttpTrigger", "--authlevel", authLevel]);
 
             // Call func start
             var funcStartCommand = new FuncStartCommand(FuncPath, methodName, Log);
