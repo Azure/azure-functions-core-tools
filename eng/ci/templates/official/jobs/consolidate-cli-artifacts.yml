@@ -105,7 +105,7 @@ jobs:
       arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
 
-  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}: # what about the other min.* architectures?
     - task: PowerShell@2
       displayName: 'Generate metadata.json file'
       inputs:
@@ -123,7 +123,6 @@ jobs:
         arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/coretools-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/build'
 
-  - ${{ if startsWith(parameters.arch, 'win-x') }}:
     - template: ci/sign-files.yml@eng
       parameters:
         displayName: Sign MSI files

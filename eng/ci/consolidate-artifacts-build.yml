@@ -47,8 +47,8 @@ resources:
 
 variables:
 - template: /ci/variables/cfs.yml@eng
-- name: archs
-  value: 'win-x64,win-x86,min.win-x64,osx-x64,linux-x64,osx-arm64,win-arm64,min.win-arm64,min.win-x86'
+- name: supportedRuntimes
+  value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -68,15 +68,15 @@ extends:
 
     stages:
     - stage: ConsolidateArticacts
-      displayName: "Assemble Artifacts"
+      displayName: "Consolidate CLI Artifacts"
       jobs:
-      - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
+      - template: /eng/ci/templates/official/jobs/download-cli-nuget-package.yml@self
         parameters:
           isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
 
-      - ${{ each arch in split(variables.archs,',') }}:
-        - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
+      - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
+        - template: /eng/ci/templates/official/jobs/consolidate-cli-artifacts.yml@self
           parameters:
-            arch: ${{ arch }}
-            displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
+            arch: ${{ runtime }}
+            displayName: ${{ replace(replace(runtime, '-', ''), '.', '') }}
             isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}

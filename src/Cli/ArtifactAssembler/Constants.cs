@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
         internal const string CoreToolsHostDirectoryName = "host";
         internal const string VisualStudioOutputArtifactDirectoryName = "coretools-visualstudio";
         internal const string InProcOutputArtifactNameSuffix = "_inproc";
-        internal const string CoreToolsProductVersionPattern = @"(\d+\.\d+\.\d+)$";
+        internal const string CoreToolsProductVersionPattern = @"(\d+\.\d+\.\d+(?:-[0-9A-Za-z\-\.]+)?(?:\+[0-9A-Za-z\-\.]+)?)$";
         internal const string ArtifactNameRegexPattern = @"^(.*?)(\d+\.\d+\.\d+)$";
         internal const string OutOfProcDirectoryName = "default";
         internal const string CliOutputArtifactDirectoryName = "coretools-cli";
