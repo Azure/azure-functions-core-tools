@@ -73,12 +73,12 @@ namespace Azure.Functions.Cli.Common
                 await ExtensionBundleHelper.GetExtensionBundle();
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                 templatesJson = await contentProvider.GetTemplates();
-
             }
             else
             {
                 templatesJson = GetTemplatesJson();
             }
+
             Console.WriteLine("=== TEMPLATES JSON ===");
             Console.WriteLine(templatesJson);
             Console.WriteLine("=== END TEMPLATES JSON ===");
