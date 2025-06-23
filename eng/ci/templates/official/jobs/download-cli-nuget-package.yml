@@ -4,8 +4,8 @@ parameters:
     default: false
 
 jobs:
-- job: ProcessNuGetPackage
-  displayName: "Process NuGet Package"
+- job: DownloadNuGetPackage
+  displayName: "Download NuGet Package"
   templateContext:
     ${{ if eq(parameters.isNightlyBuild, false) }}:
       inputs:
@@ -33,9 +33,10 @@ jobs:
         version: '*'
         downloadPath: '$(Pipeline.Workspace)/core-tools-default/func-cli'
 
-  - task: PowerShell@2
-    displayName: 'Process and move nuget package to staging directory'
+  - task: CopyFiles@2
+    displayName: 'Copy NuGet package to output directory'
     inputs:
-      targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/move-nuget-package.ps1'
-      arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'
+      SourceFolder: '$(Pipeline.Workspace)/core-tools-default/func-cli'
+      Contents: 'Microsoft.Azure.Functions.CoreTools.*.nupkg'
+      TargetFolder: '$(Pipeline.Workspace)/nugetPackage'
+      OverWrite: true

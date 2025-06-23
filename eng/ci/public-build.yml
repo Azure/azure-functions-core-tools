@@ -62,8 +62,8 @@ extends:
         dependsOn: ''
 
         jobs:
-        - template: /eng/ci/templates/jobs/test-unit-windows.yml@self
-        - template: /eng/ci/templates/jobs/test-unit-linux.yml@self
+        - template: /eng/ci/templates/public/jobs/test-unit-windows.yml@self
+        - template: /eng/ci/templates/public/jobs/test-unit-linux.yml@self
 
       # Do we want the E2E tests for the public build?
       # Might need this at first whilst we work on building out solid unit tests
