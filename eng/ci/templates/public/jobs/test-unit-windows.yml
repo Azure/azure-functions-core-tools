@@ -13,9 +13,9 @@ jobs:
   - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
   # The windows part of this test will create a Zip file that we need to download and test on Linux.
-  - template: /eng/ci/templates/steps/build-test-zip.yml@self
+  - template: /eng/ci/templates/public/steps/build-test-zip.yml@self
 
-  - template: /eng/ci/templates/steps/run-unit-tests.yml@self
+  - template: /eng/ci/templates/public/steps/run-unit-tests.yml@self
 
   templateContext:
     outputs:

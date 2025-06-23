@@ -31,6 +31,6 @@ extends:
       image: 1es-windows-2022
       os: windows
     stages:
-      - stage: BuildAndTest
+      - stage: BuildDEBPackage
         jobs:
-        - template: /eng/ci/templates/official/jobs/linux-build-pack.yml@self
+        - template: /eng/ci/templates/official/jobs/linux-deb-build-pack.yml@self
