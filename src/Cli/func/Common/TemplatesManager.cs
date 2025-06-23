@@ -69,14 +69,19 @@ namespace Azure.Functions.Cli.Common
 
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
+                Console.WriteLine("in extension bundle configured");
                 await ExtensionBundleHelper.GetExtensionBundle();
                 var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
                 templatesJson = await contentProvider.GetTemplates();
+
             }
             else
             {
                 templatesJson = GetTemplatesJson();
             }
+            Console.WriteLine("=== TEMPLATES JSON ===");
+            Console.WriteLine(templatesJson);
+            Console.WriteLine("=== END TEMPLATES JSON ===");
 
             var templates = JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
             templates = templates.Concat(await GetNodeV4TemplatesJson()).ToList();
