@@ -738,7 +738,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                    },
                    ExpectExit = true,
                    ExitInError = true,
-                   ErrorContains = new[] { "Host.json file in missing" },
+                   ErrorContains = new[] { "Host.json file is missing" },
                },
             }, _output);
         }

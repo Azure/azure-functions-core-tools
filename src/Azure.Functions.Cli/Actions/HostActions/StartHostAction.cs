@@ -446,7 +446,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             var hostJsonPath = Path.Combine(Environment.CurrentDirectory, Constants.HostJsonFileName);
             if (IsPreCompiledApp && !File.Exists(hostJsonPath))
             {
-                throw new CliException($"Host.json file in missing. Please make sure host.json file is present at {Environment.CurrentDirectory}");
+                throw new CliException($"Host.json file is missing. Please make sure host.json file is present at {Environment.CurrentDirectory}");
             }
 
             //BuildHostJsonConfigutation only if host.json file exists.
