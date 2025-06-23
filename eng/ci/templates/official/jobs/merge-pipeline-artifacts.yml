@@ -8,40 +8,40 @@ jobs:
     inputs:
     - input: pipelineArtifact
       artifactName: func-cli-linux-x64
-      targetPath: $(Pipeline.Workspace)/cli/linux-x64
+      targetPath: $(Pipeline.Workspace)/func-cli
 
     - input: pipelineArtifact
       artifactName: func-cli-osx-x64
-      targetPath: $(Pipeline.Workspace)/cli/osx-x64
+      targetPath: $(Pipeline.Workspace)/func-cli
     - input: pipelineArtifact
       artifactName: func-cli-osx-arm64
-      targetPath: $(Pipeline.Workspace/cli/osx-arm64
+      targetPath: $(Pipeline.Workspace/func-cli
 
     - input: pipelineArtifact
       artifactName: func-cli-win-x86
-      targetPath: $(Pipeline.Workspace)/cli/win-x86
+      targetPath: $(Pipeline.Workspace)/func-cli
     - input: pipelineArtifact
       artifactName: func-cli-win-x64
-      targetPath: $(Pipeline.Workspace)/cli/win-x64
+      targetPath: $(Pipeline.Workspace)/func-cli
     - input: pipelineArtifact
       artifactName: func-cli-win-arm64
-      targetPath: $(Pipeline.Workspace)/cli/win-arm64
+      targetPath: $(Pipeline.Workspace)/func-cli
 
     - input: pipelineArtifact
       artifactName: func-cli-min.win-x86
-      targetPath: $(Pipeline.Workspace)/cli/min-win-x86
+      targetPath: $(Pipeline.Workspace)/func-cli
     - input: pipelineArtifact
       artifactName: func-cli-min.win-x64
-      targetPath: $(Pipeline.Workspace)/cli/min-win-x64
+      targetPath: $(Pipeline.Workspace)/func-cli
     - input: pipelineArtifact
       artifactName: func-cli-min.win-arm64
-      targetPath: $(Pipeline.Workspace)/cli/min-win-arm64
+      targetPath: $(Pipeline.Workspace)/func-cli
 
     - input: pipelineArtifact
       artifactName: func-cli-nupkg
-      targetPath: $(Pipeline.Workspace)/cli/nupkg
+      targetPath: $(Pipeline.Workspace)/func-cli
 
     outputs:
     - output: pipelineArtifact
-      targetPath: $(Pipeline.Workspace)/cli
-      artifactName: 'func-cli-$(Build.BuildNumber)'
+      targetPath: $(Pipeline.Workspace)/func-cli
+      artifactName: 'func-cli'

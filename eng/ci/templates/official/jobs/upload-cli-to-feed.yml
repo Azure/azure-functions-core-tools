@@ -1,6 +1,6 @@
 jobs:
-- job: PublishNightlyBuild
-  displayName: 'Publish CLI Nightly Build to Feed'
+- job: UploadCliToFeed
+  displayName: 'Upload CLI to Feed'
   timeoutInMinutes: "180"
 
   pool:
@@ -10,16 +10,16 @@ jobs:
 
   steps:
   - task: DownloadPipelineArtifact@2
-    displayName: Download CLI
+    displayName: Download CLI artifacts
     inputs:
       artifact: 'func-cli-$(Build.BuildNumber)'
-      path: $(Build.ArtifactStagingDirectory)/cli
+      path: $(Build.ArtifactStagingDirectory)/func-cli
 
   - task: UniversalPackages@0
     displayName: Publish to feed
     inputs:
       command: publish
-      publishDirectory: '$(Build.ArtifactStagingDirectory)/cli'
+      publishDirectory: '$(Build.ArtifactStagingDirectory)/func-cli'
       vstsFeedPublish: 'internal/core-tools-nightly-build'
       vstsFeedPackagePublish: 'func-cli'
       versionOption: custom

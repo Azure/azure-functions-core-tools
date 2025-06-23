@@ -45,7 +45,7 @@ extends:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
     stages:
-      - stage: Publish
+      - stage: BuildAndPublish
         jobs:
         - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
           - template: /eng/ci/templates/official/jobs/publish-cli.yml@self
@@ -56,17 +56,17 @@ extends:
         - template: /eng/ci/templates/official/jobs/pack-cli.yml@self
 
       - stage: Merge
-        dependsOn: 'Publish'
+        dependsOn: 'BuildAndPublish'
 
         jobs:
-        - template: /eng/ci/templates/official/jobs/merge-artifacts.yml@self
+        - template: /eng/ci/templates/official/jobs/merge-pipeline-artifacts.yml@self
 
-      - stage: PublishToNightlyFeed
+      - stage: UploadToNightlyFeed
         dependsOn: 'Merge'
         condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
 
         jobs:
-        - template: /eng/ci/templates/official/jobs/publish-cli-to-feed.yml@self
+        - template: /eng/ci/templates/official/jobs/upload-cli-to-feed.yml@self
 
       - stage: E2ETestWindows
         dependsOn: ''
