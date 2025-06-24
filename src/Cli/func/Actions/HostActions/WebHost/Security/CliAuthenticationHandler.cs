@@ -17,8 +17,13 @@ namespace Azure.Functions.Cli.Actions.HostActions.WebHost.Security
 {
     public class CliAuthenticationHandler<TOptions> : AuthenticationHandler<TOptions> where TOptions : AuthenticationSchemeOptions, new()
     {
+#if NET7_0_OR_GREATER
         public CliAuthenticationHandler(IOptionsMonitor<TOptions> options, ILoggerFactory logger, UrlEncoder encoder)
             : base(options, logger, encoder)
+#else
+        public CliAuthenticationHandler(IOptionsMonitor<TOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock)
+            : base(options, logger, encoder, clock)
+#endif
         {
         }
 

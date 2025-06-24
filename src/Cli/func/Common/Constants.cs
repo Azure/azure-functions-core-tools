@@ -46,6 +46,7 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsCoreToolsEnvironment = "FUNCTIONS_CORETOOLS_ENVIRONMENT";
         public const string EnablePersistenceChannelDebugSetting = "FUNCTIONS_CORE_TOOLS_ENABLE_PERSISTENCE_CHANNEL_DEBUG_OUTPUT";
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
+        public const string FunctionsCoreToolsInProcChildProcess = "FUNCTIONS_CORE_TOOLS_INPROC_CHILD_PROCESS";
         public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
         public const string ScmDoBuildDuringDeployment = "SCM_DO_BUILD_DURING_DEPLOYMENT";
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";

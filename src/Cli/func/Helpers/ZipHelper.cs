@@ -5,6 +5,9 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 using Azure.Functions.Cli.Common;
+#if NET6_0
+using Azure.Functions.Cli.Extensions;
+#endif
 using Colors.Net;
 using static Colors.Net.StringStaticMethods;
 
@@ -193,7 +196,11 @@ namespace Azure.Functions.Cli.Helpers
             if (stream.Position >= buffer.Length)
             {
                 stream.Seek(-buffer.Length, SeekOrigin.Current);
+#if NET7_0_OR_GREATER
                 stream.ReadExactly(buffer.AsSpan());
+#else
+                StreamExtensions.ReadExactly(stream, buffer.AsSpan());
+#endif
                 stream.Seek(-buffer.Length, SeekOrigin.Current);
                 bufferPointer = buffer.Length - 1;
                 return false;
@@ -204,7 +211,11 @@ namespace Azure.Functions.Cli.Helpers
                 // return back that position in the buffer to the caller
                 int bytesToRead = (int)stream.Position;
                 stream.Seek(0, SeekOrigin.Begin);
+#if NET7_0_OR_GREATER
                 stream.ReadExactly(buffer, 0, bytesToRead);
+#else
+                StreamExtensions.ReadExactly(stream, buffer, 0, bytesToRead);
+#endif
                 stream.Seek(0, SeekOrigin.Begin);
                 bufferPointer = bytesToRead - 1;
                 return true;

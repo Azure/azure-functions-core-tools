@@ -403,8 +403,10 @@ namespace Azure.Functions.Cli.Actions.HostActions
             await PreRunConditions();
             var isVerbose = VerboseLogging.HasValue && VerboseLogging.Value;
 
-            // Return if running is delegated to another version of Core Tools
-            if (await TryHandleInProcDotNetLaunchAsync())
+            // Skip in-proc handling if the child process environment variable is set.
+            // This means that we are already running in the child process, and we don't need to handle in-proc logic again.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.FunctionsCoreToolsInProcChildProcess))
+                && await TryHandleInProcDotNetLaunchAsync())
             {
                 return;
             }
@@ -609,7 +611,11 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                Environment =
+                {
+                    [Constants.FunctionsCoreToolsInProcChildProcess] = "true",
+                }
             };
 
             try
