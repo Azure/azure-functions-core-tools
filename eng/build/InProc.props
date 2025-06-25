@@ -1,0 +1,34 @@
+<Project>
+
+  <PropertyGroup>
+    <ProjectName>Azure.Functions.Cli</ProjectName>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+    <Configuration Condition="'$(Configuration)' == ''">debug</Configuration>
+    <RuntimeSuffix Condition="'$(RuntimeIdentifier)' != ''">_$(RuntimeIdentifier)</RuntimeSuffix>
+  </PropertyGroup>
+
+  <!-- InProc .NET 6 -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <OutputPath>$(ArtifactsPath)\bin\$(ProjectName)\$(Configuration)_inproc6$(RuntimeSuffix)\</OutputPath>
+    <PublishDir>$(ArtifactsPath)\pub\$(ProjectName)\$(Configuration)_inproc6$(RuntimeSuffix)\</PublishDir>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'" >
+    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.634.3" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageVersion Include="System.Text.Json" Version="6.0.10" />
+  </ItemGroup>
+
+  <!-- InProc .NET 8 -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <OutputPath>$(ArtifactsPath)\bin\$(ProjectName)\$(Configuration)_inproc8$(RuntimeSuffix)\</OutputPath>
+    <PublishDir>$(ArtifactsPath)\pub\$(ProjectName)\$(Configuration)_inproc8$(RuntimeSuffix)\</PublishDir>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'" >
+    <PackageVersion Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.834.3" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
+    <PackageVersion Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+</Project>

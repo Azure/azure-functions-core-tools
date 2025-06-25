@@ -18,9 +18,19 @@
       <_CliDisplayName>Azure.Functions.Cli</_CliDisplayName>
     </PropertyGroup>
 
+    <!-- If InProcBuild is true and targeting net6.0 -->
+    <PropertyGroup Condition="'$(InProcBuild)' == 'true' and '$(TargetFramework)' == 'net6.0'">
+      <_InProcSuffixWithPeriod>.inproc6</_InProcSuffixWithPeriod>
+    </PropertyGroup>
+
+    <!-- If InProcBuild is true and targeting net8.0 -->
+    <PropertyGroup Condition="'$(InProcBuild)' == 'true' and '$(TargetFramework)' == 'net8.0'">
+      <_InProcSuffixWithPeriod>.inproc8</_InProcSuffixWithPeriod>
+    </PropertyGroup>
+
     <!-- If no publish artifact is available, we will add the publish directory as a default. -->
     <ItemGroup Condition="'$(ZipArtifactsPath)' != '' AND '@(ZipArtifact)' == ''">
-      <ZipArtifact Include="$(PublishDir)" TargetPath="$(ZipArtifactsPath)$(_CliDisplayName)$(_MinifiedSuffixWithPeriod)$(_RuntimeIdentifierWithPeriod).$(Version).zip" />
+      <ZipArtifact Include="$(PublishDir)" TargetPath="$(ZipArtifactsPath)$(_CliDisplayName)$(_MinifiedSuffixWithPeriod)$(_RuntimeIdentifierWithPeriod)$(_InProcSuffixWithPeriod).$(Version).zip" />
     </ItemGroup>
   </Target>
 
