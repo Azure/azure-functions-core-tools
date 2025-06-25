@@ -96,7 +96,6 @@ jobs:
         version: '*'
         downloadPath: '$(Pipeline.Workspace)/core-tools-default/func-cli'
 
-
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
     inputs:
@@ -105,14 +104,6 @@ jobs:
       arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
 
-  - ${{ if eq(parameters.arch, 'min.win-x64') }}: # what about the other min.* architectures?
-    - task: PowerShell@2
-      displayName: 'Generate metadata.json file'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/generate-metadata-file.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
-        workingDirectory: '$(Pipeline.Workspace)'
 
   - ${{ if startsWith(parameters.arch, 'win-x') }}:
     - task: PowerShell@2
@@ -192,6 +183,14 @@ jobs:
       TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
 
   - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+    - task: PowerShell@2
+      displayName: 'Generate metadata.json file'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/generate-metadata-file.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
+        workingDirectory: '$(Pipeline.Workspace)'
+
     - task: CopyFiles@2
       displayName: 'Copy metadata.json to Artifact Staging Directory'
       inputs:

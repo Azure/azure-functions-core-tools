@@ -18,7 +18,44 @@ jobs:
   - template: /eng/ci/templates/official/variables/authenticode-binaries-tosign.yml@self
   - template: /eng/ci/templates/official/variables/thirdparty-binaries-tosign.yml@self
 
+  templateContext:
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+      - output: pipelineArtifact
+        displayName: Publish assembled artifact ${{ parameters.runtime }}
+        targetPath: $(Build.ArtifactStagingDirectory)/core-tools
+        artifact: func-cli-${{ parameters.runtime }}
+      - output: pipelineArtifact
+        displayName: Publish metadata.json
+        targetPath: $(Build.ArtifactStagingDirectory)/metadata.json
+        artifact: func-cli-metadata-json
+        condition: and(succeeded(), eq('${{ parameters.runtime }}', 'min.win-x64'))
+
   steps:
+  - task: DownloadPipelineArtifact@2
+    displayName: Download linux host
+    inputs:
+      artifact: 'func-host-linux'
+      path: $(Pipeline.Workspace)/core-tools-host/func-host-linux
+
+  - task: DownloadPipelineArtifact@2
+    displayName: Download windows host
+    inputs:
+      artifact: 'func-host-windows'
+      path: $(Pipeline.Workspace)/core-tools-host/func-host-windows
+
+  - task: DownloadPipelineArtifact@2
+    displayName: Download inproc6
+    inputs:
+      artifact: 'func-cli-inproc6'
+      path: $(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc6
+
+  - task: DownloadPipelineArtifact@2
+    displayName: Download inproc8
+    inputs:
+      artifact: 'func-cli-inproc8'
+      path: $(Pipeline.Workspace)/core-tools-inproc/func-cli-inproc8
+
   - template: /eng/ci/templates/official/steps/prebuild-common.yml@self
 
   - pwsh: |
@@ -42,15 +79,15 @@ jobs:
     env:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
 
-  - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
-    parameters:
-      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
-      signPatterns: $(authenticodeBinariesToSign)
+  # - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
+  #   parameters:
+  #     folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+  #     signPatterns: $(authenticodeBinariesToSign)
 
-  - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
-    parameters:
-      folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
-      signPatterns: $(thirdPartyBinariesToSign)
+  # - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
+  #   parameters:
+  #     folderPath: '$(Build.Repository.LocalPath)/out/bin/Azure.Functions.Cli'
+  #     signPatterns: $(thirdPartyBinariesToSign)
 
   - pwsh: |
       $runtime = "${{ parameters.runtime }}"
@@ -74,14 +111,54 @@ jobs:
     displayName: 'Publish & Zip CLI'
 
   # What can we do for linux signing? We have nothing to sign func and gozip binaries on linux at the moment.
-  - ${{ if contains(parameters.runtime, 'osx') }}:
-    - template: /eng/ci/templates/official/steps/sign-mac.yml@self
-      parameters:
-        folderPath: '$(Build.Repository.LocalPath)/artifacts'
-        signPatterns: '*.osx-*.zip'
+  # - ${{ if contains(parameters.runtime, 'osx') }}:
+  #   - template: /eng/ci/templates/official/steps/sign-mac.yml@self
+  #     parameters:
+  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
+  #       signPatterns: '*.osx-*.zip'
 
   # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
-  - ${{ if and(contains(parameters.runtime, 'win'), not(contains(parameters.runtime, 'arm64')), not(contains(parameters.runtime, 'min'))) }}:
+  # - ${{ if and(contains(parameters.runtime, 'win'), not(contains(parameters.runtime, 'arm64')), not(contains(parameters.runtime, 'min'))) }}:
+  #   - pwsh: >
+  #       ./eng/scripts/generate-msi-files.ps1
+  #       -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
+  #       -runtime "${{ parameters.runtime }}"
+  #     displayName: 'Generate MSI files'
+
+  #   - template: /eng/ci/templates/official/steps/sign-msi.yml@self
+  #     parameters:
+  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
+
+  # - pwsh: ./eng/scripts/generate-sha-files.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
+  #   displayName: 'Generate sha files'
+
+  - task: CopyFiles@2
+    displayName: 'Copy CLI build to core-tools-default/func-cli'
+    inputs:
+      SourceFolder: '$(Build.Repository.LocalPath)/artifacts/$runtime'
+      Contents: '*'
+      TargetFolder: '$(Pipeline.Workspace)/core-tools-default/func-cli'
+      OverWrite: true
+
+  - task: DotNetCoreCLI@2
+    displayName: "Run ArtifactAssembler"
+    inputs:
+      command: run
+      projects: "$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj"
+      arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.runtime }}"'
+      workingDirectory: '$(Pipeline.Workspace)'
+    env:
+      IN_PROC_ARTIFACT_ALIAS: 'core-tools-inproc'
+      IN_PROC6_ARTIFACT_NAME: 'func-cli-inproc6'
+      IN_PROC8_ARTIFACT_NAME: 'func-cli-inproc8'
+      OUT_OF_PROC_ARTIFACT_ALIAS: 'core-tools-default'
+      OUT_OF_PROC_ARTIFACT_NAME: 'func-cli'
+      CORETOOLS_HOST_ARTIFACT_ALIAS: 'core-tools-host'
+      CORETOOLS_HOST_WINDOWS_ARTIFACT_NAME: 'func-host-windows'
+      CORETOOLS_HOST_LINUX_ARTIFACT_NAME: 'func-host-linux'
+
+  # - ${{ if and(contains(parameters.runtime, 'win'), not(contains(parameters.runtime, 'arm64')), not(contains(parameters.runtime, 'min'))) }}:
+  - ${{ if startsWith(parameters.runtime, 'win-x') }}:
     - pwsh: >
         ./eng/scripts/generate-msi-files.ps1
         -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
@@ -92,26 +169,71 @@ jobs:
       parameters:
         folderPath: '$(Build.Repository.LocalPath)/artifacts'
 
-  - pwsh: ./eng/scripts/generate-sha-files.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
-    displayName: 'Generate sha files'
+  # - ${{ if eq(parameters.runtime, 'min.win-x64') }}:
+  #   - task: PowerShell@2
+  #     displayName: 'Test Artifacts - Visual Studio'
+  #     inputs:
+  #       targetType: filePath
+  #       filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
+  #       arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-visualstudio"'
 
-  - pwsh: |
-      $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -ErrorAction SilentlyContinue
-      if ($msiFiles) {
-        Write-Host "Moving MSI files to ArtifactStagingDirectory: $($msiFiles.FullName)"
-        Move-Item -Path $msiFiles.FullName -Destination '$(Build.ArtifactStagingDirectory)'
-      }
+  # - ${{ if startsWith(parameters.runtime, 'win') }}:
+  #   - task: PowerShell@2
+  #     displayName: 'Test Artifacts'
+  #     inputs:
+  #       targetType: filePath
+  #       filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
+  #       arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-cli"'
 
-      $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -ErrorAction SilentlyContinue
-      if ($funcZips) {
-        Write-Host "Moving func zips to ArtifactStagingDirectory: $($funcZips.FullName)"
-        Move-Item -Path $funcZips.FullName -Destination '$(Build.ArtifactStagingDirectory)'
-      }
-    displayName: 'Move artifacts to ArtifactStagingDirectory'
-
-  - task: 1ES.PublishPipelineArtifact@1
-    condition: succeeded()
+  - task: DotNetCoreCLI@2
+    displayName: 'Zip Artifacts'
     inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifactName: 'func-cli-${{ parameters.runtime }}'
-      artifactType: 'pipeline'
+      command: run
+      projects: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj'
+      arguments: '--no-build -c release -- zip'
+      workingDirectory: '$(Pipeline.Workspace)'
+
+  - task: PowerShell@2
+    displayName: 'Generate SHA files'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-sha-files.ps1'
+      arguments: '-artifactsPath "$(Pipeline.Workspace)/staging"'
+
+  # - pwsh: |
+  #     $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -ErrorAction SilentlyContinue
+  #     if ($msiFiles) {
+  #       Write-Host "Moving MSI files to ArtifactStagingDirectory: $($msiFiles.FullName)"
+  #       Move-Item -Path $msiFiles.FullName -Destination '$(Build.ArtifactStagingDirectory)'
+  #     }
+
+  #     $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -ErrorAction SilentlyContinue
+  #     if ($funcZips) {
+  #       Write-Host "Moving func zips to ArtifactStagingDirectory: $($funcZips.FullName)"
+  #       Move-Item -Path $funcZips.FullName -Destination '$(Build.ArtifactStagingDirectory)'
+  #     }
+  #   displayName: 'Move artifacts to ArtifactStagingDirectory'
+
+  - task: CopyFiles@2
+    displayName: 'Copy CLI to output directory'
+    inputs:
+      SourceFolder: '$(Pipeline.Workspace)/staging'
+      Contents: 'coretools-*/**'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
+
+  - ${{ if eq(parameters.runtime, 'min.win-x64') }}:
+    - task: PowerShell@2
+      displayName: 'Generate metadata.json file'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/generate-metadata-file.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
+        workingDirectory: '$(Pipeline.Workspace)'
+
+    - task: CopyFiles@2
+      displayName: 'Copy metadata.json to output directory'
+      inputs:
+        SourceFolder: '$(Pipeline.Workspace)/staging'
+        Contents: 'metadata.json'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+

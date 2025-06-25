@@ -45,7 +45,16 @@ extends:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
     stages:
-      - stage: BuildAndPublish
+      - stage: BuildInProc
+        jobs:
+        - template: /eng/ci/templates/official/jobs/inproc-build-pack.yml@self
+
+      - stage: BuildHost
+        jobs:
+        - template: /eng/ci/templates/official/jobs/host-build-pack.yml@self
+
+      - stage: BuildAndPublishCLI
+        dependsOn: 'BuildInProc,BuildHost'
         jobs:
         - ${{ each runtime in split(variables.supportedRuntimes,',') }}:
           - template: /eng/ci/templates/official/jobs/publish-cli.yml@self
@@ -61,27 +70,27 @@ extends:
         jobs:
         - template: /eng/ci/templates/official/jobs/merge-pipeline-artifacts.yml@self
 
-      - stage: UploadToNightlyFeed
-        dependsOn: 'Merge'
-        condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
+      # - stage: UploadToNightlyFeed
+      #   dependsOn: 'Merge'
+      #   condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
 
-        jobs:
-        - template: /eng/ci/templates/official/jobs/upload-cli-to-feed.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/official/jobs/upload-cli-to-feed.yml@self
 
-      - stage: E2ETestWindows
-        dependsOn: ''
+      # - stage: E2ETestWindows
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
 
-      - stage: E2ETestLinux
-        dependsOn: ''
+      # - stage: E2ETestLinux
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
 
-      - stage: E2ETestOSX
-        dependsOn: ''
+      # - stage: E2ETestOSX
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self

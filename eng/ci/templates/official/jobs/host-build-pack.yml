@@ -7,16 +7,7 @@ jobs:
     os: windows
 
   steps:
-  - task: UseDotNet@2
-    inputs:
-      version: 9.x
-      includePreviewVersions: true
-    displayName: Install .NET 9
-
-  - task: UseDotNet@2
-    inputs:
-      version: 6.x
-    displayName: Install .NET 6
+  - template: /eng/ci/templates/steps/install-tools.yml@self
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (win-x64)
@@ -104,7 +95,7 @@ jobs:
       Contents: |
         func.exe
         nethost.dll
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-x64
+      TargetFolder: $(Build.ArtifactStagingDirectory)/CoreToolsHostPackages/win-x64
 
   - task: CopyFiles@2
     displayName: Copy files (win-arm64)
@@ -114,32 +105,14 @@ jobs:
       Contents: |
         func.exe
         nethost.dll
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-arm64
-
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - task: PowerShell@2
-      displayName: 'Generate nightly build package version for feed'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-nightly-build-version.ps1'
-
-    - task: UniversalPackages@0
-      displayName: Publish
-      inputs:
-        command: publish
-        publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
-        vstsFeedPublish: 'internal/core-tools-nightly-build'
-        vstsFeedPackagePublish: 'func-host-windows-signed'
-        versionOption: custom
-        versionPublish: '$(NightlyBuildVersion)'
-        packagePublishDescription: 'Core tools host build (windows)'
+      TargetFolder: $(Build.ArtifactStagingDirectory)/CoreToolsHostPackages/win-arm64
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
-      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: func-host-windows-signed
+      path: $(Build.ArtifactStagingDirectory)/CoreToolsHostPackages
+      artifact: func-host-windows
 
 - job: BuildCoreToolsHostLinux
   displayName: '[Linux] Build CoreToolsHost'
@@ -149,11 +122,7 @@ jobs:
     os: linux
 
   steps:
-  - task: UseDotNet@2
-    inputs:
-      version: 9.x
-      includePreviewVersions: true
-    displayName: Install .NET 9
+  - template: /eng/ci/templates/steps/install-tools.yml@self
 
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (linux-x64)
@@ -163,42 +132,6 @@ jobs:
       zipAfterPublish: false
       arguments: -c Release -r linux-x64 -o $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
       workingDirectory: $(Build.SourcesDirectory)/src/CoreToolsHost
-
-  - task: CopyFiles@2
-    displayName: Copy files (linux-x64)
-    inputs:
-      SourceFolder: $(Build.SourcesDirectory)/pkg_output/linux/linux-x64
-      # Publish output will include many other files. We only need func & nethost.dll
-      Contents: |
-        func
-        libnethost.so
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
-
-  templateContext:
-    outputParentDirectory: $(Build.ArtifactStagingDirectory)
-    outputs:
-    - output: pipelineArtifact
-      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: func-host-linux
-
-- job: SignCoreToolsHostLinux
-  displayName: '[Linux] Sign CoreToolsHost'
-  dependsOn: BuildCoreToolsHostLinux
-  pool:
-    name: 1es-pool-azfunc
-    image: 1es-ubuntu-22.04
-    os: linux
-
-  steps:
-  - task: UseDotNet@2
-    inputs:
-      version: 8.x
-    displayName: Install .NET 8
-
-  - task: DownloadPipelineArtifact@2
-    inputs:
-      artifact: func-host-linux
-      path: $(Build.SourcesDirectory)/func-host-linux
 
   - task: Bash@3
     inputs:
@@ -237,36 +170,11 @@ jobs:
       Contents: |
         func
         libnethost.so
-      TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
-
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - task: PowerShell@2
-      displayName: 'Generate nightly build package version for feed'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-nightly-build-version.ps1'
-
-    - task: PowerShell@2
-      displayName: 'Print NightlyBuildVersion'
-      inputs:
-        targetType: 'inline'
-        script: |
-          Write-Host "NightlyBuildVersion value: $(NightlyBuildVersion)"
-
-    - task: UniversalPackages@0
-      displayName: Publish
-      inputs:
-        command: publish
-        publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
-        vstsFeedPublish: 'internal/core-tools-nightly-build'
-        vstsFeedPackagePublish: 'func-host-linux-signed'
-        versionOption: custom
-        versionPublish: '$(NightlyBuildVersion)'
-        packagePublishDescription: 'Core tools host build (linux)'
+      TargetFolder: $(Build.ArtifactStagingDirectory)/CoreToolsHostPackages/linux-x64
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
     - output: pipelineArtifact
-      path: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages
-      artifact: func-host-linux-signed
+      path: $(Build.ArtifactStagingDirectory)/CoreToolsHostPackages
+      artifact: func-host-linux
