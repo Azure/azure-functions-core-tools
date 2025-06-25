@@ -17,10 +17,10 @@ namespace Azure.Functions.Cli.ArtifactAssembler
         internal void ZipCliArtifacts()
         {
             Console.WriteLine("Zipping CLI Artifacts");
-            string stagingDirectory = Path.Combine(_rootWorkingDirectory, Constants.StagingDirName, Constants.CliOutputArtifactDirectoryName);
+            string releaseDirectory = Path.Combine(_rootWorkingDirectory, Constants.ReleaseDirName, Constants.CliOutputArtifactDirectoryName);
 
             // Get all directories in the staging directory
-            var directories = Directory.EnumerateDirectories(stagingDirectory);
+            var directories = Directory.EnumerateDirectories(releaseDirectory);
 
             foreach (var dir in directories)
             {
@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
 
                 // Define zip file path and name
                 string zipFileName = $"{new DirectoryInfo(dir).Name}.zip";
-                string zipFilePath = Path.Combine(stagingDirectory, zipFileName);
+                string zipFilePath = Path.Combine(releaseDirectory, zipFileName);
 
                 // Compress directory into zip file
                 ZipFile.CreateFromDirectory(dir, zipFilePath, CompressionLevel.Optimal, includeBaseDirectory: false);
@@ -54,16 +54,16 @@ namespace Azure.Functions.Cli.ArtifactAssembler
         internal void ZipVisualStudioArtifacts()
         {
             Console.WriteLine("Zipping Visual Studio Artifacts");
-            string stagingDirectory = Path.Combine(_rootWorkingDirectory, Constants.StagingDirName, Constants.VisualStudioOutputArtifactDirectoryName);
+            string releaseDirectory = Path.Combine(_rootWorkingDirectory, Constants.ReleaseDirName, Constants.VisualStudioOutputArtifactDirectoryName);
 
             // Get all directories in the staging directory
-            var directories = Directory.EnumerateDirectories(stagingDirectory);
+            var directories = Directory.EnumerateDirectories(releaseDirectory);
 
             foreach (var dir in directories)
             {
                 // Define zip file path and name
                 string zipFileName = $"{new DirectoryInfo(dir).Name}.zip";
-                string zipFilePath = Path.Combine(stagingDirectory, zipFileName);
+                string zipFilePath = Path.Combine(releaseDirectory, zipFileName);
 
                 // Compress directory into zip file
                 FileUtilities.CreateZipFile(dir, zipFilePath);
