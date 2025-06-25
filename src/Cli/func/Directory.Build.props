@@ -2,6 +2,8 @@
 
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
+    <Import Project="$(EngBuildRoot)InProc.props" Condition="'$(InProcBuild)' == 'true'"/>
     <Import Project="$(EngBuildRoot)Telemetry.props" />
+    <Import Project="$(EngBuildRoot)StaticResources.props" />
 
 </Project>
