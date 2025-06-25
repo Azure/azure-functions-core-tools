@@ -96,7 +96,6 @@ jobs:
         version: '*'
         downloadPath: '$(Pipeline.Workspace)/core-tools-default/func-cli'
 
-
   - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
     inputs:
@@ -104,6 +103,17 @@ jobs:
       projects: "$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj"
       arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
+    env:
+      # Directory names containing the artifacts
+      IN_PROC_ARTIFACT_ALIAS: 'core-tools-inproc'
+      OUT_OF_PROC_ARTIFACT_ALIAS: 'core-tools-default'
+      CORETOOLS_HOST_ARTIFACT_ALIAS: 'core-tools-host'
+      # Subdirectory names for the artifacts
+      IN_PROC6_ARTIFACT_NAME: 'func-cli-inproc6'
+      IN_PROC8_ARTIFACT_NAME: 'func-cli-inproc8'
+      OUT_OF_PROC_ARTIFACT_NAME: 'func-cli'
+      CORETOOLS_HOST_WINDOWS_ARTIFACT_NAME: 'func-host-windows-signed'
+      CORETOOLS_HOST_LINUX_ARTIFACT_NAME: 'func-host-linux-signed'
 
   - ${{ if eq(parameters.arch, 'min.win-x64') }}: # what about the other min.* architectures?
     - task: PowerShell@2
