@@ -71,11 +71,11 @@ extends:
 
               - input: pipelineArtifact
                 artifactName: func-cli-inproc8
-                targetPath: $Build.ArtifactStagingDirectory)/func-cli-inproc/inproc8
+                targetPath: $(Build.ArtifactStagingDirectory)/func-cli-inproc/inproc8
 
             outputs:
               - output: pipelineArtifact
-                targetPath: $(Build.ArtifactStagingDirectorye)/func-cli-inproc
+                targetPath: $(Build.ArtifactStagingDirectory)/func-cli-inproc
                 artifactName: 'func-cli-inproc'
 
       - stage: UploadToNightlyFeed
