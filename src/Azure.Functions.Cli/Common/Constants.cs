@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using Azure.Functions.Cli.Helpers;
+using Azure.Functions.Cli.Extensions;
 
 namespace Azure.Functions.Cli.Common
 {
@@ -96,10 +97,9 @@ namespace Azure.Functions.Cli.Common
         public const string AzureDevSessionsPortSuffixPlaceholder = "<port>";
         // Sample format https://n12abc3t-<port>.asse.devtunnels.ms/
 
+        public static string CliVersion => typeof(Constants).Assembly.GetCliVersion();
 
-        public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
-
-        public static string CliDetailedVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+        public static string CliDetailedVersion => typeof(Constants).Assembly.GetInformationalVersion();
 
         public static string CliUserAgent = $"functions-core-tools/{Constants.CliVersion}";
 

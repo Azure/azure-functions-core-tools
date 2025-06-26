@@ -42,7 +42,7 @@ extends:
          compiled:
            enabled: true
          runSourceLanguagesInSourceAnalysis: true
-    stages:     
+    stages:
       - stage: BuildAndTest
         jobs:
           - template: /eng/ci/templates/official/jobs/build-test.yml@self
@@ -53,3 +53,37 @@ extends:
             parameters:
               artifactTargetFramework: inproc8
               jobTitle: BuildInproc8
+
+      - stage: Merge
+        dependsOn: 'BuildAndTest'
+
+        jobs:
+        - job: MergeArtifacts
+          displayName: 'Merge artifacts'
+
+          templateContext:
+            type: artifactJob
+
+            inputs:
+              - input: pipelineArtifact
+                artifactName: func-cli-inproc6
+                targetPath: $(Build.ArtifactStagingDirectory)/func-cli-inproc/inproc6
+
+              - input: pipelineArtifact
+                artifactName: func-cli-inproc8
+                targetPath: $Build.ArtifactStagingDirectory)/func-cli-inproc/inproc8
+
+            outputs:
+              - output: pipelineArtifact
+                targetPath: $(Build.ArtifactStagingDirectorye)/func-cli-inproc
+                artifactName: 'func-cli-inproc'
+
+      - stage: UploadToNightlyFeed
+        dependsOn: 'Merge'
+        condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
+
+        jobs:
+        - template: /eng/ci/templates/official/jobs/upload-artifact-to-feed.yml@self
+          parameters:
+            artifactName: 'func-cli-inproc'
+            packageName: 'func-cli-inproc'
