@@ -1,13 +1,15 @@
-$projectFileName = ".\Azure.Functions.Cli.csproj"
-$logFilePath = "..\..\build.log"
-$skipCveFilePath = "..\..\skipPackagesCve.json"
+param (
+    [string]$projectPath = "src/Azure.Functions.Cli/Azure.Functions.Cli.csproj"
+)
 
+$logFilePath = "build.log"
+$skipCveFilePath = "skipPackagesCve.json"
 
-$cmd = "restore"
+$cmd = "restore", "$projectPath"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath
 
-$cmd = "list", "package", "--include-transitive", "--vulnerable", "--format", "json"
+$cmd = "list", $projectPath, "package", "--include-transitive", "--vulnerable", "--format", "json"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath
 

@@ -6,7 +6,7 @@
         ./validateWorkerVersions.ps1
 
     .EXAMPLE
-        ./validateWorkerVersions.ps1 -Update -HostVersion 4.1037.0
+        ./validateWorkerVersions.ps1 -Update -HostVersion 4.40.100
 
     .EXAMPLE
         ./validateWorkerVersions.ps1 -TargetFramework net8.0
@@ -29,39 +29,31 @@ $cliCsprojPath = "$PSScriptRoot/src/Azure.Functions.Cli/Azure.Functions.Cli.cspr
 $cliCsprojContent = removeBomIfExists(Get-Content $cliCsprojPath)
 $cliCsprojXml = [xml]$cliCsprojContent
 
-# For WebHost only: lookup by TargetFramework
 function getWebHostVersion() {
-    $groups = $cliCsprojXml.Project.ItemGroup | Where-Object {
-        $_.Condition -match $TargetFramework
-    }
-    foreach ($group in $groups) {
+    foreach ($group in $cliCsprojXml.Project.ItemGroup) {
         foreach ($pkg in $group.PackageReference) {
-            if ($pkg.Include -eq "Microsoft.Azure.WebJobs.Script.WebHost") {
+            if ($pkg.Include -eq "Microsoft.Azure.WebJobs.Script.WebHost.InProc") {
                 return $pkg.Version
             }
         }
     }
-    throw "Could not find Microsoft.Azure.WebJobs.Script.WebHost for $TargetFramework"
+    throw "Could not find Microsoft.Azure.WebJobs.Script.WebHost.InProc in the CLI project."
 }
 
 function setWebHostVersion([string]$newVersion) {
-    $groups = $cliCsprojXml.Project.ItemGroup | Where-Object {
-        $_.Condition -match $TargetFramework
-    }
-    foreach ($group in $groups) {
+    foreach ($group in $cliCsprojXml.Project.ItemGroup) {
         foreach ($pkg in $group.PackageReference) {
             if ($pkg.Include -eq "Microsoft.Azure.WebJobs.Script.WebHost") {
                 $oldVersion = $pkg.Version
                 $pkg.Version = $newVersion
-                Write-Output "Updated WebHost from $oldVersion to $newVersion for $TargetFramework"
+                Write-Output "Updated WebHost from $oldVersion to $newVersion"
                 return
             }
         }
     }
-    throw "Failed to find WebHost package reference for $TargetFramework"
+    throw "Failed to find Microsoft.Azure.WebJobs.Script.WebHost in the CLI project."
 }
 
-# For workers: unconditional lookup
 function getWorkerVersion([string]$packageName) {
     foreach ($group in $cliCsprojXml.Project.ItemGroup) {
         foreach ($pkg in $group.PackageReference) {
@@ -87,24 +79,43 @@ function setWorkerVersion([string]$packageName, [string]$newVersion) {
     throw "Failed to find $packageName in CLI project"
 }
 
-# WebHost version
-if (-Not $hostVersion) {
-    $hostVersion = getWebHostVersion
-} elseif ($Update) {
+function getHostTagVersionFromPackage([string]$packageVersion, [string]$targetFramework) {
+    $parts = $packageVersion -split '\.'
+    if ($parts.Length -ne 3) {
+        throw "Unexpected version format: $packageVersion"
+    }
+
+    $major = $parts[0]
+    $minor = $parts[1]
+    $patch = $parts[2]
+
+    $tfmDigit = switch ($targetFramework) {
+        "net6.0" { "6" }
+        "net8.0" { "8" }
+        default { throw "Unsupported TargetFramework: $targetFramework" }
+    }
+
+    return "$major.$tfmDigit$minor.$patch"
+}
+
+# Determine versions
+$webHostPackageVersion = if ($hostVersion) { $hostVersion } else { getWebHostVersion }
+if ($Update -and $hostVersion) {
     setWebHostVersion $hostVersion
 }
 
+$hostTagVersion = getHostTagVersionFromPackage $webHostPackageVersion $TargetFramework
+Write-Output "Using host tag version: v$hostTagVersion"
+
 # Validate the tag exists
-$tagUri = "https://api.github.com/repos/Azure/azure-functions-host/git/refs/tags/v$hostVersion"
+$tagUri = "https://api.github.com/repos/Azure/azure-functions-host/git/refs/tags/v$hostTagVersion"
 $result = Invoke-WebRequest -Uri $tagUri
 if ($result.StatusCode -ne 200) {
-    throw "Host tag version $hostVersion does not exist."
+    throw "Host tag version v$hostTagVersion does not exist. Check that the tag is published."
 }
-Write-Output "Host version: $hostVersion"
 
-# Fetch worker versions from remote
 function getWorkerPropsFileFromHost([string]$filePath) {
-    $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/refs/tags/v$hostVersion/$filePath"
+    $uri = "https://raw.githubusercontent.com/Azure/azure-functions-host/refs/tags/v$hostTagVersion/$filePath"
     $content = removeBomIfExists((Invoke-WebRequest -Uri $uri).Content)
     return [xml]$content
 }
@@ -127,7 +138,6 @@ foreach ($key in $workerPropsToWorkerName.Keys) {
         Write-Output "Validating $worker version..."
         $packageName = "Microsoft.Azure.Functions.$worker"
 
-        # Host version from .props file
         $node = $workerPropsContent.Project.ItemGroup.PackageReference | Where-Object { $_.Include -eq $packageName }
         if (-not $node) {
             throw "Could not find $packageName in $key"
@@ -147,7 +157,6 @@ foreach ($key in $workerPropsToWorkerName.Keys) {
 }
 Write-Output "----------------------------------------------"
 
-# Save if updated
 if ($Update) {
     $cliCsprojXml.Save($cliCsprojPath)
     Write-Output "Updated worker versions! 🚀"

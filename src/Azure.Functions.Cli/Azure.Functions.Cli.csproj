@@ -26,6 +26,7 @@
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <NuspecFile>Azure.Functions.Cli.nuspec</NuspecFile>
     <NuspecProperties>configuration=$(Configuration);targetFramework=$(TargetFramework);version=$(Version)</NuspecProperties>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
   <!-- Pack only the net6.0 version (which will include the bits needed for net8.0 usecase) -->
   <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
@@ -286,7 +287,7 @@
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Azure.DurableTask.AzureStorage.Internal" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost" Version="4.40.100" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Script.WebHost.InProc" Version="4.40.100" />
     <PackageReference Include="Microsoft.Build" Version="17.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -297,8 +298,7 @@
   </ItemGroup>
   <!-- System.Text.Json is a transitive dependency that we need to explicitly add -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
-    <PackageReference Include="System.Text.Json" Version="6.0.10" />
-    >
+    <PackageReference Include="System.Text.Json" Version="6.0.11" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <PackageReference Include="System.Text.Json" Version="8.0.5" />

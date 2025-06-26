@@ -48,7 +48,7 @@ jobs:
     displayName: "Run Check Vulnerabilities Script"
     inputs:
       filePath: '$(Build.SourcesDirectory)/check-vulnerabilities.ps1'
-      workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.Cli'
+      workingDirectory: '$(Build.SourcesDirectory)'
   - pwsh: |
       .\build.ps1
     env:
