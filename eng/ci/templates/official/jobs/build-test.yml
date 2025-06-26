@@ -276,7 +276,9 @@ jobs:
     condition: eq(variables.IsIntegrationBuild, 'true')
 
 - job: MergeArtifacts
-  dependsOn: BuildInproc6, BuildInproc8
+  dependsOn:
+  - BuildInproc6
+  - BuildInproc8
   displayName: 'Merge artifacts'
 
   templateContext:
