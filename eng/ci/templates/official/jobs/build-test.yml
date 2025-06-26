@@ -18,6 +18,7 @@ jobs:
   steps:
   - pwsh: . "tools/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
+
   - pwsh: |
       $simulateReleaseBuild = $null
       if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
@@ -37,6 +38,7 @@ jobs:
     env:
       BuildSourceBranchName: $(Build.SourceBranchName)
       SimulateReleaseBuild: $(SimulateReleaseBuild)
+
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -46,20 +48,25 @@ jobs:
       Write-Host "##vso[task.setvariable variable=IsIntegrationBuild]$isIntegrationBuild"
       Write-Host "IsIntegrationBuild: $isIntegrationBuild"
     displayName: 'Set IsIntegrationBuild variable'
+
   - pwsh: |
       Write-Host "Target branch: '$(DEVOPS_REPO_BRANCH)'"
     displayName: Set up environment variables
+
   - task: NodeTool@0
     inputs:
       versionSpec: '18.x'
+
   - pwsh: |
       Import-Module ".\pipelineUtilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
+
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
     displayName: Install Nuget tool
+
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
     inputs:
@@ -71,15 +78,18 @@ jobs:
         # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
+
   - pwsh: |
       .\validateWorkerVersions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
+
   - task: PowerShell@2
     displayName: "Run Check Vulnerabilities Script"
     inputs:
       filePath: '$(Build.SourcesDirectory)/check-vulnerabilities.ps1'
       workingDirectory: '$(Build.SourcesDirectory)/src/Azure.Functions.Cli'
+
   - pwsh: |
       .\build.ps1
     env:
@@ -91,6 +101,13 @@ jobs:
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Executing build script'
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true
+    condition: succeededOrFailed()
 
   - template: ci/sign-files.yml@eng
     parameters:
@@ -121,13 +138,6 @@ jobs:
               "ToolVersion": "1.0"
             }
         ]
-
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFormat: 'VSTest'
-      testResultsFiles: '**/*.trx'
-      failTaskOnFailedTests: true
-    condition: succeededOrFailed()
 
   - template: ci/sign-files.yml@eng
     parameters:
@@ -251,30 +261,12 @@ jobs:
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
     displayName: 'Move artifacts'
 
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - task: PowerShell@2
-      displayName: 'Generate nightly build package version for feed'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/generateNightlyBuildPackageVersion.ps1'
-
-    - task: UniversalPackages@0
-      displayName: Publish
-      inputs:
-        command: publish
-        publishDirectory: '$(Build.ArtifactStagingDirectory)'
-        vstsFeedPublish: 'internal/core-tools-nightly-build'
-        vstsFeedPackagePublish: 'func-cli-${{ parameters.artifactTargetFramework }}'
-        versionOption: custom
-        versionPublish: '$(NightlyBuildVersion)'
-        packagePublishDescription: 'Core tools ${{ parameters.artifactTargetFramework }} nightly build'
-
   - task: 1ES.PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: 'func-cli-${{ parameters.artifactTargetFramework }}'
       artifactType: 'pipeline'
-      
+
   - pwsh: |
       .\uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
     env:
@@ -282,3 +274,32 @@ jobs:
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)
     displayName: 'Upload Core Tools build to the storage account for Integration Tests'
     condition: eq(variables.IsIntegrationBuild, 'true')
+
+- job: MergeArtifacts
+  dependsOn: BuildInproc6, BuildInproc8
+  displayName: 'Merge artifacts'
+
+  templateContext:
+    type: artifactJob
+
+  inputs:
+    - input: pipelineArtifact
+      artifactName: func-cli-inproc6
+      targetPath: $(Build.ArtifactStagingDirectory)/func-cli-inproc/inproc6
+
+    - input: pipelineArtifact
+      artifactName: func-cli-inproc8
+      targetPath: $Build.ArtifactStagingDirectory)/func-cli-inproc/inproc8
+
+  outputs:
+    - output: pipelineArtifact
+      targetPath: $(Build.ArtifactStagingDirectorye)/func-cli-inproc
+      artifactName: 'func-cli-inproc'
+
+# Upload the inproc cli to the feed if nightly build
+- template: /eng/ci/templates/official/jobs/upload-artifact-to-feed.yml@self
+  dependsOn: MergeArtifacts
+  condition: and(succeeded(), eq(variables['Build.Reason'], 'Schedule'))
+  parameters:
+    artifactName: 'func-cli-inproc'
+    packageName: 'func-cli-inproc'
