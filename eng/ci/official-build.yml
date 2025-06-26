@@ -66,8 +66,12 @@ extends:
         condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
 
         jobs:
-        - template: /eng/ci/templates/official/jobs/upload-cli-to-feed.yml@self
+        - template: /eng/ci/templates/official/jobs/upload-artifact-to-feed.yml@self
+          parameters:
+            artifactName: 'func-cli'
+            packageName: 'func-cli'
 
+      # Test Stages
       - stage: E2ETestWindows
         dependsOn: ''
 

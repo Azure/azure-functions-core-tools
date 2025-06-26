@@ -116,24 +116,6 @@ jobs:
         nethost.dll
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/win-arm64
 
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - task: PowerShell@2
-      displayName: 'Generate nightly build package version for feed'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-nightly-build-version.ps1'
-
-    - task: UniversalPackages@0
-      displayName: Publish
-      inputs:
-        command: publish
-        publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
-        vstsFeedPublish: 'internal/core-tools-nightly-build'
-        vstsFeedPackagePublish: 'func-host-windows-signed'
-        versionOption: custom
-        versionPublish: '$(NightlyBuildVersion)'
-        packagePublishDescription: 'Core tools host build (windows)'
-
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
     outputs:
@@ -238,31 +220,6 @@ jobs:
         func
         libnethost.so
       TargetFolder: $(Build.ArtifactStagingDirectory)/_coreToolsHostPackages/linux-x64
-
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - task: PowerShell@2
-      displayName: 'Generate nightly build package version for feed'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-nightly-build-version.ps1'
-
-    - task: PowerShell@2
-      displayName: 'Print NightlyBuildVersion'
-      inputs:
-        targetType: 'inline'
-        script: |
-          Write-Host "NightlyBuildVersion value: $(NightlyBuildVersion)"
-
-    - task: UniversalPackages@0
-      displayName: Publish
-      inputs:
-        command: publish
-        publishDirectory: '$(Build.ArtifactStagingDirectory)/_coreToolsHostPackages'
-        vstsFeedPublish: 'internal/core-tools-nightly-build'
-        vstsFeedPackagePublish: 'func-host-linux-signed'
-        versionOption: custom
-        versionPublish: '$(NightlyBuildVersion)'
-        packagePublishDescription: 'Core tools host build (linux)'
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)

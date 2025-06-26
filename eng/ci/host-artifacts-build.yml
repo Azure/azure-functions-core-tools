@@ -46,3 +46,37 @@ extends:
       - stage: BuildCoreToolsHost
         jobs:
         - template: /eng/ci/templates/official/jobs/host-build-pack.yml@self
+
+      - stage: Merge
+        dependsOn: 'BuildCoreToolsHost'
+
+        jobs:
+        - job: MergeArtifacts
+          displayName: 'Merge artifacts'
+
+          templateContext:
+            type: artifactJob
+
+            inputs:
+              - input: pipelineArtifact
+                artifactName: func-host-windows-signed
+                targetPath: $(Build.ArtifactStagingDirectory)/func-cli-host/windows
+
+              - input: pipelineArtifact
+                artifactName: func-host-linux-signed
+                targetPath: $Build.ArtifactStagingDirectory)/func-cli-host/linux
+
+            outputs:
+              - output: pipelineArtifact
+                targetPath: $(Build.ArtifactStagingDirectorye)/func-cli-host
+                artifactName: 'func-cli-host'
+
+      - stage: UploadToNightlyFeed
+        dependsOn: 'Merge'
+        condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
+
+        jobs:
+        - template: /eng/ci/templates/official/jobs/upload-artifact-to-feed.yml@self
+          parameters:
+            artifactName: 'func-cli-host'
+            packageName: 'func-cli-host'
