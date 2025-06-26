@@ -64,11 +64,11 @@ extends:
 
               - input: pipelineArtifact
                 artifactName: func-host-linux-signed
-                targetPath: $Build.ArtifactStagingDirectory)/func-cli-host/linux
+                targetPath: $(Build.ArtifactStagingDirectory)/func-cli-host/linux
 
             outputs:
               - output: pipelineArtifact
-                targetPath: $(Build.ArtifactStagingDirectorye)/func-cli-host
+                targetPath: $(Build.ArtifactStagingDirectory)/func-cli-host
                 artifactName: 'func-cli-host'
 
       - stage: UploadToNightlyFeed
