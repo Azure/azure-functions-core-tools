@@ -1,0 +1,5 @@
+<Project>
+
+  <Import Project="$(MSBuildThisFileDirectory)../../eng/build/Version.targets" />
+
+</Project>

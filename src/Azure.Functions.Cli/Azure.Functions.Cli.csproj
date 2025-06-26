@@ -4,14 +4,6 @@
     <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
-    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
-    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
-    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
-    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
-    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
-    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
-    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
     <Company>Microsoft</Company>
     <Authors>Microsoft</Authors>
     <Title>Azure Functions Cli</Title>
@@ -291,11 +283,9 @@
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NuGet.Packaging" Version="5.11.6" />
-    <PackageReference Include="System.Formats.Asn1" Version="6.0.1" />    
+    <PackageReference Include="System.Formats.Asn1" Version="6.0.1" />
     <PackageReference Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageReference Include="YamlDotNet" Version="6.0.0" />
-    <!-- Transitive dependency -->
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
   <!-- System.Text.Json is a transitive dependency that we need to explicitly add -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
