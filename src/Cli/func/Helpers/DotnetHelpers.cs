@@ -68,7 +68,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
-            await TemplateOperation(
+            await TemplateOperationAsync(
                 async () =>
                 {
                     var frameworkString = string.IsNullOrEmpty(targetFramework)
@@ -90,7 +90,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             ColoredConsole.WriteLine($"{Environment.NewLine}Creating dotnet function...");
-            await TemplateOperation(
+            await TemplateOperationAsync(
                 async () =>
                 {
                     // In .NET 6.0, the 'dotnet new' command requires the short name.
@@ -276,18 +276,21 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
+        private static async Task TemplateOperationAsync(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
 
-            if (workerRuntime == WorkerRuntime.DotnetIsolated)
+            await FileLockHelper.WithFileLockAsync("func_dotnet_templates.lock", async () =>
             {
-                return IsolatedTemplateOperation(action);
-            }
-            else
-            {
-                return WebJobsTemplateOperation(action);
-            }
+                if (workerRuntime == WorkerRuntime.DotnetIsolated)
+                {
+                    await IsolatedTemplateOperation(action);
+                }
+                else
+                {
+                    await WebJobsTemplateOperation(action);
+                }
+            });
         }
 
         private static async Task IsolatedTemplateOperation(Func<Task> action)
@@ -300,49 +303,45 @@ namespace Azure.Functions.Cli.Helpers
         {
             await EnsureWebJobsTemplatesInstalled();
             await action();
-
-            // No uninstall - templates stay installed
         }
 
         private static async Task EnsureIsolatedTemplatesInstalled()
         {
-            // Check if isolated templates are already available
             if (await AreIsolatedTemplatesAvailable())
             {
-                ColoredConsole.WriteLine("Isolated templates are already available");
-                return; // Already installed and available
+                ColoredConsole.WriteLine("Isolated templates are already available; skipping installation.");
+                return;
             }
 
             // Clean conflicting WebJobs templates if they exist
             if (await AreWebJobsTemplatesAvailable())
             {
-                ColoredConsole.WriteLine("Uninstalling web jobs templates templates are already available");
+                ColoredConsole.WriteLine("WebJobs templates found, uninstalling to avoid conflicts.");
                 await UninstallWebJobsTemplates();
             }
 
             await InstallIsolatedTemplates();
 
-            ColoredConsole.WriteLine("Isolated templates installed successfully");
+            ColoredConsole.WriteLine("Isolated templates installed successfully.");
         }
 
         private static async Task EnsureWebJobsTemplatesInstalled()
         {
-            // Check if WebJobs templates are already available
             if (await AreWebJobsTemplatesAvailable())
             {
-                ColoredConsole.WriteLine("WebJobs templates already installed");
-                return; // Already installed and available
+                ColoredConsole.WriteLine("WebJobs templates already installed; skipping installation.");
+                return;
             }
 
-            // Clean conflicting Isolated templates if they exist
             if (await AreIsolatedTemplatesAvailable())
             {
+                ColoredConsole.WriteLine("Isolated templates found, uninstalling to avoid conflicts.");
                 await UninstallIsolatedTemplates();
             }
 
             await InstallWebJobsTemplates();
 
-            ColoredConsole.WriteLine("WebJobs templates installed successfully");
+            ColoredConsole.WriteLine("WebJobs templates installed successfully.");
         }
 
         private static async Task<bool> AreIsolatedTemplatesAvailable()

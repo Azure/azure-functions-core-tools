@@ -4,6 +4,7 @@
 using System.Reflection;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Newtonsoft.Json;
@@ -70,18 +71,22 @@ namespace Azure.Functions.Cli.Common
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
                 Console.WriteLine("in extension bundle configured");
-                await ExtensionBundleHelper.GetExtensionBundle();
-                var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
-                templatesJson = await contentProvider.GetTemplates();
+                templatesJson = await FileLockHelper.WithFileLockAsync("func_bundle_templates.lock", async () =>
+                {
+                    await ExtensionBundleHelper.GetExtensionBundle();
+                    var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+                    return await contentProvider.GetTemplates();
+                });
             }
             else
             {
                 templatesJson = GetTemplatesJson();
             }
 
-            Console.WriteLine("=== TEMPLATES JSON ===");
-            Console.WriteLine(templatesJson);
-            Console.WriteLine("=== END TEMPLATES JSON ===");
+            if (string.IsNullOrEmpty(templatesJson))
+            {
+                throw new CliException("Templates JSON is empty. Please check the templates location.");
+            }
 
             var templates = JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
             templates = templates.Concat(await GetNodeV4TemplatesJson()).ToList();
@@ -285,6 +290,11 @@ namespace Azure.Functions.Cli.Common
             else
             {
                 templateJson = await GetV2TemplatesJson();
+            }
+
+            if (string.IsNullOrEmpty(templateJson))
+            {
+                throw new CliException("Templates JSON is empty. Please check the templates location.");
             }
 
             return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(templateJson);
