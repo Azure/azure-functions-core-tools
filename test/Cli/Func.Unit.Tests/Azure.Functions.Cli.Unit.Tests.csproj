@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoSrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
+    <ProjectReference Include="$(SrcRoot)Cli\func\Azure.Functions.Cli.csproj" />
   </ItemGroup>
 
 </Project>
