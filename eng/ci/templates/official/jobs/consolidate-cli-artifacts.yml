@@ -105,13 +105,13 @@ jobs:
       inputs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-msi-files.ps1'
-        arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/coretools-cli"'
+        arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/func-cli"'
         workingDirectory: '$(Build.SourcesDirectory)/build'
 
     - template: ci/sign-files.yml@eng
       parameters:
         displayName: Sign MSI files
-        folderPath: $(Pipeline.Workspace)/staging/coretools-cli
+        folderPath: $(Pipeline.Workspace)/staging/func-cli
         pattern: '*.msi'
         signType: 'inline'
         inlineOperation: |
@@ -144,7 +144,7 @@ jobs:
       inputs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-visualstudio"'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/func-cli-visualstudio"'
 
   - ${{ if startsWith(parameters.arch, 'win') }}:
     - task: PowerShell@2
@@ -152,17 +152,7 @@ jobs:
       inputs:
         targetType: filePath
         filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/coretools-cli"'
-      env:
-        DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
-      
-    - task: 1ES.PublishPipelineArtifact@1
-      condition: succeededOrFailed()
-      continueOnError: true
-      inputs:
-        targetPath: '$(Build.SourcesDirectory)/TestLogs'
-        artifactName: 'TestLogs_$(System.JobId)_$(System.JobAttempt)'
-        artifactType: 'pipeline'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/func-cli"'
 
   - task: DotNetCoreCLI@2
     displayName: 'Zip Artifacts'
@@ -183,7 +173,7 @@ jobs:
     displayName: 'Copy Files to Artifact Staging Directory'
     inputs:
       SourceFolder: '$(Pipeline.Workspace)/staging'
-      Contents: 'coretools-*/**'
+      Contents: 'func-cli-*/**'
       TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
 
   - ${{ if eq(parameters.arch, 'min.win-x64') }}:
