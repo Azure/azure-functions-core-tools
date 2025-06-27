@@ -10,9 +10,9 @@ using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Script;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using NuGet.Common;
 using static Azure.Functions.Cli.Common.Constants;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
@@ -28,9 +28,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
         private readonly ITemplatesManager _templatesManager;
-        private readonly AsyncLazy<IEnumerable<Template>> _templatesLazy;
-        private readonly AsyncLazy<IEnumerable<NewTemplate>> _newTemplatesLazy;
-        private readonly AsyncLazy<IEnumerable<UserPrompt>> _userPromptsLazy;
         private IEnumerable<Template> _templates;
         private IEnumerable<NewTemplate> _newTemplates;
         private IEnumerable<UserPrompt> _userPrompts;
@@ -43,9 +40,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
             _userInputHandler = new UserInputHandler(_templatesManager);
-            _templatesLazy = new AsyncLazy<IEnumerable<Template>>(async () => { return await _templatesManager.Templates; });
-            _newTemplatesLazy = new AsyncLazy<IEnumerable<NewTemplate>>(async () => { return await _templatesManager.NewTemplates; });
-            _userPromptsLazy = new AsyncLazy<IEnumerable<UserPrompt>>(async () => { return await _templatesManager.UserPrompts; });
         }
 
         public string Language { get; set; }
@@ -104,9 +98,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public async Task InitializeTemplatesAndPrompts()
         {
-            _templates = await _templatesLazy;
-            _newTemplates = await _newTemplatesLazy;
-            _userPrompts = await _userPromptsLazy;
+            _templates = await _templatesManager.Templates;
+            _newTemplates = await _templatesManager.NewTemplates;
+            _userPrompts = await _templatesManager.UserPrompts;
         }
 
         public override async Task RunAsync()
@@ -181,7 +175,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (FileName != PySteinFunctionAppPy)
                 {
                     var filePath = Path.Combine(Environment.CurrentDirectory, FileName);
-                    if (Microsoft.Azure.WebJobs.Script.FileUtility.FileExists(filePath))
+                    if (FileUtility.FileExists(filePath))
                     {
                         jobName = "AppendToBlueprint";
                         providedInputs[GetBluePrintExistingFileNameParamId] = FileName;
