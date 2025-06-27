@@ -7,11 +7,13 @@
     <PackageVersion Include="WindowsAzure.Storage" Version="9.3.1" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
   </ItemGroup>
+
   <!-- abstractions-->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5.25306.101" />
   </ItemGroup>
+
   <!-- func -->
   <ItemGroup>
     <PackageVersion Include="Autofac" Version="4.6.2" />
@@ -30,6 +32,7 @@
     <!-- Transitive dependency -->
     <PackageVersion Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
+
   <!-- workers -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Azure.Functions.JavaWorker" Version="2.19.1" />
@@ -39,10 +42,12 @@
     <PackageVersion Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" Version="4.0.4206" />
     <PackageVersion Include="Microsoft.Azure.Functions.PythonWorker" Version="4.37.0" />
   </ItemGroup>
+
   <!-- host -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NETCore.DotNetAppHost" Version="8.0.8" />
   </ItemGroup>
+
   <!-- test projects -->
   <ItemGroup>
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
