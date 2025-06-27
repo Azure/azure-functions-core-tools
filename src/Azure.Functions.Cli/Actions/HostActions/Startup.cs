@@ -70,8 +70,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 services.AddAuthentication()
                     .AddScriptJwtBearer()
-                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
-                    .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
+                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { });
             }
 
             services.AddSingleton<IAuthorizationHandler, CoreToolsAuthorizationHandler>();
