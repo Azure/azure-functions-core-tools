@@ -9,6 +9,7 @@ parameters:
 jobs:
 - job: AssembleArtifact${{ parameters.displayName }}
   displayName: "Assemble ${{ parameters.arch }}"
+
   templateContext:
     ${{ if eq(parameters.isNightlyBuild, false) }}:
       inputs:
@@ -90,15 +91,6 @@ jobs:
       CORETOOLS_HOST_WINDOWS_ARTIFACT_NAME: 'windows'
       CORETOOLS_HOST_LINUX_ARTIFACT_NAME: 'linux'
 
-  - ${{ if eq(parameters.arch, 'min.win-x64') }}: # what about the other min.* architectures?
-    - task: PowerShell@2
-      displayName: 'Generate metadata.json file'
-      inputs:
-        targetType: filePath
-        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/generate-metadata-file.ps1'
-        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
-        workingDirectory: '$(Pipeline.Workspace)'
-
   - ${{ if startsWith(parameters.arch, 'win-x') }}:
     - task: PowerShell@2
       displayName: 'Generate MSI files'
@@ -177,6 +169,14 @@ jobs:
       TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
 
   - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+    - task: PowerShell@2
+      displayName: 'Generate metadata.json file'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/generate-metadata-file.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
+        workingDirectory: '$(Pipeline.Workspace)'
+
     - task: CopyFiles@2
       displayName: 'Copy metadata.json to Artifact Staging Directory'
       inputs:
