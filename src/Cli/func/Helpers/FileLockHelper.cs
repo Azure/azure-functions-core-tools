@@ -29,7 +29,7 @@ namespace Azure.Functions.Cli.Helpers
                 catch (IOException)
                 {
                     stream?.Dispose();
-                    await Task.Delay(200);
+                    await Task.Delay(500);
                 }
                 finally
                 {

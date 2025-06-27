@@ -99,8 +99,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public async Task InitializeTemplatesAndPrompts()
         {
             _templates = await _templatesManager.Templates;
-            _newTemplates = await _templatesManager.NewTemplates;
-            _userPrompts = await _templatesManager.UserPrompts;
+            if (IsNewPythonProgrammingModel())
+            {
+                _newTemplates = await _templatesManager.NewTemplates;
+                _userPrompts = await _templatesManager.UserPrompts;
+            }
         }
 
         public override async Task RunAsync()
