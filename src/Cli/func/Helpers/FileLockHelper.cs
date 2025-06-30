@@ -22,7 +22,7 @@ namespace Azure.Functions.Cli.Helpers
                         lockFile,
                         FileMode.OpenOrCreate,
                         FileAccess.ReadWrite,
-                        FileShare.None); // Exclusive access
+                        FileShare.Delete);
 
                     return await action();
                 }
