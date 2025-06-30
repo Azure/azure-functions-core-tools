@@ -1,7 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -16,6 +15,8 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
+        private const string TemplatesLockFileName = "func_dotnet_templates.lock";
+        private static readonly Lazy<Task<HashSet<string>>> _installedTemplatesList = new(GetInstalledTemplatePackageIds);
 
         public static void EnsureDotnet()
         {
@@ -68,7 +69,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static async Task DeployDotnetProject(string name, bool force, WorkerRuntime workerRuntime, string targetFramework = "")
         {
-            await TemplateOperation(
+            await TemplateOperationAsync(
                 async () =>
                 {
                     var frameworkString = string.IsNullOrEmpty(targetFramework)
@@ -90,7 +91,7 @@ namespace Azure.Functions.Cli.Helpers
         public static async Task DeployDotnetFunction(string templateName, string functionName, string namespaceStr, string language, WorkerRuntime workerRuntime, AuthorizationLevel? httpAuthorizationLevel = null)
         {
             ColoredConsole.WriteLine($"{Environment.NewLine}Creating dotnet function...");
-            await TemplateOperation(
+            await TemplateOperationAsync(
                 async () =>
                 {
                     // In .NET 6.0, the 'dotnet new' command requires the short name.
@@ -276,163 +277,140 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private static Task TemplateOperation(Func<Task> action, WorkerRuntime workerRuntime)
+        private static async Task TemplateOperationAsync(Func<Task> action, WorkerRuntime workerRuntime)
         {
             EnsureDotnet();
 
             if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
-                return IsolatedTemplateOperation(action);
+                await EnsureIsolatedTemplatesInstalled();
             }
             else
             {
-                return WebJobsTemplateOperation(action);
+                await EnsureWebJobsTemplatesInstalled();
             }
-        }
 
-        private static async Task IsolatedTemplateOperation(Func<Task> action)
-        {
-            await EnsureIsolatedTemplatesInstalled();
             await action();
-        }
-
-        private static async Task WebJobsTemplateOperation(Func<Task> action)
-        {
-            await EnsureWebJobsTemplatesInstalled();
-            await action();
-
-            // No uninstall - templates stay installed
         }
 
         private static async Task EnsureIsolatedTemplatesInstalled()
         {
-            // Check if isolated templates are already available
-            if (await AreIsolatedTemplatesAvailable())
+            if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
             {
-                ColoredConsole.WriteLine("Isolated templates are already available");
-                return; // Already installed and available
-            }
-
-            // Clean conflicting WebJobs templates if they exist
-            if (await AreWebJobsTemplatesAvailable())
-            {
-                ColoredConsole.WriteLine("Uninstalling web jobs templates templates are already available");
+                ColoredConsole.WriteLine("WebJobs templates found, uninstalling to avoid conflicts.");
                 await UninstallWebJobsTemplates();
             }
 
-            await InstallIsolatedTemplates();
+            if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
+            {
+                ColoredConsole.WriteLine("Isolated templates are already available; skipping installation.");
+                return;
+            }
 
-            ColoredConsole.WriteLine("Isolated templates installed successfully");
+            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, async () =>
+            {
+                await InstallIsolatedTemplates();
+
+                ColoredConsole.WriteLine("Isolated templates installed successfully.");
+            });
         }
 
         private static async Task EnsureWebJobsTemplatesInstalled()
         {
-            // Check if WebJobs templates are already available
-            if (await AreWebJobsTemplatesAvailable())
+            if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
             {
-                ColoredConsole.WriteLine("WebJobs templates already installed");
-                return; // Already installed and available
-            }
-
-            // Clean conflicting Isolated templates if they exist
-            if (await AreIsolatedTemplatesAvailable())
-            {
+                ColoredConsole.WriteLine("Isolated templates found, uninstalling to avoid conflicts.");
                 await UninstallIsolatedTemplates();
             }
 
-            await InstallWebJobsTemplates();
+            if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
+            {
+                ColoredConsole.WriteLine("WebJobs templates already installed; skipping installation.");
+                return;
+            }
 
-            ColoredConsole.WriteLine("WebJobs templates installed successfully");
+            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, async () =>
+            {
+                await InstallWebJobsTemplates();
+
+                ColoredConsole.WriteLine("WebJobs templates installed successfully.");
+            });
         }
 
-        private static async Task<bool> AreIsolatedTemplatesAvailable()
+        private static async Task<bool> IsTemplatePackageInstalled(string packageId)
         {
-            try
-            {
-                var templateList = await GetInstalledTemplateList();
-
-                // Check for key isolated templates that should be available
-                return templateList.Contains($"{IsolatedTemplateBasePackId}.ProjectTemplates") &&
-                       templateList.Contains($"{IsolatedTemplateBasePackId}.ItemTemplates");
-            }
-            catch (Exception ex)
-            {
-                ColoredConsole.WriteLine($"Error checking isolated templates: {ex.Message}");
-                return false;
-            }
+            var templates = await _installedTemplatesList.Value;
+            return templates.Any(id => id.StartsWith(packageId, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static async Task<bool> AreWebJobsTemplatesAvailable()
+        private static async Task<HashSet<string>> GetInstalledTemplatePackageIds()
         {
-            try
-            {
-                var templateList = await GetInstalledTemplateList();
-
-                // Check for key WebJobs templates
-                return templateList.Contains($"{WebJobsTemplateBasePackId}.ProjectTemplates") &&
-                       templateList.Contains($"{WebJobsTemplateBasePackId}.ItemTemplates");
-            }
-            catch (Exception ex)
-            {
-                ColoredConsole.WriteLine($"Error checking WebJobs templates: {ex.Message}");
-            }
-
-            return false;
-        }
-
-        private static async Task<string> GetInstalledTemplateList()
-        {
-            var exe = new Executable("dotnet", "new list");
+            var exe = new Executable("dotnet", "new uninstall", shareConsole: false);
             var output = new StringBuilder();
-            var exitCode = await exe.RunAsync(o => output.Append(o), e => { });
+            var exitCode = await exe.RunAsync(o => output.AppendLine(o), e => output.AppendLine(e));
 
             if (exitCode != 0)
             {
-                throw new CliException("Failed to get template list from dotnet CLI");
+                throw new CliException("Failed to get list of installed template packages");
             }
 
-            return output.ToString().ToLowerInvariant();
+            var lines = output.ToString()
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+
+            var packageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            const string uninstallPrefix = "dotnet new uninstall ";
+
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+
+                if (trimmed.StartsWith(uninstallPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var packageId = trimmed.Substring(uninstallPrefix.Length).Trim();
+                    if (!string.IsNullOrWhiteSpace(packageId))
+                    {
+                        packageIds.Add(packageId);
+                    }
+                }
+            }
+
+            return packageIds;
         }
 
-        private static async Task UninstallIsolatedTemplates()
-        {
-            string projTemplates = $"{IsolatedTemplateBasePackId}.ProjectTemplates";
-            string itemTemplates = $"{IsolatedTemplateBasePackId}.ItemTemplates";
+        private static Task UninstallIsolatedTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{IsolatedTemplateBasePackId}.ProjectTemplates", $"{IsolatedTemplateBasePackId}.ItemTemplates"]);
 
-            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
-            await exe.RunAsync();
-
-            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
-            await exe.RunAsync();
-        }
-
-        private static async Task UninstallWebJobsTemplates()
-        {
-            string projTemplates = $"{WebJobsTemplateBasePackId}.ProjectTemplates";
-            string itemTemplates = $"{WebJobsTemplateBasePackId}.ItemTemplates";
-
-            var exe = new Executable("dotnet", $"new -u \"{projTemplates}\"");
-            await exe.RunAsync();
-
-            exe = new Executable("dotnet", $"new -u \"{itemTemplates}\"");
-            await exe.RunAsync();
-        }
+        private static Task UninstallWebJobsTemplates() => DotnetTemplatesAction("uninstall", nugetPackageList: [$"{WebJobsTemplateBasePackId}.ProjectTemplates", $"{WebJobsTemplateBasePackId}.ItemTemplates"]);
 
         private static Task InstallWebJobsTemplates() => DotnetTemplatesAction("install", "templates");
 
         private static Task InstallIsolatedTemplates() => DotnetTemplatesAction("install", Path.Combine("templates", $"net-isolated"));
 
-        private static async Task DotnetTemplatesAction(string action, string templateDirectory)
+        private static async Task DotnetTemplatesAction(string action, string templateDirectory = null, string[] nugetPackageList = null)
         {
-            var templatesLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), templateDirectory);
-            if (!FileSystemHelpers.DirectoryExists(templatesLocation))
+            string[] list;
+
+            if (!string.IsNullOrEmpty(templateDirectory))
             {
-                throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
+                var templatesLocation = Path.Combine(
+                    Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                    templateDirectory);
+
+                if (!FileSystemHelpers.DirectoryExists(templatesLocation))
+                {
+                    throw new CliException($"Can't find templates location. Looked under '{templatesLocation}'");
+                }
+
+                list = Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly);
+            }
+            else
+            {
+                list = nugetPackageList ?? Array.Empty<string>();
             }
 
-            foreach (var nupkg in Directory.GetFiles(templatesLocation, "*.nupkg", SearchOption.TopDirectoryOnly))
+            foreach (var nupkg in list)
             {
-                var exe = new Executable("dotnet", $"new --{action} \"{nupkg}\"");
+                var exe = new Executable("dotnet", $"new {action} \"{nupkg}\"");
                 await exe.RunAsync();
             }
         }
