@@ -28,10 +28,16 @@ jobs:
   - task: NodeTool@0
     inputs:
       versionSpec: '18.x'
-  - pwsh: |
-      Import-Module ".\pipelineUtilities.psm1" -Force
-      Install-Dotnet
-    displayName: 'Install .NET 6.0 and 3.1'
+  - task: UseDotNet@2
+    displayName: Install .NET 3.1
+    inputs:
+      packageType: sdk
+      version: 3.1
+  - task: UseDotNet@2
+    displayName: Install .NET 6
+    inputs:
+      packageType: sdk
+      version: 6.x
   - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
