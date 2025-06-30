@@ -115,7 +115,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             await UpdateLanguageAndRuntime();
 
-            if (IsNewPythonProgrammingModel()) // depends on UpdateLanguageAndRuntime to set 'Language'
+            // Depends on UpdateLanguageAndRuntime to set 'Language'
+            if (IsNewPythonProgrammingModel())
             {
                 _newTemplates = await _templatesManager.NewTemplates;
                 _userPrompts = await _templatesManager.UserPrompts;
