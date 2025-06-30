@@ -1,7 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -16,7 +15,8 @@ namespace Azure.Functions.Cli.Helpers
     {
         private const string WebJobsTemplateBasePackId = "Microsoft.Azure.WebJobs";
         private const string IsolatedTemplateBasePackId = "Microsoft.Azure.Functions.Worker";
-        private static HashSet<string> _installedPackages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private const string TemplatesLockFileName = "func_dotnet_templates.lock";
+        private static readonly Lazy<Task<HashSet<string>>> _installedTemplatesList = new(GetInstalledTemplatePackageIds);
 
         public static void EnsureDotnet()
         {
@@ -281,66 +281,66 @@ namespace Azure.Functions.Cli.Helpers
         {
             EnsureDotnet();
 
-            await FileLockHelper.WithFileLockAsync("func_dotnet_templates.lock", async () =>
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
-                _installedPackages = await GetInstalledTemplatePackageIds();
-                if (workerRuntime == WorkerRuntime.DotnetIsolated)
-                {
-                    await EnsureIsolatedTemplatesInstalled();
-                    await action();
-                }
-                else
-                {
-                    await EnsureWebJobsTemplatesInstalled();
-                    await action();
-                }
-            });
+                await EnsureIsolatedTemplatesInstalled();
+            }
+            else
+            {
+                await EnsureWebJobsTemplatesInstalled();
+            }
+
+            await action();
         }
 
         private static async Task EnsureIsolatedTemplatesInstalled()
         {
-            // Clean conflicting WebJobs templates if they exist
-            if (IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
+            if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
             {
                 ColoredConsole.WriteLine("WebJobs templates found, uninstalling to avoid conflicts.");
                 await UninstallWebJobsTemplates();
-                _installedPackages.RemoveWhere(id => id.StartsWith(WebJobsTemplateBasePackId, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
+            if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
             {
                 ColoredConsole.WriteLine("Isolated templates are already available; skipping installation.");
                 return;
             }
 
-            await InstallIsolatedTemplates();
+            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, async () =>
+            {
+                await InstallIsolatedTemplates();
 
-            ColoredConsole.WriteLine("Isolated templates installed successfully.");
+                ColoredConsole.WriteLine("Isolated templates installed successfully.");
+            });
         }
 
         private static async Task EnsureWebJobsTemplatesInstalled()
         {
-            if (IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
+            if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
             {
                 ColoredConsole.WriteLine("Isolated templates found, uninstalling to avoid conflicts.");
                 await UninstallIsolatedTemplates();
-                _installedPackages.RemoveWhere(id => id.StartsWith(IsolatedTemplateBasePackId, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
+            if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
             {
                 ColoredConsole.WriteLine("WebJobs templates already installed; skipping installation.");
                 return;
             }
 
-            await InstallWebJobsTemplates();
+            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, async () =>
+            {
+                await InstallWebJobsTemplates();
 
-            ColoredConsole.WriteLine("WebJobs templates installed successfully.");
+                ColoredConsole.WriteLine("WebJobs templates installed successfully.");
+            });
         }
 
-        private static bool IsTemplatePackageInstalled(string packageId)
+        private static async Task<bool> IsTemplatePackageInstalled(string packageId)
         {
-            return _installedPackages.Any(id => id.StartsWith(packageId, StringComparison.OrdinalIgnoreCase));
+            var templates = await _installedTemplatesList.Value;
+            return templates.Any(id => id.StartsWith(packageId, StringComparison.OrdinalIgnoreCase));
         }
 
         private static async Task<HashSet<string>> GetInstalledTemplatePackageIds()

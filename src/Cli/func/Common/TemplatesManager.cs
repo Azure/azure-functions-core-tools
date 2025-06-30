@@ -13,6 +13,7 @@ namespace Azure.Functions.Cli.Common
 {
     internal class TemplatesManager : ITemplatesManager
     {
+        private const string BundleTemplatesLockFileName = "func_bundle_templates.lock";
         private readonly ISecretsManager _secretsManager;
 
         public TemplatesManager(ISecretsManager secretsManager)
@@ -71,7 +72,7 @@ namespace Azure.Functions.Cli.Common
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
                 Console.WriteLine("in extension bundle configured");
-                templatesJson = await FileLockHelper.WithFileLockAsync("func_bundle_templates.lock", async () =>
+                templatesJson = await FileLockHelper.WithFileLockAsync(BundleTemplatesLockFileName, async () =>
                 {
                     await ExtensionBundleHelper.GetExtensionBundle();
                     var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
