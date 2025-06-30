@@ -96,16 +96,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return base.ParseArgs(args);
         }
 
-        public async Task InitializeTemplatesAndPrompts()
-        {
-            _templates = await _templatesManager.Templates;
-            if (IsNewPythonProgrammingModel())
-            {
-                _newTemplates = await _templatesManager.NewTemplates;
-                _userPrompts = await _templatesManager.UserPrompts;
-            }
-        }
-
         public override async Task RunAsync()
         {
             // Check if the command only ran for help.
@@ -120,10 +110,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 return;
             }
 
-            // Ensure that the templates, new templates, and user prompts are loaded before proceeding.
-            await InitializeTemplatesAndPrompts();
+            // Ensure that the _templates are loaded before we proceed
+            _templates = await _templatesManager.Templates;
 
             await UpdateLanguageAndRuntime();
+
+            if (IsNewPythonProgrammingModel()) // depends on UpdateLanguageAndRuntime to set 'Language'
+            {
+                _newTemplates = await _templatesManager.NewTemplates;
+                _userPrompts = await _templatesManager.UserPrompts;
+            }
 
             if (WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) && !Csx)
             {
