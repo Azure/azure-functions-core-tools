@@ -28,9 +28,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly IUserInputHandler _userInputHandler;
         private readonly InitAction _initAction;
         private readonly ITemplatesManager _templatesManager;
-        private readonly Lazy<IEnumerable<Template>> _templates;
-        private readonly Lazy<IEnumerable<NewTemplate>> _newTemplates;
-        private readonly Lazy<IEnumerable<UserPrompt>> _userPrompts;
+        private IEnumerable<Template> _templates;
+        private IEnumerable<NewTemplate> _newTemplates;
+        private IEnumerable<UserPrompt> _userPrompts;
         private WorkerRuntime _workerRuntime;
 
         public CreateFunctionAction(ITemplatesManager templatesManager, ISecretsManager secretsManager, IContextHelpManager contextHelpManager)
@@ -40,9 +40,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             _contextHelpManager = contextHelpManager;
             _initAction = new InitAction(_templatesManager, _secretsManager);
             _userInputHandler = new UserInputHandler(_templatesManager);
-            _templates = new Lazy<IEnumerable<Template>>(() => EnsureTemplatesLoaded(tm => tm.Templates, "Templates"));
-            _newTemplates = new Lazy<IEnumerable<NewTemplate>>(() => EnsureTemplatesLoaded(tm => tm.NewTemplates, "New Templates"));
-            _userPrompts = new Lazy<IEnumerable<UserPrompt>>(() => EnsureTemplatesLoaded(tm => tm.UserPrompts, "User Prompts"));
         }
 
         public string Language { get; set; }
@@ -99,6 +96,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return base.ParseArgs(args);
         }
 
+        public async Task InitializeTemplatesAndPrompts()
+        {
+            _templates = await _templatesManager.Templates;
+            if (IsNewPythonProgrammingModel())
+            {
+                _newTemplates = await _templatesManager.NewTemplates;
+                _userPrompts = await _templatesManager.UserPrompts;
+            }
+        }
+
         public override async Task RunAsync()
         {
             // Check if the command only ran for help.
@@ -112,6 +119,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 return;
             }
+
+            // Ensure that the templates, new templates, and user prompts are loaded before proceeding.
+            await InitializeTemplatesAndPrompts();
 
             await UpdateLanguageAndRuntime();
 
@@ -147,7 +157,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     FileName = "function_app.py";
                 }
 
-                var userPrompt = _userPrompts.Value.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
+                var userPrompt = _userPrompts.First(x => string.Equals(x.Id, "app-selectedFileName", StringComparison.OrdinalIgnoreCase));
                 while (!_userInputHandler.ValidateResponse(userPrompt, FileName))
                 {
                     _userInputHandler.PrintInputLabel(userPrompt, PySteinFunctionAppPy);
@@ -184,7 +194,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     providedInputs[GetFileNameParamId] = FileName;
                 }
 
-                var template = _newTemplates.Value.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
+                var template = _newTemplates.FirstOrDefault(t => string.Equals(t.Name, TemplateName, StringComparison.CurrentCultureIgnoreCase) && string.Equals(t.Language, Language, StringComparison.CurrentCultureIgnoreCase));
+
+                if (template is null)
+                {
+                    throw new CliException($"Can't find template \"{TemplateName}\" in \"{Language}\"");
+                }
 
                 var templateJob = template.Jobs.Single(x => x.Type.Equals(jobName, StringComparison.OrdinalIgnoreCase));
 
@@ -303,23 +318,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 if (_workerRuntime == WorkerRuntime.None)
                 {
                     SelectionMenuHelper.DisplaySelectionWizardPrompt("language");
-                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Value.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
+                    Language = SelectionMenuHelper.DisplaySelectionWizard(_templates.Select(t => t.Metadata.Language).Where(l => !l.Equals("python", StringComparison.OrdinalIgnoreCase)).Distinct());
                     _workerRuntime = WorkerRuntimeLanguageHelper.SetWorkerRuntime(_secretsManager, Language);
                 }
                 else if (!WorkerRuntimeLanguageHelper.IsDotnet(_workerRuntime) || Csx)
                 {
                     var languages = WorkerRuntimeLanguageHelper.LanguagesForWorker(_workerRuntime);
-
-                    // If templates are not loaded yet, we need to check the task status and force it to populate if it hasn't already
-                    if (!_templates.IsValueCreated)
-                    {
-                        ColoredConsole.WriteLine("Templates not loaded yet, checking task status...");
-                        var taskStatus = _templatesManager.Templates.Status;
-                        ColoredConsole.WriteLine($"Templates task status: {taskStatus}");
-                        _ = _templatesManager.Templates.Result; // This should force templates to load in templatesManager
-                    }
-
-                    var displayList = _templates.Value?
+                    var displayList = _templates?
                             .Select(t => t.Metadata.Language)
                             .Where(l => languages.Contains(l, StringComparer.OrdinalIgnoreCase))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -356,15 +361,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             if (IsNewNodeJsProgrammingModel(_workerRuntime) ||
                 (forNewModelHelp && (Languages.TypeScript.EqualsIgnoreCase(templateLanguage) || Languages.JavaScript.EqualsIgnoreCase(templateLanguage))))
             {
-                return _templates.Value.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                return _templates.Where(t => t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
             else if (_workerRuntime == WorkerRuntime.Node)
             {
                 // Ensuring that we only show v3 templates for node when the user has not opted into the new model
-                return _templates.Value.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                return _templates.Where(t => !t.Id.EndsWith("-4.x") && t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
 
-            return _templates.Value.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+            return _templates.Where(t => t.Metadata.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
         }
 
         private IEnumerable<string> GetTriggerNamesFromNewTemplates(string templateLanguage, bool forNewModelHelp = false)
@@ -376,7 +381,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (IsNewPythonProgrammingModel() || (Languages.Python.EqualsIgnoreCase(templateLanguage) && forNewModelHelp))
             {
-                return _newTemplates.Value.Where(t => t.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
+                return _newTemplates.Where(t => t.Language.Equals(templateLanguage, StringComparison.OrdinalIgnoreCase));
             }
 
             throw new CliException("The new version of templates are only supported for Python.");
@@ -524,9 +529,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 if (workerRuntime == WorkerRuntime.Node)
                 {
-                    if (FileSystemHelpers.FileExists(Constants.PackageJsonFileName))
+                    if (FileSystemHelpers.FileExists(PackageJsonFileName))
                     {
-                        var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(Constants.PackageJsonFileName);
+                        var packageJsonData = FileSystemHelpers.ReadAllTextFromFile(PackageJsonFileName);
                         var packageJson = JsonConvert.DeserializeObject<JToken>(packageJsonData);
                         var funcPackageVersion = packageJson["dependencies"]["@azure/functions"];
                         if (funcPackageVersion != null && new Regex("^[^0-9]*4").IsMatch(funcPackageVersion.ToString()))
@@ -547,26 +552,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private bool CurrentPathHasLocalSettings()
         {
             return FileSystemHelpers.FileExists(Path.Combine(Environment.CurrentDirectory, "local.settings.json"));
-        }
-
-        private IEnumerable<T> EnsureTemplatesLoaded<T>(Func<ITemplatesManager, Task<IEnumerable<T>>> templateGetter, string templateType)
-        {
-            try
-            {
-                IEnumerable<T> templates = templateGetter(_templatesManager).Result;
-                if (templates == null)
-                {
-                    ColoredConsole.WriteLine(ErrorColor($"{templateType} could not be loaded - returning empty collection"));
-                    return [];
-                }
-
-                return templates;
-            }
-            catch (Exception ex)
-            {
-                ColoredConsole.WriteLine(ErrorColor($"Failed to load {templateType.ToLowerInvariant()}: {ex.Message}"));
-                return [];
-            }
         }
     }
 }
