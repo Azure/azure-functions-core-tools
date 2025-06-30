@@ -297,44 +297,30 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
             {
-                ColoredConsole.WriteLine("WebJobs templates found, uninstalling to avoid conflicts.");
                 await UninstallWebJobsTemplates();
             }
 
             if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
             {
-                ColoredConsole.WriteLine("Isolated templates are already available; skipping installation.");
                 return;
             }
 
-            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, async () =>
-            {
-                await InstallIsolatedTemplates();
-
-                ColoredConsole.WriteLine("Isolated templates installed successfully.");
-            });
+            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallIsolatedTemplates);
         }
 
         private static async Task EnsureWebJobsTemplatesInstalled()
         {
             if (await IsTemplatePackageInstalled(IsolatedTemplateBasePackId))
             {
-                ColoredConsole.WriteLine("Isolated templates found, uninstalling to avoid conflicts.");
                 await UninstallIsolatedTemplates();
             }
 
             if (await IsTemplatePackageInstalled(WebJobsTemplateBasePackId))
             {
-                ColoredConsole.WriteLine("WebJobs templates already installed; skipping installation.");
                 return;
             }
 
-            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, async () =>
-            {
-                await InstallWebJobsTemplates();
-
-                ColoredConsole.WriteLine("WebJobs templates installed successfully.");
-            });
+            await FileLockHelper.WithFileLockAsync(TemplatesLockFileName, InstallWebJobsTemplates);
         }
 
         private static async Task<bool> IsTemplatePackageInstalled(string packageId)

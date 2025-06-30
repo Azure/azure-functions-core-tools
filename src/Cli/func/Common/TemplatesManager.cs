@@ -71,7 +71,6 @@ namespace Azure.Functions.Cli.Common
 
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
-                Console.WriteLine("in extension bundle configured");
                 templatesJson = await FileLockHelper.WithFileLockAsync(BundleTemplatesLockFileName, async () =>
                 {
                     await ExtensionBundleHelper.GetExtensionBundle();
