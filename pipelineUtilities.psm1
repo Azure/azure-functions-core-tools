@@ -59,23 +59,23 @@ $DotnetSDKVersionRequirements = @{
 
     # .NET SDK 3.1 is required by the Microsoft.ManifestTool.dll tool
     '3.1' = @{
-        MinimalPatch = '415'
-        DefaultPatch = '415'
+        MinimalPatch = '426'
+        DefaultPatch = '426'
     }
 
     '6.0' = @{
-        MinimalPatch = '417'
-        DefaultPatch = '417'
+        MinimalPatch = '428'
+        DefaultPatch = '428'
     }
 
     '8.0' = @{
-        MinimalPatch = '204'
-        DefaultPatch = '204'
+        MinimalPatch = '411'
+        DefaultPatch = '411'
     }
     # Update .NET 9 patch once .NET 9 has been released out of preview
     '9.0' = @{
-        MinimalPatch = '100-preview.6.24328.19'
-        DefaultPatch = '100-preview.6.24328.19'
+        MinimalPatch = '301'
+        DefaultPatch = '301'
 
     }
 }
