@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 using Autofac;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
@@ -12,6 +13,9 @@ namespace Azure.Functions.Cli
         static IContainer _container;
         internal static void Main(string[] args)
         {
+            // Set console encoding to UTF-8 to properly display international characters
+            Console.OutputEncoding = Encoding.UTF8;
+
             FirstTimeCliExperience();
             SetupGlobalExceptionHandler();
             SetCoreToolsEnvironmentVariables(args);
