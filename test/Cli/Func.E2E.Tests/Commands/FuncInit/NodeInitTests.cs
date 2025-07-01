@@ -157,6 +157,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             var funcInitResult = funcInitCommand
                 .WithWorkingDirectory(workingDir)
+                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "node")
                 .Execute(["--docker-only", "--worker-runtime", "node"]);
 
             // Validate expected output content

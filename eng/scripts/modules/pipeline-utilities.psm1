@@ -32,8 +32,8 @@ $DotnetSDKVersionRequirements = @{
     }
     # Update .NET 9 patch once .NET 9 has been released out of preview
     '9.0' = @{
-        MinimalPatch = '100-rc.1.24452.12'
-        DefaultPatch = '100-rc.1.24452.12'
+        MinimalPatch = '106'
+        DefaultPatch = '106'
 
     }
 }
@@ -54,10 +54,23 @@ function Find-DotnetVersionsToInstall
     $missingVersions = [System.Collections.Generic.List[string]]::new()
     foreach ($majorMinorVersion in $DotnetSDKVersionRequirements.Keys) {
         $minimalVersion = "$majorMinorVersion.$($DotnetSDKVersionRequirements[$majorMinorVersion].MinimalPatch)"
-        $firstAcceptable = $installedDotnetSdks |
-                                Where-Object { $_.StartsWith("$majorMinorVersion.") } |
-                                Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
-                                Select-Object -First 1
+        $acceptableSdks = $installedDotnetSdks |
+            Where-Object { $_.StartsWith("$majorMinorVersion.") }
+
+        if ($majorMinorVersion -eq '9.0') {
+            # Check if exactly 9.0.106 is installed, not just any 9.0.x version
+            $acceptableSdks = $acceptableSdks | Where-Object { $_ -eq '9.0.106' }
+            $firstAcceptable = $acceptableSdks | Select-Object -First 1
+        } else {
+            $firstAcceptable = $acceptableSdks |
+                Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
+                Select-Object -First 1
+        }
+
+        $firstAcceptable = $acceptableSdks |
+            Where-Object { [System.Management.Automation.SemanticVersion]::new($_) -ge [System.Management.Automation.SemanticVersion]::new($minimalVersion) } |
+            Select-Object -First 1
+
         if ($firstAcceptable) {
             Write-Host "Found dotnet SDK $firstAcceptable for .NET Core $majorMinorVersion."
         }

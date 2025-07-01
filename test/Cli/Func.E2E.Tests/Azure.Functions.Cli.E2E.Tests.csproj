@@ -1,11 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
 	<DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include=".runsettings\new_and_init_tests\ci_pipeline\default.runsettings" />
+    <None Include=".runsettings\new_and_init_tests\ci_pipeline\dotnet_inproc.runsettings" />
     <None Include=".runsettings\start_tests\artifact_consolidation_pipeline\visualstudio.runsettings" />
     <None Include=".runsettings\start_tests\ci_pipeline\default.runsettings" />
     <None Include=".runsettings\start_tests\ci_pipeline\dotnet_inproc.runsettings" />

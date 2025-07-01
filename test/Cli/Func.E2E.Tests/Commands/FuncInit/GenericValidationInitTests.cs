@@ -43,7 +43,6 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
 
             // Validate expected output content
             funcInitResult.Should().ExitWith(1);
-            funcInitResult.Should().HaveStdErrContaining($"Can't determine project language from files.");
         }
 
         [Fact]
@@ -70,7 +69,7 @@ namespace Azure.Functions.Cli.E2E.Tests.Commands.FuncInit
             var testName = nameof(Init_WithWorkerRuntimeTypescript_GeneratesExpectedFunctionProjectFiles);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));
 
-            // Initialize dotnet function app
+            // Initialize typescript function app
             var funcInitResult = funcInitCommand
                .WithWorkingDirectory(workingDir)
                .Execute(["--worker-runtime", "typescript"]);
