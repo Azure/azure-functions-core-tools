@@ -6,8 +6,6 @@ schedules:
       - main
   always: true
 
-name: $(Build.SourceBranchName)_$(Build.Reason)
-
 pr: none
 
 trigger:
