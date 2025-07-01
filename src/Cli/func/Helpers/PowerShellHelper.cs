@@ -1,11 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using System.Xml;
 using Azure.Functions.Cli.Common;
-using System.Net.Http;
-using System.Xml;
-using System.Text.Json;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -107,6 +105,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return runtimeVersion;
             }
+
             // Fallback: Check local.settings.json (for local development)
             string settingsPath = Path.Combine(functionAppRoot, "local.settings.json");
             if (File.Exists(settingsPath))
@@ -121,6 +120,7 @@ namespace Azure.Functions.Cli.Helpers
                     }
                 }
             }
+
             return null;
         }
     }

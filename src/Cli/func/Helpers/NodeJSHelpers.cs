@@ -70,13 +70,16 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return null;
             }
+
             var packageJson = JObject.Parse(File.ReadAllText(packageJsonPath));
+
             // Check if "engines" field specifies Node.js version
             string nodeVersion = packageJson["engines"]?["node"]?.ToString();
             if (!string.IsNullOrEmpty(nodeVersion))
             {
                 return nodeVersion;
             }
+
             return null;
         }
     }

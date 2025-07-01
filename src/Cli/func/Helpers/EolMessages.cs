@@ -31,6 +31,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             return $"Upgrade to {displayName} {nextStackVersion} as {displayName} {currentStackVersion} will reach end-of-life on {FormatDate(eol)}  and will no longer be supported. Learn more: {link}";
         }
+
         public static string GetAfterEolUpdateMessage(string displayName, string currentStackVersion, string nextStackVersion, DateTime eol, string link = "")
         {
             return $"Upgrade to {displayName} {nextStackVersion} as {displayName} {currentStackVersion} has reached end-of-life on {FormatDate(eol)} and is no longer supported. Learn more: {link}";

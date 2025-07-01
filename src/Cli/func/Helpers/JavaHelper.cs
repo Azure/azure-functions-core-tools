@@ -1,4 +1,7 @@
-﻿using System.Xml.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Xml.Linq;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -13,6 +16,7 @@ namespace Azure.Functions.Cli.Helpers
                 var versionElement = xmlDoc.Descendants().FirstOrDefault(e => e.Name.LocalName == "java.version");
                 return versionElement?.Value;
             }
+
             return null;
         }
     }

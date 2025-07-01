@@ -63,7 +63,7 @@ namespace Azure.Functions.Cli.Helpers
 
         public static T GetOtherRuntimeSettings<T>(this FunctionsStacks stacks, string workerRuntime, string runtimeVersion, Func<StackSettings, T> settingsSelector)
         {
-            if (WorkerRuntime.java.ToString() == workerRuntime)
+            if (WorkerRuntime.Java.ToString() == workerRuntime)
             {
                 if (runtimeVersion.StartsWith("1."))
                 {
@@ -84,7 +84,7 @@ namespace Azure.Functions.Cli.Helpers
             return settingsSelector(minorVersion?.StackSettings);
         }
 
-        public static (string nextVersion, string displayText) GetNextRuntimeVersion(
+        public static (string NextVersion, string DisplayText) GetNextRuntimeVersion(
             this FunctionsStacks stacks,
             string workerRuntime,
             string currentRuntimeVersion,
@@ -97,7 +97,9 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return (null, null); // No matching runtime found
             }
+
             string displayName = runtimeStack.Properties.DisplayText;
+
             // Extract and sort supported versions using the provided selector function
             var supportedVersions = versionSelector(runtimeStack.Properties)?
                 .Where(v => !string.IsNullOrEmpty(v))
@@ -106,6 +108,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 return (null, displayName); // No valid versions found
             }
+
             if (isNumericVersion)
             {
                 // Special case for Node.js: Versions are integers
@@ -118,6 +121,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     return (null, displayName); // Invalid current version
                 }
+
                 var nextVersion = numericVersions.FirstOrDefault(v => v > currentMajorVersion);
                 return ((nextVersion ?? numericVersions.First()).ToString(), displayName);
             }
@@ -133,6 +137,7 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     return (null, displayName); // Invalid current version
                 }
+
                 var nextVersion = parsedVersions.FirstOrDefault(v => v > currentVersion);
                 return ((nextVersion ?? parsedVersions.First()).ToString(), displayName);
             }
@@ -140,7 +145,10 @@ namespace Azure.Functions.Cli.Helpers
 
         public static bool ExpiresInNextSixMonths(this DateTime? date)
         {
-            if (!date.HasValue) return false; // Null check
+            if (!date.HasValue)
+            {
+                return false; // Null check
+            }
 
             DateTime currentDate = DateTime.UtcNow;
             DateTime sixMonthsFromNow = currentDate.AddMonths(6);

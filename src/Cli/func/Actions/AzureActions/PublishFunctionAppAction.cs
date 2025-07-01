@@ -210,7 +210,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Show warning message for other worker runtimes (Node, Python, Powershell, Java)
-            if (workerRuntime != WorkerRuntime.dotnet && workerRuntime != WorkerRuntime.dotnetIsolated)
+            if (workerRuntime != WorkerRuntime.Dotnet && workerRuntime != WorkerRuntime.DotnetIsolated)
             {
                 string workerRuntimeStr = Convert.ToString(workerRuntime);
                 string runtimeVersion = GetWorkerRuntimeVersion(workerRuntime, functionAppRoot);
@@ -221,7 +221,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     var stacks = await AzureHelper.GetFunctionsStacks(AccessToken, ManagementURL);
                     DateTime currentDate = DateTime.Now;
 
-                    object runtimeSettings = (workerRuntime == WorkerRuntime.python) ? stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, s => s.LinuxRuntimeSettings) : stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, s => s.WindowsRuntimeSettings);
+                    object runtimeSettings = (workerRuntime == WorkerRuntime.Python) ? stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, s => s.LinuxRuntimeSettings) : stacks.GetOtherRuntimeSettings(workerRuntimeStr, runtimeVersion, s => s.WindowsRuntimeSettings);
 
                     DateTime? eolDate = runtimeSettings switch
                     {
@@ -235,7 +235,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                         DateTime warningThresholdDate = eolDate.Value.AddMonths(-6);
                         if (currentDate > eolDate || currentDate >= warningThresholdDate)
                         {
-                            //Show EOL warning message
+                            // Show EOL warning message
                             ShowEolMessageForOtherStack(stacks, eolDate.Value, workerRuntimeStr, runtimeVersion);
                         }
                     }
@@ -1506,6 +1506,69 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
+        /// <summary>
+        /// Determines the version of the specified worker runtime.
+        /// </summary>
+        private string GetWorkerRuntimeVersion(WorkerRuntime workerRuntime, string functionAppRoot)
+        {
+            switch (workerRuntime)
+            {
+                case WorkerRuntime.Node:
+                    return NodeJSHelpers.GetNodeVersion(functionAppRoot);
+                case WorkerRuntime.Python:
+                    return PythonHelpers.GetPythonVersion(functionAppRoot).GetAwaiter().GetResult();
+                case WorkerRuntime.Powershell:
+                    return PowerShellHelper.GetPowerShellVersion(functionAppRoot);
+                case WorkerRuntime.Java:
+                    return JavaHelper.GetJavaVersion(functionAppRoot);
+                default:
+                    return null;
+            }
+        }
+
+        private void ShowEolMessageForOtherStack(FunctionsStacks stacks, DateTime eolDate, string workerRuntime, string runtimeVersion)
+        {
+            try
+            {
+                string nextVersion, displayName, warningMessage = string.Empty;
+                (nextVersion, displayName) = workerRuntime switch
+                {
+                    var wr when wr.Equals(WorkerRuntime.Python.ToString(), StringComparison.OrdinalIgnoreCase)
+                    || wr.Equals(WorkerRuntime.Powershell.ToString(), StringComparison.OrdinalIgnoreCase)
+                    || wr.Equals(WorkerRuntime.Java.ToString(), StringComparison.OrdinalIgnoreCase)
+                        => stacks.GetNextRuntimeVersion(
+                            workerRuntime,
+                            runtimeVersion,
+                            properties => properties.MajorVersions
+                           .SelectMany(mv => mv.MinorVersions, (major, minor) => minor.Value),
+                            isNumericVersion: false),
+
+                    var wr when wr.Equals(WorkerRuntime.Node.ToString(), StringComparison.OrdinalIgnoreCase)
+                        => stacks.GetNextRuntimeVersion(
+                            workerRuntime,
+                            runtimeVersion,
+                            properties => properties.MajorVersions
+                           .Select(mv => mv.Value),
+                            isNumericVersion: true),
+                    _ => (null, workerRuntime) // Default case: No next version available
+                };
+                if (StacksApiHelper.ExpiresInNextSixMonths(eolDate))
+                {
+                    warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, eolDate, Constants.FunctionsStackUpgrade);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+                else
+                {
+                    warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, eolDate, Constants.FunctionsStackUpgrade);
+                    ColoredConsole.WriteLine(WarningColor(warningMessage));
+                }
+            }
+            catch (Exception)
+            {
+                // ignore. Failure to show the EOL message should not fail the deployment.
+            }
+        }
+
         // For testing
         internal class AzureHelperService
         {
@@ -1526,61 +1589,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             public virtual Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string runtime, string region) =>
                  AzureHelper.GetFlexFunctionsStacks(_accessToken, _managementUrl, runtime, region);
-        }
-
-        /// <summary>
-        /// Determines the version of the specified worker runtime.
-        /// </summary>
-        private string GetWorkerRuntimeVersion(WorkerRuntime workerRuntime, string functionAppRoot)
-        {
-            switch (workerRuntime)
-            {
-                case WorkerRuntime.node:
-                    return NodeJSHelpers.GetNodeVersion(functionAppRoot);
-                case WorkerRuntime.python:
-                    return PythonHelpers.GetPythonVersion(functionAppRoot).GetAwaiter().GetResult();
-                case WorkerRuntime.powershell:
-                    return PowerShellHelper.GetPowerShellVersion(functionAppRoot);
-                case WorkerRuntime.java:
-                    return JavaHelper.GetJavaVersion(functionAppRoot);
-                default:
-                    return null;
-            }
-        }
-
-        private void ShowEolMessageForOtherStack(FunctionsStacks stacks, DateTime eolDate, string workerRuntime, string runtimeVersion)
-        {
-            try
-            {
-                string nextVersion, displayName, warningMessage = string.Empty;
-                (nextVersion, displayName) = workerRuntime switch
-                {
-                    var wr when wr.Equals(WorkerRuntime.python.ToString(), StringComparison.OrdinalIgnoreCase) || wr.Equals(WorkerRuntime.powershell.ToString(), StringComparison.OrdinalIgnoreCase) || wr.Equals(WorkerRuntime.java.ToString(), StringComparison.OrdinalIgnoreCase)
-                        => stacks.GetNextRuntimeVersion(workerRuntime, runtimeVersion,
-                           properties => properties.MajorVersions
-                           .SelectMany(mv => mv.MinorVersions, (major, minor) => minor.Value), isNumericVersion: false),
-                    var wr when wr.Equals(WorkerRuntime.node.ToString(), StringComparison.OrdinalIgnoreCase)
-                        => stacks.GetNextRuntimeVersion(workerRuntime, runtimeVersion,
-                           properties => properties.MajorVersions
-                           .Select(mv => mv.Value),
-                           isNumericVersion: true),
-                    _ => (null, workerRuntime) // Default case: No next version available
-                };
-                if (StacksApiHelper.ExpiresInNextSixMonths(eolDate))
-                {
-                    warningMessage = EolMessages.GetEarlyEolUpdateMessage(displayName, runtimeVersion, nextVersion, eolDate, Constants.FunctionsStackUpgrade);
-                    ColoredConsole.WriteLine(WarningColor(warningMessage));
-                }
-                else
-                {
-                    warningMessage = EolMessages.GetAfterEolUpdateMessage(displayName, runtimeVersion, nextVersion, eolDate, Constants.FunctionsStackUpgrade);
-                    ColoredConsole.WriteLine(WarningColor(warningMessage));
-                }
-            }
-            catch (Exception)
-            {
-                // ignore. Failure to show the EOL message should not fail the deployment.
-            }
         }
     }
 }
