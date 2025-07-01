@@ -97,6 +97,16 @@ jobs:
     displayName: 'Download test zip'
     artifact: ZippedOnWindows
 
+  - task: UseDotNet@2
+    displayName: 'Install .NET SDK from global.json'
+    inputs:
+      useGlobalJson: true
+
+  - task: UseDotNet@2
+    inputs:
+      packageType: 'sdk'
+      version: '8.x'
+
   - script: |
       sudo apt-get update
       sudo apt-get -y install fuse-zip
