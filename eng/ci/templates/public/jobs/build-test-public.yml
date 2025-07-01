@@ -102,12 +102,6 @@ jobs:
       sudo apt-get -y install fuse-zip
     displayName: 'Install fuse-zip'
 
-  - task: UseDotNet@2
-    displayName: Install .NET SDK from global.json
-    inputs:
-      packageType: sdk
-      useGlobalJson: true
-
   - task: DotNetCoreCLI@2
     inputs:
       command: 'test'
