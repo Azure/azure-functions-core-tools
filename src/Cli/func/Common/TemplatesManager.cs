@@ -4,6 +4,7 @@
 using System.Reflection;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.ExtensionBundle;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Newtonsoft.Json;
@@ -12,6 +13,7 @@ namespace Azure.Functions.Cli.Common
 {
     internal class TemplatesManager : ITemplatesManager
     {
+        private const string BundleTemplatesLockFileName = "func_bundle_templates.lock";
         private readonly ISecretsManager _secretsManager;
 
         public TemplatesManager(ISecretsManager secretsManager)
@@ -20,7 +22,7 @@ namespace Azure.Functions.Cli.Common
         }
 
         /// <summary>
-        /// Gets get new templates.
+        /// Gets new (v2) templates.
         /// </summary>
         public Task<IEnumerable<NewTemplate>> NewTemplates
         {
@@ -69,13 +71,21 @@ namespace Azure.Functions.Cli.Common
 
             if (extensionBundleManager.IsExtensionBundleConfigured())
             {
-                await ExtensionBundleHelper.GetExtensionBundle();
-                var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
-                templatesJson = await contentProvider.GetTemplates();
+                templatesJson = await FileLockHelper.WithFileLockAsync(BundleTemplatesLockFileName, async () =>
+                {
+                    await ExtensionBundleHelper.GetExtensionBundle();
+                    var contentProvider = ExtensionBundleHelper.GetExtensionBundleContentProvider();
+                    return await contentProvider.GetTemplates();
+                });
             }
             else
             {
                 templatesJson = GetTemplatesJson();
+            }
+
+            if (string.IsNullOrEmpty(templatesJson))
+            {
+                throw new CliException("Templates JSON is empty. Please check the templates location.");
             }
 
             var templates = JsonConvert.DeserializeObject<IEnumerable<Template>>(templatesJson);
@@ -280,6 +290,11 @@ namespace Azure.Functions.Cli.Common
             else
             {
                 templateJson = await GetV2TemplatesJson();
+            }
+
+            if (string.IsNullOrEmpty(templateJson))
+            {
+                throw new CliException("Templates JSON is empty. Please check the templates location.");
             }
 
             return JsonConvert.DeserializeObject<IEnumerable<NewTemplate>>(templateJson);
