@@ -1,7 +1,6 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
@@ -19,19 +18,25 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         private readonly ISecretsManager _secretsManager;
         private readonly bool _showNoActionWarning;
 
-        public string Package { get; set; } = string.Empty;
-        public string Version { get; set; } = string.Empty;
-        public string OutputPath { get; set; } = Path.GetFullPath("bin");
-        public string Source { get; set; } = string.Empty;
-        public string ConfigPath { get; set; } = string.Empty;
-        public bool Csx { get; set; }
-        public bool Force { get; set; } = false;
-
         public InstallExtensionAction(ISecretsManager secretsManager, bool showNoActionWarning = true)
         {
             _secretsManager = secretsManager;
             _showNoActionWarning = showNoActionWarning;
         }
+
+        public string Package { get; set; } = string.Empty;
+
+        public string Version { get; set; } = string.Empty;
+
+        public string OutputPath { get; set; } = Path.GetFullPath("bin");
+
+        public string Source { get; set; } = string.Empty;
+
+        public string ConfigPath { get; set; } = string.Empty;
+
+        public bool Csx { get; set; }
+
+        public bool Force { get; set; } = false;
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -73,7 +78,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return base.ParseArgs(args);
         }
 
-        public async override Task RunAsync()
+        public override async Task RunAsync()
         {
             var extensionBundleManager = ExtensionBundleHelper.GetExtensionBundleManager();
             if (extensionBundleManager.IsExtensionBundleConfigured())
@@ -83,6 +88,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     ColoredConsole.WriteLine(WarningColor($"No action performed. Extension bundle is configured in {hostFilePath}."));
                 }
+
                 return;
             }
 
@@ -118,10 +124,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 }
                 else
                 {
-                    throw new CliArgumentsException("Must specify extension package name and version",
-                    new CliArgument { Name = nameof(Package), Description = "Extension package name" },
-                    new CliArgument { Name = nameof(Version), Description = "Extension package version" }
-                    );
+                    throw new CliArgumentsException(
+                        "Must specify extension package name and version",
+                        new CliArgument { Name = nameof(Package), Description = "Extension package name" },
+                        new CliArgument { Name = nameof(Version), Description = "Extension package version" });
                 }
 
                 var syncAction = new SyncExtensionsAction(_secretsManager, false)
@@ -164,6 +170,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
+
                 return false;
             }
 
@@ -182,12 +189,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     ColoredConsole.WriteLine(WarningColor(warningMessage));
                 }
+
                 if (StaticSettings.IsDebug)
                 {
                     ColoredConsole.WriteLine(VerboseColor($"InstallExtensionAction: No action performed because only {Constants.ExtensionsMetadataGeneratorPackage.Name} reference was found." +
                     $" This extension package does not require and extension install by itself." +
                     $" No other required extensions were found."));
                 }
+
                 return false;
             }
 
@@ -201,6 +210,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 args += $" --version {version}";
             }
+
             if (!string.IsNullOrEmpty(Source))
             {
                 args += $" --source {Source}";

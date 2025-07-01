@@ -1,10 +1,8 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace Azure.Functions.Cli.StacksApi
 {
@@ -139,6 +137,7 @@ namespace Azure.Functions.Cli.StacksApi
         public List<SupportedFunctionsExtensionVersionsInfo> SupportedFunctionsExtensionVersionsInfo { get; set; }
 
         public bool? IsDeprecatedForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDeprecated;
+
         public bool? IsDefaultForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDefault;
     }
 
@@ -151,10 +150,10 @@ namespace Azure.Functions.Cli.StacksApi
         public bool IsHidden { get; set; }
 
         [JsonProperty("IsEarlyAccess")]
-        public bool isEarlyAccess { get; set; }
+        public bool IsEarlyAccess { get; set; }
 
         [JsonProperty("RemoteDebuggingSupported")]
-        public bool remoteDebuggingSupported { get; set; }
+        public bool RemoteDebuggingSupported { get; set; }
 
         [JsonProperty("appInsightsSettings")]
         public AppInsightsSettings AppInsightsSettings { get; set; }
@@ -175,24 +174,25 @@ namespace Azure.Functions.Cli.StacksApi
         public List<SupportedFunctionsExtensionVersionsInfo> SupportedFunctionsExtensionVersionsInfo { get; set; }
 
         public bool? IsDeprecatedForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDeprecated;
+
         public bool? IsDefaultForRuntime => SupportedFunctionsExtensionVersionsInfo?.FirstOrDefault(x => x.Version == "~4")?.IsDefault;
 
         [JsonProperty("endOfLifeDate")]
         public string EndOfLifeDateStr { get; set; }
 
-        public DateTime? EndOfLifeDate => string.IsNullOrWhiteSpace(EndOfLifeDateStr)? null : DateTime.ParseExact(EndOfLifeDateStr, "ddd MMM dd yyyy HH:mm:ss 'GMT'K '(Coordinated Universal Time)'", CultureInfo.InvariantCulture);
+        public DateTime? EndOfLifeDate => string.IsNullOrWhiteSpace(EndOfLifeDateStr) ? null : DateTime.ParseExact(EndOfLifeDateStr, "ddd MMM dd yyyy HH:mm:ss 'GMT'K '(Coordinated Universal Time)'", CultureInfo.InvariantCulture);
 
         [JsonProperty("isDefault")]
         public bool? IsDefault { get; set; }
 
         [JsonProperty("IsDeprecated")]
-        public bool? isDeprecated { get; set; }
+        public bool? IsDeprecated { get; set; }
 
         [JsonProperty("IsPreview")]
-        public bool? isPreview { get; set; }
+        public bool? IsPreview { get; set; }
 
         [JsonProperty("IsAutoUpdate")]
-        public bool? isAutoUpdate { get; set; }
+        public bool? IsAutoUpdate { get; set; }
     }
 
     public class AppInsightsSettings
@@ -204,10 +204,10 @@ namespace Azure.Functions.Cli.StacksApi
     public class GitHubActionSettings
     {
         [JsonProperty("IsSupported")]
-        public bool isSupported { get; set; }
+        public bool IsSupported { get; set; }
 
         [JsonProperty("SupportedVersion")]
-        public string supportedVersion { get; set; }
+        public string SupportedVersion { get; set; }
     }
 
     public class AppSettingsDictionary

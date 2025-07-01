@@ -192,34 +192,34 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
 
         [Theory]
         // In-proc target, in-proc 8 argument, project configured for .NET 8. Succeeds.
-        [InlineData(WorkerRuntime.dotnet, DotnetConstants.InProc8HostRuntime, true, false)]
+        [InlineData(WorkerRuntime.Dotnet, DotnetConstants.InProc8HostRuntime, true, false)]
         // In-proc target, in-proc 8 argument, project NOT configured for .NET 8. Fails.
-        [InlineData(WorkerRuntime.dotnet, DotnetConstants.InProc8HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.Dotnet, DotnetConstants.InProc8HostRuntime, false, true)]
         // In-proc target, in-proc 6 argument, project NOT configured for .NET 8. Succeeds.
-        [InlineData(WorkerRuntime.dotnet, DotnetConstants.InProc6HostRuntime, false, false)]
+        [InlineData(WorkerRuntime.Dotnet, DotnetConstants.InProc6HostRuntime, false, false)]
         // In-proc target,'default' argument, project configured for .NET 8. Fails.
-        [InlineData(WorkerRuntime.dotnet, "default", true, true)]
+        [InlineData(WorkerRuntime.Dotnet, "default", true, true)]
         // Isolated target,'default' argument, project NOT configured for .NET 8. Succeeds.
-        [InlineData(WorkerRuntime.dotnetIsolated, "default", true, false)]
+        [InlineData(WorkerRuntime.DotnetIsolated, "default", true, false)]
         // Isolated target,'default' argument, project configured for .NET 8. Succeeds.
-        [InlineData(WorkerRuntime.dotnetIsolated, "default", false, false)]
+        [InlineData(WorkerRuntime.DotnetIsolated, "default", false, false)]
         // Isolated target,in-proc 8 argument, project configured for .NET 8. Fails.
-        [InlineData(WorkerRuntime.dotnetIsolated, DotnetConstants.InProc8HostRuntime, true, true)]
+        [InlineData(WorkerRuntime.DotnetIsolated, DotnetConstants.InProc8HostRuntime, true, true)]
         // Isolated target,in-proc 6 argument, project not configured for .NET 8. Fails.
-        [InlineData(WorkerRuntime.dotnetIsolated, DotnetConstants.InProc6HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.DotnetIsolated, DotnetConstants.InProc6HostRuntime, false, true)]
         // Unsupported runtime targets.
-        [InlineData(WorkerRuntime.dotnetIsolated, "somevalue", false, true)]
-        [InlineData(WorkerRuntime.dotnet, "somevalue", false, true)]
+        [InlineData(WorkerRuntime.DotnetIsolated, "somevalue", false, true)]
+        [InlineData(WorkerRuntime.Dotnet, "somevalue", false, true)]
         // Non .NET worker runtimes.
-        [InlineData(WorkerRuntime.python, "default", false, false)]
-        [InlineData(WorkerRuntime.java, "default", false, false)]
-        [InlineData(WorkerRuntime.node, "default", false, false)]
-        [InlineData(WorkerRuntime.python, DotnetConstants.InProc6HostRuntime, false, true)]
-        [InlineData(WorkerRuntime.java, DotnetConstants.InProc6HostRuntime, false, true)]
-        [InlineData(WorkerRuntime.node, DotnetConstants.InProc6HostRuntime, false, true)]
-        [InlineData(WorkerRuntime.python, DotnetConstants.InProc8HostRuntime, false, true)]
-        [InlineData(WorkerRuntime.java, DotnetConstants.InProc8HostRuntime, false, true)]
-        [InlineData(WorkerRuntime.node, DotnetConstants.InProc8HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.Python, "default", false, false)]
+        [InlineData(WorkerRuntime.Java, "default", false, false)]
+        [InlineData(WorkerRuntime.Node, "default", false, false)]
+        [InlineData(WorkerRuntime.Python, DotnetConstants.InProc6HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.Java, DotnetConstants.InProc6HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.Node, DotnetConstants.InProc6HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.Python, DotnetConstants.InProc8HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.Java, DotnetConstants.InProc8HostRuntime, false, true)]
+        [InlineData(WorkerRuntime.Node, DotnetConstants.InProc8HostRuntime, false, true)]
         public async Task ValidateHostRuntimeAsync_MatchesExpectedResults(WorkerRuntime currentRuntime, string hostRuntimeArgument, bool validNet8Configuration, bool expectException)
         {
             try
@@ -240,7 +240,7 @@ namespace Azure.Functions.Cli.Tests.ActionsTests
                 {
                     throw;
                 }
-                
+
                 return;
             }
 

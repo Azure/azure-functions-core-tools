@@ -25,12 +25,15 @@ resources:
   pipelines:
     - pipeline: core-tools-host
       source: azure/azure-functions-core-tools/core-tools-host.official
+      branch: main
+      trigger:
+        branches:
+          include:
+            - main
 
     - pipeline: core-tools-inproc
       source: azure/azure-functions-core-tools/core-tools.official
       branch: in-proc  # in-proc branch of core-tools.official
-      tags:
-      - nightly-build
       trigger:
         branches:
           include:
@@ -39,8 +42,6 @@ resources:
     - pipeline: core-tools-default
       source: azure/azure-functions-core-tools/core-tools.official
       branch: main  # main branch of core-tools.official
-      tags:
-      - nightly-build
       trigger:
         branches:
           include:
@@ -72,9 +73,12 @@ extends:
       displayName: "Assemble Artifacts"
       jobs:
       - template: /eng/ci/templates/official/jobs/process-nuget-package.yml@self
+        parameters:
+          isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}
 
       - ${{ each arch in split(variables.archs,',') }}:
         - template: /eng/ci/templates/official/jobs/assemble-artifacts.yml@self
           parameters:
             arch: ${{ arch }}
             displayName: ${{ replace(replace(arch, '-', ''), '.', '') }}
+            isNightlyBuild: ${{ eq(variables['Build.Reason'], 'Schedule') }}

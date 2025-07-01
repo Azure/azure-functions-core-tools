@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk" InitialTargets="ExcludeWorkersFromReadyToRun">
   <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AssemblyName>func</AssemblyName>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
@@ -101,6 +102,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.python3.12">
       <LogicalName>$(AssemblyName).Dockerfile.python3.12</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StaticResources\Dockerfile.python3.13">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.13</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="StaticResources\Dockerfile.javascript">
       <LogicalName>$(AssemblyName).Dockerfile.javascript</LogicalName>
@@ -279,6 +283,7 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="NuGet.Packaging" />
     <PackageReference Include="System.Formats.Asn1" />
+    <PackageReference Include="StyleCop.Analyzers" />
     <PackageReference Include="WindowsAzure.Storage" />
     <PackageReference Include="YamlDotNet" />
     <!-- Transitive dependency -->
@@ -291,7 +296,9 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
+    <!-- PythonWorker v4.35 introduced an error when being build for win-arm64. For now, we will not include this package when we build
+      core tools for win-arm64. This is a temporary measure as we figure out how we want this to go. -->
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Condition="'$(RuntimeIdentifier)' != 'win-arm64'" />
   </ItemGroup>
 
   <ItemGroup>

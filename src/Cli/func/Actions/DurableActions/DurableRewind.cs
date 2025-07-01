@@ -1,21 +1,22 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
 using Fclp;
 
 namespace Azure.Functions.Cli.Actions.DurableActions
 {
     [Action(Name = "rewind", Context = Context.Durable, HelpText = "Rewind the specified orchestration instance")]
-    class DurableRewind : BaseDurableActionWithId
+    internal class DurableRewind : BaseDurableActionWithId
     {
-        private string Reason { get; set; }
-
         private readonly IDurableManager _durableManager;
 
         public DurableRewind(IDurableManager durableManager)
         {
             _durableManager = durableManager;
         }
+
+        private string Reason { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {

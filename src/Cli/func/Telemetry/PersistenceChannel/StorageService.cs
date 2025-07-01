@@ -1,13 +1,7 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Microsoft.ApplicationInsights.Channel;
 
@@ -78,7 +72,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             CapacityInBytes = 10 * 1024 * 1024; // 10 MB
             MaxFiles = 100;
 
-            Task.Run((Action) DeleteObsoleteFiles)
+            Task.Run((Action)DeleteObsoleteFiles)
                 .ContinueWith(
                     task =>
                     {
@@ -123,7 +117,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 {
                     try
                     {
-                        // if a file was peeked before, skip it (wait until it is disposed).  
+                        // if a file was peeked before, skip it (wait until it is disposed).
                         if (PeekedTransmissions.ContainsKey(file) == false &&
                             _deletedFilesQueue.Contains(file) == false)
                         {
@@ -161,7 +155,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                     return;
                 }
 
-                // Initial storage size calculation. 
+                // Initial storage size calculation.
                 CalculateSize();
 
                 long fileSize = GetSize(item.FileName);
@@ -169,7 +163,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
 
                 _deletedFilesQueue.Enqueue(item.FileName);
 
-                // calculate size                
+                // calculate size
                 Interlocked.Add(ref _storageSize, -fileSize);
                 Interlocked.Decrement(ref _storageCountFiles);
             }
@@ -188,12 +182,12 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                     return;
                 }
 
-                // Initial storage size calculation. 
+                // Initial storage size calculation.
                 CalculateSize();
 
                 if ((ulong)_storageSize >= CapacityInBytes || _storageCountFiles >= MaxFiles)
                 {
-                    // if max storage capacity has reached, drop the transmission (but log every 100 lost transmissions). 
+                    // if max storage capacity has reached, drop the transmission (but log every 100 lost transmissions).
                     if (_transmissionsDropped++ % 100 == 0)
                     {
                         PersistenceChannelDebugLog.WriteLine("Total transmissions dropped: " + _transmissionsDropped);
@@ -212,7 +206,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 // Saves transmission to the temp file
                 await SaveTransmissionToFileAsync(transmission, tempFileName).ConfigureAwait(false);
 
-                // Now that the file is written increase storage size. 
+                // Now that the file is written increase storage size.
                 long temporaryFileSize = GetSize(tempFileName);
                 Interlocked.Add(ref _storageSize, temporaryFileSize);
 
@@ -243,7 +237,8 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 string message =
                     string.Format(
                         "Failed to save transmission to file. UnauthorizedAccessException. File path: {0}, FileName: {1}",
-                        StorageFolder, file);
+                        StorageFolder,
+                        file);
                 PersistenceChannelDebugLog.WriteLine(message);
                 throw;
             }
@@ -262,10 +257,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
             }
             catch (Exception e)
             {
-                string message =
-                    string.Format(
-                        "Failed to load transmission from file. File path: {0}, FileName: {1}, Exception: {2}",
-                        "storageFolderName", file, e);
+                string message = string.Format("Failed to load transmission from file. File path: {0}, FileName: {1}, Exception: {2}", "storageFolderName", file, e);
                 PersistenceChannelDebugLog.WriteLine(message);
                 throw;
             }
@@ -274,7 +266,6 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
         /// <summary>
         ///     Get files from <see cref="storageFolder" />.
         /// </summary>
-        /// <param name="fileQuery">Define the logic for sorting the files.</param>
         /// <param name="filterByExtension">Defines a file extension. This method will return only files with this extension.</param>
         /// <param name="top">
         ///     Define how many files to return. This can be useful when the directory has a lot of files, in that case
@@ -343,6 +334,7 @@ namespace Azure.Functions.Cli.Telemetry.PersistenceChannel
                 foreach (string file in files)
                 {
                     DateTime creationTime = File.GetCreationTimeUtc(Path.Combine(StorageFolder, file));
+
                     // if the file is older then 5 minutes - delete it.
                     if (DateTime.UtcNow - creationTime >= TimeSpan.FromMinutes(5))
                     {

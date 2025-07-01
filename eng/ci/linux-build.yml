@@ -18,6 +18,9 @@ resources:
     type: git
     name: engineering
     ref: refs/tags/release
+  pipelines:
+  - pipeline: core-tools-consolidated-artifacts
+    source: azure/azure-functions-core-tools/core-tools-consolidated-artifacts.official
 
 variables:
   - template: /ci/variables/cfs.yml@eng

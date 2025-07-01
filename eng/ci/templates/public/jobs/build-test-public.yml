@@ -34,7 +34,7 @@ jobs:
       versionSpec: '18.x'
 
   - pwsh: |
-      Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
+      Import-Module "./eng/scripts/modules/pipeline-utilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
 
@@ -44,7 +44,7 @@ jobs:
     displayName: Install Nuget tool
 
   - pwsh: |
-      eng/scripts/validateWorkerVersions.ps1
+      eng/scripts/validate-worker-versions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
 
@@ -59,7 +59,16 @@ jobs:
       IsReleaseBuild: false
       IsPublicBuild: true
       IsCodeqlBuild: false
+      DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    continueOnError: true
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
+      artifactName: 'TestLogs_$(System.JobAttempt)'
+      artifactType: 'pipeline'
 
   - task: PublishTestResults@2
     inputs:

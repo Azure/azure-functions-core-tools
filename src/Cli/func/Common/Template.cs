@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -38,8 +40,6 @@ namespace Azure.Functions.Cli.Common
 
         [JsonProperty("extensions")]
         public IEnumerable<FunctionExtension> Extensions { get; set; }
-
-
     }
 
     internal class FunctionExtension
@@ -79,7 +79,6 @@ namespace Azure.Functions.Cli.Common
 
         [JsonProperty("files")]
         public Dictionary<string, string> Files { get; set; }
-
     }
 
     internal class TemplateJob
@@ -110,7 +109,6 @@ namespace Azure.Functions.Cli.Common
 
         [JsonProperty("required")]
         public bool IsRequired { get; set; }
-
     }
 
     internal class TemplateAction
@@ -161,7 +159,7 @@ namespace Azure.Functions.Cli.Common
     {
         [JsonProperty("id")]
         public string Id { get; set; }
-        
+
         [JsonProperty("name")]
         public string Name { get; set; }
 

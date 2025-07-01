@@ -1,11 +1,8 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-// This file is modified copy of: 
+// This file is modified copy of:
 // https://github.com/aspnet/Logging/blob/cc350d7ef616ef292c1b4ae7130b8c2b45fc1164/src/Microsoft.Extensions.Logging/LoggerRuleSelector.cs.
-
-using System;
-
 namespace Microsoft.Extensions.Logging
 {
     internal class LoggerRuleSelector
@@ -22,7 +19,6 @@ namespace Microsoft.Extensions.Logging
             // 3. If there is only one rule use it's level and filter
             // 4. If there are multiple rules use last
             // 5. If there are no applicable rules use global minimal level
-
             LoggerFilterRule current = null;
             foreach (var rule in options.Rules)
             {

@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.Constants;
@@ -15,9 +13,11 @@ namespace Azure.Functions.Cli.Helpers
     public static class PythonHelpers
     {
         private static readonly string _pythonDefaultExecutableVar = "languageWorkers:python:defaultExecutablePath";
-        private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
-        public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
         private static WorkerLanguageVersionInfo _pythonVersionCache = null;
+
+        private static bool InVirtualEnvironment => !string.IsNullOrEmpty(VirtualEnvironmentPath);
+
+        public static string VirtualEnvironmentPath => Environment.GetEnvironmentVariable("VIRTUAL_ENV");
 
         public static async Task SetupPythonProject(ProgrammingModel programmingModel, bool generatePythonDocumentation = true)
         {
@@ -35,7 +35,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 PrintPySteinAwarenessMessage();
             }
-
 
             await CreateRequirements();
             await EnsureVirtualEnvironmentIgnored();
@@ -68,10 +67,10 @@ namespace Azure.Functions.Cli.Helpers
             ColoredConsole.WriteLine(LinksColor("https://aka.ms/pythonprogrammingmodel"));
         }
 
-
         public static async Task WarnIfAzureFunctionsWorkerInRequirementsTxt()
         {
-            if (FileSystemHelpers.FileExists(Path.Join(Environment.CurrentDirectory, Constants.RequirementsTxt))) {
+            if (FileSystemHelpers.FileExists(Path.Join(Environment.CurrentDirectory, Constants.RequirementsTxt)))
+            {
                 List<PythonPackage> packages = await RequirementsTxtParser.ParseRequirementsTxtFile(Environment.CurrentDirectory);
                 PythonPackage workerPackage = packages.FirstOrDefault(p => p.Name == "azure-functions-worker");
                 if (workerPackage != null)
@@ -91,6 +90,7 @@ namespace Azure.Functions.Cli.Helpers
                     if (FileSystemHelpers.DirectoryExists(Path.Join(Environment.CurrentDirectory, virtualEnvName)))
                     {
                         var funcIgnorePath = Path.Join(Environment.CurrentDirectory, Constants.FuncIgnoreFile);
+
                         // If .funcignore exists and already has the venv name, we are done here
                         if (FileSystemHelpers.FileExists(funcIgnorePath))
                         {
@@ -100,6 +100,7 @@ namespace Azure.Functions.Cli.Helpers
                                 return;
                             }
                         }
+
                         // Write the current env to .funcignore
                         ColoredConsole.WriteLine($"Writing {Constants.FuncIgnoreFile}");
                         using (var fileStream = FileSystemHelpers.OpenFile(funcIgnorePath, FileMode.Append, FileAccess.Write))
@@ -117,7 +118,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private async static Task CreateFile(string fileName)
+        private static async Task CreateFile(string fileName)
         {
             if (!FileSystemHelpers.FileExists(fileName))
             {
@@ -131,7 +132,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private async static Task CreateGettingStartedMarkdown(ProgrammingModel programmingModel)
+        private static async Task CreateGettingStartedMarkdown(ProgrammingModel programmingModel)
         {
             if (programmingModel == ProgrammingModel.V1)
             {
@@ -149,7 +150,7 @@ namespace Azure.Functions.Cli.Helpers
             }
         }
 
-        private async static Task CreateRequirements()
+        private static async Task CreateRequirements()
         {
             if (!FileSystemHelpers.FileExists(Constants.RequirementsTxt))
             {
@@ -167,8 +168,12 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. 3.7.x, 3.8.x, 3.9.x, 3.10.x, 3.11.x or 3.12.x is recommended, and used in Azure Functions.";
-                if (errorIfNoVersion) throw new CliException(message);
+                var message = "Could not find a Python version. 3.9.x, 3.10.x, 3.11.x, 3.12.x or 3.13.x is recommended, and used in Azure Functions.";
+                if (errorIfNoVersion)
+                {
+                    throw new CliException(message);
+                }
+
                 ColoredConsole.WriteLine(WarningColor(message));
                 return;
             }
@@ -185,14 +190,21 @@ namespace Azure.Functions.Cli.Helpers
             if (pythonVersion.Major == 3)
             {
                 if (errorIfNotSupported)
-                    throw new CliException($"Python 3.7.x to 3.12.x is required for this operation. " +
-                        $"Please install Python 3.7, 3.8, 3.9, 3.10, 3.11 or 3.12 and use a virtual environment to switch to Python 3.7, 3.8, 3.9, 3.10, 3.11 or 3.12.");
-                ColoredConsole.WriteLine(WarningColor("Python  3.7.x, 3.8.x, 3.9.x, 3.10.x, 3.11.x or 3.12.x is recommended, and used in Azure Functions."));
+                {
+                    throw new CliException($"Python 3.9.x to 3.13.x is required for this operation. " +
+                        $"Please install Python 3.9, 3.10, 3.11, 3.12 or 3.13 and use a virtual environment to switch to Python 3.9, 3.10, 3.11, 3.12 or 3.13.");
+                }
+
+                ColoredConsole.WriteLine(WarningColor("Python 3.9.x, 3.10.x, 3.11.x, 3.12.x or 3.13.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
             var error = "Python 3.x (recommended version 3.[7|8|9|10|11|12]) is required.";
-            if (errorIfNoVersion) throw new CliException(error);
+            if (errorIfNoVersion)
+            {
+                throw new CliException(error);
+            }
+
             ColoredConsole.WriteLine(WarningColor(error));
         }
 
@@ -226,6 +238,7 @@ namespace Azure.Functions.Cli.Helpers
             var python310GetVersionTask = GetVersion("python3.10");
             var python311GetVersionTask = GetVersion("python3.11");
             var python312GetVersionTask = GetVersion("python3.12");
+            var python313GetVersionTask = GetVersion("python3.13");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
@@ -238,7 +251,8 @@ namespace Azure.Functions.Cli.Helpers
                 await python39GetVersionTask,
                 await python310GetVersionTask,
                 await python311GetVersionTask,
-                await python312GetVersionTask
+                await python312GetVersionTask,
+                await python313GetVersionTask
             };
 
             // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
@@ -259,7 +273,7 @@ namespace Azure.Functions.Cli.Helpers
 
             // Least preferred -- If we found any python versions at all we return that
             WorkerLanguageVersionInfo anyPythonWorker = versions.FirstOrDefault(w => !string.IsNullOrEmpty(w?.Version));
-            _pythonVersionCache = anyPythonWorker ?? new WorkerLanguageVersionInfo(WorkerRuntime.python, null, null);
+            _pythonVersionCache = anyPythonWorker ?? new WorkerLanguageVersionInfo(WorkerRuntime.Python, null, null);
 
             return _pythonVersionCache;
         }
@@ -270,6 +284,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 Environment.SetEnvironmentVariable(_pythonDefaultExecutableVar, pyExe, EnvironmentVariableTarget.Process);
             }
+
             if (StaticSettings.IsDebug)
             {
                 ColoredConsole.WriteLine(VerboseColor($"{_pythonDefaultExecutableVar} is set to {Environment.GetEnvironmentVariable(_pythonDefaultExecutableVar)}"));
@@ -283,8 +298,9 @@ namespace Azure.Functions.Cli.Helpers
             pythonExeVersion = pythonExeVersion.Replace("Python ", string.Empty);
             if (!string.IsNullOrEmpty(pythonExeVersion))
             {
-                return new WorkerLanguageVersionInfo(WorkerRuntime.python, pythonExeVersion, pythonExe);
+                return new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonExeVersion, pythonExe);
             }
+
             return null;
         }
 
@@ -312,15 +328,18 @@ namespace Azure.Functions.Cli.Helpers
             {
                 throw new CliException("Unable to verify Python version. Please make sure you have Python 3.6 or 3.7 installed.");
             }
+
             if (exitCode == 0)
             {
                 var trials = 0;
+
                 // this delay to make sure the output
                 while (string.IsNullOrWhiteSpace(sb.ToString()) && trials < 5)
                 {
                     trials++;
                     await Task.Delay(TimeSpan.FromMilliseconds(200));
                 }
+
                 return sb.ToString().Trim();
             }
             else
@@ -391,6 +410,7 @@ namespace Azure.Functions.Cli.Helpers
                 throw new CliException($"{Constants.RequirementsTxt} is not found. " +
                 $"{Constants.RequirementsTxt} is required for python function apps. Please make sure to generate one before publishing.");
             }
+
             var packagesLocation = Path.Combine(functionAppRoot, Constants.ExternalPythonPackages);
             if (FileSystemHelpers.DirectoryExists(packagesLocation))
             {
@@ -401,6 +421,7 @@ namespace Azure.Functions.Cli.Helpers
                     ColoredConsole.WriteLine(WarningColor($"Directory {Constants.ExternalPythonPackages} already in sync with {Constants.RequirementsTxt}. Skipping restoring dependencies..."));
                     return await ZipHelper.CreateZip(files.Union(FileSystemHelpers.GetFiles(packagesLocation)), functionAppRoot, Enumerable.Empty<string>());
                 }
+
                 ColoredConsole.WriteLine($"Deleting the old {Constants.ExternalPythonPackages} directory");
                 FileSystemHelpers.DeleteDirectorySafe(packagesLocation);
             }
@@ -453,6 +474,7 @@ namespace Azure.Functions.Cli.Helpers
             if (exitCode != 0)
             {
                 var errorMessage = "There was an error restoring dependencies. " + sbErrors.ToString();
+
                 // If --build-native-deps if required, we exit with this specific code to notify other toolings
                 // If this exit code changes, partner tools must be updated
                 if (exitCode == ExitCodes.BuildNativeDepsRequired)
@@ -460,6 +482,7 @@ namespace Azure.Functions.Cli.Helpers
                     ColoredConsole.WriteLine(ErrorColor(errorMessage));
                     Environment.Exit(ExitCodes.BuildNativeDepsRequired);
                 }
+
                 throw new CliException(errorMessage);
             }
         }
@@ -508,6 +531,7 @@ namespace Azure.Functions.Cli.Helpers
                     await DockerHelpers.ExecInContainer(containerId, $"apt-get update");
                     await DockerHelpers.ExecInContainer(containerId, $"apt-get install -y {additionalPackages}");
                 }
+
                 await DockerHelpers.CopyToContainer(containerId, scriptFilePath, Constants.StaticResourcesNames.PythonDockerBuild);
                 await DockerHelpers.ExecInContainer(containerId, $"chmod +x /{Constants.StaticResourcesNames.PythonDockerBuild}");
                 await DockerHelpers.ExecInContainer(containerId, $"/{Constants.StaticResourcesNames.PythonDockerBuild}");
@@ -542,6 +566,7 @@ namespace Azure.Functions.Cli.Helpers
                 FileSystemHelpers.EnsureDirectory(Path.Combine(tmp, relativeDirName));
                 FileSystemHelpers.Copy(file, Path.Combine(tmp, relativeFileName));
             }
+
             return tmp;
         }
 
@@ -563,8 +588,11 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython311;
                     case 12:
                         return StaticResources.DockerfilePython312;
+                    case 13:
+                        return StaticResources.DockerfilePython313;
                 }
             }
+
             return StaticResources.DockerfilePython37;
         }
 
@@ -588,9 +616,12 @@ namespace Azure.Functions.Cli.Helpers
                         return Constants.DockerImages.LinuxPython311ImageAmd64;
                     case 12:
                         return Constants.DockerImages.LinuxPython312ImageAmd64;
+                    case 13:
+                        return Constants.DockerImages.LinuxPython313ImageAmd64;
                 }
             }
-            return Constants.DockerImages.LinuxPython36ImageAmd64;
+
+            return Constants.DockerImages.LinuxPython312ImageAmd64;
         }
 
         private static bool IsVersionSupported(WorkerLanguageVersionInfo info)
@@ -599,6 +630,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
+                    case 13:
                     case 12:
                     case 11:
                     case 10:
@@ -607,22 +639,28 @@ namespace Azure.Functions.Cli.Helpers
                     case 7: return true;
                     default: return false;
                 }
-            } else return false;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         public static bool IsLinuxFxVersionRuntimeVersionMatched(string linuxFxVersion, int? major, int? minor)
         {
-            // No linux fx version will default to python 3.11
+            // No linux fx version will default to python 3.12
             if (string.IsNullOrEmpty(linuxFxVersion))
             {
-                // Match if version is 3.11
-                return major == 3 && minor == 11;
+                // Match if version is 3.12
+                return major == 3 && minor == 12;
             }
+
             // Only validate on LinuxFxVersion that follows the pattern PYTHON|<version>
             else if (!linuxFxVersion.StartsWith("PYTHON|", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
+
             // Validate LinuxFxVersion that follows the pattern PYTHON|<major>.<minor>
             return string.Equals(linuxFxVersion, $"PYTHON|{major}.{minor}", StringComparison.OrdinalIgnoreCase);
         }
@@ -631,15 +669,16 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (string.IsNullOrEmpty(flexRuntime) || string.IsNullOrEmpty(flexRuntimeVersion))
             {
-                // Match if version is 3.10
-                return major == 3 && minor == 10;
+                // Match if version is 3.12
+                return major == 3 && minor == 12;
             }
+
             // Only validate for python.
             else if (!flexRuntime.Equals("python", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
-            
+
             // Validate LinuxFxVersion that follows the pattern PYTHON|<major>.<minor>
             return flexRuntimeVersion.Equals($"{major}.{minor}", StringComparison.OrdinalIgnoreCase);
         }

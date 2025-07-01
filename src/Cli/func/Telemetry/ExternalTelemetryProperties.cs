@@ -1,16 +1,13 @@
-// Copyright (c) .NET Foundation and contributors. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
-using System.IO;
+using System.Runtime.InteropServices;
 using System.Security;
 using Microsoft.DotNet.PlatformAbstractions;
 using Microsoft.Win32;
 using RuntimeEnvironment = Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment;
-using System.Runtime.InteropServices;
-using System.Diagnostics;
 
 namespace Azure.Functions.Cli.Telemetry
 {
@@ -24,28 +21,28 @@ namespace Azure.Functions.Cli.Telemetry
         /// </summary>
         internal static string GetInstallationType()
         {
-            if (RuntimeEnvironment.OperatingSystemPlatform != Platform.Windows)
-            {
-                return "";
-            }
-
             const string Key = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
             const string ValueName = @"InstallationType";
 
             try
             {
-                return (string)Registry.GetValue(Key, ValueName, defaultValue: "");
+                return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? Registry.GetValue(Key, ValueName, defaultValue: string.Empty) as string
+                    : string.Empty;
             }
+
             // Catch everything: this is for telemetry only.
             catch (Exception e)
             {
-                Debug.Assert(e is ArgumentException | e is SecurityException | e is InvalidCastException);
-                return "";
+                Debug.Assert(e is ArgumentException | e is SecurityException | e is InvalidCastException, string.Empty);
+                return string.Empty;
             }
         }
 
         [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = false)]
+#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
         private static extern bool GetProductInfo(uint dwOSMajorVersion, uint dwOSMinorVersion, uint dwSpMajorVersion, uint dwSpMinorVersion, out uint pdwReturnedProductType);
+#pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
 
         /// <summary>
         /// For Windows, returns the product type, loosely the SKU, as encoded by GetProductInfo().
@@ -58,7 +55,7 @@ namespace Azure.Functions.Cli.Telemetry
         {
             if (RuntimeEnvironment.OperatingSystemPlatform != Platform.Windows)
             {
-                return "";
+                return string.Empty;
             }
 
             try
@@ -68,20 +65,29 @@ namespace Azure.Functions.Cli.Telemetry
                     return productType.ToString("D", CultureInfo.InvariantCulture);
                 }
             }
+
             // Catch everything: this is for telemetry only
             catch (Exception e)
             {
                 Debug.Assert(false, $"Unexpected exception from GetProductInfo: ${e.GetType().Name}: ${e.Message}");
             }
 
-            return "";
+            return string.Empty;
         }
 
         [DllImport("libc", ExactSpelling = true, CallingConvention = CallingConvention.Cdecl)]
+#pragma warning disable SA1300 // Element should begin with upper-case letter
+#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
         private static extern IntPtr gnu_get_libc_release();
+#pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
+#pragma warning restore SA1300 // Element should begin with upper-case letter
 
         [DllImport("libc", ExactSpelling = true, CallingConvention = CallingConvention.Cdecl)]
+#pragma warning disable SA1300 // Element should begin with upper-case letter
+#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
         private static extern IntPtr gnu_get_libc_version();
+#pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
+#pragma warning restore SA1300 // Element should begin with upper-case letter
 
         /// <summary>
         /// If gnulibc is available, returns the release, such as "stable".
@@ -92,18 +98,19 @@ namespace Azure.Functions.Cli.Telemetry
         {
             if (RuntimeEnvironment.OperatingSystemPlatform == Platform.Windows)
             {
-                return "";
+                return string.Empty;
             }
 
             try
             {
                 return Marshal.PtrToStringUTF8(gnu_get_libc_release());
             }
+
             // Catch everything: this is for telemetry only
             catch (Exception e)
             {
-                Debug.Assert(e is DllNotFoundException || e is EntryPointNotFoundException);
-                return "";
+                Debug.Assert(e is DllNotFoundException or EntryPointNotFoundException, string.Empty);
+                return string.Empty;
             }
         }
 
@@ -116,18 +123,19 @@ namespace Azure.Functions.Cli.Telemetry
         {
             if (RuntimeEnvironment.OperatingSystemPlatform == Platform.Windows)
             {
-                return "";
+                return string.Empty;
             }
 
             try
             {
                 return Marshal.PtrToStringUTF8(gnu_get_libc_version());
             }
+
             // Catch everything: this is for telemetry only
             catch (Exception e)
             {
-                Debug.Assert(e is DllNotFoundException || e is EntryPointNotFoundException);
-                return "";
+                Debug.Assert(e is DllNotFoundException || e is EntryPointNotFoundException, string.Empty);
+                return string.Empty;
             }
         }
     }

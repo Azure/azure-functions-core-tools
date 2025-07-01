@@ -1,6 +1,7 @@
-﻿using System;
-using System.IO;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Xml;
 using Azure.Functions.Cli.Common;
 using System.Net.Http;
 using System.Xml;
@@ -29,27 +30,30 @@ namespace Azure.Functions.Cli.Helpers
             string latestMajorVersion = null;
             Stream stream = null;
 
-            await RetryHelper.Retry(async () =>
-            {
-                using (var client = new HttpClient())
+            await RetryHelper.Retry(
+                async () =>
                 {
-                    client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
-                    client.Timeout = TimeSpan.FromSeconds(DefaultTimeOutInSeconds);
+                    using (var client = new HttpClient())
+                    {
+                        client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
+                        client.Timeout = TimeSpan.FromSeconds(DefaultTimeOutInSeconds);
 
-                    try
-                    {
-                        var response = await client.GetAsync(address);
-                        // Throw is not a successful request
-                        response.EnsureSuccessStatusCode();
-                        stream = await response.Content.ReadAsStreamAsync();
+                        try
+                        {
+                            var response = await client.GetAsync(address);
+
+                            // Throw is not a successful request
+                            response.EnsureSuccessStatusCode();
+                            stream = await response.Content.ReadAsStreamAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            var errorMsg = $@"Fail to get module version for {AzModuleName}. Errors: {ex.Message}";
+                            throw new CliException(errorMsg);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        var errorMsg = $@"Fail to get module version for {AzModuleName}. Errors: {ex.Message}";
-                        throw new CliException(errorMsg);
-                    }
-                }
-            }, retryCount: 3);
+                },
+                retryCount: 3);
 
             if (stream != null)
             {

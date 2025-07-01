@@ -1,5 +1,5 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the MIT License. See License.txt in the project root for license information.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
 
@@ -8,6 +8,7 @@ namespace Azure.Functions.Cli.ArtifactAssembler
     internal sealed class ArtifactZipper
     {
         private readonly string _rootWorkingDirectory;
+
         public ArtifactZipper(string rootWorkingDirectory)
         {
             _rootWorkingDirectory = rootWorkingDirectory;

@@ -1,5 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Kubernetes.Models;
 using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Colors.Net;
@@ -9,15 +10,15 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
 {
     public static class KedaHelper
     {
-        internal static string GetKedaDeploymentYaml(string @namespace, KedaVersion kedaVersion = KedaVersion.v2)
+        internal static string GetKedaDeploymentYaml(string @namespace, KedaVersion kedaVersion = KedaVersion.V2)
         {
             string rawTemplate;
             switch (kedaVersion)
             {
-                case KedaVersion.v1:
+                case KedaVersion.V1:
                     rawTemplate = StaticResources.KedaV1Template.Result;
                     break;
-                case KedaVersion.v2:
+                case KedaVersion.V2:
                     rawTemplate = StaticResources.KedaV2Template.Result;
                     break;
                 default:
@@ -44,19 +45,19 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
                 ColoredConsole.WriteLine("KEDA was not found, using KEDA v2 as default");
 
                 // We use KEDA v2 as a default
-                return KedaVersion.v2;
+                return KedaVersion.V2;
             }
 
             var parsedJson = JToken.Parse(resourceInfo.Output);
             var rawKedaVersion = parsedJson["metadata"]?["labels"]?["app.kubernetes.io/version"]?.ToString();
-            
+
             if (string.IsNullOrWhiteSpace(rawKedaVersion) == false && rawKedaVersion.StartsWith("2."))
             {
-                return KedaVersion.v2;
+                return KedaVersion.V2;
             }
 
             // We were unable to determine the version, falling back to v1
-            return KedaVersion.v1;
+            return KedaVersion.V1;
         }
 
         public static async Task<bool> IsInstalled(string @namespace)
@@ -74,7 +75,7 @@ namespace Azure.Functions.Cli.Kubernetes.KEDA
                 // As a fallback, look for v1 resource for backwards compatibility
                 resourceInfo = await KubernetesHelper.ResourceExists("Deployment", "keda", @namespace, returnJsonOutput: true);
             }
-            
+
             return resourceInfo;
         }
     }

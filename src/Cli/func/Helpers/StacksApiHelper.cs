@@ -1,10 +1,8 @@
-﻿using Azure.Functions.Cli.Common;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.StacksApi;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Helpers
 {
@@ -18,7 +16,8 @@ namespace Azure.Functions.Cli.Helpers
             {
                 currentMajorVersion++;
                 runtimeSettings = GetRuntimeSettings(stacks, currentMajorVersion, out isLTS);
-            } while (runtimeSettings != null && (!isLTS && runtimeSettings.IsDeprecated != true && runtimeSettings.IsDeprecatedForRuntime != true));
+            }
+            while (runtimeSettings != null && (!isLTS && runtimeSettings.IsDeprecated != true && runtimeSettings.IsDeprecatedForRuntime != true));
 
             return currentMajorVersion;
         }
@@ -29,7 +28,6 @@ namespace Azure.Functions.Cli.Helpers
             var minorVersion = stacks?.Languages.FirstOrDefault(x => x.Name.Equals(Constants.Dotnet, StringComparison.InvariantCultureIgnoreCase))
                             ?.Properties.MajorVersions?.FirstOrDefault(x => x.Value == dotnetIsolatedStackKey)
                             ?.MinorVersions.LastOrDefault();
-
 
             isLTS = minorVersion?.Value?.Contains("LTS") == true;
             return minorVersion?.StackSettings?.WindowsRuntimeSettings;
@@ -54,9 +52,13 @@ namespace Azure.Functions.Cli.Helpers
         public static bool IsInNextSixMonths(this DateTime? date)
         {
             if (date == null)
+            {
                 return false;
+            }
             else
-                return date < DateTime.Now.AddMonths(6); 
+            {
+                return date < DateTime.Now.AddMonths(6);
+            }
         }
 
         public static T GetOtherRuntimeSettings<T>(this FunctionsStacks stacks, string workerRuntime, string runtimeVersion, Func<StackSettings, T> settingsSelector)

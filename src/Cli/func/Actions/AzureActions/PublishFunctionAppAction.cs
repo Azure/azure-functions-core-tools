@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Net.Http.Handlers;
 using System.Net.Http.Headers;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Extensions;
@@ -27,35 +23,47 @@ namespace Azure.Functions.Cli.Actions.AzureActions
     [Action(Name = "publish", Context = Context.Azure, SubContext = Context.FunctionApp, HelpText = "Publish the current directory contents to an Azure Function App. Locally deleted files are not removed from destination.")]
     internal class PublishFunctionAppAction : BaseFunctionAppAction
     {
-        private const string _hostVersion = "4";
-
+        private const string HostVersion = "4";
         private readonly ISettings _settings;
         private readonly ISecretsManager _secretsManager;
         private static string _requiredNetFrameworkVersion = "8.0";
-
-        public bool PublishLocalSettings { get; set; }
-        public bool OverwriteSettings { get; set; }
-        public bool PublishLocalSettingsOnly { get; set; }
-        public bool ListIgnoredFiles { get; set; }
-        public bool ListIncludedFiles { get; set; }
-        public bool RunFromPackageDeploy { get; private set; }
-        public bool ShowKeys { get; set; }
-        public bool Force { get; set; }
-        public bool Csx { get; set; }
-        public bool BuildNativeDeps { get; set; }
-        public BuildOption PublishBuildOption { get; set; }
-        public string AdditionalPackages { get; set; } = string.Empty;
-        public bool NoBuild { get; set; }
-
-        // For .net function apps, build using "release" configuration by default. User can override using "--dotnet-cli-params" as needed.
-        public string DotnetCliParameters { get; set; } = "--configuration release";
-        public string DotnetFrameworkVersion { get; set; }
 
         public PublishFunctionAppAction(ISettings settings, ISecretsManager secretsManager)
         {
             _settings = settings;
             _secretsManager = secretsManager;
         }
+
+        public bool PublishLocalSettings { get; set; }
+
+        public bool OverwriteSettings { get; set; }
+
+        public bool PublishLocalSettingsOnly { get; set; }
+
+        public bool ListIgnoredFiles { get; set; }
+
+        public bool ListIncludedFiles { get; set; }
+
+        public bool RunFromPackageDeploy { get; private set; }
+
+        public bool ShowKeys { get; set; }
+
+        public bool Force { get; set; }
+
+        public bool Csx { get; set; }
+
+        public bool BuildNativeDeps { get; set; }
+
+        public BuildOption PublishBuildOption { get; set; }
+
+        public string AdditionalPackages { get; set; } = string.Empty;
+
+        public bool NoBuild { get; set; }
+
+        // For .net function apps, build using "release" configuration by default. User can override using "--dotnet-cli-params" as needed.
+        public string DotnetCliParameters { get; set; } = "--configuration release";
+
+        public string DotnetFrameworkVersion { get; set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
@@ -120,11 +128,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 .Setup<bool>("no-build")
                 .WithDescription("Skip building and fetching dependencies for the function project.")
                 .Callback(f => NoBuild = f);
+
             // Note about usage:
             // The value of 'dotnet-cli-params' option should either use a leading space character or escape the double quotes explicitly.
             // Ex 1: --dotnet-cli-params " --configuration debug"
             // Ex 2: --dotnet-cli-params "\"--configuration debug"\"
-            // If you don't do this, the value with leading - or -- will be read as a key (rather than the value of 'dotnet-cli-params'). 
+            // If you don't do this, the value with leading - or -- will be read as a key (rather than the value of 'dotnet-cli-params').
             // See https://github.com/fclp/fluent-command-line-parser/issues/99 for reference.
             Parser
                 .Setup<string>("dotnet-cli-params")
@@ -161,7 +170,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             // Determine the appropriate default targetFramework
             // TODO: Include proper steps for publishing a .NET Framework 4.8 application
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 string projectFilePath = ProjectHelpers.FindProjectFile(functionAppRoot);
                 if (projectFilePath != null)
@@ -196,6 +205,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             $"Can not interpret target framework '{targetFramework}', assuming framework '{_requiredNetFrameworkVersion}'"));
                     }
                 }
+
                 // We do not change the default targetFramework if no .csproj file is found
             }
 
@@ -286,12 +296,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 if (functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsExtensionVersion, out string version))
                 {
                     // v4 can be either "~4" or an exact match like "4.0.11961"
-                    if (!version.Equals($"~{_hostVersion}") &&
-                        !version.StartsWith($"{_hostVersion}."))
+                    if (!version.Equals($"~{HostVersion}") &&
+                        !version.StartsWith($"{HostVersion}."))
                     {
                         if (Force)
                         {
-                            result.Add(Constants.FunctionsExtensionVersion, $"~{_hostVersion}");
+                            result.Add(Constants.FunctionsExtensionVersion, $"~{HostVersion}");
                         }
                         else
                         {
@@ -305,7 +315,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             string workerRuntimeStr = null;
             if (functionApp.IsFlex)
             {
-                workerRuntimeStr = functionApp.FunctionAppConfig.runtime.name;
+                workerRuntimeStr = functionApp.FunctionAppConfig.Runtime.Name;
             }
 
             if (workerRuntime == WorkerRuntime.None)
@@ -313,8 +323,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException($"Worker runtime is not set. Please set a valid runtime using {Constants.FunctionsWorkerRuntime}");
             }
 
-            if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr) ||
-                (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr))))
+            if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr)) ||
+                (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr)))
             {
                 var resolution = $"You can pass --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
                 try
@@ -327,7 +337,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
                             result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
                         }
-                        else if (workerRuntime == WorkerRuntime.dotnetIsolated)
+                        else if (workerRuntime == WorkerRuntime.DotnetIsolated)
                         {
                             // Temporary: we don't have a create option for Function apps with worker runtime as dotnet-isolated.
                             // This way we temporarily update worker runtime in Azure if locally they are using dotnet-isolated.
@@ -372,18 +382,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Special checks for python dependencies
-            if (workerRuntime == WorkerRuntime.python)
+            if (workerRuntime == WorkerRuntime.Python)
             {
                 // Check if azure-functions-worker exists in requirements.txt for Python function app
                 await PythonHelpers.WarnIfAzureFunctionsWorkerInRequirementsTxt();
+
                 // Check if remote LinuxFxVersion exists and is different from local version
                 var localVersion = await PythonHelpers.GetEnvironmentPythonVersion();
 
                 if ((!functionApp.IsFlex && !PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(functionApp.LinuxFxVersion, localVersion.Major, localVersion.Minor)) ||
-                    (functionApp.IsFlex && !PythonHelpers.IsFlexPythonRuntimeVersionMatched(functionApp.FunctionAppConfig?.runtime?.name, functionApp.FunctionAppConfig?.runtime?.version, localVersion.Major, localVersion.Minor)))
+                    (functionApp.IsFlex && !PythonHelpers.IsFlexPythonRuntimeVersionMatched(functionApp.FunctionAppConfig?.Runtime?.Name, functionApp.FunctionAppConfig?.Runtime?.Version, localVersion.Major, localVersion.Minor)))
                 {
                     ColoredConsole.WriteLine(WarningColor($"Local python version '{localVersion.Version}' is different from the version expected for your deployed Function App." +
-                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{(functionApp.IsFlex ? functionApp.FunctionAppConfig.runtime.version : functionApp.LinuxFxVersion)}'."));
+                        $" This may result in 'ModuleNotFound' errors in Azure Functions. Please create a Python Function App for version {localVersion.Major}.{localVersion.Minor} or change the virtual environment on your local machine to match '{(functionApp.IsFlex ? functionApp.FunctionAppConfig.Runtime.Version : functionApp.LinuxFxVersion)}'."));
                 }
             }
 
@@ -417,7 +428,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     defaultSku = skuList.FirstOrDefault();
                 }
 
-                runtimeVersion = defaultSku?.functionAppConfigProperties.Runtime.Version;
+                runtimeVersion = defaultSku?.FunctionAppConfigProperties.Runtime.Version;
             }
 
             ColoredConsole.WriteLine($"Updating function app runtime setting with '{runtimeName} {runtimeVersion}'.");
@@ -459,14 +470,13 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         internal static async Task UpdateFrameworkVersions(Site functionApp, WorkerRuntime workerRuntime, string requestedDotNetVersion, bool force, AzureHelperService helperService)
         {
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 await UpdateDotNetIsolatedFrameworkVersion(functionApp, requestedDotNetVersion, helperService);
             }
             else if (!functionApp.IsLinux)
             {
                 await UpdateNetFrameworkVersionWindows(functionApp, requestedDotNetVersion, helperService);
-
             }
             else if (!functionApp.IsDynamic && !string.IsNullOrEmpty(functionApp.LinuxFxVersion))
             {
@@ -475,6 +485,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     ColoredConsole.WriteLine($"Your functionapp is using a custom image {functionApp.LinuxFxVersion}.\nAssuming that the image contains the correct framework.\n");
                 }
+
                 // If there the functionapp is our image but does not match the worker runtime image, we either fail or force update
                 else if (!PublishHelper.IsLinuxFxVersionRuntimeMatched(functionApp.LinuxFxVersion, workerRuntime))
                 {
@@ -501,7 +512,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                 }
             }
-
         }
 
         private static async Task UpdateDotNetIsolatedFrameworkVersion(Site functionApp, string dotnetFrameworkVersion, AzureHelperService helperService)
@@ -581,7 +591,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             // For dedicated linux apps, we do not support run from package right now
             var isFunctionAppDedicatedLinux = functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium && !functionApp.IsFlex;
 
-            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.python && !functionApp.IsLinux)
+            if (GlobalCoreToolsSettings.CurrentWorkerRuntime == WorkerRuntime.Python && !functionApp.IsLinux)
             {
                 throw new CliException("Publishing Python functions is only supported for Linux FunctionApps");
             }
@@ -596,8 +606,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             TelemetryHelpers.AddCommandEventToDictionary(TelemetryCommandEvents, "UseGoZip", useGoZip.ToString());
 
             ColoredConsole.WriteLine(GetLogMessage("Starting the function app deployment..."));
-            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption,
-                NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
+            Func<Task<Stream>> zipStreamFactory = () => ZipHelper.GetAppZipFile(functionAppRoot, BuildNativeDeps, PublishBuildOption, NoBuild, ignoreParser, AdditionalPackages, ignoreDotNetCheck: true);
 
             bool shouldSyncTriggers = true;
             bool shouldDeferPublishZipDeploy = false;
@@ -679,26 +688,29 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         private async Task SyncTriggers(Site functionApp)
         {
-            await RetryHelper.Retry(async () =>
-            {
-                ColoredConsole.WriteLine(GetLogMessage("Syncing triggers..."));
-                HttpResponseMessage response = null;
-                // This SyncTriggers function calls the endpoint for linux syncTriggers
-                response = await AzureHelper.SyncTriggers(functionApp, AccessToken, ManagementURL);
-                if (!response.IsSuccessStatusCode)
+            await RetryHelper.Retry(
+                async () =>
                 {
-                    var errorMessage = $"Error calling sync triggers ({response.StatusCode}). ";
+                    ColoredConsole.WriteLine(GetLogMessage("Syncing triggers..."));
+                    HttpResponseMessage response = null;
 
-                    // Add request ID if available
-                    var requestIds = response.Headers.GetValues("x-ms-correlation-request-id");
-                    if (requestIds != null)
+                    // This SyncTriggers function calls the endpoint for linux syncTriggers
+                    response = await AzureHelper.SyncTriggers(functionApp, AccessToken, ManagementURL);
+                    if (!response.IsSuccessStatusCode)
                     {
-                        errorMessage += $"Request ID = '{string.Join(",", requestIds)}'.";
-                    }
+                        var errorMessage = $"Error calling sync triggers ({response.StatusCode}). ";
 
-                    throw new CliException(errorMessage);
-                }
-            }, retryCount: 5);
+                        // Add request ID if available
+                        var requestIds = response.Headers.GetValues("x-ms-correlation-request-id");
+                        if (requestIds != null)
+                        {
+                            errorMessage += $"Request ID = '{string.Join(",", requestIds)}'.";
+                        }
+
+                        throw new CliException(errorMessage);
+                    }
+                },
+                retryCount: 5);
         }
 
         private async Task HandleWindowsRemoteBuildPublish(Site functionApp, Func<Task<Stream>> zipStreamFactory)
@@ -720,16 +732,20 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
                 }
-                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
-                    shouldNotHaveSettings: new Dictionary<string, string> { { Constants.WebsiteRunFromPackage, "1" } }, timeOutSeconds: 300);
+
+                await WaitForAppSettingUpdateSCM(
+                    functionApp,
+                    shouldHaveSettings: functionApp.AzureAppSettings,
+                    shouldNotHaveSettings: new Dictionary<string, string> { { Constants.WebsiteRunFromPackage, "1" } },
+                    timeOutSeconds: 300);
                 await Task.Delay(TimeSpan.FromSeconds(15));
             }
 
             var isFunctionAppDedicatedWindows = !functionApp.IsLinux && !functionApp.IsDynamic && !functionApp.IsElasticPremium;
             if (isFunctionAppDedicatedWindows)
             {
-                Task<DeployStatus> pollWindowsBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
-                await PerformServerSideBuild(functionApp, zipStreamFactory, pollWindowsBuild);
+                Task<DeployStatus> PollWindowsBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
+                await PerformServerSideBuild(functionApp, zipStreamFactory, PollWindowsBuild);
             }
             else
             {
@@ -768,6 +784,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     await PublishZipDeploy(functionApp, zipStreamFactory);
                 }
+
                 return;
             }
 
@@ -794,36 +811,40 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
                 }
-                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
-                    shouldNotHaveSettings: new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } }, timeOutSeconds: 300);
+
+                await WaitForAppSettingUpdateSCM(
+                    functionApp,
+                    shouldHaveSettings: functionApp.AzureAppSettings,
+                    shouldNotHaveSettings: new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } },
+                    timeOutSeconds: 300);
             }
 
-            Task<DeployStatus> pollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
-            await PerformServerSideBuild(functionApp, zipStreamFactory, pollDedicatedBuild);
+            Task<DeployStatus> PollDedicatedBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
+            await PerformServerSideBuild(functionApp, zipStreamFactory, PollDedicatedBuild);
         }
 
         /// <summary>
-        /// Handler for Linux Consumption publish event
+        /// Handler for Linux Consumption publish event.
         /// </summary>
-        /// <param name="functionApp">Function App in Azure</param>
-        /// <param name="zipFileFactory">Factory for local project zipper</param>
-        /// <returns>ShouldSyncTrigger value</returns>
+        /// <param name="functionApp">Function App in Azure.</param>
+        /// <param name="zipFileFactory">Factory for local project zipper.</param>
+        /// <returns>ShouldSyncTrigger value.</returns>
         private async Task<bool> HandleFlexConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             // Get the WorkerRuntime
             var workerRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntime;
 
-            if (workerRuntime == WorkerRuntime.dotnetIsolated)
+            if (workerRuntime == WorkerRuntime.DotnetIsolated)
             {
                 var flexSkus = await GetFlexSkus(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), new AzureHelperService(AccessToken, ManagementURL));
-                if (!flexSkus.Any(s => s.functionAppConfigProperties.Runtime.Version == _requiredNetFrameworkVersion))
+                if (!flexSkus.Any(s => s.FunctionAppConfigProperties.Runtime.Version == _requiredNetFrameworkVersion))
                 {
-                    var versions = string.Join(", ", flexSkus.Select(s => s.functionAppConfigProperties.Runtime.Version));
+                    var versions = string.Join(", ", flexSkus.Select(s => s.FunctionAppConfigProperties.Runtime.Version));
                     throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton supports .NET {versions}. Please upgrade your app to an appropriate .NET version and try the deployment again.");
                 }
             }
 
-            Task<DeployStatus> pollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
+            Task<DeployStatus> PollDeploymentStatusTask(HttpClient client) => KuduLiteDeploymentHelpers.WaitForFlexDeployment(client, functionApp);
             var deploymentParameters = new Dictionary<string, string>();
 
             if (PublishBuildOption == BuildOption.Remote)
@@ -831,7 +852,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 deploymentParameters.Add("RemoteBuild", true.ToString());
             }
 
-            var deploymentStatus = await PerformFlexDeployment(functionApp, zipFileFactory, pollDeploymentStatusTask, deploymentParameters);
+            var deploymentStatus = await PerformFlexDeployment(functionApp, zipFileFactory, PollDeploymentStatusTask, deploymentParameters);
 
             return deploymentStatus == DeployStatus.Success;
         }
@@ -893,23 +914,23 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
         }
 
-
         /// <summary>
-        /// Handler for Linux Consumption publish event
+        /// Handler for Linux Consumption publish event.
         /// </summary>
-        /// <param name="functionApp">Function App in Azure</param>
-        /// <param name="zipFileFactory">Factory for local project zipper</param>
-        /// <returns>ShouldSyncTrigger value</returns>
+        /// <param name="functionApp">Function App in Azure.</param>
+        /// <param name="zipFileFactory">Factory for local project zipper.</param>
+        /// <returns>ShouldSyncTrigger value.</returns>
         private async Task<bool> HandleLinuxConsumptionPublish(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             string fileNameNoExtension = string.Format("{0}-{1}", DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss"), Guid.NewGuid());
+
             // Consumption Linux, try squashfs as a package format.
             if (PublishBuildOption == BuildOption.Remote)
             {
                 await EnsureRemoteBuildIsSupported(functionApp);
                 await RemoveFunctionAppAppSetting(functionApp, Constants.WebsiteRunFromPackage, Constants.WebsiteContentAzureFileConnectionString, Constants.WebsiteContentShared);
-                Task<DeployStatus> pollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
-                var deployStatus = await PerformServerSideBuild(functionApp, zipFileFactory, pollConsumptionBuild);
+                Task<DeployStatus> PollConsumptionBuild(HttpClient client) => KuduLiteDeploymentHelpers.WaitForRemoteBuild(client, functionApp);
+                var deployStatus = await PerformServerSideBuild(functionApp, zipFileFactory, PollConsumptionBuild);
                 return deployStatus == DeployStatus.Success;
             }
             else if (PublishBuildOption == BuildOption.Local)
@@ -917,7 +938,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 await PublishRunFromPackage(functionApp, await zipFileFactory(), $"{fileNameNoExtension}.zip");
                 return true;
             }
-            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.python && !NoBuild && BuildNativeDeps)
+            else if (GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.Python && !NoBuild && BuildNativeDeps)
             {
                 await PublishRunFromPackage(functionApp, await PythonHelpers.ZipToSquashfsStream(await zipFileFactory()), $"{fileNameNoExtension}.squashfs");
                 return true;
@@ -944,8 +965,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task PublishRunFromPackageLocal(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
             await SetRunFromPackageAppSetting(functionApp, "1");
-            await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } },
-                timeOutSeconds: 300);
+            await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: new Dictionary<string, string> { { "WEBSITE_RUN_FROM_PACKAGE", "1" } }, timeOutSeconds: 300);
 
             // Zip deploy
             await PublishZipDeploy(functionApp, zipFileFactory);
@@ -953,8 +973,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             ColoredConsole.WriteLine("Deployment completed successfully.");
         }
 
-        private async Task WaitForAppSettingUpdateSCM(Site functionApp, IDictionary<string, string> shouldHaveSettings = null,
-            IDictionary<string, string> shouldNotHaveSettings = null, int timeOutSeconds = 300)
+        private async Task WaitForAppSettingUpdateSCM(
+            Site functionApp,
+            IDictionary<string, string> shouldHaveSettings = null,
+            IDictionary<string, string> shouldNotHaveSettings = null,
+            int timeOutSeconds = 300)
         {
             const int retryTimeoutSeconds = 5;
 
@@ -978,6 +1001,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                             {
                                 ColoredConsole.WriteLine(VerboseColor($"\"{kvp.Key}\" : \"{kvp.Value}\""));
                             }
+
                             ColoredConsole.WriteLine(Environment.NewLine);
                         }
 
@@ -1023,6 +1047,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
                 await Task.Delay(TimeSpan.FromSeconds(retryTimeoutSeconds));
             }
+
             throw new CliException("Timed out waiting for SCM to update the Environment Settings");
         }
 
@@ -1072,8 +1097,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     throw new CliException(Constants.Errors.UnableToUpdateAppSettings);
                 }
-                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings,
-                    shouldNotHaveSettings: settingsToRemove, timeOutSeconds: 300);
+
+                await WaitForAppSettingUpdateSCM(functionApp, shouldHaveSettings: functionApp.AzureAppSettings, shouldNotHaveSettings: settingsToRemove, timeOutSeconds: 300);
             }
         }
 
@@ -1097,6 +1122,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     throw new CliException($"Error when removing app settings: {result.ErrorResult}.");
                 }
+
                 await Task.Delay(TimeSpan.FromSeconds(5));
             }
         }
@@ -1129,24 +1155,26 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
         public async Task PublishZipDeploy(Site functionApp, Func<Task<Stream>> zipFileFactory)
         {
-            await RetryHelper.Retry(async () =>
-            {
-                using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
-                using (var client = GetRemoteZipClient(functionApp, handler))
-                using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri("api/zipdeploy", UriKind.Relative)))
+            await RetryHelper.Retry(
+                async () =>
                 {
-                    request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+                    using (var handler = new ProgressMessageHandler(new HttpClientHandler()))
+                    using (var client = GetRemoteZipClient(functionApp, handler))
+                    using (var request = new HttpRequestMessage(HttpMethod.Post, new Uri("api/zipdeploy", UriKind.Relative)))
+                    {
+                        request.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
 
-                    ColoredConsole.WriteLine("Creating archive for current directory...");
+                        ColoredConsole.WriteLine("Creating archive for current directory...");
 
-                    (var content, var length) = CreateStreamContentZip(await zipFileFactory());
-                    request.Content = content;
+                        (var content, var length) = CreateStreamContentZip(await zipFileFactory());
+                        request.Content = content;
 
-                    HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
-                    await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
-                    ColoredConsole.WriteLine("Upload completed successfully.");
-                }
-            }, 2);
+                        HttpResponseMessage response = await PublishHelper.InvokeLongRunningRequest(client, handler, request, length, "Uploading");
+                        await PublishHelper.CheckResponseStatusAsync(response, "uploading archive");
+                        ColoredConsole.WriteLine("Upload completed successfully.");
+                    }
+                },
+                2);
         }
 
         public async Task<DeployStatus> PerformServerSideBuild(Site functionApp, Func<Task<Stream>> zipFileFactory, Func<HttpClient, Task<DeployStatus>> deploymentStatusPollTask)
@@ -1180,66 +1208,73 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     ColoredConsole.WriteLine(WarningColor($"Failed to retrieve remote build status, please visit https://{functionApp.ScmUri}/api/deployments"));
                 }
+
                 return status;
             }
         }
 
         private async Task<string> UploadPackageToStorage(Stream package, string blobName, IDictionary<string, string> appSettings)
         {
-            return await RetryHelper.Retry(async () =>
-            {
-                // Setting position to zero, in case we retry, we want to reset the stream
-                package.Position = 0;
-                var packageMD5 = SecurityHelpers.CalculateMd5(package);
-
-                const string containerName = "function-releases";
-
-                CloudBlobContainer blobContainer = null;
-
-                try
+            return await RetryHelper.Retry(
+                async () =>
                 {
-                    var storageConnection = appSettings["AzureWebJobsStorage"];
-                    var storageAccount = CloudStorageAccount.Parse(storageConnection);
-                    var blobClient = storageAccount.CreateCloudBlobClient();
-                    blobContainer = blobClient.GetContainerReference(containerName);
-                    await blobContainer.CreateIfNotExistsAsync();
-                }
-                catch (Exception ex)
-                {
-                    if (StaticSettings.IsDebug)
+                    // Setting position to zero, in case we retry, we want to reset the stream
+                    package.Position = 0;
+                    var packageMD5 = SecurityHelpers.CalculateMd5(package);
+
+                    const string containerName = "function-releases";
+
+                    CloudBlobContainer blobContainer = null;
+
+                    try
                     {
-                        ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
+                        var storageConnection = appSettings["AzureWebJobsStorage"];
+                        var storageAccount = CloudStorageAccount.Parse(storageConnection);
+                        var blobClient = storageAccount.CreateCloudBlobClient();
+                        blobContainer = blobClient.GetContainerReference(containerName);
+                        await blobContainer.CreateIfNotExistsAsync();
                     }
-                    throw new CliException($"Error creating a Blob container reference. Please make sure your connection string in \"AzureWebJobsStorage\" is valid");
-                }
+                    catch (Exception ex)
+                    {
+                        if (StaticSettings.IsDebug)
+                        {
+                            ColoredConsole.Error.WriteLine(ErrorColor(ex.ToString()));
+                        }
 
-                var blob = blobContainer.GetBlockBlobReference(blobName);
-                using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(package.Length)}", package.Length))
-                {
-                    await blob.UploadFromStreamAsync(package,
-                        AccessCondition.GenerateEmptyCondition(),
-                        new BlobRequestOptions(),
-                        new OperationContext(),
-                        progress,
-                        new CancellationToken());
-                }
+                        throw new CliException($"Error creating a Blob container reference. Please make sure your connection string in \"AzureWebJobsStorage\" is valid");
+                    }
 
-                var cloudMd5 = blob.Properties.ContentMD5;
+                    var blob = blobContainer.GetBlockBlobReference(blobName);
+                    using (var progress = new StorageProgressBar($"Uploading {Utilities.BytesToHumanReadable(package.Length)}", package.Length))
+                    {
+                        await blob.UploadFromStreamAsync(
+                            package,
+                            AccessCondition.GenerateEmptyCondition(),
+                            new BlobRequestOptions(),
+                            new OperationContext(),
+                            progress,
+                            CancellationToken.None);
+                    }
 
-                if (!cloudMd5.Equals(packageMD5))
-                {
-                    throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
-                }
+                    var cloudMd5 = blob.Properties.ContentMD5;
 
-                var sasConstraints = new SharedAccessBlobPolicy();
-                sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
-                sasConstraints.SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddYears(10);
-                sasConstraints.Permissions = SharedAccessBlobPermissions.Read;
+                    if (!cloudMd5.Equals(packageMD5))
+                    {
+                        throw new CliException("Upload failed: Integrity error: MD5 hash mismatch between the local copy and the uploaded copy.");
+                    }
 
-                var blobToken = blob.GetSharedAccessSignature(sasConstraints);
+                    var sasConstraints = new SharedAccessBlobPolicy();
+                    sasConstraints.SharedAccessStartTime = DateTimeOffset.UtcNow.AddMinutes(-5);
+                    sasConstraints.SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddYears(10);
+                    sasConstraints.Permissions = SharedAccessBlobPermissions.Read;
 
-                return blob.Uri + blobToken;
-            }, 3, TimeSpan.FromSeconds(1), displayError: true);
+                    var blobToken = blob.GetSharedAccessSignature(sasConstraints);
+
+                    return blob.Uri + blobToken;
+                },
+                3,
+                TimeSpan.FromSeconds(1),
+                displayError: true);
         }
 
         private static void InternalListIgnoredFiles(GitIgnoreParser ignoreParser)
@@ -1282,7 +1317,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             string flexRuntimeVersion = null;
             if (functionApp.IsFlex)
             {
-                // if the additiona keys has runtime, it would mean that runtime is already updated. 
+                // if the additiona keys has runtime, it would mean that runtime is already updated.
                 if (!additional.ContainsKey(Constants.FunctionsWorkerRuntime))
                 {
                     if (local.ContainsKey(Constants.FunctionsWorkerRuntime))
@@ -1336,7 +1371,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                     else
                     {
-                        var answer = string.Empty;
+                        string answer;
                         do
                         {
                             ColoredConsole.WriteLine(QuestionColor("Would you like to overwrite value in azure? [yes/no/show]"));
@@ -1347,7 +1382,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                                     .WriteLine($"Azure: {azure.GetValueCaseInsensitive(pair.Key)}")
                                     .WriteLine($"Locally: {pair.Value}");
                             }
-                        } while (!answer.Equals("yes", StringComparison.OrdinalIgnoreCase) &&
+                        }
+                        while (!answer.Equals("yes", StringComparison.OrdinalIgnoreCase) &&
                                  !answer.Equals("no", StringComparison.OrdinalIgnoreCase));
 
                         if (answer.Equals("yes", StringComparison.OrdinalIgnoreCase))
@@ -1375,10 +1411,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     result.Remove(pair.Key);
                 }
             }
+
             return result;
         }
 
-        private static (StreamContent, long) CreateStreamContentZip(Stream zipFile)
+        private static (StreamContent Content, long Length) CreateStreamContentZip(Stream zipFile)
         {
             var content = new StreamContent(zipFile);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
@@ -1405,6 +1442,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
             }
+
             client.DefaultRequestHeaders.Add("User-Agent", Constants.CliUserAgent);
             return client;
         }
@@ -1439,28 +1477,6 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return $"[{DateTime.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffZ", CultureInfo.InvariantCulture)}] ".ToString();
         }
 
-        // For testing
-        internal class AzureHelperService
-        {
-            private readonly string _accessToken;
-            private readonly string _managementUrl;
-
-            public AzureHelperService(string accessToken, string managementUrl)
-            {
-                _accessToken = accessToken;
-                _managementUrl = managementUrl;
-            }
-
-            public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
-                 AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
-
-            public virtual Task UpdateFlexRuntime(Site functionApp, string runtimeName, string runtimeVersion) =>
-                 AzureHelper.UpdateFlexRuntime(functionApp, runtimeName, runtimeVersion, _accessToken, _managementUrl);
-
-            public virtual Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string runtime, string region) =>
-                 AzureHelper.GetFlexFunctionsStacks(_accessToken, _managementUrl, runtime, region);
-        }
-
         private void ShowEolMessage(FunctionsStacks stacks, WindowsRuntimeSettings currentRuntimeSettings, int? majorDotnetVersion)
         {
             try
@@ -1488,6 +1504,28 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 // ignore. Failure to show the EOL message should not fail the deployment.
             }
+        }
+
+        // For testing
+        internal class AzureHelperService
+        {
+            private readonly string _accessToken;
+            private readonly string _managementUrl;
+
+            public AzureHelperService(string accessToken, string managementUrl)
+            {
+                _accessToken = accessToken;
+                _managementUrl = managementUrl;
+            }
+
+            public virtual Task<HttpResult<string, string>> UpdateWebSettings(Site functionApp, Dictionary<string, string> updatedSettings) =>
+                 AzureHelper.UpdateWebSettings(functionApp, updatedSettings, _accessToken, _managementUrl);
+
+            public virtual Task UpdateFlexRuntime(Site functionApp, string runtimeName, string runtimeVersion) =>
+                 AzureHelper.UpdateFlexRuntime(functionApp, runtimeName, runtimeVersion, _accessToken, _managementUrl);
+
+            public virtual Task<FlexFunctionsStacks> GetFlexFunctionsStacks(string runtime, string region) =>
+                 AzureHelper.GetFlexFunctionsStacks(_accessToken, _managementUrl, runtime, region);
         }
 
         /// <summary>

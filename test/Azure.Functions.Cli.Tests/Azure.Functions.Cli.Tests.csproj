@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <Nullable>disable</Nullable>
@@ -47,8 +48,5 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cli\func\Azure.Functions.Cli.csproj" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <RunSettingsFilePath>$(MSBuildProjectDirectory)\E2E\StartTests_default.runsettings</RunSettingsFilePath>
-  </PropertyGroup>
+	
 </Project>

@@ -1,9 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Helpers
@@ -35,19 +34,21 @@ namespace Azure.Functions.Cli.Helpers
                     }
                 }
             }
+
             using (var sha = SHA256.Create())
             {
                 var hash = sha.ComputeHash(digests.ToArray());
-                var str = "";
+                var str = string.Empty;
                 for (int i = 0; i < hash.Length; i++)
                 {
                     str += $"{hash[i]:x2}";
                 }
+
                 return str;
             }
         }
 
-        public static async Task<(string output, string error, int exit)> GitHash(bool ignoreError = false)
+        public static async Task<(string Output, string Error, int Exit)> GitHash(bool ignoreError = false)
         {
             var git = new Executable("git", "describe --always --dirty");
             var sbError = new StringBuilder();
@@ -58,12 +59,12 @@ namespace Azure.Functions.Cli.Helpers
             if (exitCode != 0 && !ignoreError)
             {
                 throw new CliException($"Error running {git.Command}.\n" +
-                    $"output: {sbOutput.ToString()}\n{sbError.ToString()}");
+                    $"output: {sbOutput}\n{sbError}");
             }
 
-            return (trim(sbOutput.ToString()), trim(sbError.ToString()), exitCode);
+            return (Trim(sbOutput.ToString()), Trim(sbError.ToString()), exitCode);
 
-            string trim(string str) => str.Trim(new[] { ' ', '\n' });
+            string Trim(string str) => str.Trim(new[] { ' ', '\n' });
         }
     }
 }

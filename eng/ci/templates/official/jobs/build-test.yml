@@ -56,17 +56,9 @@ jobs:
       versionSpec: '18.x'
 
   - pwsh: |
-      Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
+      Import-Module "./eng/scripts/modules/pipeline-utilities.psm1" -Force
       Install-Dotnet
     displayName: 'Install .NET 6.0 and 3.1'
-
-  - pwsh: |
-      Import-Module "./eng/scripts/modules/pipelineUtilities.psm1" -Force
-      Install-SBOMUtil -SBOMUtilSASUrl $env:SBOMUtilSASUrl
-    env:
-      SBOMUtilSASUrl: $(SBOMUtilSASUrl)
-    condition: eq(variables['IsReleaseBuild'], 'true')
-    displayName: 'Install SBOM ManifestTool'
 
   - task: NuGetToolInstaller@1
     inputs:
@@ -86,18 +78,13 @@ jobs:
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
 
   - pwsh: |
-      eng/scripts/validateWorkerVersions.ps1
+      eng/scripts/validate-worker-versions.ps1
     displayName: 'Validate worker versions'
     condition: ne(variables['skipWorkerVersionValidation'], 'true')
 
   - pwsh: |
       eng/scripts/check-vulnerabilities.ps1
     displayName: "Check for security vulnerabilities"
-
-  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
-    - pwsh: |
-        # Check if this is a scheduled build
-        Write-Host "##vso[build.addbuildtag]nightly-build"
 
   - pwsh: |
       eng/scripts/build.ps1
@@ -108,7 +95,16 @@ jobs:
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
       IntegrationBuildNumber: $(INTEGRATIONBUILDNUMBER)
+      DirectoryToLogTo: $(Build.SourcesDirectory)/TestLogs
     displayName: 'Executing build script'
+
+  - task: 1ES.PublishPipelineArtifact@1
+    condition: succeededOrFailed()
+    continueOnError: true
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)/TestLogs'
+      artifactName: 'TestLogs_$(System.JobId)_$(System.JobAttempt)'
+      artifactType: 'pipeline'
 
   - template: ci/sign-files.yml@eng
     parameters:
@@ -196,7 +192,7 @@ jobs:
         ]
 
   - pwsh: |
-      eng/scripts/repackageBinaries.ps1
+      eng/scripts/repackage-binaries.ps1
     displayName: Repackage signed binaries
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
@@ -214,7 +210,7 @@ jobs:
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 
   - pwsh: |
-      eng/scripts/generateMsiFiles.ps1
+      eng/scripts/generate-msi-files.ps1
     env:
       AzureBlobSigningConnectionString: $(AzureBlobSigningConnectionString)
       BuildArtifactsStorage: $(BuildArtifactsStorage)
@@ -254,7 +250,7 @@ jobs:
         ]
 
   - pwsh: |
-      eng/scripts/generateSha.ps1
+      eng/scripts/generate-sha-files.ps1
     displayName: 'Generate sha files'
 
   - pwsh: |
@@ -274,11 +270,29 @@ jobs:
     condition: succeeded()
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifactName: 'drop'
+      artifactName: 'func-cli'
       artifactType: 'pipeline'
 
+  - ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+    - task: PowerShell@2
+      displayName: 'Generate nightly build package version for feed'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generateNightlyBuildPackageVersionForFeed.ps1'
+
+    - task: UniversalPackages@0
+      displayName: Publish
+      inputs:
+        command: publish
+        publishDirectory: '$(Build.ArtifactStagingDirectory)'
+        vstsFeedPublish: 'internal/core-tools-nightly-build'
+        vstsFeedPackagePublish: 'func-cli'
+        versionOption: custom
+        versionPublish: '$(NightlyBuildVersion)'
+        packagePublishDescription: 'Core tools default nightly build'
+
   - pwsh: |
-      eng/scripts/uploadContentToStorageAccount.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
+      eng/scripts/upload-to-storage.ps1 -StorageAccountName $env:IntegrationTestsStorageAccountName -StorageAccountKey $env:IntegrationTestsStorageAccountKey -SourcePath '$(Build.ArtifactStagingDirectory)'
     env:
       IntegrationTestsStorageAccountName: $(IntegrationTestsStorageAccountName)
       IntegrationTestsStorageAccountKey: $(IntegrationTestsStorageAccountKey)

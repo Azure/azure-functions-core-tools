@@ -1,8 +1,9 @@
-﻿using System;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Actions.HostActions.WebHost.Security;
 using Azure.Functions.Cli.Diagnostics;
 using Azure.Functions.Cli.ExtensionBundle;
-using Azure.Functions.Cli.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -11,10 +12,7 @@ using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Authentication;
 using Microsoft.Azure.WebJobs.Script.WebHost.Controllers;
 using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security;
-using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authentication;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.UserSecrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -70,13 +68,9 @@ namespace Azure.Functions.Cli.Actions.HostActions
             {
                 services.AddAuthentication()
                     .AddScriptJwtBearer()
-                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { })
-                    .AddScheme<ArmAuthenticationOptions, CliAuthenticationHandler<ArmAuthenticationOptions>>(ArmAuthenticationDefaults.AuthenticationScheme, _ => { });
-            }
+                    .AddScheme<AuthenticationLevelOptions, CliAuthenticationHandler<AuthenticationLevelOptions>>(AuthLevelAuthenticationDefaults.AuthenticationScheme, configureOptions: _ => { });
 
-            // Only set up authorization handler which bypasses all local auth if enableAuth param is not set 
-            if (!_enableAuth)
-            {
+                // Bypass all local auth
                 services.AddSingleton<IAuthorizationHandler, CoreToolsAuthorizationHandler>();
             }
 
@@ -97,7 +91,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 o.IsSelfHost = _hostOptions.IsSelfHost;
                 o.SecretsPath = _hostOptions.SecretsPath;
             });
-            
+
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new ExtensionBundleConfigurationBuilder(_hostOptions));
             services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>, DisableConsoleConfigurationBuilder>();
             services.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(_ => new LoggingBuilder(_loggingFilterHelper, _jsonOutputFile));
@@ -136,11 +130,12 @@ namespace Azure.Functions.Cli.Actions.HostActions
                     }
                 });
             }
-
+#pragma warning disable CS0618 // IApplicationLifetime is obsolete
             IApplicationLifetime applicationLifetime = app.ApplicationServices
                 .GetRequiredService<IApplicationLifetime>();
 
             app.UseWebJobsScriptHost(applicationLifetime);
+#pragma warning restore CS0618 // Type is obsolete
         }
 
         private class ThrowingDependencyValidator : DependencyValidator

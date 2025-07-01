@@ -1,23 +1,41 @@
+parameters:
+  - name: isNightlyBuild
+    type: boolean
+    default: false
+
 jobs:
 - job: ProcessNuGetPackage
   displayName: "Process NuGet Package"
   templateContext:
-    inputs:
-      - input: pipelineArtifact
-        pipeline: core-tools-default
-        artifactName: drop
-        targetPath: $(Pipeline.Workspace)/core-tools-default/drop
+    ${{ if eq(parameters.isNightlyBuild, false) }}:
+      inputs:
+        - input: pipelineArtifact
+          pipeline: core-tools-default
+          artifactName: func-cli
+          targetPath: $(Pipeline.Workspace)/core-tools-default/func-cli
     outputs:
       - output: pipelineArtifact
         displayName: Publish nuget package
         targetPath: $(Pipeline.Workspace)/nugetPackage
-        artifact: drop-nuget-package
+        artifact: func-nuget-package
   steps:
   - checkout: self
+
+  # Conditional download of artifacts based on isNightlyBuild parameter
+  - ${{ if eq(parameters.isNightlyBuild, true) }}:
+    # Download from ADO feed for nightly builds
+    - task: DownloadPackage@1
+      displayName: 'Download core-tools-default from feed'
+      inputs:
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/core-tools-default/func-cli'
 
   - task: PowerShell@2
     displayName: 'Process and move nuget package to staging directory'
     inputs:
       targetType: filePath
-      filePath: '$(Build.SourcesDirectory)/eng/scripts/ArtifactAssemblerHelpers/moveNugetPackage.ps1'
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/move-nuget-package.ps1'
       arguments: '-CurrentDirectory "$(Pipeline.Workspace)"'

@@ -1,22 +1,17 @@
-using System;
-using System.Linq;
-using System.IO;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Helpers;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Interfaces;
-using Colors.Net;
-using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
 using Azure.Functions.Cli.Kubernetes;
+using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Colors.Net;
 using Newtonsoft.Json.Linq;
 
 namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
 {
     public class KubernetesPlatform : IHostingPlatform
     {
-        private string configFile = string.Empty;
-        private const string FUNCTIONS_NAMESPACE = "azure-functions";
+        private readonly string _configFile = string.Empty;
 
         public async Task DeployContainerizedFunction(string functionName, string image, string nameSpace, int min, int max, double cpu = 0.1, int memory = 128, string port = "80", string pullSecret = "")
         {
@@ -39,12 +34,13 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
             ColoredConsole.WriteLine("Deploying function to Kubernetes...");
 
             var deployment = GetDeployment(deploymentName, image, cpu, memory, port, nameSpace, min, pullSecret);
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(deployment,
-                            Newtonsoft.Json.Formatting.None,
-                            new Newtonsoft.Json.JsonSerializerSettings
-                            {
-                                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
-                            });
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(
+                deployment,
+                Newtonsoft.Json.Formatting.None,
+                new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                });
 
             await KubectlHelper.RunKubectl($"apply -f deployment.json --namespace {nameSpace}");
 
@@ -57,12 +53,14 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 // we can safely ignore the error here
                 await KubectlHelper.KubectlApply(service, showOutput: false);
             }
-            catch { }
+            catch
+            {
+            }
 
             await TryRemoveAutoscaler(deploymentName, nameSpace);
             await CreateAutoscaler(deploymentName, nameSpace, min, max);
 
-            var externalIP = "";
+            var externalIP = string.Empty;
 
             ColoredConsole.WriteLine("Waiting for External IP...");
 
@@ -93,9 +91,9 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         {
             var cmd = $"autoscale deploy {deploymentName} --cpu-percent={cpuPercentage} --max={maxInstances} --min={minInstances} --namespace={nameSpace}";
 
-            if (!string.IsNullOrEmpty(configFile))
+            if (!string.IsNullOrEmpty(_configFile))
             {
-                cmd += $" --kubeconfig {configFile}";
+                cmd += $" --kubeconfig {_configFile}";
             }
 
             await KubectlHelper.RunKubectl(cmd);
@@ -114,7 +112,7 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                 {
                     Selector = new Dictionary<string, string>()
                     {
-                        {"app", name}
+                        { "app", name }
                     },
                     Ports = new List<ServicePortV1>()
                     {
@@ -134,7 +132,6 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
         {
             var deployment = new DeploymentV1Apps
             {
-
                 ApiVersion = "apps/v1beta1",
                 Kind = "Deployment",
 
@@ -169,8 +166,8 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                         },
                         Spec = new PodTemplateSpecV1
                         {
-                            Containers = new ContainerV1[]
-                            {
+                            Containers =
+                            [
                                 new ContainerV1
                                 {
                                     Name = name,
@@ -185,18 +182,17 @@ namespace Azure.Functions.Cli.Actions.DeployActions.Platforms
                                     },
                                     Ports = string.IsNullOrEmpty(port)
                                         ? Array.Empty<ContainerPortV1>()
-                                        : new ContainerPortV1[] { new ContainerPortV1 { ContainerPort = int.Parse(port) } },
-
+                                        : [new ContainerPortV1 { ContainerPort = int.Parse(port) }],
                                 }
-                            },
-                            Tolerations = new PodTolerationV1[]
-                            {
+                            ],
+                            Tolerations =
+                            [
                                 new PodTolerationV1
                                 {
                                     Key = "azure.com/aci",
                                     Effect = "NoSchedule"
                                 }
-                            },
+                            ],
                             ImagePullSecrets = string.IsNullOrEmpty(pullSecret)
                                 ? null
                                 : new ImagePullSecretV1[] { new ImagePullSecretV1 { Name = pullSecret } }

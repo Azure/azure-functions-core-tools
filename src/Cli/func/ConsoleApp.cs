@@ -1,12 +1,10 @@
-﻿using System;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using Autofac;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Common;
@@ -17,10 +15,9 @@ using Azure.Functions.Cli.Telemetry;
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
-
 namespace Azure.Functions.Cli
 {
-    class ConsoleApp
+    internal class ConsoleApp
     {
         private readonly IContainer _container;
         private readonly string[] _args;
@@ -28,13 +25,29 @@ namespace Azure.Functions.Cli
         private readonly string[] _helpArgs = new[] { "help", "h", "?" };
         private readonly TelemetryEvent _telemetryEvent;
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
+        internal ConsoleApp(string[] args, Assembly assembly, IContainer container)
+        {
+            _args = args;
+            _container = container;
+            _telemetryEvent = new TelemetryEvent();
+
+            // TypeAttributePair is just a typed tuple of an IAction type and one of its action attribute.
+            _actionAttributes = assembly
+                .GetTypes()
+                .Where(t => typeof(IAction).IsAssignableFrom(t) && !t.IsAbstract)
+                .Select(type => type.GetCustomAttributes<ActionAttribute>().Select(a => new TypeAttributePair { Type = type, Attribute = a }))
+                .SelectMany(i => i);
+
+            // Check if there is a --prefix or --script-root and update CurrentDirectory
+            UpdateCurrentDirectory(args);
+            GlobalCoreToolsSettings.Init(container.Resolve<ISecretsManager>(), args);
+        }
+
         public static void Run<T>(string[] args, IContainer container)
         {
             Task.Run(() => RunAsync<T>(args, container)).Wait();
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1004:GenericMethodsShouldProvideTypeParameter")]
         public static async Task RunAsync<T>(string[] args, IContainer container)
         {
             var stopWatch = Stopwatch.StartNew();
@@ -46,6 +59,7 @@ namespace Azure.Functions.Cli
 
             var exitCode = ExitCodes.Success;
             var app = new ConsoleApp(args, typeof(T).Assembly, container);
+
             // If all goes well, we will have an action to run.
             // This action can be an actual action, or just a HelpAction, but this method doesn't care
             // since HelpAction is still an IAction.
@@ -59,6 +73,7 @@ namespace Azure.Functions.Cli
                         var initializableAction = action as IInitializableAction;
                         await initializableAction.Initialize();
                     }
+
                     // All Actions are async. No return value is expected from any action.
                     await action.RunAsync();
 
@@ -135,6 +150,7 @@ namespace Azure.Functions.Cli
                 var args = action
                     .ParseArgs(Array.Empty<string>())
                     .UnMatchedOptions
+
                     // Description is expected to contain the name of the POCO's property holding the value.
                     .Select(o => new { Name = o.Description, ParamName = o.HasLongName ? $"--{o.LongName}" : $"-{o.ShortName}" })
                     .Select(n =>
@@ -161,10 +177,9 @@ namespace Azure.Functions.Cli
                 // the process exists.
                 var logFile = Path.GetTempFileName();
                 var exeName = Process.GetCurrentProcess().MainModule.FileName;
+
                 // '2>&1' redirects stderr to stdout.
                 command = $"/c \"\"{exeName}\" {command} > \"{logFile}\" 2>&1\"";
-
-
                 var startInfo = new ProcessStartInfo("cmd")
                 {
                     Verb = "runas",
@@ -185,23 +200,6 @@ namespace Azure.Functions.Cli
             }
         }
 
-        internal ConsoleApp(string[] args, Assembly assembly, IContainer container)
-        {
-            _args = args;
-            _container = container;
-            _telemetryEvent = new TelemetryEvent();
-            // TypeAttributePair is just a typed tuple of an IAction type and one of its action attribute.
-            _actionAttributes = assembly
-                .GetTypes()
-                .Where(t => typeof(IAction).IsAssignableFrom(t) && !t.IsAbstract)
-                .Select(type => type.GetCustomAttributes<ActionAttribute>().Select(a => new TypeAttributePair { Type = type, Attribute = a }))
-                .SelectMany(i => i);
-
-            // Check if there is a --prefix or --script-root and update CurrentDirectory
-            UpdateCurrentDirectory(args);
-            GlobalCoreToolsSettings.Init(container.Resolve<ISecretsManager>(), args);
-        }
-
         /// <summary>
         /// This method parses _args into an IAction.
         /// </summary>
@@ -211,8 +209,7 @@ namespace Azure.Functions.Cli
             // If args are passed and any it matched any of the strings in _helpArgs with a "-" then display help.
             // Otherwise, continue parsing.
             if (_args.Length == 0 ||
-                (_args.Length == 1 && _helpArgs.Any(ha => _args[0].Replace("-", "").Equals(ha, StringComparison.OrdinalIgnoreCase)))
-               )
+                (_args.Length == 1 && _helpArgs.Any(ha => _args[0].Replace("-", string.Empty).Equals(ha, StringComparison.OrdinalIgnoreCase))))
             {
                 _telemetryEvent.CommandName = "help";
                 _telemetryEvent.IActionName = typeof(HelpAction).Name;
@@ -222,6 +219,7 @@ namespace Azure.Functions.Cli
 
             bool isHelp = false;
             var argsToParse = Enumerable.Empty<string>();
+
             // this supports the format:
             //     `func help <context: optional> <subContext: optional> <action: optional>`
             // but help has to be the first word. So `func azure help` for example doesn't work
@@ -236,13 +234,13 @@ namespace Azure.Functions.Cli
                 // This is for passing --help anywhere in the command line.
                 var argsHelpIntersection = _args
                     .Where(a => a.StartsWith("-"))
-                    .Select(a => a.ToLowerInvariant().Replace("-", ""))
+                    .Select(a => a.ToLowerInvariant().Replace("-", string.Empty))
                     .Intersect(_helpArgs)
                     .ToArray();
                 isHelp = argsHelpIntersection.Any();
 
                 argsToParse = isHelp
-                    ? _args.Where(a => !a.StartsWith("-") || argsHelpIntersection.Contains(a.Replace("-", "").ToLowerInvariant()))
+                    ? _args.Where(a => !a.StartsWith("-") || argsHelpIntersection.Contains(a.Replace("-", string.Empty).ToLowerInvariant()))
                     : _args;
             }
 
@@ -302,6 +300,7 @@ namespace Azure.Functions.Cli
                 _telemetryEvent.CommandName = string.IsNullOrEmpty(invokedCommand) ? "help" : invokedCommand;
                 _telemetryEvent.IActionName = typeof(HelpAction).Name;
                 _telemetryEvent.Parameters = new List<string>();
+
                 // If this wasn't a help command, actionStr was empty or null implying a parseError.
                 _telemetryEvent.ParseError = !isHelp;
 
@@ -341,6 +340,7 @@ namespace Azure.Functions.Cli
             {
                 invokeCommand.Append(" ");
             }
+
             invokeCommand.Append(actionStr);
 
             // Create the IAction
@@ -361,6 +361,7 @@ namespace Azure.Functions.Cli
                     _telemetryEvent.IActionName = typeof(HelpAction).Name;
                     _telemetryEvent.Parameters = new List<string>();
                     _telemetryEvent.ParseError = true;
+
                     // There was an error with the args, pass it to the HelpAction.
                     return new HelpAction(_actionAttributes, CreateAction, action, parseResult);
                 }
@@ -369,11 +370,12 @@ namespace Azure.Functions.Cli
                     _telemetryEvent.CommandName = invokeCommand.ToString();
                     _telemetryEvent.IActionName = action.GetType().Name;
                     _telemetryEvent.Parameters = TelemetryHelpers.GetCommandsFromCommandLineOptions(action.MatchedOptions);
+
                     // Action is ready to run.
                     return action;
                 }
             }
-            catch (CliArgumentsException ex)
+            catch (CliArgumentsException)
             {
                 // TODO: we can probably display help here as well.
                 // This happens for actions that expect an ordered untyped options.
@@ -390,9 +392,9 @@ namespace Azure.Functions.Cli
 
         /// <summary>
         /// This method will update Environment.CurrentDirectory
-        /// if there is a --script-root or a --prefix provided on the commandline
+        /// if there is a --script-root or a --prefix provided on the commandline.
         /// </summary>
-        /// <param name="args">args to check for --prefix or --script-root</param>
+        /// <param name="args">args to check for --prefix or --script-root.</param>
         private void UpdateCurrentDirectory(string[] args)
         {
             // assume index of -1 means the string is not there
@@ -439,8 +441,10 @@ namespace Azure.Functions.Cli
         {
             var ctor = type.GetConstructors()?.SingleOrDefault();
             var args = ctor?.GetParameters()?.Select(p =>
-                p.Attributes == (ParameterAttributes.HasDefault | ParameterAttributes.Optional) ? p.DefaultValue : _container.Resolve(p.ParameterType)
-            ).ToArray();
+                p.Attributes == (ParameterAttributes.HasDefault | ParameterAttributes.Optional)
+                ? p.DefaultValue
+                : _container.Resolve(p.ParameterType)).ToArray();
+
             return args == null || args.Length == 0
                 ? (IAction)Activator.CreateInstance(type)
                 : (IAction)Activator.CreateInstance(type, args);

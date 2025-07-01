@@ -1,40 +1,40 @@
-﻿using System;
-using System.IO;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
-using static Azure.Functions.Cli.Common.OutputTheme;
 using Azure.Functions.Cli.Interfaces;
 using Colors.Net;
 using Fclp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using static Colors.Net.StringStaticMethods;
-using Azure.Functions.Cli.Helpers;
+using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.AzureActions
 {
-    abstract class BaseAzureAction : BaseAction, IInitializableAction
+    internal abstract class BaseAzureAction : BaseAction, IInitializableAction
     {
         // Az is the Azure PowerShell module that works in both PowerShell Core and Windows PowerShell
-        private const string _azProfileModuleName = "Az.Accounts";
+        private const string AzProfileModuleName = "Az.Accounts";
 
         // AzureRm is the Azure PowerShell module that only works on Windows PowerShell
-        private const string _azureRmProfileModuleName = "AzureRM.Profile";
+        private const string AzureRmProfileModuleName = "AzureRM.Profile";
 
         // PowerShell Core is version 6.0 and higher that is cross-platform
-        private const string _powerShellCoreExecutable = "pwsh";
+        private const string PowerShellCoreExecutable = "pwsh";
 
         // Windows PowerShell is PowerShell version 5.1 and lower that only works on Windows
-        private const string _windowsPowerShellExecutable = "powershell";
+        private const string WindowsPowerShellExecutable = "powershell";
 
-        private const string _defaultManagementURL = Constants.DefaultManagementURL;
+        private const string DefaultManagementURL = Constants.DefaultManagementURL;
 
         public string AccessToken { get; set; }
+
         public bool ReadStdin { get; set; }
+
         public string ManagementURL { get; set; }
+
         public string Subscription { get; private set; }
 
         public override ICommandLineParserResult ParseArgs(string[] args)
@@ -73,6 +73,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     AccessToken = accessToken;
                 }
+
                 if (string.IsNullOrEmpty(AccessToken))
                 {
                     throw new CliException("Unable to set access token from stdin.");
@@ -101,14 +102,15 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 // TODO: Try with Poweshell if az is non-existent or if the call fails
                 // For now, let's default this out
-                managementURL = _defaultManagementURL;
+                managementURL = DefaultManagementURL;
             }
+
             // Having a trailing slash could cause issues later when we attach it to function IDs
             // It's easier to remove now, than to do that before every ARM call.
-            return managementURL.EndsWith("/") ? managementURL.Substring(0, managementURL.Length - 1) : managementURL;
+            return managementURL.EndsWith("/") ? managementURL[..^1] : managementURL;
         }
 
-        private async Task<(bool, string)> TryGetAzCLIManagementURL()
+        private async Task<(bool AzCliSucceeded, string ManagementURL)> TryGetAzCLIManagementURL()
         {
             try
             {
@@ -120,6 +122,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     ColoredConsole.WriteLine(WarningColor("Unable to retrieve the resource manager URL from az CLI"));
                 }
+
                 return (false, null);
             }
         }
@@ -127,17 +130,25 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private async Task<string> GetAccessToken()
         {
             (bool cliSucceeded, string cliToken) = await TryGetAzCliToken();
-            if (cliSucceeded) return cliToken;
+
+            if (cliSucceeded)
+            {
+                return cliToken;
+            }
 
             (bool powershellSucceeded, string psToken) = await TryGetAzPowerShellToken();
-            if (powershellSucceeded) return psToken;
+
+            if (powershellSucceeded)
+            {
+                return psToken;
+            }
 
             if (TryGetTokenFromTestEnvironment(out string envToken))
             {
                 return envToken;
             }
 
-            throw new CliException($"Unable to connect to Azure. Make sure you have the `az` CLI or `{_azProfileModuleName}` PowerShell module installed and logged in and try again");
+            throw new CliException($"Unable to connect to Azure. Make sure you have the `az` CLI or `{AzProfileModuleName}` PowerShell module installed and logged in and try again");
         }
 
         private bool TryGetTokenFromTestEnvironment(out string token)
@@ -146,7 +157,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             return !string.IsNullOrEmpty(token);
         }
 
-        private async Task<(bool succeeded, string token)> TryGetAzCliToken()
+        private async Task<(bool Succeeded, string Token)> TryGetAzCliToken()
         {
             try
             {
@@ -158,6 +169,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     ColoredConsole.WriteLine(WarningColor("Unable to fetch access token from az CLI"));
                 }
+
                 return (false, null);
             }
         }
@@ -168,6 +180,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             {
                 throw new CliException("az CLI not found");
             }
+
             var az = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? new Executable("cmd", $"/c az {param}")
                 : new Executable("az", param);
@@ -175,6 +188,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
             var exitCode = await az.RunAsync(o => stdout.AppendLine(o), e => stderr.AppendLine(e));
+
             if (exitCode == 0)
             {
                 return stdout.ToString().Trim(' ', '\n', '\r', '"');
@@ -185,18 +199,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 {
                     ColoredConsole.WriteLine(VerboseColor($"Unable to run az CLI command `az {param}`. Error: {stderr.ToString().Trim(' ', '\n', '\r')}"));
                 }
+
                 throw new CliException("Error running Az CLI command");
             }
         }
 
-        private async Task<(bool succeeded, string token)> TryGetAzPowerShellToken()
+        private async Task<(bool Succeeded, string Token)> TryGetAzPowerShellToken()
         {
             // PowerShell Core can only use Az so we can check that it exists and that the Az module exists
-            if (CommandChecker.CommandExists(_powerShellCoreExecutable) &&
-                await CommandChecker.PowerShellModuleExistsAsync(_powerShellCoreExecutable, _azProfileModuleName))
+            if (CommandChecker.CommandExists(PowerShellCoreExecutable) &&
+                await CommandChecker.PowerShellModuleExistsAsync(PowerShellCoreExecutable, AzProfileModuleName))
             {
-                var az = new Executable(_powerShellCoreExecutable,
-                    $"-NonInteractive -o Text -NoProfile -c {GetPowerShellAccessTokenScript(_azProfileModuleName)}");
+                var az = new Executable(PowerShellCoreExecutable, $"-NonInteractive -o Text -NoProfile -c {GetPowerShellAccessTokenScript(AzProfileModuleName)}");
 
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
@@ -215,18 +229,18 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             }
 
             // Windows PowerShell can use Az or AzureRM so first we check if powershell.exe is available
-            if (CommandChecker.CommandExists(_windowsPowerShellExecutable))
+            if (CommandChecker.CommandExists(WindowsPowerShellExecutable))
             {
                 string moduleToUse;
 
                 // depending on if Az.Profile or AzureRM.Profile is available, we need to change the prefix
-                if (await CommandChecker.PowerShellModuleExistsAsync(_windowsPowerShellExecutable, _azProfileModuleName))
+                if (await CommandChecker.PowerShellModuleExistsAsync(WindowsPowerShellExecutable, AzProfileModuleName))
                 {
-                    moduleToUse = _azProfileModuleName;
+                    moduleToUse = AzProfileModuleName;
                 }
-                else if (await CommandChecker.PowerShellModuleExistsAsync(_windowsPowerShellExecutable, _azureRmProfileModuleName))
+                else if (await CommandChecker.PowerShellModuleExistsAsync(WindowsPowerShellExecutable, AzureRmProfileModuleName))
                 {
-                    moduleToUse = _azureRmProfileModuleName;
+                    moduleToUse = AzureRmProfileModuleName;
                 }
                 else
                 {
@@ -235,6 +249,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         ColoredConsole.WriteLine(VerboseColor("Unable to find Az.Profile or AzureRM.Profile."));
                     }
+
                     return (false, null);
                 }
 
@@ -255,6 +270,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                 }
             }
+
             return (false, null);
         }
 
@@ -262,17 +278,17 @@ namespace Azure.Functions.Cli.Actions.AzureActions
         private static string GetPowerShellAccessTokenScript(string module)
         {
             string prefix;
-            if (module == _azProfileModuleName)
+            if (module == AzProfileModuleName)
             {
                 prefix = "Az";
             }
-            else if (module == _azureRmProfileModuleName)
+            else if (module == AzureRmProfileModuleName)
             {
                 prefix = "AzureRM";
             }
             else
             {
-                throw new ArgumentException($"Expected module to be '{_azProfileModuleName}' or '{_azureRmProfileModuleName}'");
+                throw new ArgumentException($"Expected module to be '{AzProfileModuleName}' or '{AzureRmProfileModuleName}'");
             }
 
             // This PowerShell script first grabs the Azure context, fetches the profile client and requests an accesstoken.

@@ -1,5 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Colors.Net;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
@@ -24,8 +25,9 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     if (retryCount <= 0)
                     {
-                        throw e;
+                        throw;
                     }
+
                     retryCount--;
                     if (displayError)
                     {
@@ -33,6 +35,7 @@ namespace Azure.Functions.Cli.Helpers
                         ColoredConsole.Error.WriteLine(ErrorColor($"Retry: {totalRetries - retryCount} of {totalRetries}"));
                     }
                 }
+
                 await Task.Delay(retryDelay);
             }
         }
@@ -50,8 +53,9 @@ namespace Azure.Functions.Cli.Helpers
                 {
                     if (retryCount <= 0)
                     {
-                        throw e;
+                        throw;
                     }
+
                     retryCount--;
                     if (displayError)
                     {
@@ -59,6 +63,7 @@ namespace Azure.Functions.Cli.Helpers
                         ColoredConsole.Error.WriteLine(ErrorColor($"Retry: {totalRetries - retryCount} of {totalRetries}"));
                     }
                 }
+
                 await Task.Delay(retryDelay);
             }
         }

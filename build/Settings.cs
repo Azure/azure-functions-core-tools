@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -19,10 +19,10 @@ namespace Build
                 : value;
         }
 
-        public const string DotnetIsolatedItemTemplatesVersion = "4.0.5051";
-        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.5051";
-        public const string DotnetItemTemplatesVersion = "4.0.5051";
-        public const string DotnetProjectTemplatesVersion = "4.0.5051";
+        public const string DotnetIsolatedItemTemplatesVersion = "4.0.5086";
+        public const string DotnetIsolatedProjectTemplatesVersion = "4.0.5086";
+        public const string DotnetItemTemplatesVersion = "4.0.5086";
+        public const string DotnetProjectTemplatesVersion = "4.0.5086";
         public const string TemplateJsonVersion = "3.1.1648";
 
         public static readonly string SBOMManifestToolPath = Path.GetFullPath("../ManifestTool/Microsoft.ManifestTool.dll");
@@ -39,6 +39,10 @@ namespace Build
 
         public static readonly string DurableFolder = Path.Combine(TestProjectPath, "Resources", "DurableTestFolder");
 
+        public static readonly string NewTestProjectFile = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", "Azure.Functions.Cli.E2E.Tests.csproj");
+
+        public static readonly string RuntimeSettings = Path.Combine("..", "test", "Cli", "Func.E2E.Tests", ".runsettings", "start_tests", "ci_pipeline", "dotnet_inproc.runsettings");
+
         public static readonly string[] TargetRuntimes = new[] {
             "min.win-arm64",
             "min.win-x86",
@@ -48,7 +52,10 @@ namespace Build
             "osx-arm64",
             "win-x86",
             "win-x64",
-            "win-arm64" };
+            "win-arm64"
+        };
+
+        public static readonly string[] UnsupportedPythonRuntimes = new[] { "win-arm64" };
 
         public static readonly Dictionary<string, string> RuntimesToOS = new Dictionary<string, string>
         {
@@ -169,22 +176,19 @@ namespace Build
 
         public static string MinifiedVersionPrefix = "min.";
 
-        public const string DistLibVersion = "distlib-0.3.0";
-
-        public const string DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.0.zip";
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
         public static readonly string SBOMManifestTelemetryDir = Path.Combine(OutputDir, "SBOMManifestTelemetry");
-        
+
         public static string TargetFramework = "net6.0";
 
         public static readonly string NupkgPublishDir = Path.GetFullPath($"../src/Azure.Functions.Cli/bin/Release/{TargetFramework}/publish");
-        
+
         public static readonly string PreSignTestDir = "PreSignTest";
 
         public static readonly string SignTestDir = "SignTest";
-       
+
         public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
 
         public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
@@ -271,7 +275,7 @@ namespace Build
                 "Grpc.AspNetCore.Server.dll",
                 "Grpc.Core.dll",
                 "Grpc.Core.Api.dll",
-                "Grpc.Net.Client.dll", 
+                "Grpc.Net.Client.dll",
                 "Grpc.Net.ClientFactory.dll",
                 "Grpc.Net.Common.dll",
                 "grpc_csharp_ext.x64.dll",
@@ -349,9 +353,11 @@ namespace Build
                 "OpenTelemetry.Extensions.Hosting.dll",
                 "OpenTelemetry.Instrumentation.AspNetCore.dll",
                 "OpenTelemetry.Instrumentation.Http.dll",
+                "OpenTelemetry.Instrumentation.Process.dll",
+                "OpenTelemetry.Instrumentation.Runtime.dll",
                 "OpenTelemetry.PersistentStorage.Abstractions.dll",
                 "OpenTelemetry.PersistentStorage.FileSystem.dll",
-                Path.Combine("tools", "python", "packapp", "distlib")
+                Path.Combine("tools", "python", "packapp")
             };
         }
     }

@@ -1,10 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.Net.Http.Handlers;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Arm.Models;
 using Azure.Functions.Cli.Common;
 
@@ -22,7 +19,10 @@ namespace Azure.Functions.Cli.Helpers
                     return new GitIgnoreParser(FileSystemHelpers.ReadAllTextFromFile(path));
                 }
             }
-            catch { }
+            catch
+            {
+            }
+
             return null;
         }
 
@@ -42,18 +42,18 @@ namespace Azure.Functions.Cli.Helpers
             if (currentBuildOption == BuildOption.Default)
             {
                 // Change to remote build if, python app, has requirements.txt, requirements.txt has content
-                if (runtime == WorkerRuntime.python &&
+                if (runtime == WorkerRuntime.Python &&
                     FileSystemHelpers.FileExists(Constants.RequirementsTxt) &&
                     new FileInfo(Path.Combine(Environment.CurrentDirectory, Constants.RequirementsTxt)).Length > 0)
                 {
                     return BuildOption.Remote;
                 }
             }
+
             return currentBuildOption;
         }
 
-        public static async Task<HttpResponseMessage> InvokeLongRunningRequest(HttpClient client,
-            ProgressMessageHandler handler, HttpRequestMessage request, long requestSize = 0, string prompt = null)
+        public static async Task<HttpResponseMessage> InvokeLongRunningRequest(HttpClient client, ProgressMessageHandler handler, HttpRequestMessage request, long requestSize = 0, string prompt = null)
         {
             if (prompt == null)
             {
@@ -114,7 +114,8 @@ namespace Azure.Functions.Cli.Helpers
             return isStartingWithDocker && !isLegacyImageMatched;
         }
 
-        public static bool IsLinuxFxVersionRuntimeMatched(string linuxFxVersion, WorkerRuntime runtime) {
+        public static bool IsLinuxFxVersionRuntimeMatched(string linuxFxVersion, WorkerRuntime runtime)
+        {
             if (string.IsNullOrEmpty(linuxFxVersion))
             {
                 // Suppress the check since when LinuxFxVersion == "", runtime image will depends on FUNCTIONS_WORKER_RUNTIME setting
@@ -124,7 +125,8 @@ namespace Azure.Functions.Cli.Helpers
             // Test if linux fx version matches any legacy runtime image (e.g. DOCKER|mcr.microsoft.com/azure-functions/dotnet)
             bool isStartingWithDocker = linuxFxVersion.StartsWith("docker|", StringComparison.OrdinalIgnoreCase);
             bool isLegacyImageMatched = false;
-            if (Constants.WorkerRuntimeImages.TryGetValue(runtime, out IEnumerable<string> legacyImages)) {
+            if (Constants.WorkerRuntimeImages.TryGetValue(runtime, out IEnumerable<string> legacyImages))
+            {
                 isLegacyImageMatched = legacyImages
                     .Any(image => linuxFxVersion.Contains(image, StringComparison.OrdinalIgnoreCase));
             }
