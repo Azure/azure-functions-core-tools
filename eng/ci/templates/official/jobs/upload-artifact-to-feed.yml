@@ -1,0 +1,33 @@
+parameters:
+  - name: artifactName
+    type: string
+  - name: packageName
+    type: string
+
+jobs:
+- job: UploadArtifactToFeed
+  displayName: 'Upload artifact to Feed'
+  timeoutInMinutes: "180"
+
+  pool:
+    name: 1es-pool-azfunc-public
+    image: 1es-windows-2022
+    os: windows
+
+  steps:
+  - task: DownloadPipelineArtifact@2
+    displayName: Download artifact
+    inputs:
+      artifact: '{{ parameters.artifactName }}'
+      path: $(Build.ArtifactStagingDirectory)/drop
+
+  - task: UniversalPackages@0
+    displayName: Publish to feed
+    inputs:
+      command: publish
+      publishDirectory: '$(Build.ArtifactStagingDirectory)/drop'
+      vstsFeedPublish: 'internal/core-tools-nightly-build'
+      vstsFeedPackagePublish: '{{ parameters.packageName }}'
+      versionOption: custom
+      versionPublish: '$(Build.BuildNumber)'
+      packagePublishDescription: 'Core tools default nightly build'

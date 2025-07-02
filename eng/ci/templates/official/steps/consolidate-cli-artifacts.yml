@@ -1,0 +1,25 @@
+parameters:
+  - name: supportedRuntimes
+    type: string
+
+steps:
+- ${{ each runtime in split(parameters.supportedRuntimes,',') }}:
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download func-cli-${{ runtime }}'
+    inputs:
+      artifact: 'func-cli-${{ runtime }}'
+      path: '$(Pipeline.Workspace)/all-cli/func-cli-${{ runtime }}'
+
+- task: DownloadPipelineArtifact@2
+  displayName: 'Download func-cli-nupkg'
+  inputs:
+    artifact: 'func-cli-nupkg'
+    path: '$(Pipeline.Workspace)/all-cli/func-cli-nupkg'
+
+- pwsh: |
+    $artifactDir = "$(Build.ArtifactStagingDirectory)\func-cli"
+    $sourceDir = "$(Pipeline.Workspace)\all-cli"
+
+    New-Item -Path $artifactDir -ItemType Directory -Force | Out-Null
+    Copy-Item -Path "$sourceDir\*" -Destination $artifactDir -Recurse -Force
+  displayName: "Bundle all func-cli artifacts into one directory"

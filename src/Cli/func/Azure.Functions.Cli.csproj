@@ -19,17 +19,6 @@
     <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>4.0</MajorMinorProductVersion>
-    <Version>$(MajorMinorProductVersion).$(BuildNumber)</Version>
-    <AssemblyVersion>$(MajorMinorProductVersion).$(BuildNumber)</AssemblyVersion>
-    <FileVersion>$(MajorMinorProductVersion).$(BuildNumber)</FileVersion>
-    <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
-    <IntegrationBuildNumberInfo Condition="$(IntegrationBuildNumber) != ''">Integration build number: $(IntegrationBuildNumber)</IntegrationBuildNumberInfo>
-    <InformationalVersion>$(FileVersion) Commit hash: $(CommitHash) $(IntegrationBuildNumberInfo)</InformationalVersion>
-  </PropertyGroup>
-
   <ItemGroup>
     <EmbeddedResource Include="StaticResources\stacks.json">
       <LogicalName>$(AssemblyName).stacks.json</LogicalName>
@@ -262,7 +251,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="$(RepoRoot)tools\python\packapp\__main__.py">
+    <Content Include="$(EngRoot)tools\python\packapp\__main__.py">
       <Link>tools\python\packapp\__main__.py</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -296,9 +285,13 @@
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.0" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.2" />
     <PackageReference Include="Microsoft.Azure.Functions.PowerShellWorker.PS7.4" />
-    <!-- PythonWorker v4.35 introduced an error when being build for win-arm64. For now, we will not include this package when we build
-      core tools for win-arm64. This is a temporary measure as we figure out how we want this to go. -->
-    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" Condition="'$(RuntimeIdentifier)' != 'win-arm64'" />
+    <PackageReference Include="Microsoft.Azure.Functions.PythonWorker" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SrcRoot)GoZipTool\GoZipTool.csproj">
+      <Properties>ResolvedRuntimeIdentifier=$(RuntimeIdentifier)</Properties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>

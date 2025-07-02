@@ -1,0 +1,185 @@
+parameters:
+  - name: arch
+    type: string
+  - name: displayName
+    type: string
+  - name: isNightlyBuild
+    type: boolean
+
+jobs:
+- job: AssembleArtifact${{ parameters.displayName }}
+  displayName: "Assemble ${{ parameters.arch }}"
+
+  templateContext:
+    ${{ if eq(parameters.isNightlyBuild, false) }}:
+      inputs:
+        - input: pipelineArtifact
+          pipeline: core-tools-host
+          artifactName: func-cli-host
+          targetPath: $(Pipeline.Workspace)/func-cli-host/
+
+        - input: pipelineArtifact
+          pipeline: core-tools-inproc
+          artifactName: func-cli-inproc
+          targetPath: $(Pipeline.Workspace)/func-cli-inproc/
+
+        - input: pipelineArtifact
+          pipeline: core-tools-default
+          artifactName: func-cli
+          targetPath: $(Pipeline.Workspace)/func-cli-default/func-cli
+
+    outputParentDirectory: $(Build.ArtifactStagingDirectory)
+    outputs:
+      - output: pipelineArtifact
+        displayName: Publish assembled artifact ${{ parameters.arch }}
+        targetPath: $(Build.ArtifactStagingDirectory)/core-tools
+        artifact: func-cli-${{ parameters.arch }}
+      - output: pipelineArtifact
+        displayName: Publish metadata.json
+        targetPath: $(Build.ArtifactStagingDirectory)/metadata.json
+        artifact: func-cli-metadata-json
+        condition: and(succeeded(), eq('${{ parameters.arch }}', 'min.win-x64'))
+
+  steps:
+  - checkout: self
+
+  # Conditional download of artifacts based on isNightlyBuild parameter from ADO feed
+  - ${{ if eq(parameters.isNightlyBuild, true) }}:
+    - task: DownloadPackage@1
+      displayName: 'Download func-cli-host from feed'
+      inputs:
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli-host'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/func-cli-host'
+
+    - task: DownloadPackage@1
+      displayName: 'Download func-cli-inproc from feed'
+      inputs:
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli-inproc'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/func-cli-inproc'
+
+    - task: DownloadPackage@1
+      displayName: 'Download func-cli from feed'
+      inputs:
+        packageType: 'upack'
+        feed: 'internal/core-tools-nightly-build'
+        definition: 'func-cli'
+        version: '*'
+        downloadPath: '$(Pipeline.Workspace)/func-cli-default/func-cli'
+
+  - task: DotNetCoreCLI@2
+    displayName: "Run ArtifactAssembler"
+    inputs:
+      command: run
+      projects: "$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj"
+      arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
+      workingDirectory: '$(Pipeline.Workspace)'
+    env:
+      # Directory names containing the artifacts
+      OUT_OF_PROC_ARTIFACT_ALIAS: 'func-cli-default'
+      IN_PROC_ARTIFACT_ALIAS: 'func-cli-inproc'
+      CORETOOLS_HOST_ARTIFACT_ALIAS: 'func-cli-host'
+      # Subdirectory names for the artifacts
+      OUT_OF_PROC_ARTIFACT_NAME: 'func-cli'
+      IN_PROC6_ARTIFACT_NAME: 'inproc6'
+      IN_PROC8_ARTIFACT_NAME: 'inproc8'
+      CORETOOLS_HOST_WINDOWS_ARTIFACT_NAME: 'windows'
+      CORETOOLS_HOST_LINUX_ARTIFACT_NAME: 'linux'
+
+  - ${{ if startsWith(parameters.arch, 'win-x') }}:
+    - task: PowerShell@2
+      displayName: 'Generate MSI files'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-msi-files.ps1'
+        arguments: '-ArtifactsPath "$(Pipeline.Workspace)/staging/func-cli"'
+        workingDirectory: '$(Build.SourcesDirectory)/build'
+
+    - template: ci/sign-files.yml@eng
+      parameters:
+        displayName: Sign MSI files
+        folderPath: $(Pipeline.Workspace)/staging/func-cli
+        pattern: '*.msi'
+        signType: 'inline'
+        inlineOperation: |
+          [
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolSign",
+              "Parameters": {
+                "OpusName": "Microsoft",
+                "OpusInfo": "http://www.microsoft.com",
+                "FileDigest": "/fd \"SHA256\"",
+                "PageHash": "/NPH",
+                "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+              },
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-230012",
+              "OperationCode": "SigntoolVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+          ]
+
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+    - task: PowerShell@2
+      displayName: 'Test Artifacts - Visual Studio'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-vs-artifacts.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/func-cli-visualstudio"'
+
+  - ${{ if startsWith(parameters.arch, 'win') }}:
+    - task: PowerShell@2
+      displayName: 'Test Artifacts'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/test-artifacts.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging/func-cli"'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Zip Artifacts'
+    inputs:
+      command: run
+      projects: '$(Build.SourcesDirectory)/src/Cli/ArtifactAssembler/Azure.Functions.Cli.ArtifactAssembler.csproj'
+      arguments: '--no-build -c release -- zip'
+      workingDirectory: '$(Pipeline.Workspace)'
+
+  - task: PowerShell@2
+    displayName: 'Generate SHA files'
+    inputs:
+      targetType: filePath
+      filePath: '$(Build.SourcesDirectory)/eng/scripts/generate-sha-files.ps1'
+      arguments: '-artifactsPath "$(Pipeline.Workspace)/staging"'
+
+  - task: CopyFiles@2
+    displayName: 'Copy Files to Artifact Staging Directory'
+    inputs:
+      SourceFolder: '$(Pipeline.Workspace)/staging'
+      Contents: 'func-cli-*/**'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/core-tools'
+
+  - ${{ if eq(parameters.arch, 'min.win-x64') }}:
+    - task: PowerShell@2
+      displayName: 'Generate metadata.json file'
+      inputs:
+        targetType: filePath
+        filePath: '$(Build.SourcesDirectory)/eng/scripts/artifact-assembler/generate-metadata-file.ps1'
+        arguments: '-StagingDirectory "$(Pipeline.Workspace)/staging"'
+        workingDirectory: '$(Pipeline.Workspace)'
+
+    - task: CopyFiles@2
+      displayName: 'Copy metadata.json to Artifact Staging Directory'
+      inputs:
+        SourceFolder: '$(Pipeline.Workspace)/staging'
+        Contents: 'metadata.json'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'

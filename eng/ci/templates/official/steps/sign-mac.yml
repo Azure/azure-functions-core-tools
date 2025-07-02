@@ -1,0 +1,23 @@
+parameters:
+- name: folderPath
+  type: string
+- name: signPatterns
+  type: string
+
+steps:
+- template: ci/sign-files.yml@eng
+  parameters:
+    displayName: 'Mac signing'
+    folderPath: '${{ parameters.folderPath }}'
+    pattern: '${{ parameters.signPatterns }}'
+    signType: inline
+    inlineOperation: |
+      [
+        {
+            "KeyCode" : "CP-401337-Apple",
+            "OperationCode" : "MacAppDeveloperSign",
+            "Parameters" : {},
+            "ToolName" : "sign",
+            "ToolVersion" : "1.0"
+        }
+      ]

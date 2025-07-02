@@ -2,12 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Collections.ObjectModel;
-using System.Reflection;
+using Azure.Functions.Cli.Extensions;
 using Azure.Functions.Cli.Helpers;
 
 namespace Azure.Functions.Cli.Common
 {
-    internal static class Constants
+    internal static partial class Constants
     {
         public const string StorageConnectionStringTemplate = "DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}";
         public const string FunctionsStorageAccountNamePrefix = "AzureFunctions";
@@ -46,7 +46,6 @@ namespace Azure.Functions.Cli.Common
         public const string FunctionsCoreToolsEnvironment = "FUNCTIONS_CORETOOLS_ENVIRONMENT";
         public const string EnablePersistenceChannelDebugSetting = "FUNCTIONS_CORE_TOOLS_ENABLE_PERSISTENCE_CHANNEL_DEBUG_OUTPUT";
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
-        public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
         public const string ScmRunFromPackage = "SCM_RUN_FROM_PACKAGE";
         public const string ScmDoBuildDuringDeployment = "SCM_DO_BUILD_DURING_DEPLOYMENT";
         public const string WebsiteRunFromPackage = "WEBSITE_RUN_FROM_PACKAGE";
@@ -120,12 +119,11 @@ namespace Azure.Functions.Cli.Common
             "entityTrigger",
         ];
 
-#pragma warning disable SA1401 // Fields should be private
-        public static string CliDetailedVersion = typeof(Constants).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-        public static string CliUserAgent = $"functions-core-tools/{CliVersion}";
-#pragma warning restore SA1401 // Fields should be private
+        public static string CliVersion => typeof(Constants).Assembly.GetCliVersion();
 
-        public static string CliVersion => typeof(Constants).GetTypeInfo().Assembly.GetName().Version.ToString(3);
+        public static string CliDetailedVersion => typeof(Constants).Assembly.GetInformationalVersion();
+
+        public static string CliUserAgent => $"functions-core-tools/{CliVersion}";
 
         public static ExtensionPackage ExtensionsMetadataGeneratorPackage => new ExtensionPackage { Name = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator" };
 

@@ -1,7 +1,8 @@
 $rootDir = Join-Path $PSScriptRoot "../.." # Path to the root of the repository
 $rootDir = Resolve-Path $rootDir
 
-Set-Location "$rootDir/build"
+Set-Location "$rootDir"
+
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Unzip([string]$zipfilePath, [string]$outputpath) {
