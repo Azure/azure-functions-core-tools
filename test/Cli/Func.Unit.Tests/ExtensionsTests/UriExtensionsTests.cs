@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 using SuaveServerWrapper;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests.ExtensionsTests
 {
     public class UriExtensionsTests
     {

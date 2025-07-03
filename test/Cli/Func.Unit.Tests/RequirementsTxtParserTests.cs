@@ -1,8 +1,8 @@
-﻿using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Common;
 using System.Collections.Generic;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests
 {
     public class RequirementsTxtParserTests
     {

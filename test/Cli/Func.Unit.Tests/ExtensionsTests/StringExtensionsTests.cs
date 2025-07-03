@@ -1,9 +1,9 @@
-﻿using Azure.Functions.Cli.Exceptions;
+using Azure.Functions.Cli.Exceptions;
 using Azure.Functions.Cli.Extensions;
 using System;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests.ExtensionsTests
+namespace Azure.Functions.Cli.Unit.Tests.ExtensionsTests
 {
     public class StringExtensionsTests
     {

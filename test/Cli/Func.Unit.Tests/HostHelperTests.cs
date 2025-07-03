@@ -1,4 +1,3 @@
-
 using System;
 using System.IO;
 using System.IO.Abstractions;
@@ -9,7 +8,7 @@ using FluentAssertions;
 using NSubstitute;
 using Xunit;
 
-namespace Azure.Functions.Cli.Tests
+namespace Azure.Functions.Cli.Unit.Tests
 {
     public class HostHelperTests
     {
