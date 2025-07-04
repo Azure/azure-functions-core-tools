@@ -18,7 +18,15 @@ namespace Azure.Functions.Cli
         internal static void Main(string[] args)
         {
             // Set console encoding to UTF-8 to properly display international characters
-            Console.OutputEncoding = Encoding.UTF8;
+            try
+            {
+                Console.OutputEncoding = Encoding.UTF8;
+            }
+            catch
+            {
+                // Silently fall back to default encoding if UTF-8 isn't supported
+                // International characters may not display correctly but CLI will still function
+            }
 
             // Check for version arg up front and prioritize speed over all else
             // Tools like VS Code may call this often and we want their UI to be responsive
