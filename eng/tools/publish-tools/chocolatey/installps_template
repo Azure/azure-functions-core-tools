@@ -11,11 +11,12 @@ $checksum_x64   = '$CHECKSUM_X64'
 
 # Get-PackageParameters returns a hash table array of values
 $pp = Get-PackageParameters
-# If specifically asked for x64 or arm64, we use that
-if ($pp.ContainsKey('x64'))
+
+# If specifically asked for x86 or arm64, we use that
+if ($pp.ContainsKey('x86'))
 {
-  $url = $url_x64
-  $checksum = $checksum_x64
+  $url = $url_x86
+  $checksum = $checksum_x86
 }
 elseif ($pp.ContainsKey('arm64'))
 {
@@ -24,9 +25,9 @@ elseif ($pp.ContainsKey('arm64'))
 }
 else
 {
-  # By default, we want the x86 installer
-  $url = $url_x86
-  $checksum = $checksum_x86
+  # By default, we want the x64 installer
+  $url = $url_x64
+  $checksum = $checksum_x64
 }
 
 $packageArgs = @{
