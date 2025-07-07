@@ -22,6 +22,8 @@ resources:
 
 variables:
   - template: /ci/variables/cfs.yml@eng
+  - name: DisableKubernetesDeploymentDetector
+    value: true
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
