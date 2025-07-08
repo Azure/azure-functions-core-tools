@@ -45,18 +45,18 @@ jobs:
 
   - template: /eng/ci/templates/official/steps/sign-authenticode.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)/artifacts/$runtime'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}'
       signPatterns: $(authenticodeBinariesToSign)
 
   - template: /eng/ci/templates/official/steps/sign-thirdparty.yml@self
     parameters:
-      folderPath: '$(Build.Repository.LocalPath)/artifacts/$runtime'
+      folderPath: '$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}'
       signPatterns: $(thirdPartyBinariesToSign)
 
   - task: ArchiveFiles@2
     displayName: 'Zip CLI (${{ parameters.runtime }})'
     inputs:
-      rootFolderOrFile: '$(Build.Repository.LocalPath)/artifacts/$runtime'
+      rootFolderOrFile: '$(Build.Repository.LocalPath)/artifacts/${{ parameters.runtime }}'
       includeRootFolder: false
       archiveType: 'zip'
       archiveFile: '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.${{ parameters.runtime }}.$(Build.BuildNumber).zip'
