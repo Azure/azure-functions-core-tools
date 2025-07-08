@@ -32,7 +32,8 @@ variables:
   - name: DisableKubernetesDeploymentDetector
     value: true
   - name: supportedRuntimes
-    value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
+    value: 'linux-x64,osx-arm64,win-arm64'
+    # value: 'linux-x64,osx-x64,osx-arm64,win-arm64,win-x64,win-x86,min.win-arm64,min.win-x86,min.win-x64'
 
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1es
@@ -57,37 +58,37 @@ extends:
 
         - template: /eng/ci/templates/official/jobs/pack-cli.yml@self
 
-      - stage: Merge
-        dependsOn: 'BuildAndPublish'
+      # - stage: Merge
+      #   dependsOn: 'BuildAndPublish'
 
-        jobs:
-        - template: /eng/ci/templates/official/jobs/merge-pipeline-artifacts.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/official/jobs/merge-pipeline-artifacts.yml@self
 
-      - stage: UploadToNightlyFeed
-        dependsOn: 'Merge'
-        condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
+      # - stage: UploadToNightlyFeed
+      #   dependsOn: 'Merge'
+      #   condition: and(succeeded(), eq(variables['Build.Reason'], 'schedule'))
 
-        jobs:
-        - template: /eng/ci/templates/official/jobs/upload-artifact-to-feed.yml@self
-          parameters:
-            artifactName: 'func-cli'
-            packageName: 'func-cli'
+      #   jobs:
+      #   - template: /eng/ci/templates/official/jobs/upload-artifact-to-feed.yml@self
+      #     parameters:
+      #       artifactName: 'func-cli'
+      #       packageName: 'func-cli'
 
-      # Test Stages
-      - stage: E2ETestWindows
-        dependsOn: ''
+      # # Test Stages
+      # - stage: E2ETestWindows
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-windows.yml@self
 
-      - stage: E2ETestLinux
-        dependsOn: ''
+      # - stage: E2ETestLinux
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-linux.yml@self
 
-      - stage: E2ETestOSX
-        dependsOn: ''
+      # - stage: E2ETestOSX
+      #   dependsOn: ''
 
-        jobs:
-        - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self
+      #   jobs:
+      #   - template: /eng/ci/templates/jobs/test-e2e-osx.yml@self

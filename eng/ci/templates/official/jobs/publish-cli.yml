@@ -70,44 +70,50 @@ jobs:
         --no-build `
         /p:ZipAfterPublish=true `
         /p:ZipArtifactsPath="$(Build.Repository.LocalPath)/artifacts" `
-        $isMinified
+        $isMinified `
+        -bl:$(Build.ArtifactStagingDirectory)/clipublish.binlog
     displayName: 'Publish & Zip CLI'
 
-  # What can we do for linux signing? We have nothing to sign func and gozip binaries on linux at the moment.
-  - ${{ if contains(parameters.runtime, 'osx') }}:
-    - template: /eng/ci/templates/official/steps/sign-mac.yml@self
-      parameters:
-        folderPath: '$(Build.Repository.LocalPath)/artifacts'
-        signPatterns: '*.osx-*.zip'
+  # - ${{ if contains(parameters.runtime, 'osx') }}:
+  #   - template: /eng/ci/templates/official/steps/sign-mac.yml@self
+  #     parameters:
+  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
+  #       signPatterns: '*.osx-*.zip'
 
-  # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
-  - ${{ if startsWith(parameters.runtime, 'win-x') }}:
-    - pwsh: >
-        ./eng/scripts/generate-msi-files.ps1
-        -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
-        -runtime "${{ parameters.runtime }}"
-      displayName: 'Generate MSI files'
+  # - ${{ if contains(parameters.runtime, 'linux') }}:
+  #   - template: /eng/ci/templates/official/steps/sign-linux.yml@self
+  #     parameters:
+  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
+  #       signPatterns: 'func,gozip'
 
-    - template: /eng/ci/templates/official/steps/sign-msi.yml@self
-      parameters:
-        folderPath: '$(Build.Repository.LocalPath)/artifacts'
+  # # arm64 MSI signing is not supported yet, so we skip it for now. We also do not generate MSI for .min versions.
+  # - ${{ if startsWith(parameters.runtime, 'win-x') }}:
+  #   - pwsh: >
+  #       ./eng/scripts/generate-msi-files.ps1
+  #       -artifactsPath "$(Build.Repository.LocalPath)/artifacts"
+  #       -runtime "${{ parameters.runtime }}"
+  #     displayName: 'Generate MSI files'
 
-  - pwsh: ./eng/scripts/generate-sha-files.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
-    displayName: 'Generate sha files'
+  #   - template: /eng/ci/templates/official/steps/sign-msi.yml@self
+  #     parameters:
+  #       folderPath: '$(Build.Repository.LocalPath)/artifacts'
 
-  - pwsh: |
-      $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -ErrorAction SilentlyContinue
-      if ($msiFiles) {
-        Write-Host "Moving MSI files to ArtifactStagingDirectory: $($msiFiles.FullName)"
-        Move-Item -Path $msiFiles.FullName -Destination '$(Build.ArtifactStagingDirectory)'
-      }
+  # - pwsh: ./eng/scripts/generate-sha-files.ps1 -artifactsPath '$(Build.Repository.LocalPath)/artifacts'
+  #   displayName: 'Generate .sha files'
 
-      $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -ErrorAction SilentlyContinue
-      if ($funcZips) {
-        Write-Host "Moving func zips to ArtifactStagingDirectory: $($funcZips.FullName)"
-        Move-Item -Path $funcZips.FullName -Destination '$(Build.ArtifactStagingDirectory)'
-      }
-    displayName: 'Move artifacts to ArtifactStagingDirectory'
+  # - pwsh: |
+  #     $msiFiles = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/func-cli*.msi' -ErrorAction SilentlyContinue
+  #     if ($msiFiles) {
+  #       Write-Host "Moving MSI files to ArtifactStagingDirectory: $($msiFiles.FullName)"
+  #       Move-Item -Path $msiFiles.FullName -Destination '$(Build.ArtifactStagingDirectory)'
+  #     }
+
+  #     $funcZips = Get-ChildItem -Path '$(Build.Repository.LocalPath)/artifacts/Azure.Functions.Cli.*' -ErrorAction SilentlyContinue
+  #     if ($funcZips) {
+  #       Write-Host "Moving func zips to ArtifactStagingDirectory: $($funcZips.FullName)"
+  #       Move-Item -Path $funcZips.FullName -Destination '$(Build.ArtifactStagingDirectory)'
+  #     }
+  #   displayName: 'Move artifacts to ArtifactStagingDirectory'
 
   - task: 1ES.PublishPipelineArtifact@1
     condition: succeeded()
