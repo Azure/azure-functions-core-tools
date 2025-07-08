@@ -50,7 +50,7 @@ If you see an error saying the templates folder is missing, you can download the
 From the root of the repo, run:
 
 - `./eng/scripts/download-templates.ps1 -OutputPath "./out/bin/<test_project_name>/debug`
-  - e.g. "./out/bin/Azure.Functions.Cli.E2E.Tests/debug"
+  - e.g. "./out/bin/Azure.Functions.Cli.E2ETests/debug"
 
 The script will download the template packages to a `templates` folder in the specified output directory.
 

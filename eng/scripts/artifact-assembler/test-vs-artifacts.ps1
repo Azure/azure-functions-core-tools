@@ -8,8 +8,8 @@ Write-Host "Root directory: $rootDir"
 ls $rootDir
 
 # Set the path to test project (.csproj) and runtime settings
-$testProjectPath = ".\test\Cli\Func.E2E.Tests\Azure.Functions.Cli.E2E.Tests.csproj"
-$runtimeSettings = ".\test\Cli\Func.E2E.Tests\.runsettings\start_tests\artifact_consolidation_pipeline\visualstudio.runsettings"
+$testProjectPath = ".\test\Cli\Func.E2ETests\Azure.Functions.Cli.E2ETests.csproj"
+$runtimeSettings = ".\test\Cli\Func.E2ETests\.runsettings\start_tests\artifact_consolidation_pipeline\visualstudio.runsettings"
 
 [System.Environment]::SetEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet", "Process")
 
