@@ -15,7 +15,7 @@
     <description>The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.</description>
   </metadata>
   <files>
-    <file src="tools\**" target="tools\" />
-    <file src="..\..\..\res\functions.png" target="images\" />
+    <file src="tools/**" target="tools/" />
+    <file src="../../../res/functions.png" target="images/" />
   </files>
 </package>

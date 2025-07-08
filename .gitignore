@@ -30,6 +30,7 @@ artifacts/
 launchSettings.json
 publish-env
 *.binlog
+_*
 
 # MacOS related
 .DS_Store
