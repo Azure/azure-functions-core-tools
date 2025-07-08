@@ -8,7 +8,7 @@ using Moq;
 using Moq.Protected;
 using Xunit;
 
-namespace Azure.Functions.Cli.UnitTests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class VersionHelperTests
     {

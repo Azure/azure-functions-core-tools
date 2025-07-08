@@ -1,14 +1,14 @@
-using System;
-using System.IO;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System.IO.Abstractions;
-using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using FluentAssertions;
 using NSubstitute;
 using Xunit;
 
-namespace Azure.Functions.Cli.UnitTests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class HostHelperTests
     {
@@ -24,10 +24,11 @@ namespace Azure.Functions.Cli.UnitTests
             {
                 fileSystem.File.Exists(Arg.Any<string>()).Returns(true);
 
-                fileSystem.File.Open(Arg.Is("host.json"),
-                                     Arg.Any<FileMode>(),
-                                     Arg.Any<FileAccess>(),
-                                     Arg.Any<FileShare>())
+                fileSystem.File.Open(
+                    Arg.Is("host.json"),
+                    Arg.Any<FileMode>(),
+                    Arg.Any<FileAccess>(),
+                    Arg.Any<FileShare>())
                     .Returns(hostJsonContent.ToStream());
             }
 

@@ -1,12 +1,14 @@
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Kubernetes.KEDA.V1;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace Azure.Functions.Cli.UnitTests
+namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class KedaHelperUnitTests
+    public class KedaHelperTests
     {
         [Fact]
         public void PopulateMetadataDictionary_KedaV1_CorrectlyPopulatesRabbitMQMetadata()

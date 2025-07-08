@@ -1,31 +1,15 @@
-using System;
-using FluentAssertions;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Azure.Functions.Cli.Extensions;
+using FluentAssertions;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ExtensionsTests
 {
     public class GenericExtensionsTests
     {
-        class Source
-        {
-            public string name { get; set; }
-            public int value { get; set; }
-            public DateTime timestamp { get; set; }
-            public Test direction { get; set; }
-            public Test from { get; set; }
-        }
-
-        class Target
-        {
-            public string Name { get; set; }
-            public int Value { get; set; }
-            public DateTime? Timestamp { get; set; }
-            public Test? Direction { get; set; }
-            public Test From { get; set; }
-        }
-
-        enum Test
+        public enum Test
         {
             North,
             South
@@ -34,16 +18,42 @@ namespace Azure.Functions.Cli.UnitTests.ExtensionsTests
         [Fact]
         public void MergeWithTest()
         {
-            var source = new Source { name = "Original", value = 10, timestamp = DateTime.UtcNow, direction = Test.South, from = Test.South };
+            var source = new Source { Name = "Original", Value = 10, Timestamp = DateTime.UtcNow, Direction = Test.South, From = Test.South };
             var target = new Target();
 
             target = target.MergeWith(source, t => t);
 
-            target.Name.Should().Be(source.name);
-            target.Value.Should().Be(source.value);
-            target.Timestamp.Should().Be(source.timestamp);
-            target.Direction.Should().Be(source.direction);
-            target.From.Should().Be(source.from);
+            target.Name.Should().Be(source.Name);
+            target.Value.Should().Be(source.Value);
+            target.Timestamp.Should().Be(source.Timestamp);
+            target.Direction.Should().Be(source.Direction);
+            target.From.Should().Be(source.From);
+        }
+
+        public class Source
+        {
+            public string Name { get; set; }
+
+            public int Value { get; set; }
+
+            public DateTime Timestamp { get; set; }
+
+            public Test Direction { get; set; }
+
+            public Test From { get; set; }
+        }
+
+        public class Target
+        {
+            public string Name { get; set; }
+
+            public int Value { get; set; }
+
+            public DateTime? Timestamp { get; set; }
+
+            public Test? Direction { get; set; }
+
+            public Test From { get; set; }
         }
     }
 }

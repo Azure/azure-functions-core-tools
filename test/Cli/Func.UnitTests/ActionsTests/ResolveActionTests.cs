@@ -1,18 +1,18 @@
-using System;
-using System.Linq;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.IO.Abstractions;
 using Autofac;
-using FluentAssertions;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Actions.DurableActions;
 using Azure.Functions.Cli.Actions.HostActions;
 using Azure.Functions.Cli.Actions.LocalActions;
-using Azure.Functions.Cli.Arm;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Interfaces;
+using FluentAssertions;
 using NSubstitute;
 using Xunit;
-using System.IO.Abstractions;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
