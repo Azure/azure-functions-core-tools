@@ -5,7 +5,7 @@ using FluentAssertions;
 using RichardSzalay.MockHttp;
 using Xunit;
 
-namespace Azure.Functions.Cli.Unit.Tests
+namespace Azure.Functions.Cli.UnitTests
 {
     public class AzureHelperTests
     {

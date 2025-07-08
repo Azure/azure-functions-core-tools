@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Azure.Functions.Cli.Unit.Tests
+namespace Azure.Functions.Cli.UnitTests
 {
     public static class TestUtils
     {

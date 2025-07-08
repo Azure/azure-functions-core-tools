@@ -1,7 +1,7 @@
 using System.IO;
 using System.Threading.Tasks;
 
-namespace Azure.Functions.Cli.Unit.Tests
+namespace Azure.Functions.Cli.UnitTests
 {
     public static class Extensions
     {

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
-namespace Azure.Functions.Cli.Unit.Tests
+namespace Azure.Functions.Cli.UnitTests
 {
     public class UtilitiesTests
     {
@@ -34,7 +34,7 @@ namespace Azure.Functions.Cli.Unit.Tests
                 settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "extensionBundle", "id"), "Microsoft.Azure.Functions.ExtensionBundle");
                 settings.Add(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "extensionBundle", "version"), "[2.*, 3.0.0)");
             }
-            
+
             var testConfiguration = TestUtils.CreateSetupWithConfiguration(settings);
             Assert.Equal(expected, Utilities.JobHostConfigSectionExists(testConfiguration, section));
         }

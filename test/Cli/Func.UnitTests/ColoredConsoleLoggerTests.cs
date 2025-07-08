@@ -11,7 +11,7 @@ using System.Text;
 using Xunit;
 using System;
 
-namespace Azure.Functions.Cli.Unit.Tests
+namespace Azure.Functions.Cli.UnitTests
 {
     public class ColoredConsoleLoggerTests
     {

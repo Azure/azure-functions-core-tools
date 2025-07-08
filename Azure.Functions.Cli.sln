@@ -29,7 +29,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoZipTool", "src\GoZipTool\
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Cli", "Cli", "{4FC405F4-CF0B-4CD6-8555-A93AF42A27E8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.Unit.Tests", "test\Cli\Func.Unit.Tests\Azure.Functions.Cli.Unit.Tests.csproj", "{BBCC9C23-0594-4F5F-8604-B4E032EFC8DE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Functions.Cli.UnitTests", "test\Cli\Func.UnitTests\Azure.Functions.Cli.UnitTests.csproj", "{BBCC9C23-0594-4F5F-8604-B4E032EFC8DE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

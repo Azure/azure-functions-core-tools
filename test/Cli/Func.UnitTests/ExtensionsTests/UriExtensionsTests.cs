@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 using SuaveServerWrapper;
 using Xunit;
 
-namespace Azure.Functions.Cli.Unit.Tests.ExtensionsTests
+namespace Azure.Functions.Cli.UnitTests.ExtensionsTests
 {
     public class UriExtensionsTests
     {

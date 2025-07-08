@@ -14,7 +14,7 @@ using NSubstitute;
 using Xunit;
 using System.IO.Abstractions;
 
-namespace Azure.Functions.Cli.Unit.Tests.ActionsTests
+namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
     public class ResolveActionTests
     {
@@ -92,7 +92,7 @@ namespace Azure.Functions.Cli.Unit.Tests.ActionsTests
 
             Assert.Throws<CliArgumentsException>(app.Parse);
         }
-        
+
         private IContainer InitializeContainerForTests()
         {
             var builder = new ContainerBuilder();

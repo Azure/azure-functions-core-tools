@@ -5,7 +5,7 @@ using Azure.Functions.Cli.Extensions;
 using Xunit;
 using System.Runtime.InteropServices;
 
-namespace Azure.Functions.Cli.Unit.Tests.ExtensionsTests
+namespace Azure.Functions.Cli.UnitTests.ExtensionsTests
 {
     public class ProcessExtensionsTests
     {
