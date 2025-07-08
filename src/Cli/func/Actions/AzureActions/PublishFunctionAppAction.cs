@@ -853,9 +853,9 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         await AzureHelper.CheckFunctionHostStatusForFlex(functionApp, AccessToken, ManagementURL);
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check the app logs.");
+                        throw new CliException("Deployment was successful but the app appears to be unhealthy, please check the app logs.", ex);
                     }
 
                     ColoredConsole.WriteLine(VerboseColor(GetLogMessage("The deployment was successful!")));
